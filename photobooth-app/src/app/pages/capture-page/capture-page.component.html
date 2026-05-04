@@ -1,13 +1,30 @@
 <div class="pb-page pb-capture">
   <div class="pb-capture-layout">
-    <div class="pb-preview-wrap">
+    <div
+      class="pb-preview-wrap"
+      [class.pb-preview-wrap--sized]="previewAspectRatio() !== null"
+      [class.pb-preview-wrap--empty]="showPreviewPlaceholder()"
+      [style.--preview-ar]="previewAspectRatio() ?? 1.5"
+    >
       @if (useWebcam()) {
-        <video #videoEl class="pb-preview" autoplay playsinline muted></video>
+        <video
+          #videoEl
+          class="pb-preview"
+          autoplay
+          playsinline
+          muted
+          (loadedmetadata)="onVideoMeta($event)"
+        ></video>
       } @else {
         @if (sdkPreview(); as src) {
-          <img class="pb-preview" [src]="src" alt="Live preview" />
+          <img
+            class="pb-preview"
+            [src]="src"
+            alt="Live preview"
+            (load)="onPreviewImgLoad($event)"
+          />
         } @else {
-          <div class="pb-preview pb-preview-placeholder">Starting camera…</div>
+          <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
         }
       }
 
@@ -17,8 +34,8 @@
     </div>
 
     <aside class="pb-side">
-      <h2 class="pb-side-title">How to pose</h2>
-      <p class="pb-instruction">{{ instruction }}</p>
+      <h2 class="pb-side-title">{{ copy().capture.sideTitle }}</h2>
+      <p class="pb-instruction">{{ copy().capture.instructions }}</p>
       @if (hint(); as t) {
         <p class="pb-hint">{{ t }}</p>
       }

@@ -1,8 +1,19 @@
 <div class="pb-page pb-attract">
   <div class="pb-card">
-    <span class="pb-icon" aria-hidden="true">📷</span>
-    <h1 class="pb-title">PhotoBooth</h1>
-    <p class="pb-sub">Touch anywhere to begin</p>
-    <a routerLink="/qr" class="pb-tap-full" aria-label="Start"> </a>
+    @if (branding.logoSrc(); as logo) {
+      <img
+        class="pb-icon pb-icon-logo"
+        [src]="logo"
+        [attr.alt]="copy().attract.title"
+        loading="eager"
+        decoding="async"
+      />
+    } @else {
+      <span class="pb-icon" aria-hidden="true">{{ copy().attract.icon }}</span>
+    }
+    <h1 class="pb-title">{{ copy().attract.title }}</h1>
+    <p class="pb-sub">{{ copy().attract.subtitle }}</p>
+    <a routerLink="/qr" class="pb-tap-full" [attr.aria-label]="copy().attract.startAria"> </a>
+    <a routerLink="/admin" class="pb-attract-admin">{{ copy().attract.adminLink }}</a>
   </div>
 </div>

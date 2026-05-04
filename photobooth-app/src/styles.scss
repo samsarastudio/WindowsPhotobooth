@@ -4,6 +4,19 @@
   box-sizing: border-box;
 }
 
+:root {
+  --pb-font-sans: 'DM Sans', system-ui, sans-serif;
+  --pb-font-display: 'Cormorant Garamond', Georgia, serif;
+  --pb-bg-base: #efe6d8;
+  --pb-ink: #2b2218;
+  --pb-card-bg: rgba(255, 252, 246, 0.72);
+  --pb-card-border: rgba(61, 48, 32, 0.12);
+  --pb-msg: #7a2e2e;
+  --pb-btn-primary-top: #3d3020;
+  --pb-btn-primary-bottom: #2b2218;
+  --pb-btn-primary-text: #fdfaf5;
+}
+
 html,
 body {
   height: 100%;
@@ -11,9 +24,9 @@ body {
 }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
-  color: #2b2218;
-  background-color: #efe6d8;
+  font-family: var(--pb-font-sans);
+  color: var(--pb-ink);
+  background-color: var(--pb-bg-base);
   background-image:
     linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 40%),
     radial-gradient(ellipse at 20% 0%, rgba(212, 196, 176, 0.55), transparent 55%),
@@ -21,7 +34,28 @@ body {
   min-height: 100vh;
 }
 
+/* Fixed decorative layer (themes override inner elements). */
+.pb-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+html[data-pb-theme='default'] .pb-doodle-circuit,
+html[data-pb-theme='default'] .pb-backdrop-el {
+  display: none !important;
+}
+
+html[data-pb-theme='circuit'] .pb-doodle-paper,
+html[data-pb-theme='circuit'] .pb-backdrop-wash {
+  display: none !important;
+}
+
 .pb-page {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   width: 100%;
   padding: clamp(1rem, 3vw, 2.5rem);
@@ -34,12 +68,12 @@ body {
   position: relative;
   width: min(920px, 100%);
   padding: clamp(1.5rem, 4vw, 3rem);
-  background: rgba(255, 252, 246, 0.72);
+  background: var(--pb-card-bg);
   border-radius: 18px;
   box-shadow:
     0 4px 24px rgba(43, 34, 24, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(61, 48, 32, 0.12);
+  border: 1px solid var(--pb-card-border);
   text-align: center;
 }
 
@@ -50,8 +84,20 @@ body {
   margin-bottom: 0.75rem;
 }
 
+/* Rectangular responsive logo (replaces emoji when uploaded in admin) */
+.pb-icon-logo {
+  width: auto;
+  height: auto;
+  max-width: min(320px, 78vw);
+  max-height: clamp(3rem, 11vw, 6.5rem);
+  object-fit: contain;
+  display: block;
+  margin-inline: auto;
+  margin-bottom: 0.75rem;
+}
+
 .pb-title {
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: var(--pb-font-display);
   font-weight: 600;
   font-size: clamp(2.25rem, 6vw, 4rem);
   margin: 0 0 0.5rem;
@@ -87,7 +133,7 @@ body {
 }
 
 .pb-msg {
-  color: #7a2e2e;
+  color: var(--pb-msg);
   margin-top: 0.75rem;
 }
 
@@ -116,14 +162,14 @@ body {
 }
 
 .pb-btn-primary {
-  background: linear-gradient(180deg, #3d3020, #2b2218);
-  color: #fdfaf5;
+  background: linear-gradient(180deg, var(--pb-btn-primary-top), var(--pb-btn-primary-bottom));
+  color: var(--pb-btn-primary-text);
   box-shadow: 0 6px 20px rgba(43, 34, 24, 0.25);
 }
 
 .pb-btn-ghost {
   background: rgba(255, 255, 255, 0.65);
-  color: #2b2218;
+  color: var(--pb-ink);
   border: 2px solid rgba(61, 48, 32, 0.25);
 }
 

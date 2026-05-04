@@ -4,11 +4,14 @@ import {
   OnDestroy,
   OnInit,
   ViewChild,
+  computed,
+  inject,
   signal,
 } from '@angular/core';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
+import { BoothConfigService } from '../../services/booth-config.service';
 import type { PbCameraResult } from '../../../types/pb-api';
 
 /** Target EVF refresh rate; bridge keeps live view open — interval mainly limits UI work. */
@@ -22,13 +25,16 @@ const PREVIEW_FPS = 24;
 export class CapturePageComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl') videoRef?: ElementRef<HTMLVideoElement>;
 
+  private readonly booth = inject(BoothConfigService);
+  readonly copy = this.booth.copy;
+
   readonly sdkPreview = signal<SafeUrl | null>(null);
   readonly useWebcam = signal(false);
   readonly hint = signal<string | null>(null);
   readonly countdown = signal<number | null>(null);
-
-  readonly instruction =
-    'Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends';
+  /** Width ÷ height — frame hugs preview pixels without letterboxing when known. */
+  readonly previewAspectRatio = signal<number | null>(null);
+  readonly showPreviewPlaceholder = computed(() => !this.useWebcam() && !this.sdkPreview());
 
   private previewTimer?: ReturnType<typeof setInterval>;
   private countdownTimer?: ReturnType<typeof setInterval>;
@@ -181,6 +187,20 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   private async navigateResult(filePath: string): Promise<void> {
     await this.router.navigate(['/result'], { state: { path: filePath } });
+  }
+
+  onPreviewImgLoad(ev: Event): void {
+    const img = ev.target as HTMLImageElement;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      this.previewAspectRatio.set(img.naturalWidth / img.naturalHeight);
+    }
+  }
+
+  onVideoMeta(ev: Event): void {
+    const v = ev.target as HTMLVideoElement;
+    if (v.videoWidth > 0 && v.videoHeight > 0) {
+      this.previewAspectRatio.set(v.videoWidth / v.videoHeight);
+    }
   }
 
   ngOnDestroy(): void {

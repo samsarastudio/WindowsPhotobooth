@@ -1,6 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
+import { BoothConfigService } from '../../services/booth-config.service';
 
 @Component({
   selector: 'pb-result-page',
@@ -8,9 +9,13 @@ import { CameraService } from '../../services/camera.service';
   styleUrl: './result-page.component.scss',
 })
 export class ResultPageComponent implements OnInit {
+  private readonly booth = inject(BoothConfigService);
+  readonly copy = this.booth.copy;
+
   readonly path = signal<string | null>(null);
   readonly imageDataUrl = signal<string | null>(null);
   readonly err = signal<string | null>(null);
+  readonly resultAspectRatio = signal<number | null>(null);
 
   constructor(
     private readonly router: Router,
@@ -55,5 +60,12 @@ export class ResultPageComponent implements OnInit {
   submit(): void {
     void this.camera.closeSession().catch(() => {});
     void this.router.navigate(['/']);
+  }
+
+  onResultImgLoad(ev: Event): void {
+    const img = ev.target as HTMLImageElement;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      this.resultAspectRatio.set(img.naturalWidth / img.naturalHeight);
+    }
   }
 }

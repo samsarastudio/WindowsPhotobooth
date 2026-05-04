@@ -3,6 +3,7 @@
 # Compiled output
 /dist
 /build
+/config/photobooth-config.json
 /tmp
 /out-tsc
 /bazel-out

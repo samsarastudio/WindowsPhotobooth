@@ -1,6 +1,8 @@
 export interface PbPaths {
   portableRoot: string;
   captureDir: string;
+  themesDir?: string;
+  configPath?: string;
   hasBridge: boolean;
 }
 
@@ -10,10 +12,24 @@ export interface PbCameraResult {
   msg?: string;
   path?: string;
   cameras?: string[];
-  /** Electron adds file:// URL for live preview (avoid base64 each frame). */
   previewFileUrl?: string | null;
   imageBase64?: string | null;
   readErr?: string;
+}
+
+export interface PhotoboothConfigPublic {
+  activeThemeId: string;
+  branding?: Record<string, unknown>;
+  copy: Record<string, unknown>;
+}
+
+export interface PbThemeListItem {
+  id: string;
+  folder: string;
+  name: string;
+  version?: string;
+  author?: string;
+  description?: string;
 }
 
 export interface PbApi {
@@ -21,6 +37,24 @@ export interface PbApi {
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
   readFileBase64(filePath: string): Promise<string>;
   saveJpeg(fullPath: string, base64Body: string): Promise<{ ok: boolean; path?: string }>;
+  adminGetConfig(): Promise<{ ok: boolean; config?: PhotoboothConfigPublic; error?: string }>;
+  adminSaveConfig(
+    partial: Record<string, unknown>,
+  ): Promise<{ ok: boolean; config?: PhotoboothConfigPublic; error?: string }>;
+  adminListThemes(): Promise<{ ok: boolean; themes?: PbThemeListItem[]; error?: string }>;
+  adminGetThemeStylesheetUrl(): Promise<{ ok: boolean; url?: string | null; error?: string }>;
+  adminPickThemeZip(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+  adminInstallThemeFromZip(
+    zipPath: string,
+  ): Promise<{ ok: boolean; id?: string; error?: string }>;
+  adminExportThemeTemplate(): Promise<{ ok: boolean; path?: string; error?: string }>;
+  adminVerifyPin(pin: string): Promise<{ ok: boolean; valid?: boolean; error?: string }>;
+  adminPickLogoImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+  adminInstallLogo(
+    sourcePath: string,
+  ): Promise<{ ok: boolean; logoFile?: string; url?: string; error?: string }>;
+  adminClearLogo(): Promise<{ ok: boolean; error?: string }>;
+  adminGetBrandingLogoUrl(): Promise<{ ok: boolean; url?: string | null; error?: string }>;
 }
 
 declare global {
@@ -28,3 +62,5 @@ declare global {
     pbApi?: PbApi;
   }
 }
+
+export {};

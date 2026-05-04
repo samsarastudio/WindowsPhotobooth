@@ -5,16 +5,34 @@
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
-  align-items: stretch;
+  align-items: start;
   min-height: 70vh;
 }
 
 .pb-preview-wrap {
+  --preview-ar: 1.5;
   position: relative;
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, calc(min(72vh, 920px) * var(--preview-ar)));
+  aspect-ratio: var(--preview-ar);
   background: rgba(0, 0, 0, 0.06);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  min-height: 400px;
+  box-shadow:
+    0 12px 40px rgba(43, 34, 24, 0.12),
+    0 4px 14px rgba(43, 34, 24, 0.06);
+
+  &.pb-preview-wrap--empty {
+    aspect-ratio: unset;
+    min-height: min(40vh, 360px);
+    max-width: 100%;
+  }
+
+  /* SDK/Webcam connected but dimensions not yet reported */
+  &:not(.pb-preview-wrap--sized):not(.pb-preview-wrap--empty) {
+    min-height: min(48vh, 440px);
+  }
 }
 
 .pb-preview {
@@ -31,6 +49,9 @@
   justify-content: center;
   color: #fff;
   font-size: clamp(1.25rem, 2vw, 1.75rem);
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
 }
 
 .pb-count {

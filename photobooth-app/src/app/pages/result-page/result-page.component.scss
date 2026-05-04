@@ -12,19 +12,26 @@
 }
 
 .pb-result-frame {
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 12px 48px rgba(43, 34, 24, 0.18);
+  --result-ar: 1.5;
+  position: relative;
+  margin-inline: auto;
   margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: min(100%, calc(min(62vh, 720px) * var(--result-ar)));
+  aspect-ratio: var(--result-ar);
+  border-radius: 14px;
+  overflow: hidden;
   background: #111;
+  box-shadow:
+    0 14px 42px rgba(43, 34, 24, 0.14),
+    0 6px 18px rgba(0, 0, 0, 0.08);
 }
 
 .pb-result-img {
   width: 100%;
-  max-height: min(62vh, 720px);
+  height: 100%;
   object-fit: contain;
   display: block;
-  margin: 0 auto;
 }
 
 .pb-result-actions {

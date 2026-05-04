@@ -1,0 +1,231 @@
+/**
+ * Default theme — warm paper booth + soft floating “doodle” shapes.
+ * Icons: round aperture-style badges so emoji reads clearly as “photo booth”.
+ */
+:root {
+  --pb-font-sans: "DM Sans", system-ui, sans-serif;
+  --pb-font-display: "Cormorant Garamond", Georgia, serif;
+  --pb-bg-base: #efe6d8;
+  --pb-ink: #2b2218;
+  --pb-card-bg: rgba(255, 252, 246, 0.72);
+  --pb-card-border: rgba(61, 48, 32, 0.12);
+  --pb-msg: #7a2e2e;
+  --pb-btn-primary-top: #3d3020;
+  --pb-btn-primary-bottom: #2b2218;
+  --pb-btn-primary-text: #fdfaf5;
+}
+
+/* ─── Clear icon frames (attract + QR cards) — emoji only; logo uses .pb-icon-logo ─── */
+.pb-attract .pb-icon:not(.pb-icon-logo),
+.pb-qr .pb-icon:not(.pb-icon-logo) {
+  position: relative;
+  z-index: 0;
+  width: clamp(4.25rem, 11vw, 6rem);
+  height: clamp(4.25rem, 11vw, 6rem);
+  margin-inline: auto;
+  margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: clamp(2.15rem, 6.5vw, 3.15rem);
+  line-height: 1;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 252, 246, 0.98), rgba(212, 196, 176, 0.35)),
+    radial-gradient(circle at 70% 75%, rgba(190, 176, 154, 0.45), transparent 55%);
+  border: 3px solid rgba(61, 48, 32, 0.14);
+  box-shadow:
+    0 10px 32px rgba(43, 34, 24, 0.1),
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -6px 16px rgba(212, 196, 176, 0.25);
+  animation: pb-default-icon-float 7s ease-in-out infinite alternate;
+}
+
+.pb-attract .pb-icon:not(.pb-icon-logo)::after,
+.pb-qr .pb-icon:not(.pb-icon-logo)::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px dashed rgba(61, 48, 32, 0.12);
+  animation: pb-default-icon-ring 14s linear infinite;
+}
+
+.pb-attract .pb-icon-logo,
+.pb-qr .pb-icon-logo {
+  position: relative;
+  z-index: 0;
+  margin-bottom: 1rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 12px;
+  background: rgba(255, 252, 246, 0.4);
+  border: 1px solid rgba(61, 48, 32, 0.1);
+  box-shadow: 0 8px 28px rgba(43, 34, 24, 0.08);
+}
+
+@keyframes pb-default-icon-float {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+
+@keyframes pb-default-icon-ring {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Backdrop: soft paper wash + Font Awesome “doodle” clusters ─── */
+.pb-backdrop-wash {
+  position: absolute;
+  inset: -5%;
+  background:
+    radial-gradient(ellipse 70% 55% at 15% 20%, rgba(255, 252, 246, 0.45), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 88% 78%, rgba(212, 196, 176, 0.32), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(190, 176, 154, 0.2), transparent 60%);
+  animation: pb-paper-wash 42s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.pb-doodle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  contain: layout style;
+}
+
+.pb-doodle-paper {
+  perspective: 960px;
+}
+
+.pb-doodle-paper .pb-doodle-cluster {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: clamp(0.75rem, 2.5vw, 1.35rem) clamp(1rem, 3vw, 1.75rem);
+  max-width: min(42vw, 520px);
+  font-size: clamp(1.1rem, 2.8vw, 2rem);
+  color: rgba(43, 34, 24, 0.12);
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35));
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.pb-doodle-paper .pb-doodle-cluster--a {
+  top: 6%;
+  left: 3%;
+  transform-origin: 12% 45%;
+  animation: pb-paper-cluster-a 21s ease-in-out infinite;
+}
+
+.pb-doodle-paper .pb-doodle-cluster--b {
+  bottom: 8%;
+  right: 2%;
+  justify-content: flex-end;
+  transform-origin: 88% 45%;
+  animation: pb-paper-cluster-b 24s ease-in-out infinite;
+}
+
+.pb-doodle-paper .pb-doodle-cluster i {
+  animation: pb-paper-icon-nudge 10s ease-in-out infinite;
+}
+
+.pb-doodle-paper .pb-doodle-cluster i:nth-child(odd) {
+  animation-delay: -3s;
+}
+
+.pb-doodle-paper .pb-doodle-cluster i:nth-child(3n) {
+  animation-delay: -6s;
+}
+
+@keyframes pb-paper-wash {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(2%, -1%) scale(1.03);
+    opacity: 1;
+  }
+}
+
+/* Drift + subtle opacity pulse + flag-like skew / yaw (anchored at transform-origin) */
+@keyframes pb-paper-cluster-a {
+  0%,
+  100% {
+    opacity: 0.62;
+    transform: translate(0, 0) rotate(-4deg) skewY(0deg) rotateY(0deg);
+  }
+  20% {
+    opacity: 0.82;
+    transform: translate(2.5%, 2%) rotate(-3deg) skewY(2deg) rotateY(-3deg);
+  }
+  40% {
+    opacity: 0.72;
+    transform: translate(4.5%, 3.5%) rotate(-2deg) skewY(-1deg) rotateY(2deg);
+  }
+  60% {
+    opacity: 0.88;
+    transform: translate(3%, 2%) rotate(-3deg) skewY(1.5deg) rotateY(-2deg);
+  }
+  80% {
+    opacity: 0.68;
+    transform: translate(1%, 1%) rotate(-4deg) skewY(-0.5deg) rotateY(1deg);
+  }
+}
+
+@keyframes pb-paper-cluster-b {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: translate(0, 0) rotate(5deg) skewY(0deg) rotateY(0deg);
+  }
+  22% {
+    opacity: 0.84;
+    transform: translate(-3%, -2%) rotate(4deg) skewY(-2.2deg) rotateY(3deg);
+  }
+  45% {
+    opacity: 0.7;
+    transform: translate(-5%, -4%) rotate(3deg) skewY(1deg) rotateY(-2.5deg);
+  }
+  68% {
+    opacity: 0.86;
+    transform: translate(-3.5%, -3%) rotate(4deg) skewY(-1deg) rotateY(2deg);
+  }
+  85% {
+    opacity: 0.64;
+    transform: translate(-1%, -1%) rotate(5deg) skewY(0.8deg) rotateY(-1deg);
+  }
+}
+
+@keyframes pb-paper-icon-nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-backdrop-wash,
+  .pb-doodle-paper .pb-doodle-cluster,
+  .pb-doodle-paper .pb-doodle-cluster i,
+  .pb-attract .pb-icon:not(.pb-icon-logo),
+  .pb-qr .pb-icon:not(.pb-icon-logo),
+  .pb-attract .pb-icon:not(.pb-icon-logo)::after,
+  .pb-qr .pb-icon:not(.pb-icon-logo)::after {
+    animation: none !important;
+  }
+
+  .pb-doodle-paper .pb-doodle-cluster {
+    transform: none;
+    opacity: 0.8;
+  }
+}

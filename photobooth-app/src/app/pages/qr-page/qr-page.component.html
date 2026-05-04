@@ -1,10 +1,20 @@
 <div class="pb-page pb-qr">
   <div class="pb-card">
-    <span class="pb-icon" aria-hidden="true">🔐</span>
-    <h1 class="pb-title">Scan &amp; unlock</h1>
-    <p class="pb-sub">Enter session code (placeholder — type <strong>1234</strong>)</p>
+    @if (branding.logoSrc(); as logo) {
+      <img
+        class="pb-icon pb-icon-logo"
+        [src]="logo"
+        [attr.alt]="copy().qr.title"
+        loading="eager"
+        decoding="async"
+      />
+    } @else {
+      <span class="pb-icon" aria-hidden="true">{{ copy().qr.icon }}</span>
+    }
+    <h1 class="pb-title">{{ copy().qr.title }}</h1>
+    <p class="pb-sub">{{ copy().qr.subtitle }}</p>
 
-    <label class="pb-label" for="code">Code</label>
+    <label class="pb-label" for="code">{{ copy().qr.codeLabel }}</label>
     <input
       id="code"
       class="pb-input"
@@ -20,12 +30,12 @@
     }
 
     <div class="pb-row">
-      <button type="button" class="pb-btn pb-btn-primary" (click)="onSubmit()">OK</button>
-      <button type="button" class="pb-btn pb-btn-ghost" routerLink="/">Back</button>
+      <button type="button" class="pb-btn pb-btn-primary" (click)="onSubmit()">{{ copy().qr.ok }}</button>
+      <button type="button" class="pb-btn pb-btn-ghost" routerLink="/">{{ copy().qr.back }}</button>
     </div>
 
     <div class="pb-debug">
-      <p class="pb-debug-label">Debug — type <strong>ok</strong> then Enter</p>
+      <p class="pb-debug-label">{{ copy().qr.debugHint }}</p>
       <input
         class="pb-input pb-input-sm"
         type="text"

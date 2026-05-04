@@ -1,7 +1,7 @@
 {
   "name": "photobooth-app",
   "version": "1.0.0",
-  "description": "KIA PhotoBooth — Electron + Angular + Canon EDSDK",
+  "description": "PhotoBooth — Electron + Angular + Canon EDSDK",
   "main": "electron/main.cjs",
   "scripts": {
     "ng": "ng",
@@ -19,6 +19,7 @@
     "@angular/platform-browser": "^19.2.0",
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
+    "@fortawesome/fontawesome-free": "^7.2.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
@@ -41,7 +42,7 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.kia.photobooth",
+    "appId": "com.photobooth.app",
     "productName": "PhotoBooth",
     "directories": {
       "output": "release"
@@ -49,7 +50,10 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "package.json"
+      "package.json",
+      "themes/**/*",
+      "config/**/*",
+      "theme-template/**/*"
     ],
     "extraFiles": [
       {
@@ -58,6 +62,18 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "themes",
+        "to": "themes"
+      },
+      {
+        "from": "config",
+        "to": "config"
+      },
+      {
+        "from": "theme-template",
+        "to": "theme-template"
       }
     ],
     "win": {

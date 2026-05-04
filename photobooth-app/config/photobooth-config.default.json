@@ -1,0 +1,39 @@
+{
+  "activeThemeId": "default",
+  "adminPin": "2727",
+  "branding": {
+    "logoFile": null
+  },
+  "copy": {
+    "attract": {
+      "icon": "📷",
+      "title": "PhotoBooth",
+      "subtitle": "Touch anywhere to begin",
+      "startAria": "Start",
+      "adminLink": "Admin"
+    },
+    "qr": {
+      "icon": "🔐",
+      "title": "Scan & unlock",
+      "subtitle": "Enter session code (placeholder — type 1234)",
+      "codeLabel": "Code",
+      "ok": "OK",
+      "back": "Back",
+      "invalidCode": "Invalid code. Use 1234 to continue (debug).",
+      "debugHint": "Debug — type ok then Enter",
+      "bypassCode": "1234"
+    },
+    "capture": {
+      "sideTitle": "How to pose",
+      "instructions": "Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends",
+      "starting": "Starting camera…"
+    },
+    "result": {
+      "title": "Your photo",
+      "loading": "Loading…",
+      "savedPrefix": "Saved:",
+      "retake": "Retake",
+      "submit": "Submit"
+    }
+  }
+}

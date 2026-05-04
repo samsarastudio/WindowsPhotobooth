@@ -8,3 +8,19 @@
   inset: 0;
   z-index: 2;
 }
+
+.pb-attract-admin {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.55rem;
+  z-index: 3;
+  font-size: 0.75rem;
+  opacity: 0.55;
+  color: var(--pb-ink-muted, #5c4d42);
+  text-decoration: none;
+}
+
+.pb-attract-admin:hover {
+  opacity: 0.95;
+  text-decoration: underline;
+}

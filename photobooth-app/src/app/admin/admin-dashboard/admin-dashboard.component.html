@@ -1,0 +1,153 @@
+<div class="pb-page pb-admin-dash">
+  <div class="pb-admin-shell">
+    <header class="pb-admin-head">
+      <h1 class="pb-admin-title">PhotoBooth admin</h1>
+      <nav class="pb-admin-nav">
+        <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'copy'" (click)="setTab('copy')">
+          Copy
+        </button>
+        <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'themes'" (click)="setTab('themes')">
+          Themes
+        </button>
+        <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'branding'" (click)="setTab('branding')">
+          Logo
+        </button>
+      </nav>
+      <div class="pb-admin-actions">
+        <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="reloadConfig()">Reload</button>
+        <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="logout()">Sign out</button>
+        <a routerLink="/" class="pb-btn pb-btn-ghost pb-btn-sm">Booth</a>
+      </div>
+    </header>
+
+    @if (status(); as s) {
+      <p class="pb-admin-status">{{ s }}</p>
+    }
+
+    @if (tab === 'copy') {
+      <div class="pb-admin-grid">
+        <section class="pb-admin-card">
+          <h2>Attract</h2>
+          <label>Icon</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.icon" />
+          <label>Title</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.title" />
+          <label>Subtitle</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.subtitle" />
+          <label>Start (aria)</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.startAria" />
+          <label>Admin link label</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.adminLink" />
+        </section>
+
+        <section class="pb-admin-card">
+          <h2>QR / unlock</h2>
+          <label>Icon</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.icon" />
+          <label>Title</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.title" />
+          <label>Subtitle</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.subtitle" />
+          <label>Code label</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.codeLabel" />
+          <label>OK button</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.ok" />
+          <label>Back button</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.back" />
+          <label>Invalid code message</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.invalidCode" />
+          <label>Debug hint</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.debugHint" />
+          <label>Bypass code</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.bypassCode" />
+        </section>
+
+        <section class="pb-admin-card">
+          <h2>Capture</h2>
+          <label>Side title</label>
+          <input class="pb-input" [(ngModel)]="draft.capture.sideTitle" />
+          <label>Instructions</label>
+          <textarea class="pb-input pb-textarea" rows="3" [(ngModel)]="draft.capture.instructions"></textarea>
+          <label>Starting camera placeholder</label>
+          <input class="pb-input" [(ngModel)]="draft.capture.starting" />
+        </section>
+
+        <section class="pb-admin-card">
+          <h2>Result</h2>
+          <label>Title</label>
+          <input class="pb-input" [(ngModel)]="draft.result.title" />
+          <label>Loading</label>
+          <input class="pb-input" [(ngModel)]="draft.result.loading" />
+          <label>Saved prefix</label>
+          <input class="pb-input" [(ngModel)]="draft.result.savedPrefix" />
+          <label>Retake</label>
+          <input class="pb-input" [(ngModel)]="draft.result.retake" />
+          <label>Submit</label>
+          <input class="pb-input" [(ngModel)]="draft.result.submit" />
+        </section>
+      </div>
+      <div class="pb-admin-footer">
+        <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveCopy()">Save copy</button>
+      </div>
+    }
+
+    @if (tab === 'themes') {
+      <div class="pb-admin-themes">
+        <section class="pb-admin-card">
+          <h2>Active theme</h2>
+          <p class="pb-hint">WordPress-style packs live in the <code>themes/&lt;id&gt;/</code> folder (theme.json + styles.css).</p>
+          <label>Theme</label>
+          <select class="pb-input" [(ngModel)]="activeThemeId">
+            @if (themes().length === 0) {
+              <option [value]="activeThemeId">{{ activeThemeId }}</option>
+            }
+            @for (t of themes(); track t.id) {
+              <option [value]="t.id">{{ t.name }} ({{ t.id }})</option>
+            }
+          </select>
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveThemeSelection()">
+              Apply theme
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="installZip()">
+              Install from zip
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" (click)="exportTemplate()">Download theme template zip</button>
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (tab === 'branding') {
+      <div class="pb-admin-branding">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Booth logo</h2>
+          <p class="pb-hint">
+            Upload a rectangular logo (PNG, JPG, WebP, SVG). It replaces the camera / lock emoji on the attract and
+            unlock screens. Wide logos scale down to fit; aspect ratio is preserved.
+          </p>
+          @if (branding.logoSrc(); as logo) {
+            <div class="pb-admin-logo-preview">
+              <img [src]="logo" alt="Current logo preview" />
+            </div>
+          } @else {
+            <p class="pb-hint">No custom logo — emoji icons from copy settings are shown.</p>
+          }
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="uploadLogo()">
+              Upload logo…
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
+              [disabled]="busy() || !branding.hasLogo()"
+              (click)="removeLogo()"
+            >
+              Remove logo
+            </button>
+          </div>
+        </section>
+      </div>
+    }
+  </div>
+</div>

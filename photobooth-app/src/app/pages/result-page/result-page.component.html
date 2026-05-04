@@ -1,26 +1,31 @@
 <div class="pb-page pb-result">
   <div class="pb-result-inner">
-    <h1 class="pb-result-title">Your photo</h1>
+    <h1 class="pb-result-title">{{ copy().result.title }}</h1>
 
     @if (imageDataUrl(); as src) {
-      <div class="pb-result-frame">
-        <img class="pb-result-img" [src]="src" alt="Captured photo" />
+      <div class="pb-result-frame" [style.--result-ar]="resultAspectRatio() ?? 1.5">
+        <img
+          class="pb-result-img"
+          [src]="src"
+          alt="Captured photo"
+          (load)="onResultImgLoad($event)"
+        />
       </div>
     } @else {
       @if (err(); as e) {
         <p class="pb-msg">{{ e }}</p>
       } @else {
-        <p class="pb-loading">Loading…</p>
+        <p class="pb-loading">{{ copy().result.loading }}</p>
       }
     }
 
     @if (path(); as p) {
-      <p class="pb-path-hint">Saved: {{ p }}</p>
+      <p class="pb-path-hint">{{ copy().result.savedPrefix }} {{ p }}</p>
     }
 
     <div class="pb-row pb-result-actions">
-      <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">Retake</button>
-      <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">Submit</button>
+      <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ copy().result.retake }}</button>
+      <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
     </div>
   </div>
 </div>
