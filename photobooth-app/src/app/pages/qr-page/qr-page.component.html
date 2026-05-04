@@ -1,0 +1,39 @@
+<div class="pb-page pb-qr">
+  <div class="pb-card">
+    <span class="pb-icon" aria-hidden="true">🔐</span>
+    <h1 class="pb-title">Scan &amp; unlock</h1>
+    <p class="pb-sub">Enter session code (placeholder — type <strong>1234</strong>)</p>
+
+    <label class="pb-label" for="code">Code</label>
+    <input
+      id="code"
+      class="pb-input"
+      type="text"
+      inputmode="numeric"
+      autocomplete="one-time-code"
+      [(ngModel)]="code"
+      (keyup.enter)="onSubmit()"
+    />
+
+    @if (message(); as m) {
+      <p class="pb-msg">{{ m }}</p>
+    }
+
+    <div class="pb-row">
+      <button type="button" class="pb-btn pb-btn-primary" (click)="onSubmit()">OK</button>
+      <button type="button" class="pb-btn pb-btn-ghost" routerLink="/">Back</button>
+    </div>
+
+    <div class="pb-debug">
+      <p class="pb-debug-label">Debug — type <strong>ok</strong> then Enter</p>
+      <input
+        class="pb-input pb-input-sm"
+        type="text"
+        placeholder="ok"
+        [value]="debugInput()"
+        (input)="debugInput.set($any($event.target).value)"
+        (keyup.enter)="onDebugEnter()"
+      />
+    </div>
+  </div>
+</div>

@@ -1,0 +1,27 @@
+<div class="pb-page pb-capture">
+  <div class="pb-capture-layout">
+    <div class="pb-preview-wrap">
+      @if (useWebcam()) {
+        <video #videoEl class="pb-preview" autoplay playsinline muted></video>
+      } @else {
+        @if (sdkPreview(); as src) {
+          <img class="pb-preview" [src]="src" alt="Live preview" />
+        } @else {
+          <div class="pb-preview pb-preview-placeholder">Starting camera…</div>
+        }
+      }
+
+      @if (countdown() !== null && countdown()! > 0) {
+        <div class="pb-count" aria-live="polite">{{ countdown() }}</div>
+      }
+    </div>
+
+    <aside class="pb-side">
+      <h2 class="pb-side-title">How to pose</h2>
+      <p class="pb-instruction">{{ instruction }}</p>
+      @if (hint(); as t) {
+        <p class="pb-hint">{{ t }}</p>
+      }
+    </aside>
+  </div>
+</div>

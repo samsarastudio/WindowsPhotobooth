@@ -1,0 +1,44 @@
+.pb-result-inner {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.pb-result-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin-bottom: 1.5rem;
+}
+
+.pb-result-frame {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(43, 34, 24, 0.18);
+  margin-bottom: 1.5rem;
+  background: #111;
+}
+
+.pb-result-img {
+  width: 100%;
+  max-height: min(62vh, 720px);
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.pb-result-actions {
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.pb-path-hint {
+  font-size: 0.95rem;
+  opacity: 0.75;
+  word-break: break-all;
+}
+
+.pb-loading {
+  font-size: 1.5rem;
+}

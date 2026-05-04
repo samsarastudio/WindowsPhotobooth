@@ -1,0 +1,81 @@
+.pb-capture-layout {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 26vw);
+  gap: 2rem;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  align-items: stretch;
+  min-height: 70vh;
+}
+
+.pb-preview-wrap {
+  position: relative;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 400px;
+}
+
+.pb-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #222;
+}
+
+.pb-preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+}
+
+.pb-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(5rem, 18vw, 12rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 6px 32px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.pb-side {
+  padding: 1rem 1.25rem;
+  border-left: 2px dashed rgba(61, 48, 32, 0.25);
+}
+
+.pb-side-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  margin: 0 0 1rem;
+}
+
+.pb-instruction {
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.pb-hint {
+  margin-top: 1rem;
+  font-size: 1rem;
+  color: #7a2e2e;
+}
+
+@media (orientation: portrait), (max-width: 900px) {
+  .pb-capture-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pb-side {
+    border-left: none;
+    border-top: 2px dashed rgba(61, 48, 32, 0.25);
+  }
+}

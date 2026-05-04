@@ -1,0 +1,18 @@
+# Electron / builder output
+photobooth-app/release/
+
+# App build artifacts
+photobooth-app/dist/
+photobooth-app/node_modules/
+photobooth-app/.angular/
+photobooth-app/build/
+
+# Native bridge CMake output
+photobooth-app/native/edsdk-bridge/build/
+
+# OS / IDE
+Thumbs.db
+.DS_Store
+*.log
+.idea/
+.vscode/
