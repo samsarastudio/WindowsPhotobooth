@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('pbApi', {
   adminGetThemeStylesheetUrl: () => ipcRenderer.invoke('admin:getThemeStylesheetUrl'),
   adminPickThemeZip: () => ipcRenderer.invoke('admin:pickThemeZip'),
   adminInstallThemeFromZip: (zipPath) => ipcRenderer.invoke('admin:installThemeFromZip', zipPath),
+  adminExportThemeZip: (themeId) => ipcRenderer.invoke('admin:exportThemeZip', themeId),
+  adminDeleteTheme: (themeId) => ipcRenderer.invoke('admin:deleteTheme', themeId),
   adminExportThemeTemplate: () => ipcRenderer.invoke('admin:exportThemeTemplate'),
   adminVerifyPin: (pin) => ipcRenderer.invoke('admin:verifyPin', pin),
   adminPickLogoImage: () => ipcRenderer.invoke('admin:pickLogoImage'),

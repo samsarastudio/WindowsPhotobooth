@@ -119,6 +119,33 @@ function sanitizeThemeId(id) {
   return s || 'imported';
 }
 
+/** Resolve folder on disk for a theme id or folder name (handles legacy `kia` → circuit). */
+function resolveThemeDirectory(themeId) {
+  const raw = String(themeId || '').trim();
+  if (!raw) return null;
+  const normalized = raw === 'kia' ? 'circuit' : raw;
+  const root = getThemesDir();
+  const tryDirs = [path.join(root, normalized), path.join(root, sanitizeThemeId(normalized))];
+  for (const d of tryDirs) {
+    if (fs.existsSync(path.join(d, 'theme.json'))) return d;
+  }
+  try {
+    for (const ent of fs.readdirSync(root, { withFileTypes: true })) {
+      if (!ent.isDirectory()) continue;
+      const tj = path.join(root, ent.name, 'theme.json');
+      if (!fs.existsSync(tj)) continue;
+      try {
+        const meta = readJsonSafe(tj);
+        const mid = meta.id || ent.name;
+        if (mid === normalized || ent.name === normalized || mid === raw) {
+          return path.join(root, ent.name);
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return null;
+}
+
 /**
  * Still + preview files. Dev: `<repo>/build/capture`. Packaged: `<folder of exe>/capture`.
  */
@@ -381,6 +408,75 @@ ipcMain.handle('admin:pickThemeZip', async () => {
   });
   if (r.canceled || !r.filePaths?.length) return { ok: false, canceled: true };
   return { ok: true, path: r.filePaths[0] };
+});
+
+ipcMain.handle('admin:exportThemeZip', async (_e, themeId) => {
+  try {
+    const themeDir = resolveThemeDirectory(themeId);
+    if (!themeDir || !fs.existsSync(themeDir)) {
+      return { ok: false, error: 'Theme not found.' };
+    }
+    let meta = {};
+    try {
+      meta = readJsonSafe(path.join(themeDir, 'theme.json'));
+    } catch (_) {}
+    const slug = sanitizeThemeId(meta.id || path.basename(themeDir));
+    const downloads = app.getPath('downloads');
+    const out = path.join(downloads, `Photobooth-theme-${slug}.zip`);
+    const glob = path.join(themeDir, '*');
+    execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Compress-Archive -Path ${psQuote(glob)} -DestinationPath ${psQuote(out)} -Force`,
+      ],
+      { windowsHide: true, stdio: 'pipe' },
+    );
+    return { ok: true, path: out };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('admin:deleteTheme', async (_e, themeId) => {
+  try {
+    const themeDir = resolveThemeDirectory(themeId);
+    if (!themeDir || !fs.existsSync(themeDir)) {
+      return { ok: false, error: 'Theme not found.' };
+    }
+    const folderName = path.basename(themeDir);
+    if (folderName === 'default') {
+      return { ok: false, error: 'Cannot remove the built-in default theme.' };
+    }
+    let meta = {};
+    try {
+      meta = readJsonSafe(path.join(themeDir, 'theme.json'));
+    } catch (_) {}
+    const deletedId = meta.id || folderName;
+
+    ensureConfigFiles();
+    const cfg = loadMergedConfig();
+    let active = cfg.activeThemeId || 'default';
+    if (active === 'kia') active = 'circuit';
+
+    fs.rmSync(themeDir, { recursive: true, force: true });
+
+    const activeMatches =
+      active === deletedId ||
+      active === folderName ||
+      sanitizeThemeId(active) === sanitizeThemeId(deletedId);
+
+    if (activeMatches) {
+      const merged = deepMerge(loadMergedConfig(), { activeThemeId: 'default' });
+      fs.writeFileSync(getConfigPath(), JSON.stringify(merged, null, 2), 'utf8');
+      return { ok: true, removedId: deletedId, switchedActiveToDefault: true };
+    }
+    return { ok: true, removedId: deletedId, switchedActiveToDefault: false };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
 });
 
 ipcMain.handle('admin:installThemeFromZip', async (_e, zipPath) => {

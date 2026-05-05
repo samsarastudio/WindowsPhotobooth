@@ -47,6 +47,13 @@ export interface PbApi {
   adminInstallThemeFromZip(
     zipPath: string,
   ): Promise<{ ok: boolean; id?: string; error?: string }>;
+  adminExportThemeZip(themeId: string): Promise<{ ok: boolean; path?: string; error?: string }>;
+  adminDeleteTheme(themeId: string): Promise<{
+    ok: boolean;
+    removedId?: string;
+    switchedActiveToDefault?: boolean;
+    error?: string;
+  }>;
   adminExportThemeTemplate(): Promise<{ ok: boolean; path?: string; error?: string }>;
   adminVerifyPin(pin: string): Promise<{ ok: boolean; valid?: boolean; error?: string }>;
   adminPickLogoImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;

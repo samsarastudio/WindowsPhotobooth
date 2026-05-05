@@ -112,8 +112,23 @@
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="installZip()">
               Install from zip
             </button>
-            <button type="button" class="pb-btn pb-btn-ghost" (click)="exportTemplate()">Download theme template zip</button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="downloadSelectedTheme()">
+              Download theme zip
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
+              [disabled]="busy() || activeThemeId === 'default'"
+              (click)="removeSelectedTheme()"
+            >
+              Remove theme
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" (click)="exportTemplate()">Download blank template zip</button>
           </div>
+          <p class="pb-hint pb-hint-tight">
+            “Download theme zip” exports the selected theme folder. “Remove theme” deletes it from disk (not available
+            for <code>default</code>). If you remove the active theme, the app switches to default.
+          </p>
         </section>
       </div>
     }

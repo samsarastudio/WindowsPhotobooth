@@ -137,6 +137,59 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
+  async downloadSelectedTheme(): Promise<void> {
+    this.status.set(null);
+    if (!window.pbApi?.adminExportThemeZip) {
+      this.status.set('Theme download requires Electron.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const r = await window.pbApi.adminExportThemeZip(this.activeThemeId);
+      if (r.ok && r.path) {
+        this.status.set(`Saved theme zip to: ${r.path}`);
+      } else {
+        this.status.set(r.error ?? 'Export failed.');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async removeSelectedTheme(): Promise<void> {
+    if (this.activeThemeId === 'default') {
+      return;
+    }
+    if (
+      !confirm(
+        `Remove theme "${this.activeThemeId}" from this machine? This deletes the theme folder. Continue?`,
+      )
+    ) {
+      return;
+    }
+    if (!window.pbApi?.adminDeleteTheme) {
+      this.status.set('Removing themes requires Electron.');
+      return;
+    }
+    this.status.set(null);
+    this.busy.set(true);
+    try {
+      const r = await window.pbApi.adminDeleteTheme(this.activeThemeId);
+      if (r.ok) {
+        await this.booth.load();
+        this.syncFromService();
+        await this.theme.applyFromConfig();
+        await this.refreshThemes();
+        const extra = r.switchedActiveToDefault ? ' Switched active theme to default.' : '';
+        this.status.set(`Theme “${r.removedId ?? this.activeThemeId}” removed.${extra}`);
+      } else {
+        this.status.set(r.error ?? 'Could not remove theme.');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   async uploadLogo(): Promise<void> {
     if (!window.pbApi?.adminPickLogoImage || !window.pbApi.adminInstallLogo) {
       this.status.set('Logo upload requires Electron.');
