@@ -24,6 +24,8 @@ export class CameraService {
     if (!paths.hasBridge) {
       return { previewBasePath: previewFile, useWebcam: true, lastError: 'EDS bridge .exe not placed next to app' };
     }
+    // Always release previous session before init (retake/navigation races can otherwise leave EOS stuck).
+    await this.closeSession();
     const initR = await window.pbApi!.cameraInvoke({ cmd: 'init' });
     if (!initR.ok) {
       return {
@@ -58,6 +60,11 @@ export class CameraService {
   }
 
   async closeSession(): Promise<void> {
-    await window.pbApi?.cameraInvoke({ cmd: 'close' });
+    if (!this.hasApi()) return;
+    try {
+      await window.pbApi!.cameraInvoke({ cmd: 'close' });
+    } catch {
+      /* idle or already closed — still safe to continue */
+    }
   }
 }

@@ -1,21 +1,35 @@
 {
   "activeThemeId": "default",
   "adminPin": "2727",
+  "aiGenerationEnabled": false,
+  "aiModes": [
+    {
+      "id": "newspaper",
+      "label": "Newspaper",
+      "prompt": "Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject's face remains recognizable but stylized to match the printed newspaper aesthetic."
+    }
+  ],
   "branding": {
     "logoFile": null
   },
   "copy": {
     "attract": {
       "icon": "📷",
-      "title": "PhotoBooth",
-      "subtitle": "Touch anywhere to begin",
-      "startAria": "Start",
+      "tagline": "Movement that inspires",
+      "mainScale": 1,
+      "topScale": 1,
+      "title": "Your Moment Starts Here",
+      "subtitle": "Tap to create your\npersonalized photo keepsake.",
+      "ctaLabel": "Tap to Start",
+      "startAria": "Tap to Start",
       "adminLink": "Admin"
     },
     "qr": {
       "icon": "🔐",
-      "title": "Scan & unlock",
-      "subtitle": "Enter session code (placeholder — type 1234)",
+      "title": "Scan your QR",
+      "subtitle": "Hold your phone to the photobooth scanner to begin your photo experience.",
+      "scanSuccess": "QR verified",
+      "footer": "Have your registration QR ready.",
       "codeLabel": "Code",
       "ok": "OK",
       "back": "Back",
@@ -26,14 +40,38 @@
     "capture": {
       "sideTitle": "How to pose",
       "instructions": "Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends",
-      "starting": "Starting camera…"
+      "starting": "Starting camera…",
+      "readyTitle": "Get Ready",
+      "readySubtitle": "Center yourself in the frame. Your photo begins in…",
+      "footerHint": "Look at the camera and hold still.",
+      "smileHint": "Smile — capturing soon"
     },
     "result": {
       "title": "Your photo",
       "loading": "Loading…",
       "savedPrefix": "Saved:",
       "retake": "Retake",
-      "submit": "Submit"
+      "submit": "Submit",
+      "generateAi": "Create AI version",
+      "generatingAi": "Creating your AI image…",
+      "aiPreviewTitle": "AI version",
+      "aiErrorPrefix": "AI generation failed:",
+      "aiGalleryTitle": "Your photos",
+      "galleryThumbOriginal": "Original",
+      "galleryThumbAi": "AI style",
+      "galleryBackToResult": "Back to photo",
+      "galleryFinish": "Finish",
+      "thinkingSummary": "Preparing your image",
+      "thinkingStepAnalyze": "Analysing framing and composition",
+      "thinkingStepPlan": "Applying your chosen style directions",
+      "thinkingStepImage": "Rendering with the image API",
+      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT-5 reasoning text for image jobs."
+    },
+    "aiMode": {
+      "title": "Choose a style",
+      "subtitle": "Pick how we transform your photo",
+      "back": "Back",
+      "plainPhotoLabel": "Photocapture"
     }
   }
 }

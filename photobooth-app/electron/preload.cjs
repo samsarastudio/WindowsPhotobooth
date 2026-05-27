@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld('pbApi', {
   adminInstallLogo: (sourcePath) => ipcRenderer.invoke('admin:installLogo', sourcePath),
   adminClearLogo: () => ipcRenderer.invoke('admin:clearLogo'),
   adminGetBrandingLogoUrl: () => ipcRenderer.invoke('admin:getBrandingLogoUrl'),
+  openAiGenerateImage: (payload) => ipcRenderer.invoke('openai:generateImage', payload),
 });

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { pathToFileURL } = require('url');
+const { pathToFileURL, URL } = require('url');
+const https = require('https');
 const fs = require('fs');
 const { spawn, execFileSync } = require('child_process');
 const readline = require('readline');
@@ -166,6 +167,79 @@ function getCaptureDir() {
   return dir;
 }
 
+function isPathUnder(filePath, parentDir) {
+  const rel = path.relative(path.resolve(parentDir), path.resolve(filePath));
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
+ * POST multipart/form-data using Node https + form.pipe().
+ * Electron/Node global fetch (undici) often corrupts the `form-data` stream and OpenAI returns
+ * "failed to parse multipart/form-data".
+ */
+function httpsPostMultipart(urlString, form, authHeaders) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: `${u.pathname}${u.search}`,
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          ...form.getHeaders(),
+        },
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    form.pipe(req);
+  });
+}
+
+function httpsPostJson(urlString, jsonBody, authHeaders) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlString);
+    const body = JSON.stringify(jsonBody);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: `${u.pathname}${u.search}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+          ...authHeaders,
+        },
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 function findBridgeExecutable() {
   const root = getPortableRoot();
   const candidates = [
@@ -313,7 +387,10 @@ ipcMain.handle('camera:invoke', async (_e, cmd) => {
 
 ipcMain.handle('file:readBase64', async (_e, filePath) => {
   const buf = fs.readFileSync(filePath);
-  return `data:image/jpeg;base64,${buf.toString('base64')}`;
+  const ext = path.extname(filePath).toLowerCase();
+  const mime =
+    ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  return `data:${mime};base64,${buf.toString('base64')}`;
 });
 
 ipcMain.handle('file:saveJpeg', async (_e, fullPath, base64Body) => {
@@ -323,10 +400,174 @@ ipcMain.handle('file:saveJpeg', async (_e, fullPath, base64Body) => {
   return { ok: true, path: fullPath };
 });
 
+ipcMain.handle('openai:generateImage', async (_e, payload) => {
+  try {
+    let sharpMod;
+    let FormData;
+    try {
+      sharpMod = require('sharp');
+      FormData = require('form-data');
+    } catch (_dep) {
+      return {
+        ok: false,
+        error: 'Server dependencies missing: run npm install sharp form-data in the app folder.',
+      };
+    }
+    const imagePath =
+      payload && typeof payload.imagePath === 'string' ? payload.imagePath : '';
+    const prompt = payload && typeof payload.prompt === 'string' ? payload.prompt : '';
+    if (!imagePath.trim() || !prompt.trim()) {
+      return { ok: false, error: 'Missing image path or prompt.' };
+    }
+    const cfg = loadMergedConfig();
+    const apiKey = cfg.openAiApiKey;
+    if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+      return { ok: false, error: 'OpenAI API key not configured.' };
+    }
+    const captureRoot = path.resolve(getCaptureDir());
+    const absImage = path.resolve(imagePath);
+    if (!fs.existsSync(absImage)) {
+      return { ok: false, error: 'Source image not found.' };
+    }
+    if (!isPathUnder(absImage, captureRoot)) {
+      return { ok: false, error: 'Invalid image path.' };
+    }
+    // Edit input hard limit: PNG and < 4 MB.
+    // Build a 4x6 landscape (3:2) letterboxed PNG and, if needed, progressively downscale until it fits.
+    const MAX_IMAGE_BYTES = 4 * 1024 * 1024 - 8192; // Small safety margin.
+    let pngBuf = null;
+    const LANDSCAPE_SIZES = [
+      [1536, 1024],
+      [1440, 960],
+      [1296, 864],
+      [1152, 768],
+      [1024, 682],
+      [960, 640],
+      [768, 512],
+    ];
+    for (const [w, h] of LANDSCAPE_SIZES) {
+      const candidate = await sharpMod(absImage)
+        .resize(w, h, {
+          fit: 'contain',
+          position: 'center',
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        })
+        .ensureAlpha()
+        .png({ compressionLevel: 9, effort: 10, palette: true })
+        .toBuffer();
+      if (candidate.length <= MAX_IMAGE_BYTES) {
+        pngBuf = candidate;
+        break;
+      }
+    }
+    if (!pngBuf) {
+      return { ok: false, error: 'Prepared PNG is still above 4 MB.' };
+    }
+    /** DALL·E 2 image edit prompt max length — keep suffix within budget. */
+    const DALLE2_PROMPT_MAX = 1000;
+    const suffix =
+      ' Use the entire visible scene (letterboxed in the square). Transform the whole composition—do not output a tighter zoom or headshot crop unless the uploaded image already is.';
+    const rawPrompt = String(prompt).trim();
+    const newspaperHeadlineGuard =
+      rawPrompt.toLowerCase().includes('newspaper') &&
+      !rawPrompt.toUpperCase().includes('HAPPENING NOW!')
+        ? ' Ensure the primary newspaper masthead headline reads exactly: HAPPENING NOW!'
+        : '';
+    let fullPrompt = rawPrompt + newspaperHeadlineGuard + suffix;
+    if (fullPrompt.length > DALLE2_PROMPT_MAX) {
+      fullPrompt = fullPrompt.slice(0, DALLE2_PROMPT_MAX);
+    }
+    const parseJsonSafe = (text) => {
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        return null;
+      }
+    };
+
+    const makeErr = (statusCode, json, text) =>
+      json?.error?.message || json?.message || text.slice(0, 400) || `HTTP ${statusCode}`;
+
+    let json = null;
+    let modelUsed = 'gpt-image-1.5';
+    const inputDataUrl = `data:image/png;base64,${pngBuf.toString('base64')}`;
+
+    // Primary path: GPT image edits API (closer to ChatGPT image quality/features).
+    const gptEditPayload = {
+      model: 'gpt-image-1.5',
+      images: [{ image_url: inputDataUrl }],
+      prompt: fullPrompt,
+      n: 1,
+      size: '1536x1024',
+      quality: 'high',
+      input_fidelity: 'high',
+    };
+    const gptRes = await httpsPostJson('https://api.openai.com/v1/images/edits', gptEditPayload, {
+      Authorization: `Bearer ${apiKey.trim()}`,
+    });
+    const gptJson = parseJsonSafe(gptRes.body);
+    const gptOk = gptRes.statusCode >= 200 && gptRes.statusCode < 300 && !!gptJson;
+    if (gptOk) {
+      json = gptJson;
+    } else {
+      const primaryErr = makeErr(gptRes.statusCode, gptJson, gptRes.body);
+      // Compatibility fallback for accounts that only allow DALL-E 2 on edits.
+      const form = new FormData();
+      form.append('image', pngBuf, { filename: 'photo.png', contentType: 'image/png' });
+      form.append('prompt', fullPrompt);
+      form.append('model', 'dall-e-2');
+      form.append('n', '1');
+      form.append('size', '1536x1024');
+      form.append('response_format', 'b64_json');
+      const d2Res = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, {
+        Authorization: `Bearer ${apiKey.trim()}`,
+      });
+      const d2Json = parseJsonSafe(d2Res.body);
+      const d2Ok = d2Res.statusCode >= 200 && d2Res.statusCode < 300 && !!d2Json;
+      if (!d2Ok) {
+        const fallbackErr = makeErr(d2Res.statusCode, d2Json, d2Res.body);
+        return {
+          ok: false,
+          error: `${primaryErr} (GPT edits failed; fallback dall-e-2 also failed: ${fallbackErr})`,
+        };
+      }
+      json = d2Json;
+      modelUsed = 'dall-e-2';
+    }
+    const entry = json.data && json.data[0];
+    const b64 = entry && entry.b64_json;
+    const imageUrl = entry && entry.url;
+    let outBuf;
+    if (b64) {
+      outBuf = Buffer.from(b64, 'base64');
+    } else if (imageUrl) {
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) {
+        return { ok: false, error: 'Could not download generated image.' };
+      }
+      const ab = await imgRes.arrayBuffer();
+      outBuf = Buffer.from(ab);
+    } else {
+      return { ok: false, error: 'No image data in API response.' };
+    }
+    const dir = path.dirname(absImage);
+    const base = path.basename(absImage, path.extname(absImage));
+    const outPath = path.join(dir, `${base}_ai.png`);
+    fs.writeFileSync(outPath, outBuf);
+    return { ok: true, path: outPath, model: modelUsed };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
 function configForRenderer(full) {
   if (!full || typeof full !== 'object') return full;
-  const { adminPin: _omit, ...rest } = full;
-  return rest;
+  const { adminPin: _omit, openAiApiKey: _key, ...rest } = full;
+  return {
+    ...rest,
+    openAiConfigured:
+      typeof full.openAiApiKey === 'string' && full.openAiApiKey.trim().length > 0,
+  };
 }
 
 ipcMain.handle('admin:getConfig', async () => {

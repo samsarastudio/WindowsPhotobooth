@@ -62,6 +62,10 @@ export interface PbApi {
   ): Promise<{ ok: boolean; logoFile?: string; url?: string; error?: string }>;
   adminClearLogo(): Promise<{ ok: boolean; error?: string }>;
   adminGetBrandingLogoUrl(): Promise<{ ok: boolean; url?: string | null; error?: string }>;
+  openAiGenerateImage(payload: {
+    imagePath: string;
+    prompt: string;
+  }): Promise<{ ok: boolean; path?: string; model?: string; error?: string }>;
 }
 
 declare global {

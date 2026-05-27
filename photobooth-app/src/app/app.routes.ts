@@ -6,12 +6,16 @@ import { AttractPageComponent } from './pages/attract-page/attract-page.componen
 import { CapturePageComponent } from './pages/capture-page/capture-page.component';
 import { QrPageComponent } from './pages/qr-page/qr-page.component';
 import { ResultPageComponent } from './pages/result-page/result-page.component';
+import { AiModePageComponent } from './pages/ai-mode-page/ai-mode-page.component';
+import { AiGalleryPageComponent } from './pages/ai-gallery-page/ai-gallery-page.component';
 
 export const routes: Routes = [
   { path: '', component: AttractPageComponent },
   { path: 'qr', component: QrPageComponent },
+  { path: 'ai-mode', component: AiModePageComponent },
   { path: 'capture', component: CapturePageComponent },
   { path: 'result', component: ResultPageComponent },
+  { path: 'ai-gallery', component: AiGalleryPageComponent },
   { path: 'admin/login', component: AdminLoginComponent },
   { path: 'admin', canActivate: [adminGuard], component: AdminDashboardComponent },
   { path: '**', redirectTo: '' },

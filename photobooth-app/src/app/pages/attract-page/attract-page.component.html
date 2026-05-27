@@ -1,19 +1,36 @@
-<div class="pb-page pb-attract">
-  <div class="pb-card">
-    @if (branding.logoSrc(); as logo) {
-      <img
-        class="pb-icon pb-icon-logo"
-        [src]="logo"
-        [attr.alt]="copy().attract.title"
-        loading="eager"
-        decoding="async"
-      />
-    } @else {
-      <span class="pb-icon" aria-hidden="true">{{ copy().attract.icon }}</span>
-    }
-    <h1 class="pb-title">{{ copy().attract.title }}</h1>
-    <p class="pb-sub">{{ copy().attract.subtitle }}</p>
-    <a routerLink="/qr" class="pb-tap-full" [attr.aria-label]="copy().attract.startAria"> </a>
+<div class="pb-page pb-attract pb-kia-attract-page">
+  <div
+    class="pb-kia-attract"
+    [style.--pb-attract-main-scale]="copy().attract.mainScale"
+    [style.--pb-attract-top-scale]="copy().attract.topScale"
+  >
+    <div class="pb-kia-attract-main">
+      <header class="pb-kia-attract-brand">
+        @if (branding.logoSrc(); as logo) {
+          <img
+            class="pb-kia-logo"
+            [src]="logo"
+            [attr.alt]="copy().attract.title"
+            loading="eager"
+            decoding="async"
+          />
+        }
+        <p class="pb-kia-tagline">{{ copy().attract.tagline }}</p>
+      </header>
+
+      <h1 class="pb-kia-hero-title">{{ copy().attract.title }}</h1>
+      <div class="pb-kia-hero-streak" aria-hidden="true"></div>
+      <p class="pb-kia-hero-sub">{{ copy().attract.subtitle }}</p>
+    </div>
+
+    <div class="pb-kia-attract-cta-wrap">
+      <a routerLink="/qr" class="pb-kia-cta" [attr.aria-label]="copy().attract.startAria">
+        <span class="pb-kia-cta-icon" aria-hidden="true"><i class="fa-regular fa-camera"></i></span>
+        <span class="pb-kia-cta-divider" aria-hidden="true"></span>
+        <span class="pb-kia-cta-label">{{ copy().attract.ctaLabel }}</span>
+      </a>
+    </div>
+
     <a routerLink="/admin" class="pb-attract-admin">{{ copy().attract.adminLink }}</a>
   </div>
 </div>

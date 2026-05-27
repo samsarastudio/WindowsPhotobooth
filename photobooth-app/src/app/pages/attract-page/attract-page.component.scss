@@ -1,23 +1,21 @@
 .pb-attract {
   position: relative;
-  cursor: pointer;
-}
-
-.pb-tap-full {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
 }
 
 .pb-attract-admin {
   position: absolute;
-  right: 0.75rem;
-  bottom: 0.55rem;
+  right: clamp(0.5rem, 2vmin, 1rem);
+  bottom: clamp(0.35rem, 2vmin, 1rem);
   z-index: 3;
-  font-size: 0.75rem;
-  opacity: 0.55;
-  color: var(--pb-ink-muted, #5c4d42);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.85rem;
+  font-size: clamp(0.72rem, 1.9vmin, 0.9rem);
+  opacity: 0.32;
+  color: var(--pb-kia-admin-ink, rgba(255, 255, 255, 0.5));
   text-decoration: none;
+  border-radius: 10px;
 }
 
 .pb-attract-admin:hover {

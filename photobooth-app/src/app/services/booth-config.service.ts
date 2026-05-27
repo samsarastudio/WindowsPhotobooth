@@ -1,6 +1,16 @@
 import { Injectable, computed, signal } from '@angular/core';
-import type { PhotoboothConfig, PhotoboothBranding, PhotoboothCopy } from '../models/photobooth-config.model';
-import { PHOTOBOOTH_DEFAULT_BRANDING, PHOTOBOOTH_DEFAULT_COPY } from '../models/photobooth-config.model';
+import type {
+  PhotoboothAiMode,
+  PhotoboothConfig,
+  PhotoboothBranding,
+  PhotoboothCopy,
+} from '../models/photobooth-config.model';
+import {
+  PLAIN_PHOTO_MODE_ID,
+  PHOTOBOOTH_DEFAULT_AI_MODES,
+  PHOTOBOOTH_DEFAULT_BRANDING,
+  PHOTOBOOTH_DEFAULT_COPY,
+} from '../models/photobooth-config.model';
 
 function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): PhotoboothCopy {
   if (!patch) return base;
@@ -9,6 +19,37 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     qr: { ...base.qr, ...patch.qr },
     capture: { ...base.capture, ...patch.capture },
     result: { ...base.result, ...patch.result },
+    aiMode: { ...base.aiMode, ...patch.aiMode },
+  };
+}
+
+function normalizeScale(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.min(1.6, Math.max(0.6, value));
+}
+
+/** Older booth saves used generic attract copy — upgrade to Kia ref defaults unless clearly customized. */
+function upgradeLegacyAttractCopy(attract: PhotoboothCopy['attract']): PhotoboothCopy['attract'] {
+  const d = PHOTOBOOTH_DEFAULT_COPY.attract;
+  const sub = attract.subtitle?.trim().toLowerCase() ?? '';
+  const title = attract.title?.trim().toLowerCase() ?? '';
+  const legacy =
+    sub === 'touch anywhere to begin' ||
+    (title === 'photobooth' && sub.includes('touch anywhere'));
+  if (!legacy) return attract;
+  return {
+    ...d,
+    icon: attract.icon?.trim() ? attract.icon : d.icon,
+    adminLink: attract.adminLink?.trim() ? attract.adminLink : d.adminLink,
+  };
+}
+
+function normalizeAttractControls(attract: PhotoboothCopy['attract']): PhotoboothCopy['attract'] {
+  const d = PHOTOBOOTH_DEFAULT_COPY.attract;
+  return {
+    ...attract,
+    mainScale: normalizeScale(attract.mainScale, d.mainScale),
+    topScale: normalizeScale(attract.topScale, d.topScale),
   };
 }
 
@@ -22,13 +63,31 @@ function mergeBranding(patch?: Partial<PhotoboothBranding> | null): PhotoboothBr
   };
 }
 
+function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
+  if (!Array.isArray(raw)) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
+  const out: PhotoboothAiMode[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    const id = typeof o['id'] === 'string' ? o['id'].trim() : '';
+    const label = typeof o['label'] === 'string' ? o['label'].trim() : '';
+    const prompt = typeof o['prompt'] === 'string' ? o['prompt'].trim() : '';
+    if (id && label && prompt && id !== PLAIN_PHOTO_MODE_ID) {
+      out.push({ id, label, prompt });
+    }
+  }
+  return out.length > 0 ? out : [...PHOTOBOOTH_DEFAULT_AI_MODES];
+}
+
 function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const { adminPin: _a, ...rest } = o;
-  const copy = mergeCopy(
+  const { adminPin: _a, openAiApiKey: _k, ...rest } = o;
+  let copy = mergeCopy(
     PHOTOBOOTH_DEFAULT_COPY,
     (rest['copy'] as Partial<PhotoboothCopy> | undefined) ?? undefined,
   );
+  copy = { ...copy, attract: upgradeLegacyAttractCopy(copy.attract) };
+  copy = { ...copy, attract: normalizeAttractControls(copy.attract) };
   let activeRaw = rest['activeThemeId'];
   if (typeof activeRaw === 'string' && activeRaw === 'kia') {
     activeRaw = 'circuit';
@@ -36,12 +95,23 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const branding = mergeBranding(
     (rest['branding'] as Partial<PhotoboothBranding> | undefined) ?? undefined,
   );
+  const aiGenerationEnabled =
+    typeof rest['aiGenerationEnabled'] === 'boolean' ? rest['aiGenerationEnabled'] : false;
+  const aiModes = normalizeAiModes(rest['aiModes']);
+  const openAiConfigured =
+    typeof rest['openAiConfigured'] === 'boolean' ? rest['openAiConfigured'] : false;
+
   return {
     activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'default',
     branding,
     copy,
+    aiGenerationEnabled,
+    aiModes,
+    openAiConfigured,
   };
 }
+
+export type BoothAdminSavePartial = Partial<PhotoboothConfig> & { openAiApiKey?: string };
 
 @Injectable({ providedIn: 'root' })
 export class BoothConfigService {
@@ -51,6 +121,9 @@ export class BoothConfigService {
   readonly copy = computed(() => this.state()?.copy ?? PHOTOBOOTH_DEFAULT_COPY);
   readonly branding = computed(() => this.state()?.branding ?? PHOTOBOOTH_DEFAULT_BRANDING);
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'default');
+  readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
+  readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
+  readonly openAiConfigured = computed(() => this.state()?.openAiConfigured ?? false);
 
   async load(): Promise<void> {
     if (typeof window !== 'undefined' && window.pbApi?.adminGetConfig) {
@@ -66,6 +139,9 @@ export class BoothConfigService {
         activeThemeId: 'default',
         branding: PHOTOBOOTH_DEFAULT_BRANDING,
         copy: PHOTOBOOTH_DEFAULT_COPY,
+        aiGenerationEnabled: false,
+        aiModes: [...PHOTOBOOTH_DEFAULT_AI_MODES],
+        openAiConfigured: false,
       });
       return;
     }
@@ -73,9 +149,9 @@ export class BoothConfigService {
     this.state.set(normalizeConfigPayload(raw));
   }
 
-  async save(partial: Partial<PhotoboothConfig>): Promise<boolean> {
+  async save(partial: BoothAdminSavePartial): Promise<boolean> {
     if (!window.pbApi?.adminSaveConfig) return false;
-    const r = await window.pbApi.adminSaveConfig(partial);
+    const r = await window.pbApi.adminSaveConfig(partial as Record<string, unknown>);
     if (r.ok && r.config) {
       this.state.set(normalizeConfigPayload(r.config));
       return true;

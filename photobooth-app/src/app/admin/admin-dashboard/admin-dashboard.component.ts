@@ -1,8 +1,12 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import type { PhotoboothCopy } from '../../models/photobooth-config.model';
-import { PHOTOBOOTH_DEFAULT_COPY } from '../../models/photobooth-config.model';
+import type { PhotoboothAiMode, PhotoboothCopy } from '../../models/photobooth-config.model';
+import {
+  NEWSPAPER_AI_PROMPT,
+  PHOTOBOOTH_DEFAULT_AI_MODES,
+  PHOTOBOOTH_DEFAULT_COPY,
+} from '../../models/photobooth-config.model';
 import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { ThemeService } from '../../services/theme.service';
@@ -24,15 +28,19 @@ interface ThemeListItem {
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
-  tab: 'copy' | 'themes' | 'branding' = 'copy';
+  tab: 'copy' | 'themes' | 'branding' | 'ai' = 'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
   activeThemeId = 'default';
+  draftAiEnabled = false;
+  draftAiModes: PhotoboothAiMode[] = structuredClone(PHOTOBOOTH_DEFAULT_AI_MODES);
+  /** Only sent on save when non-empty; replaces stored key. */
+  openAiKeyDraft = '';
   themes = signal<ThemeListItem[]>([]);
   status = signal<string | null>(null);
   busy = signal(false);
 
   constructor(
-    private readonly booth: BoothConfigService,
+    readonly booth: BoothConfigService,
     readonly branding: BrandingLogoService,
     private readonly theme: ThemeService,
     private readonly router: Router,
@@ -46,15 +54,88 @@ export class AdminDashboardComponent implements OnInit {
   private syncFromService(): void {
     this.draft = structuredClone(this.booth.copy());
     this.activeThemeId = this.booth.activeThemeId();
+    const cfg = this.booth.config();
+    this.draftAiEnabled = cfg?.aiGenerationEnabled ?? false;
+    this.draftAiModes = structuredClone(cfg?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
+    this.openAiKeyDraft = '';
   }
 
-  setTab(t: 'copy' | 'themes' | 'branding'): void {
+  setTab(t: 'copy' | 'themes' | 'branding' | 'ai'): void {
     this.tab = t;
     if (t === 'themes') {
       void this.refreshThemes();
     }
     if (t === 'branding') {
       void this.branding.refresh();
+    }
+  }
+
+  addAiMode(): void {
+    const id = `mode_${Date.now()}`;
+    this.draftAiModes = [...this.draftAiModes, { id, label: 'New mode', prompt: '' }];
+  }
+
+  removeAiMode(index: number): void {
+    this.draftAiModes = this.draftAiModes.filter((_, i) => i !== index);
+  }
+
+  /** Paste the built-in Newspaper prompt into a row (same text as default config). */
+  applyNewspaperPrompt(index: number): void {
+    const next = [...this.draftAiModes];
+    const row = next[index];
+    if (!row) return;
+    next[index] = { ...row, prompt: NEWSPAPER_AI_PROMPT };
+    this.draftAiModes = next;
+  }
+
+  async saveAi(): Promise<void> {
+    this.status.set(null);
+    const normalized = this.draftAiModes
+      .map((m) => ({
+        id: m.id.trim(),
+        label: m.label.trim(),
+        prompt: m.prompt.trim(),
+      }))
+      .filter((m) => m.id.length > 0 && m.label.length > 0 && m.prompt.length > 0);
+    if (normalized.length === 0) {
+      this.status.set('Add at least one mode with id, label, and prompt.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const payload: Record<string, unknown> = {
+        aiGenerationEnabled: this.draftAiEnabled,
+        aiModes: normalized,
+      };
+      if (this.openAiKeyDraft.trim()) {
+        payload['openAiApiKey'] = this.openAiKeyDraft.trim();
+      }
+      const ok = await this.booth.save(payload);
+      if (ok) {
+        this.openAiKeyDraft = '';
+        this.status.set('AI settings saved.');
+      } else {
+        this.status.set('Save failed (run in Electron).');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async clearOpenAiKey(): Promise<void> {
+    this.status.set(null);
+    this.busy.set(true);
+    try {
+      const ok = await this.booth.save({ openAiApiKey: '' });
+      if (ok) {
+        await this.booth.load();
+        this.syncFromService();
+        this.status.set('OpenAI API key removed from this machine.');
+      } else {
+        this.status.set('Save failed (run in Electron).');
+      }
+    } finally {
+      this.busy.set(false);
     }
   }
 

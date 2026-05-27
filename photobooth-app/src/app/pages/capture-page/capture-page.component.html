@@ -1,44 +1,78 @@
-<div class="pb-page pb-capture">
-  <div class="pb-capture-layout">
-    <div
-      class="pb-preview-wrap"
-      [class.pb-preview-wrap--sized]="previewAspectRatio() !== null"
-      [class.pb-preview-wrap--empty]="showPreviewPlaceholder()"
-      [style.--preview-ar]="previewAspectRatio() ?? 1.5"
-    >
-      @if (useWebcam()) {
-        <video
-          #videoEl
-          class="pb-preview"
-          autoplay
-          playsinline
-          muted
-          (loadedmetadata)="onVideoMeta($event)"
-        ></video>
-      } @else {
-        @if (sdkPreview(); as src) {
-          <img
-            class="pb-preview"
-            [src]="src"
-            alt="Live preview"
-            (load)="onPreviewImgLoad($event)"
-          />
-        } @else {
-          <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
-        }
-      }
+<div class="pb-page pb-capture pb-kia-capture-page">
+  <div class="pb-kia-capture">
+    @if (selectedStyleLabel(); as styleName) {
+      <p class="pb-kia-style-chip">Style: {{ styleName }}</p>
+    }
 
-      @if (countdown() !== null && countdown()! > 0) {
-        <div class="pb-count" aria-live="polite">{{ countdown() }}</div>
-      }
+    <h1 class="pb-kia-ready-title">{{ copy().capture.readyTitle }}</h1>
+    <p class="pb-kia-ready-lead">{{ copy().capture.readySubtitle }}</p>
+
+    <div class="pb-kia-stage">
+      <div
+        class="pb-preview-wrap"
+        [class.pb-preview-wrap--sized]="previewAspectRatio() !== null"
+        [class.pb-preview-wrap--empty]="showPreviewPlaceholder()"
+        [style.--preview-ar]="previewAspectRatio() ?? 1.5"
+      >
+        @if (useWebcam()) {
+          <video
+            #videoEl
+            class="pb-preview"
+            autoplay
+            playsinline
+            muted
+            (loadedmetadata)="onVideoMeta($event)"
+          ></video>
+        } @else {
+          @if (showPreviewPlaceholder()) {
+            <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
+          } @else {
+            <div class="pb-preview-stack">
+              <img
+                class="pb-preview pb-preview--sdk-live pb-preview-layer"
+                [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
+                [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
+                alt="Live preview"
+                decoding="sync"
+                draggable="false"
+                fetchpriority="low"
+                (load)="onSdkPreviewLayerDecoded($event, 0)"
+              />
+              <img
+                class="pb-preview pb-preview--sdk-live pb-preview-layer"
+                [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
+                [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
+                alt=""
+                decoding="sync"
+                draggable="false"
+                fetchpriority="low"
+                (load)="onSdkPreviewLayerDecoded($event, 1)"
+              />
+            </div>
+          }
+        }
+      </div>
+
+      <div class="pb-kia-stage-rule" aria-hidden="true"></div>
+
+      <div class="pb-kia-count-column">
+        @if (countdown() !== null && countdown()! > 0) {
+          <span class="pb-count" aria-live="polite">{{ countdown() }}</span>
+          <div class="pb-kia-dots" aria-hidden="true">
+            <span class="pb-kia-dot"></span>
+            <span class="pb-kia-dot pb-kia-dot--mid"></span>
+            <span class="pb-kia-dot"></span>
+          </div>
+          <p class="pb-kia-smile">{{ copy().capture.smileHint }}</p>
+        } @else {
+          <p class="pb-kia-wait-copy">{{ copy().capture.instructions }}</p>
+        }
+        @if (hint(); as t) {
+          <p class="pb-hint">{{ t }}</p>
+        }
+      </div>
     </div>
 
-    <aside class="pb-side">
-      <h2 class="pb-side-title">{{ copy().capture.sideTitle }}</h2>
-      <p class="pb-instruction">{{ copy().capture.instructions }}</p>
-      @if (hint(); as t) {
-        <p class="pb-hint">{{ t }}</p>
-      }
-    </aside>
+    <p class="pb-kia-capture-footer">{{ copy().capture.footerHint }}</p>
   </div>
 </div>

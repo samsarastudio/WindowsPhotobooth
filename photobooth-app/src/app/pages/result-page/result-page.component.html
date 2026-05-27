@@ -1,5 +1,5 @@
 <div class="pb-page pb-result">
-  <div class="pb-result-inner">
+  <div class="pb-kiosk-surface pb-result-inner">
     <h1 class="pb-result-title">{{ copy().result.title }}</h1>
 
     @if (imageDataUrl(); as src) {
@@ -19,8 +19,54 @@
       }
     }
 
+    @if (showAiSection()) {
+      <div class="pb-result-ai">
+        @if (aiGenerating()) {
+          <details class="pb-thinking" open>
+            <summary class="pb-thinking-sum">{{ copy().result.thinkingSummary }}</summary>
+            <p class="pb-thinking-timer">
+              Status:
+              @if (aiOvertime()) {
+                finalizing (elapsed {{ aiElapsedLabel() }})
+              } @else {
+                processing (ETA {{ aiEtaLabel() }}, elapsed {{ aiElapsedLabel() }})
+              }
+            </p>
+            <ol class="pb-thinking-steps">
+              <li [class.pb-thinking-done]="thinkingStep() >= 1">{{ copy().result.thinkingStepAnalyze }}</li>
+              <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepPlan }}</li>
+              <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepImage }}</li>
+            </ol>
+            <p class="pb-thinking-foot">{{ copy().result.thinkingFootnote }}</p>
+          </details>
+          <p class="pb-loading pb-result-ai-status">{{ copy().result.generatingAi }}</p>
+        } @else if (aiErr()) {
+          <p class="pb-msg">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
+        }
+
+        @if (!aiGenerating()) {
+          <button
+            type="button"
+            class="pb-btn pb-btn-primary pb-result-ai-btn"
+            [disabled]="!canRunAiGeneration()"
+            (click)="generateAi()"
+          >
+            {{ copy().result.generateAi }}
+          </button>
+          @if (!booth.openAiConfigured()) {
+            <p class="pb-hint pb-result-ai-hint">OpenAI API key must be set in Admin → AI.</p>
+          }
+          @if (aiModelUsed(); as model) {
+            <p class="pb-hint pb-result-ai-model">Using model path: {{ model }}</p>
+          }
+        }
+      </div>
+    }
+
     @if (path(); as p) {
-      <p class="pb-path-hint">{{ copy().result.savedPrefix }} {{ p }}</p>
+      <p class="pb-path-hint" [attr.title]="copy().result.savedPrefix + ' ' + p">
+        {{ copy().result.savedPrefix }} {{ p }}
+      </p>
     }
 
     <div class="pb-row pb-result-actions">

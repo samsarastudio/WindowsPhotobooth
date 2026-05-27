@@ -12,10 +12,23 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
+import { AiStyleService } from '../../services/ai-style.service';
+import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
 
-/** Target EVF refresh rate; bridge keeps live view open — interval mainly limits UI work. */
-const PREVIEW_FPS = 24;
+function previewTargetFps(): number {
+  if (typeof window === 'undefined' || !window.matchMedia) return 15;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 8;
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  const lowCpu =
+    typeof navigator !== 'undefined' && (navigator.hardwareConcurrency ?? 8) <= 4;
+  return coarse || lowCpu ? 12 : 15;
+}
+
+function withPreviewDecodeKey(fileUrl: string, v: number): string {
+  const sep = fileUrl.includes('?') ? '&' : '?';
+  return `${fileUrl}${sep}v=${v}`;
+}
 
 @Component({
   selector: 'pb-capture-page',
@@ -26,27 +39,57 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl') videoRef?: ElementRef<HTMLVideoElement>;
 
   private readonly booth = inject(BoothConfigService);
+  private readonly aiStyle = inject(AiStyleService);
   readonly copy = this.booth.copy;
 
-  readonly sdkPreview = signal<SafeUrl | null>(null);
+  /** Label for the style chosen on `/ai-mode`, if any. */
+  readonly selectedStyleLabel = computed(() => {
+    const id = this.aiStyle.selectedModeId();
+    if (!id) return null;
+    if (id === PLAIN_PHOTO_MODE_ID) {
+      return this.copy().aiMode.plainPhotoLabel;
+    }
+    return this.booth.aiModes().find((m) => m.id === id)?.label ?? null;
+  });
+
+  /** Double-buffered file preview — swap layer only after decode to avoid blank flicker. */
+  readonly sdkPreviewActiveLayer = signal<0 | 1>(0);
+  readonly sdkPreviewUrl0 = signal<SafeUrl | null>(null);
+  readonly sdkPreviewUrl1 = signal<SafeUrl | null>(null);
+  readonly sdkPreviewHasFrame = signal(false);
   readonly useWebcam = signal(false);
   readonly hint = signal<string | null>(null);
   readonly countdown = signal<number | null>(null);
   /** Width ÷ height — frame hugs preview pixels without letterboxing when known. */
   readonly previewAspectRatio = signal<number | null>(null);
-  readonly showPreviewPlaceholder = computed(() => !this.useWebcam() && !this.sdkPreview());
+  readonly showPreviewPlaceholder = computed(
+    () => !this.useWebcam() && !this.sdkPreviewHasFrame(),
+  );
 
   private previewTimer?: ReturnType<typeof setInterval>;
   private countdownTimer?: ReturnType<typeof setInterval>;
   private mediaStream?: MediaStream;
   private previewPath = '';
   private started = false;
+  private previewFrameSeq = 0;
+  /** Monotonic id written into each preview URL `?v=` — drops stale `(load)` after rapid swaps. */
+  private layerSeq: [number, number] = [0, 0];
+  /** Pending double-buffer reveal: must match layer + same `?v=` as `layerSeq[layer]`. */
+  private pendingReveal: { layer: 0 | 1; decodeV: number } | null = null;
+  private previewRafPending = false;
+
+  /** 1×1 transparent gif so `<img [src]>` is always valid before the first EVF frame. */
+  readonly emptyPreviewSrc: SafeUrl;
 
   constructor(
     private readonly camera: CameraService,
     private readonly router: Router,
     private readonly sanitizer: DomSanitizer,
-  ) {}
+  ) {
+    this.emptyPreviewSrc = this.sanitizer.bypassSecurityTrustUrl(
+      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+    );
+  }
 
   async ngOnInit(): Promise<void> {
     const r = await this.camera.initAndOpenFirstCamera();
@@ -68,21 +111,68 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   private startSdkPreview(): void {
     if (!this.previewPath) return;
-    const intervalMs = Math.max(16, Math.round(1000 / PREVIEW_FPS));
-    this.previewTimer = setInterval(async () => {
-      const res = await this.camera.previewFrame(this.previewPath);
-      this.applyPreviewResult(res);
+    const fps = previewTargetFps();
+    const intervalMs = Math.max(24, Math.round(1000 / fps));
+    this.previewTimer = setInterval(() => {
+      void this.tickSdkPreview();
     }, intervalMs);
+  }
+
+  /** One preview poll; RAF-coalesced so bursty timers do not pile up on slow devices. */
+  private async tickSdkPreview(): Promise<void> {
+    if (this.previewRafPending) return;
+    this.previewRafPending = true;
+    requestAnimationFrame(async () => {
+      this.previewRafPending = false;
+      try {
+        const res = await this.camera.previewFrame(this.previewPath);
+        this.applyPreviewResult(res);
+      } catch (_) {
+        /* preview errors are benign; bridge may miss a frame */
+      }
+    });
   }
 
   private applyPreviewResult(res: PbCameraResult): void {
     if (!res.ok) return;
+    const v = ++this.previewFrameSeq;
+    let raw: string | null = null;
     if (res.previewFileUrl) {
-      const u = `${res.previewFileUrl}?t=${Date.now()}`;
-      this.sdkPreview.set(this.sanitizer.bypassSecurityTrustUrl(u));
+      raw = withPreviewDecodeKey(res.previewFileUrl, v);
     } else if (res.imageBase64) {
-      this.sdkPreview.set(this.sanitizer.bypassSecurityTrustUrl(res.imageBase64));
+      raw = `${res.imageBase64}#pbv=${v}`;
     }
+    if (!raw) return;
+    const safe = this.sanitizer.bypassSecurityTrustUrl(raw);
+
+    if (!this.sdkPreviewHasFrame()) {
+      this.layerSeq[0] = v;
+      this.sdkPreviewUrl0.set(safe);
+      this.sdkPreviewActiveLayer.set(0);
+      this.sdkPreviewHasFrame.set(true);
+      this.pendingReveal = null;
+      return;
+    }
+
+    const active = this.sdkPreviewActiveLayer();
+    const inactive = active === 0 ? 1 : 0;
+    this.layerSeq[inactive] = v;
+    this.pendingReveal = { layer: inactive, decodeV: v };
+    if (inactive === 0) {
+      this.sdkPreviewUrl0.set(safe);
+    } else {
+      this.sdkPreviewUrl1.set(safe);
+    }
+  }
+
+  /** Decode marker from URL so out-of-order image `load` does not reveal the wrong frame. */
+  private parseImgDecodeV(img: HTMLImageElement): number {
+    const s = img.currentSrc || img.src || '';
+    const q = s.match(/[?&]v=(\d+)/);
+    if (q) return parseInt(q[1], 10);
+    const h = s.match(/#pbv=(\d+)/);
+    if (h) return parseInt(h[1], 10);
+    return -1;
   }
 
   private async startWebcam(): Promise<void> {
@@ -110,7 +200,16 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     }
   }
 
+  private clearCountdown(): void {
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = undefined;
+    }
+    this.countdown.set(null);
+  }
+
   private startCountdown(): void {
+    this.clearCountdown();
     let n = 5;
     this.countdown.set(n);
     this.countdownTimer = setInterval(() => {
@@ -133,6 +232,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async captureShot(): Promise<void> {
+    this.clearCountdown();
     if (this.previewTimer) {
       clearInterval(this.previewTimer);
       this.previewTimer = undefined;
@@ -146,13 +246,19 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     if (this.useWebcam()) {
       const path = await this.captureWebcamFrame(outPath);
       if (path) {
+        this.mediaStream?.getTracks().forEach((t) => t.stop());
+        this.mediaStream = undefined;
+        await this.camera.closeSession();
         await this.navigateResult(path);
+      } else {
+        this.beginCaptureCycle();
       }
       return;
     }
 
     const res = await this.camera.capture(outPath);
     if (res.ok && res.path) {
+      await this.camera.closeSession();
       await this.navigateResult(res.path);
       return;
     }
@@ -189,8 +295,28 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
-  onPreviewImgLoad(ev: Event): void {
+  /** After decode: reveal buffered layer, then refresh aspect from the visible layer. */
+  onSdkPreviewLayerDecoded(ev: Event, layer: 0 | 1): void {
     const img = ev.target as HTMLImageElement;
+    const decodedV = this.parseImgDecodeV(img);
+    if (decodedV < 0 || decodedV !== this.layerSeq[layer]) {
+      return;
+    }
+
+    const pr = this.pendingReveal;
+    if (pr !== null) {
+      if (pr.layer !== layer || pr.decodeV !== decodedV) {
+        return;
+      }
+      this.sdkPreviewActiveLayer.set(layer);
+      this.pendingReveal = null;
+    } else if (this.sdkPreviewActiveLayer() !== layer) {
+      return;
+    }
+
+    if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
+      return;
+    }
     if (img.naturalWidth > 0 && img.naturalHeight > 0) {
       this.previewAspectRatio.set(img.naturalWidth / img.naturalHeight);
     }
@@ -205,7 +331,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.previewTimer) clearInterval(this.previewTimer);
-    if (this.countdownTimer) clearInterval(this.countdownTimer);
+    this.clearCountdown();
     this.mediaStream?.getTracks().forEach((t) => t.stop());
     if (this.started) {
       void this.camera.closeSession();

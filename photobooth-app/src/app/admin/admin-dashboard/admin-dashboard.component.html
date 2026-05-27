@@ -1,18 +1,7 @@
 <div class="pb-page pb-admin-dash">
   <div class="pb-admin-shell">
-    <header class="pb-admin-head">
+    <header class="pb-admin-topbar">
       <h1 class="pb-admin-title">PhotoBooth admin</h1>
-      <nav class="pb-admin-nav">
-        <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'copy'" (click)="setTab('copy')">
-          Copy
-        </button>
-        <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'themes'" (click)="setTab('themes')">
-          Themes
-        </button>
-        <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'branding'" (click)="setTab('branding')">
-          Logo
-        </button>
-      </nav>
       <div class="pb-admin-actions">
         <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="reloadConfig()">Reload</button>
         <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="logout()">Sign out</button>
@@ -20,9 +9,29 @@
       </div>
     </header>
 
-    @if (status(); as s) {
-      <p class="pb-admin-status">{{ s }}</p>
-    }
+    <div class="pb-admin-layout">
+      <aside class="pb-admin-sidebar">
+        <p class="pb-admin-sidebar-title">Sections</p>
+        <nav class="pb-admin-nav" aria-label="Admin sections">
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'copy'" (click)="setTab('copy')">
+            Copy
+          </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'themes'" (click)="setTab('themes')">
+            Themes
+          </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'branding'" (click)="setTab('branding')">
+            Logo
+          </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'ai'" (click)="setTab('ai')">
+            AI
+          </button>
+        </nav>
+      </aside>
+
+      <section class="pb-admin-content">
+        @if (status(); as s) {
+          <p class="pb-admin-status">{{ s }}</p>
+        }
 
     @if (tab === 'copy') {
       <div class="pb-admin-grid">
@@ -30,10 +39,18 @@
           <h2>Attract</h2>
           <label>Icon</label>
           <input class="pb-input" [(ngModel)]="draft.attract.icon" />
+          <label>Tagline</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.tagline" />
           <label>Title</label>
           <input class="pb-input" [(ngModel)]="draft.attract.title" />
           <label>Subtitle</label>
           <input class="pb-input" [(ngModel)]="draft.attract.subtitle" />
+          <label>Main text scale (0.6 - 1.6)</label>
+          <input class="pb-input" type="number" min="0.6" max="1.6" step="0.05" [(ngModel)]="draft.attract.mainScale" />
+          <label>Top block scale (logo + tagline, 0.6 - 1.6)</label>
+          <input class="pb-input" type="number" min="0.6" max="1.6" step="0.05" [(ngModel)]="draft.attract.topScale" />
+          <label>CTA label</label>
+          <input class="pb-input" [(ngModel)]="draft.attract.ctaLabel" />
           <label>Start (aria)</label>
           <input class="pb-input" [(ngModel)]="draft.attract.startAria" />
           <label>Admin link label</label>
@@ -48,6 +65,10 @@
           <input class="pb-input" [(ngModel)]="draft.qr.title" />
           <label>Subtitle</label>
           <input class="pb-input" [(ngModel)]="draft.qr.subtitle" />
+          <label>Scan success message</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.scanSuccess" />
+          <label>Footer line</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.footer" />
           <label>Code label</label>
           <input class="pb-input" [(ngModel)]="draft.qr.codeLabel" />
           <label>OK button</label>
@@ -70,6 +91,14 @@
           <textarea class="pb-input pb-textarea" rows="3" [(ngModel)]="draft.capture.instructions"></textarea>
           <label>Starting camera placeholder</label>
           <input class="pb-input" [(ngModel)]="draft.capture.starting" />
+          <label>Ready title</label>
+          <input class="pb-input" [(ngModel)]="draft.capture.readyTitle" />
+          <label>Ready subtitle</label>
+          <input class="pb-input" [(ngModel)]="draft.capture.readySubtitle" />
+          <label>Footer hint</label>
+          <input class="pb-input" [(ngModel)]="draft.capture.footerHint" />
+          <label>Smile hint</label>
+          <input class="pb-input" [(ngModel)]="draft.capture.smileHint" />
         </section>
 
         <section class="pb-admin-card">
@@ -84,6 +113,49 @@
           <input class="pb-input" [(ngModel)]="draft.result.retake" />
           <label>Submit</label>
           <input class="pb-input" [(ngModel)]="draft.result.submit" />
+          <label>Create AI version (button)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.generateAi" />
+          <label>Generating AI (status)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.generatingAi" />
+          <label>AI preview title</label>
+          <input class="pb-input" [(ngModel)]="draft.result.aiPreviewTitle" />
+          <label>AI error prefix</label>
+          <input class="pb-input" [(ngModel)]="draft.result.aiErrorPrefix" />
+          <label>AI gallery page title</label>
+          <input class="pb-input" [(ngModel)]="draft.result.aiGalleryTitle" />
+          <label>Gallery thumbnail — original</label>
+          <input class="pb-input" [(ngModel)]="draft.result.galleryThumbOriginal" />
+          <label>Gallery thumbnail — AI</label>
+          <input class="pb-input" [(ngModel)]="draft.result.galleryThumbAi" />
+          <label>Gallery “back to photo”</label>
+          <input class="pb-input" [(ngModel)]="draft.result.galleryBackToResult" />
+          <label>Gallery finish</label>
+          <input class="pb-input" [(ngModel)]="draft.result.galleryFinish" />
+          <label>AI progress panel title</label>
+          <input class="pb-input" [(ngModel)]="draft.result.thinkingSummary" />
+          <label>Progress step 1</label>
+          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepAnalyze" />
+          <label>Progress step 2</label>
+          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepPlan" />
+          <label>Progress step 3</label>
+          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepImage" />
+          <label>Progress footnote</label>
+          <textarea class="pb-input pb-textarea" rows="2" [(ngModel)]="draft.result.thinkingFootnote"></textarea>
+        </section>
+
+        <section class="pb-admin-card">
+          <h2>AI mode screen</h2>
+          <label>Title</label>
+          <input class="pb-input" [(ngModel)]="draft.aiMode.title" />
+          <label>Subtitle</label>
+          <input class="pb-input" [(ngModel)]="draft.aiMode.subtitle" />
+          <label>Back</label>
+          <input class="pb-input" [(ngModel)]="draft.aiMode.back" />
+          <label>Plain photo option (Photocapture / Default)</label>
+          <input class="pb-input" [(ngModel)]="draft.aiMode.plainPhotoLabel" />
+          <p class="pb-hint pb-hint-tight">
+            Shown first on the style screen; picks a normal booth photo with no AI step on the result page.
+          </p>
         </section>
       </div>
       <div class="pb-admin-footer">
@@ -133,6 +205,89 @@
       </div>
     }
 
+    @if (tab === 'ai') {
+      <div class="pb-admin-ai">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>OpenAI image generation</h2>
+          <p class="pb-hint">
+            After QR unlock, guests pick a style, capture a photo, then run <strong>Create AI version</strong> on the
+            result screen. The API key stays in Electron only; it is never sent to the browser bundle. Uses the
+            <a href="https://platform.openai.com/docs/api-reference/images" rel="noreferrer" target="_blank"
+              >Images API</a
+            >
+            (edits) with your org’s key.
+          </p>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftAiEnabled" />
+            Enable AI style step after QR
+          </label>
+          <p class="pb-hint pb-hint-tight">
+            @if (booth.openAiConfigured()) {
+              An API key is stored on this machine.
+            } @else {
+              No API key stored — add one below to enable generation.
+            }
+          </p>
+          <label>OpenAI API key (optional — leave blank to keep current)</label>
+          <input
+            class="pb-input"
+            type="password"
+            autocomplete="off"
+            placeholder="sk-…"
+            [(ngModel)]="openAiKeyDraft"
+          />
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveAi()">
+              Save AI settings
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
+              [disabled]="busy() || !booth.openAiConfigured()"
+              (click)="clearOpenAiKey()"
+            >
+              Remove API key
+            </button>
+          </div>
+        </section>
+
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>AI modes (after QR)</h2>
+          <p class="pb-hint">
+            Each mode is a button for guests. <strong>Prompt</strong> is sent with the captured photo to the image
+            model. The default <code>newspaper</code> mode uses the full vintage front-page prompt.
+          </p>
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addAiMode()">Add mode</button>
+          </div>
+          @for (m of draftAiModes; track $index) {
+            <div class="pb-admin-ai-row">
+              <h3>Mode {{ $index + 1 }}</h3>
+              <label>Id (stable key)</label>
+              <input class="pb-input" [(ngModel)]="m.id" />
+              <label>Button label</label>
+              <input class="pb-input" [(ngModel)]="m.label" />
+              <label>Prompt</label>
+              <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.prompt"></textarea>
+              <div class="pb-row pb-row-wrap">
+                <button type="button" class="pb-btn pb-btn-ghost" (click)="applyNewspaperPrompt($index)">
+                  Insert Newspaper prompt
+                </button>
+                <button
+                  type="button"
+                  class="pb-btn pb-btn-ghost"
+                  [disabled]="draftAiModes.length <= 1"
+                  (click)="removeAiMode($index)"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          }
+        </section>
+      </div>
+    }
+
     @if (tab === 'branding') {
       <div class="pb-admin-branding">
         <section class="pb-admin-card pb-admin-card-wide">
@@ -164,5 +319,7 @@
         </section>
       </div>
     }
+      </section>
+    </div>
   </div>
 </div>

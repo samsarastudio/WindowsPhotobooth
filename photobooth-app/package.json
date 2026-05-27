@@ -12,6 +12,8 @@
   },
   "private": true,
   "dependencies": {
+    "form-data": "^4.0.0",
+    "sharp": "^0.33.5",
     "@angular/common": "^19.2.0",
     "@angular/compiler": "^19.2.0",
     "@angular/core": "^19.2.0",
@@ -44,6 +46,9 @@
   "build": {
     "appId": "com.photobooth.app",
     "productName": "PhotoBooth",
+    "asarUnpack": [
+      "**/node_modules/sharp/**/*"
+    ],
     "directories": {
       "output": "release"
     },
