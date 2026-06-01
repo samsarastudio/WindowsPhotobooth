@@ -1,12 +1,20 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import type { PhotoboothAiMode, PhotoboothCopy } from '../../models/photobooth-config.model';
+import type {
+  PhotoboothAiMode,
+  PhotoboothCopy,
+  PhotoboothScannerConfig,
+  PhotoboothSyncConfig,
+} from '../../models/photobooth-config.model';
 import {
   NEWSPAPER_AI_PROMPT,
   PHOTOBOOTH_DEFAULT_AI_MODES,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_SCANNER,
+  PHOTOBOOTH_DEFAULT_SYNC,
 } from '../../models/photobooth-config.model';
+import type { PbScannerPortInfo } from '../../../types/pb-api';
 import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { ThemeService } from '../../services/theme.service';
@@ -28,8 +36,13 @@ interface ThemeListItem {
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
-  tab: 'copy' | 'themes' | 'branding' | 'ai' = 'copy';
+  tab: 'copy' | 'themes' | 'branding' | 'ai' | 'scanner' = 'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
+  draftScanner: PhotoboothScannerConfig = structuredClone(PHOTOBOOTH_DEFAULT_SCANNER);
+  draftSync: PhotoboothSyncConfig = structuredClone(PHOTOBOOTH_DEFAULT_SYNC);
+  serialPorts = signal<PbScannerPortInfo[]>([]);
+  scannerStatus = signal('disconnected');
+  lastScan = signal<string | null>(null);
   activeThemeId = 'default';
   draftAiEnabled = false;
   draftAiModes: PhotoboothAiMode[] = structuredClone(PHOTOBOOTH_DEFAULT_AI_MODES);
@@ -57,16 +70,66 @@ export class AdminDashboardComponent implements OnInit {
     const cfg = this.booth.config();
     this.draftAiEnabled = cfg?.aiGenerationEnabled ?? false;
     this.draftAiModes = structuredClone(cfg?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
+    this.draftScanner = structuredClone(cfg?.scanner ?? PHOTOBOOTH_DEFAULT_SCANNER);
+    this.draftSync = structuredClone(cfg?.sync ?? PHOTOBOOTH_DEFAULT_SYNC);
     this.openAiKeyDraft = '';
   }
 
-  setTab(t: 'copy' | 'themes' | 'branding' | 'ai'): void {
+  setTab(t: 'copy' | 'themes' | 'branding' | 'ai' | 'scanner'): void {
     this.tab = t;
     if (t === 'themes') {
       void this.refreshThemes();
     }
     if (t === 'branding') {
       void this.branding.refresh();
+    }
+    if (t === 'scanner') {
+      void this.refreshScannerAdmin();
+    }
+  }
+
+  async refreshScannerAdmin(): Promise<void> {
+    if (window.pbApi?.scannerListPorts) {
+      const r = await window.pbApi.scannerListPorts();
+      if (r.ok && r.ports) this.serialPorts.set(r.ports);
+    }
+    if (window.pbApi?.scannerGetStatus) {
+      const s = await window.pbApi.scannerGetStatus();
+      this.scannerStatus.set(s.status ?? 'disconnected');
+      if (s.lastCode) this.lastScan.set(s.lastCode);
+    }
+    if (window.pbApi?.onScannerCode) {
+      window.pbApi.onScannerCode(({ code }) => this.lastScan.set(code));
+    }
+  }
+
+  async saveScanner(): Promise<void> {
+    this.status.set(null);
+    this.busy.set(true);
+    const ok = await this.booth.save({
+      scanner: { ...this.draftScanner },
+      sync: { ...this.draftSync },
+    });
+    this.busy.set(false);
+    this.status.set(ok ? 'Scanner settings saved.' : 'Save failed.');
+    if (ok) void this.refreshScannerAdmin();
+  }
+
+  async testScannerPort(): Promise<void> {
+    if (!window.pbApi?.scannerOpen || !this.draftScanner.comPort.trim()) {
+      this.status.set('Select a COM port first.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const r = await window.pbApi.scannerOpen(
+        this.draftScanner.comPort.trim(),
+        this.draftScanner.baudRate,
+      );
+      this.scannerStatus.set(r.status ?? 'error');
+      this.status.set(r.ok ? 'Port opened for test.' : `Open failed: ${r.error ?? 'unknown'}`);
+    } finally {
+      this.busy.set(false);
     }
   }
 

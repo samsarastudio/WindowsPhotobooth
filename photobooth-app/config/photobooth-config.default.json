@@ -12,6 +12,20 @@
   "branding": {
     "logoFile": null
   },
+  "scanner": {
+    "enabled": false,
+    "comPort": "",
+    "baudRate": 9600,
+    "qrScanMode": "auto",
+    "cameraQrFallbackEnabled": true
+  },
+  "sync": {
+    "apiBaseUrl": "",
+    "validatePath": "/api/photobooth/validate-token",
+    "uploadPath": "/api/photobooth/upload",
+    "qrPrefix": "KIA-PHOTO-",
+    "boothId": ""
+  },
   "copy": {
     "attract": {
       "icon": "📷",
@@ -33,7 +47,7 @@
       "codeLabel": "Code",
       "ok": "OK",
       "back": "Back",
-      "invalidCode": "Invalid code. Use 1234 to continue (debug).",
+      "invalidCode": "Invalid QR code. Please use your registration code.",
       "debugHint": "Debug — type ok then Enter",
       "bypassCode": "1234"
     },

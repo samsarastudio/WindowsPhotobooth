@@ -11,6 +11,7 @@ import {
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
+import { BoothSessionService } from '../../services/booth-session.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
@@ -39,6 +40,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl') videoRef?: ElementRef<HTMLVideoElement>;
 
   private readonly booth = inject(BoothConfigService);
+  private readonly session = inject(BoothSessionService);
   private readonly aiStyle = inject(AiStyleService);
   readonly copy = this.booth.copy;
 
@@ -292,6 +294,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async navigateResult(filePath: string): Promise<void> {
+    this.session.addPhoto(filePath);
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 

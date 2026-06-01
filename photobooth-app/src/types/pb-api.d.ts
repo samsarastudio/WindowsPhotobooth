@@ -32,6 +32,36 @@ export interface PbThemeListItem {
   description?: string;
 }
 
+export interface PbScannerPortInfo {
+  path: string;
+  manufacturer?: string;
+  vendorId?: string;
+  productId?: string;
+  friendlyName?: string;
+}
+
+export interface PbScannerCodePayload {
+  code: string;
+}
+
+export interface PbScannerStatusPayload {
+  status: string;
+}
+
+export interface PbSyncValidateResult {
+  ok: boolean;
+  valid: boolean;
+  offline?: boolean;
+  error?: string;
+  message?: string | null;
+  statusCode?: number;
+}
+
+export interface PbSyncEnqueueEntry {
+  token: string;
+  photos: string[];
+}
+
 export interface PbApi {
   getPaths(): Promise<PbPaths>;
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
@@ -66,6 +96,18 @@ export interface PbApi {
     imagePath: string;
     prompt: string;
   }): Promise<{ ok: boolean; path?: string; model?: string; error?: string }>;
+  scannerListPorts(): Promise<{ ok: boolean; ports?: PbScannerPortInfo[]; error?: string }>;
+  scannerGetStatus(): Promise<{ ok: boolean; status?: string; lastCode?: string; error?: string }>;
+  scannerOpen(
+    portPath: string,
+    baudRate?: number,
+  ): Promise<{ ok: boolean; status?: string; error?: string }>;
+  scannerClose(): Promise<{ ok: boolean; status?: string; error?: string }>;
+  onScannerCode(handler: (payload: PbScannerCodePayload) => void): () => void;
+  onScannerStatus(handler: (payload: PbScannerStatusPayload) => void): () => void;
+  onScannerError(handler: (payload: { error: string }) => void): () => void;
+  syncValidateToken(token: string): Promise<PbSyncValidateResult>;
+  syncEnqueueSession(entry: PbSyncEnqueueEntry): Promise<{ ok: boolean; error?: string }>;
 }
 
 declare global {

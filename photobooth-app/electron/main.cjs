@@ -5,6 +5,8 @@ const https = require('https');
 const fs = require('fs');
 const { spawn, execFileSync } = require('child_process');
 const readline = require('readline');
+const { ScannerService } = require('./scanner-service.cjs');
+const { SyncService } = require('./sync-service.cjs');
 
 /** Portable root: folder containing the app exe (portable) or photobooth-app in dev. */
 function getPortableRoot() {
@@ -257,6 +259,56 @@ let mainWindow = null;
 let bridgeProc = null;
 let bridgeReadline = null;
 const bridgeQueue = [];
+const scannerService = new ScannerService();
+let syncService = null;
+
+function getSyncQueueDir() {
+  return path.join(getPortableRoot(), 'sync-data');
+}
+
+function ensureSyncService() {
+  if (!syncService) {
+    syncService = new SyncService(getSyncQueueDir());
+  }
+  return syncService;
+}
+
+function applySyncConfigFromMerged(cfg) {
+  const sync = cfg?.sync || {};
+  ensureSyncService().configure({
+    apiBaseUrl: sync.apiBaseUrl,
+    validatePath: sync.validatePath,
+    uploadPath: sync.uploadPath,
+    boothId: sync.boothId,
+  });
+}
+
+function broadcastScanner(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send(channel, payload);
+  }
+}
+
+function wireScannerListeners() {
+  scannerService.setListeners({
+    onCode: (code) => broadcastScanner('scanner:code', { code }),
+    onStatus: (status) => broadcastScanner('scanner:status', { status }),
+    onError: (error) => broadcastScanner('scanner:error', { error }),
+  });
+}
+
+async function startScannerFromConfig() {
+  wireScannerListeners();
+  const cfg = loadMergedConfig();
+  const sc = cfg.scanner || {};
+  if (!sc.enabled || !sc.comPort || !String(sc.comPort).trim()) {
+    await scannerService.close();
+    broadcastScanner('scanner:status', { status: 'disconnected' });
+    return;
+  }
+  const baud = typeof sc.baudRate === 'number' ? sc.baudRate : 9600;
+  await scannerService.open(String(sc.comPort).trim(), baud);
+}
 
 function killBridge() {
   if (bridgeReadline) {
@@ -346,9 +398,13 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   ensureConfigFiles();
+  const cfg = loadMergedConfig();
+  applySyncConfigFromMerged(cfg);
+  ensureSyncService().start();
   createWindow();
+  await startScannerFromConfig();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -359,7 +415,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => killBridge());
+app.on('before-quit', () => {
+  killBridge();
+  if (syncService) syncService.stop();
+  void scannerService.close();
+});
 
 ipcMain.handle('app:getPaths', () => {
   const captureDir = getCaptureDir();
@@ -560,6 +620,53 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
   }
 });
 
+ipcMain.handle('scanner:listPorts', async () => {
+  try {
+    const ports = await scannerService.listPorts();
+    return { ok: true, ports };
+  } catch (e) {
+    return { ok: false, error: String(e), ports: [] };
+  }
+});
+
+ipcMain.handle('scanner:getStatus', async () => {
+  return { ok: true, status: scannerService.getStatus(), lastCode: scannerService.getLastCode() };
+});
+
+ipcMain.handle('scanner:open', async (_e, portPath, baudRate) => {
+  try {
+    return await scannerService.open(portPath, baudRate);
+  } catch (e) {
+    return { ok: false, error: String(e), status: 'error' };
+  }
+});
+
+ipcMain.handle('scanner:close', async () => {
+  try {
+    return await scannerService.close();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('sync:validateToken', async (_e, token) => {
+  try {
+    applySyncConfigFromMerged(loadMergedConfig());
+    return await ensureSyncService().validateToken(token);
+  } catch (e) {
+    return { ok: false, valid: false, error: String(e), offline: true };
+  }
+});
+
+ipcMain.handle('sync:enqueueSession', async (_e, entry) => {
+  try {
+    applySyncConfigFromMerged(loadMergedConfig());
+    return ensureSyncService().enqueueSession(entry);
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
 function configForRenderer(full) {
   if (!full || typeof full !== 'object') return full;
   const { adminPin: _omit, openAiApiKey: _key, ...rest } = full;
@@ -594,6 +701,9 @@ ipcMain.handle('admin:saveConfig', async (_e, partial) => {
     const merged = deepMerge(loadMergedConfig(), partial || {});
     fs.mkdirSync(getConfigDir(), { recursive: true });
     fs.writeFileSync(getConfigPath(), JSON.stringify(merged, null, 2), 'utf8');
+    applySyncConfigFromMerged(merged);
+    ensureSyncService().start();
+    await startScannerFromConfig();
     return { ok: true, config: configForRenderer(merged) };
   } catch (e) {
     return { ok: false, error: String(e) };

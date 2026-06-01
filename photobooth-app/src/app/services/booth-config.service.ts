@@ -4,12 +4,17 @@ import type {
   PhotoboothConfig,
   PhotoboothBranding,
   PhotoboothCopy,
+  PhotoboothScannerConfig,
+  PhotoboothSyncConfig,
+  QrScanMode,
 } from '../models/photobooth-config.model';
 import {
   PLAIN_PHOTO_MODE_ID,
   PHOTOBOOTH_DEFAULT_AI_MODES,
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_SCANNER,
+  PHOTOBOOTH_DEFAULT_SYNC,
 } from '../models/photobooth-config.model';
 
 function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): PhotoboothCopy {
@@ -63,6 +68,38 @@ function mergeBranding(patch?: Partial<PhotoboothBranding> | null): PhotoboothBr
   };
 }
 
+function normalizeQrScanMode(raw: unknown): QrScanMode {
+  if (raw === 'camera' || raw === 'serial' || raw === 'auto') return raw;
+  return PHOTOBOOTH_DEFAULT_SCANNER.qrScanMode;
+}
+
+function normalizeScanner(raw: unknown): PhotoboothScannerConfig {
+  const d = PHOTOBOOTH_DEFAULT_SCANNER;
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return {
+    enabled: typeof o['enabled'] === 'boolean' ? o['enabled'] : d.enabled,
+    comPort: typeof o['comPort'] === 'string' ? o['comPort'] : d.comPort,
+    baudRate: typeof o['baudRate'] === 'number' ? o['baudRate'] : d.baudRate,
+    qrScanMode: normalizeQrScanMode(o['qrScanMode']),
+    cameraQrFallbackEnabled:
+      typeof o['cameraQrFallbackEnabled'] === 'boolean'
+        ? o['cameraQrFallbackEnabled']
+        : d.cameraQrFallbackEnabled,
+  };
+}
+
+function normalizeSync(raw: unknown): PhotoboothSyncConfig {
+  const d = PHOTOBOOTH_DEFAULT_SYNC;
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return {
+    apiBaseUrl: typeof o['apiBaseUrl'] === 'string' ? o['apiBaseUrl'] : d.apiBaseUrl,
+    validatePath: typeof o['validatePath'] === 'string' ? o['validatePath'] : d.validatePath,
+    uploadPath: typeof o['uploadPath'] === 'string' ? o['uploadPath'] : d.uploadPath,
+    qrPrefix: typeof o['qrPrefix'] === 'string' ? o['qrPrefix'] : d.qrPrefix,
+    boothId: typeof o['boothId'] === 'string' ? o['boothId'] : d.boothId,
+  };
+}
+
 function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
   if (!Array.isArray(raw)) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
   const out: PhotoboothAiMode[] = [];
@@ -105,6 +142,8 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'default',
     branding,
     copy,
+    scanner: normalizeScanner(rest['scanner']),
+    sync: normalizeSync(rest['sync']),
     aiGenerationEnabled,
     aiModes,
     openAiConfigured,
@@ -124,6 +163,8 @@ export class BoothConfigService {
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
   readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
   readonly openAiConfigured = computed(() => this.state()?.openAiConfigured ?? false);
+  readonly scanner = computed(() => this.state()?.scanner ?? PHOTOBOOTH_DEFAULT_SCANNER);
+  readonly sync = computed(() => this.state()?.sync ?? PHOTOBOOTH_DEFAULT_SYNC);
 
   async load(): Promise<void> {
     if (typeof window !== 'undefined' && window.pbApi?.adminGetConfig) {
@@ -139,6 +180,8 @@ export class BoothConfigService {
         activeThemeId: 'default',
         branding: PHOTOBOOTH_DEFAULT_BRANDING,
         copy: PHOTOBOOTH_DEFAULT_COPY,
+        scanner: { ...PHOTOBOOTH_DEFAULT_SCANNER },
+        sync: { ...PHOTOBOOTH_DEFAULT_SYNC },
         aiGenerationEnabled: false,
         aiModes: [...PHOTOBOOTH_DEFAULT_AI_MODES],
         openAiConfigured: false,

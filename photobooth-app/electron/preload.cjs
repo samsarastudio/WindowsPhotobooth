@@ -20,4 +20,25 @@ contextBridge.exposeInMainWorld('pbApi', {
   adminClearLogo: () => ipcRenderer.invoke('admin:clearLogo'),
   adminGetBrandingLogoUrl: () => ipcRenderer.invoke('admin:getBrandingLogoUrl'),
   openAiGenerateImage: (payload) => ipcRenderer.invoke('openai:generateImage', payload),
+  scannerListPorts: () => ipcRenderer.invoke('scanner:listPorts'),
+  scannerGetStatus: () => ipcRenderer.invoke('scanner:getStatus'),
+  scannerOpen: (portPath, baudRate) => ipcRenderer.invoke('scanner:open', portPath, baudRate),
+  scannerClose: () => ipcRenderer.invoke('scanner:close'),
+  onScannerCode: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('scanner:code', handler);
+    return () => ipcRenderer.removeListener('scanner:code', handler);
+  },
+  onScannerStatus: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('scanner:status', handler);
+    return () => ipcRenderer.removeListener('scanner:status', handler);
+  },
+  onScannerError: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('scanner:error', handler);
+    return () => ipcRenderer.removeListener('scanner:error', handler);
+  },
+  syncValidateToken: (token) => ipcRenderer.invoke('sync:validateToken', token),
+  syncEnqueueSession: (entry) => ipcRenderer.invoke('sync:enqueueSession', entry),
 });

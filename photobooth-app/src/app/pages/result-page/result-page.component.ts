@@ -4,6 +4,7 @@ import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
+import { BoothSessionService } from '../../services/booth-session.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
 @Component({
@@ -15,6 +16,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly gallerySession = inject(AiGallerySessionService);
+  private readonly boothSession = inject(BoothSessionService);
   readonly copy = this.booth.copy;
 
   readonly path = signal<string | null>(null);
@@ -139,10 +141,16 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/capture']);
   }
 
-  submit(): void {
+  async submit(): Promise<void> {
     this.stopAiCountdown();
     this.gallerySession.clear();
     this.aiStyle.clear();
+    const pp = this.path();
+    if (pp) this.boothSession.addPhoto(pp);
+    const ended = this.boothSession.finalize();
+    if (ended?.token && ended.photos.length > 0 && window.pbApi?.syncEnqueueSession) {
+      await window.pbApi.syncEnqueueSession({ token: ended.token, photos: ended.photos });
+    }
     void this.camera.closeSession().catch(() => {});
     void this.router.navigate(['/']);
   }

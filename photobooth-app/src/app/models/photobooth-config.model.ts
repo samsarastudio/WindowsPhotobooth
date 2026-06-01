@@ -106,6 +106,43 @@ export interface PhotoboothAiMode {
   prompt: string;
 }
 
+/** How the booth reads registration QR codes. */
+export type QrScanMode = 'serial' | 'camera' | 'auto';
+
+/** Datalogic GFS4400 USB-COM scanner (presentation / object sense). */
+export interface PhotoboothScannerConfig {
+  enabled: boolean;
+  comPort: string;
+  baudRate: number;
+  qrScanMode: QrScanMode;
+  cameraQrFallbackEnabled: boolean;
+}
+
+/** Backend token validation and photo upload. */
+export interface PhotoboothSyncConfig {
+  apiBaseUrl: string;
+  validatePath: string;
+  uploadPath: string;
+  qrPrefix: string;
+  boothId: string;
+}
+
+export const PHOTOBOOTH_DEFAULT_SCANNER: PhotoboothScannerConfig = {
+  enabled: false,
+  comPort: '',
+  baudRate: 9600,
+  qrScanMode: 'auto',
+  cameraQrFallbackEnabled: true,
+};
+
+export const PHOTOBOOTH_DEFAULT_SYNC: PhotoboothSyncConfig = {
+  apiBaseUrl: '',
+  validatePath: '/api/photobooth/validate-token',
+  uploadPath: '/api/photobooth/upload',
+  qrPrefix: 'KIA-PHOTO-',
+  boothId: '',
+};
+
 /** Exact prompt for the default Newspaper style (admin may duplicate or edit in JSON). */
 export const NEWSPAPER_AI_PROMPT =
   'Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject\'s face remains recognizable but stylized to match the printed newspaper aesthetic.';
@@ -115,6 +152,8 @@ export interface PhotoboothConfig {
   activeThemeId: string;
   branding: PhotoboothBranding;
   copy: PhotoboothCopy;
+  scanner: PhotoboothScannerConfig;
+  sync: PhotoboothSyncConfig;
   /** When true, after QR the guest picks an AI style before capture. */
   aiGenerationEnabled: boolean;
   /** Modes shown after QR; each carries the prompt sent to the Images API. */

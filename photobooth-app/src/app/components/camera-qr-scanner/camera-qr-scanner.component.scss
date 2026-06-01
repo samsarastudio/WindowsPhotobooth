@@ -1,0 +1,141 @@
+:host {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 12%;
+  overflow: hidden;
+}
+
+.pb-camera-qr {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pb-camera-qr-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pb-camera-qr-landmarks {
+  position: absolute;
+  inset: 8%;
+  pointer-events: none;
+}
+
+.pb-landmark {
+  position: absolute;
+  width: 18%;
+  height: 18%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  opacity: 0.85;
+  animation: pb-qr-landmark-idle 2s ease-in-out infinite;
+}
+
+.pb-camera-qr-landmarks--active .pb-landmark {
+  border-color: rgba(120, 220, 255, 0.95);
+  animation: pb-qr-landmark-read 0.45s ease-in-out infinite;
+}
+
+.pb-landmark-tl {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 6px 0 0 0;
+}
+
+.pb-landmark-tr {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0 6px 0 0;
+}
+
+.pb-landmark-bl {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+  border-radius: 0 0 0 6px;
+}
+
+.pb-landmark-br {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 6px 0;
+}
+
+.pb-camera-qr-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 40, 20, 0.45);
+}
+
+.pb-check-svg {
+  width: 42%;
+  height: auto;
+}
+
+.pb-check-circle {
+  stroke: rgba(120, 255, 160, 0.9);
+  stroke-width: 2.5;
+  animation: pb-check-circle-pop 0.5s ease-out forwards;
+}
+
+.pb-check-mark {
+  stroke: #7dffb0;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: pb-check-mark-draw 0.45s ease-out 0.2s forwards;
+}
+
+@keyframes pb-qr-landmark-idle {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pb-qr-landmark-read {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pb-check-circle-pop {
+  0% {
+    stroke-dasharray: 0 160;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    stroke-dasharray: 160 0;
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pb-check-mark-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}

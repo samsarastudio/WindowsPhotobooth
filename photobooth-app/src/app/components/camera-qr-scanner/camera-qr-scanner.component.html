@@ -1,0 +1,39 @@
+<div class="pb-camera-qr">
+  @if (useWebcam()) {
+    <video
+      #videoEl
+      class="pb-camera-qr-feed"
+      autoplay
+      playsinline
+      muted
+      aria-hidden="true"
+    ></video>
+  } @else {
+    <img
+      #sdkImgEl
+      class="pb-camera-qr-feed"
+      [src]="sdkPreviewUrl()"
+      alt=""
+      aria-hidden="true"
+      decoding="async"
+    />
+  }
+  <div
+    class="pb-camera-qr-landmarks"
+    [class.pb-camera-qr-landmarks--active]="detecting() || scanSuccess()"
+    aria-hidden="true"
+  >
+    <span class="pb-landmark pb-landmark-tl"></span>
+    <span class="pb-landmark pb-landmark-tr"></span>
+    <span class="pb-landmark pb-landmark-bl"></span>
+    <span class="pb-landmark pb-landmark-br"></span>
+  </div>
+  @if (scanSuccess()) {
+    <div class="pb-camera-qr-check" aria-hidden="true">
+      <svg viewBox="0 0 52 52" class="pb-check-svg">
+        <circle class="pb-check-circle" cx="26" cy="26" r="24" fill="none" />
+        <path class="pb-check-mark" fill="none" d="M14 27 L22 35 L38 17" />
+      </svg>
+    </div>
+  }
+</div>

@@ -12,7 +12,11 @@
   },
   "private": true,
   "dependencies": {
+    "@serialport/parser-readline": "^13.0.0",
+    "@zxing/browser": "^0.2.0",
+    "@zxing/library": "^0.22.0",
     "form-data": "^4.0.0",
+    "serialport": "^13.0.0",
     "sharp": "^0.33.5",
     "@angular/common": "^19.2.0",
     "@angular/compiler": "^19.2.0",
@@ -47,7 +51,8 @@
     "appId": "com.photobooth.app",
     "productName": "PhotoBooth",
     "asarUnpack": [
-      "**/node_modules/sharp/**/*"
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@serialport/**/*"
     ],
     "directories": {
       "output": "release"
