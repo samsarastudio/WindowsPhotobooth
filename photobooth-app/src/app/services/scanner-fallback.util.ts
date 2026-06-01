@@ -2,7 +2,7 @@ import type { PhotoboothScannerConfig, QrScanMode } from '../models/photobooth-c
 
 function normalizeQrScanMode(raw: unknown): QrScanMode {
   if (raw === 'camera' || raw === 'serial' || raw === 'auto') return raw;
-  return 'auto';
+  return 'serial';
 }
 
 /** True when the Electron main process should open the serial COM port. */
@@ -17,10 +17,14 @@ export function shouldUseCameraQr(
   scanner: PhotoboothScannerConfig,
   serialStatus: string,
 ): boolean {
+  if (!scanner.cameraQrFallbackEnabled) return false;
+
   const mode = normalizeQrScanMode(scanner.qrScanMode);
   if (mode === 'camera') return true;
   if (mode === 'serial') return false;
-  if (!scanner.cameraQrFallbackEnabled) return false;
-  if (!scanner.enabled || !scanner.comPort.trim()) return true;
+
+  // auto: use camera only when serial scanner is enabled but unavailable
+  if (!scanner.enabled) return false;
+  if (!scanner.comPort.trim()) return true;
   return serialStatus !== 'connected';
 }

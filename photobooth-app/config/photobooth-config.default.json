@@ -13,11 +13,11 @@
     "logoFile": null
   },
   "scanner": {
-    "enabled": false,
+    "enabled": true,
     "comPort": "",
     "baudRate": 9600,
-    "qrScanMode": "auto",
-    "cameraQrFallbackEnabled": true
+    "qrScanMode": "serial",
+    "cameraQrFallbackEnabled": false
   },
   "sync": {
     "apiBaseUrl": "",

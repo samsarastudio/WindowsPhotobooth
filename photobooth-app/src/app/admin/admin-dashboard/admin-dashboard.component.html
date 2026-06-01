@@ -48,17 +48,32 @@
             Enable serial scanner
           </label>
           <label>COM port</label>
+          @if (scannerPortsMessage(); as portMsg) {
+            <p class="pb-admin-hint">{{ portMsg }}</p>
+          }
           <select class="pb-input" [(ngModel)]="draftScanner.comPort">
             <option value="">— Select port —</option>
             @for (p of serialPorts(); track p.path) {
-              <option [value]="p.path">{{ p.path }} {{ p.friendlyName || p.manufacturer || '' }}</option>
+              <option [value]="p.path">
+                {{ p.path }}@if (p.friendlyName || p.manufacturer) {
+                  — {{ p.friendlyName || p.manufacturer }}
+                }
+              </option>
             }
           </select>
+          <label>Or type COM port manually</label>
+          <input
+            class="pb-input"
+            [(ngModel)]="draftScanner.comPort"
+            placeholder="e.g. COM3"
+            spellcheck="false"
+            autocomplete="off"
+          />
           <label>Baud rate</label>
           <input class="pb-input" type="number" [(ngModel)]="draftScanner.baudRate" />
           <label>
             <input type="checkbox" [(ngModel)]="draftScanner.cameraQrFallbackEnabled" />
-            Camera QR fallback (when serial off or disconnected)
+            Use booth camera for QR when serial scanner is unavailable (not connected or no COM port)
           </label>
           <p>Status: <strong>{{ scannerStatus() }}</strong></p>
           @if (lastScan(); as code) {

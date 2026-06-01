@@ -128,11 +128,11 @@ export interface PhotoboothSyncConfig {
 }
 
 export const PHOTOBOOTH_DEFAULT_SCANNER: PhotoboothScannerConfig = {
-  enabled: false,
+  enabled: true,
   comPort: '',
   baudRate: 9600,
-  qrScanMode: 'auto',
-  cameraQrFallbackEnabled: true,
+  qrScanMode: 'serial',
+  cameraQrFallbackEnabled: false,
 };
 
 export const PHOTOBOOTH_DEFAULT_SYNC: PhotoboothSyncConfig = {

@@ -1,10 +1,108 @@
 'use strict';
 
+const { execFileSync } = require('child_process');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 
 const DUPLICATE_COOLDOWN_MS = 3000;
 const RECONNECT_DELAY_MS = 5000;
+
+function normalizePortPath(path) {
+  const p = String(path || '').trim();
+  if (!p) return '';
+  if (/^COM\d+$/i.test(p)) return p.toUpperCase();
+  return p;
+}
+
+/** Windows: SerialPort.list() often returns [] in Electron; use .NET + WMI as fallback. */
+function listPortsWindowsFallback() {
+  if (process.platform !== 'win32') return [];
+
+  const byPath = new Map();
+
+  try {
+    const ps =
+      '[System.IO.Ports.SerialPort]::GetPortNames() | ForEach-Object { $_ } | ConvertTo-Json -Compress';
+    const out = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', ps],
+      { encoding: 'utf8', windowsHide: true, timeout: 15000 },
+    ).trim();
+    if (out && out !== 'null') {
+      let names = [];
+      try {
+        const parsed = JSON.parse(out);
+        names = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        names = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      }
+      for (const name of names) {
+        const path = normalizePortPath(name);
+        if (path) {
+          byPath.set(path, {
+            path,
+            manufacturer: '',
+            vendorId: '',
+            productId: '',
+            friendlyName: '',
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[scanner] GetPortNames fallback:', err.message);
+  }
+
+  try {
+    const wmiPs =
+      'Get-CimInstance Win32_SerialPort | Select-Object DeviceID, Name | ConvertTo-Json -Compress';
+    const wmiOut = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', wmiPs],
+      { encoding: 'utf8', windowsHide: true, timeout: 15000 },
+    ).trim();
+    if (wmiOut && wmiOut !== 'null') {
+      const parsed = JSON.parse(wmiOut);
+      const rows = Array.isArray(parsed) ? parsed : [parsed];
+      for (const row of rows) {
+        const path = normalizePortPath(row.DeviceID);
+        if (!path) continue;
+        byPath.set(path, {
+          path,
+          manufacturer: '',
+          vendorId: '',
+          productId: '',
+          friendlyName: String(row.Name || '').trim(),
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[scanner] WMI serial fallback:', err.message);
+  }
+
+  return [...byPath.values()].sort((a, b) =>
+    a.path.localeCompare(b.path, undefined, { numeric: true }),
+  );
+}
+
+function mergePortLists(primary, extra) {
+  const byPath = new Map();
+  for (const p of [...primary, ...extra]) {
+    const path = normalizePortPath(p.path);
+    if (!path) continue;
+    const existing = byPath.get(path);
+    byPath.set(path, {
+      path,
+      manufacturer: p.manufacturer || existing?.manufacturer || '',
+      vendorId: p.vendorId || existing?.vendorId || '',
+      productId: p.productId || existing?.productId || '',
+      friendlyName: p.friendlyName || existing?.friendlyName || '',
+    });
+  }
+  return [...byPath.values()].sort((a, b) =>
+    a.path.localeCompare(b.path, undefined, { numeric: true }),
+  );
+}
 
 /**
  * GFS4400 USB-COM scanner (presentation / object sense).
@@ -41,19 +139,29 @@ class ScannerService {
   }
 
   async listPorts() {
+    let ports = [];
     try {
-      const ports = await SerialPort.list();
-      return ports.map((p) => ({
-        path: p.path,
+      const listed = await SerialPort.list();
+      ports = listed.map((p) => ({
+        path: normalizePortPath(p.path),
         manufacturer: p.manufacturer || '',
         vendorId: p.vendorId || '',
         productId: p.productId || '',
         friendlyName: p.friendlyName || '',
       }));
     } catch (err) {
-      console.error('[scanner] listPorts error:', err.message);
-      return [];
+      console.error('[scanner] SerialPort.list error:', err.message);
     }
+
+    if (process.platform === 'win32') {
+      const fallback = listPortsWindowsFallback();
+      ports = mergePortLists(ports, fallback);
+      if (fallback.length > 0 && ports.length === fallback.length) {
+        console.log('[scanner] Using Windows COM port enumeration fallback');
+      }
+    }
+
+    return ports;
   }
 
   async open(portPath, baudRate) {
@@ -61,7 +169,7 @@ class ScannerService {
       await this.close(false);
     }
 
-    this._portPath = portPath;
+    this._portPath = normalizePortPath(portPath);
     this._baudRate = baudRate || 9600;
     this._autoReconnect = true;
     this._clearReconnectTimer();

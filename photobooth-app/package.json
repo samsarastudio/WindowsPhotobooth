@@ -8,7 +8,8 @@
     "start": "ng serve",
     "build": "ng build --configuration production",
     "electron:dev": "concurrently \"ng serve\" \"wait-on http://localhost:4200 && electron .\"",
-    "electron:build": "npm run build && electron-builder --win portable"
+    "electron:build": "npm run build && electron-builder --win portable",
+    "postinstall": "electron-builder install-app-deps"
   },
   "private": true,
   "dependencies": {

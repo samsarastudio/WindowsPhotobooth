@@ -41,6 +41,7 @@ export class AdminDashboardComponent implements OnInit {
   draftScanner: PhotoboothScannerConfig = structuredClone(PHOTOBOOTH_DEFAULT_SCANNER);
   draftSync: PhotoboothSyncConfig = structuredClone(PHOTOBOOTH_DEFAULT_SYNC);
   serialPorts = signal<PbScannerPortInfo[]>([]);
+  scannerPortsMessage = signal<string | null>(null);
   scannerStatus = signal('disconnected');
   lastScan = signal<string | null>(null);
   activeThemeId = 'default';
@@ -89,9 +90,28 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   async refreshScannerAdmin(): Promise<void> {
-    if (window.pbApi?.scannerListPorts) {
-      const r = await window.pbApi.scannerListPorts();
-      if (r.ok && r.ports) this.serialPorts.set(r.ports);
+    if (!window.pbApi?.scannerListPorts) {
+      this.scannerPortsMessage.set(
+        'Port list requires the Electron app (not browser-only dev server). You can type COM3 manually below.',
+      );
+      return;
+    }
+    this.scannerPortsMessage.set(null);
+    const r = await window.pbApi.scannerListPorts();
+    if (r.ok && r.ports) {
+      this.serialPorts.set(r.ports);
+      if (r.ports.length === 0) {
+        this.scannerPortsMessage.set(
+          'No COM ports detected. Connect the scanner USB cable, install the Datalogic USB-COM driver, then refresh — or type the port (e.g. COM3) manually.',
+        );
+      } else {
+        this.scannerPortsMessage.set(`Found ${r.ports.length} port(s).`);
+      }
+    } else {
+      this.serialPorts.set([]);
+      this.scannerPortsMessage.set(
+        r.error || 'Could not list COM ports. Type the port manually (e.g. COM3).',
+      );
     }
     if (window.pbApi?.scannerGetStatus) {
       const s = await window.pbApi.scannerGetStatus();
@@ -106,8 +126,9 @@ export class AdminDashboardComponent implements OnInit {
   async saveScanner(): Promise<void> {
     this.status.set(null);
     this.busy.set(true);
+    const comPort = this.draftScanner.comPort.trim().toUpperCase();
     const ok = await this.booth.save({
-      scanner: { ...this.draftScanner },
+      scanner: { ...this.draftScanner, comPort },
       sync: { ...this.draftSync },
     });
     this.busy.set(false);
