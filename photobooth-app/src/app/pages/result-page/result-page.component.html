@@ -1,77 +1,87 @@
-<div class="pb-page pb-result">
-  <div class="pb-kiosk-surface pb-result-inner">
-    <h1 class="pb-result-title">{{ copy().result.title }}</h1>
+<div class="pb-page pb-kia-experience pb-result">
+  <pb-kia-shell [innerClass]="'innerBox--result'">
+    <div kiaLogo class="kia-logo-wrap">
+      <img class="kia-logo" src="kia/logo.svg" alt="KIA Logo" loading="eager" decoding="async" />
+    </div>
 
-    @if (imageDataUrl(); as src) {
-      <div class="pb-result-frame" [style.--result-ar]="resultAspectRatio() ?? 1.5">
-        <img
-          class="pb-result-img"
-          [src]="src"
-          alt="Captured photo"
-          (load)="onResultImgLoad($event)"
-        />
+    <div class="kia-page-body">
+      <div class="kia-copy-block">
+        <h1 class="main-heading">{{ copy().result.title }}</h1>
+        <p class="sub-heading">{{ copy().result.subtitle }}</p>
       </div>
-    } @else {
-      @if (err(); as e) {
-        <p class="pb-msg">{{ e }}</p>
-      } @else {
-        <p class="pb-loading">{{ copy().result.loading }}</p>
-      }
-    }
 
-    @if (showAiSection()) {
-      <div class="pb-result-ai">
-        @if (aiGenerating()) {
-          <details class="pb-thinking" open>
-            <summary class="pb-thinking-sum">{{ copy().result.thinkingSummary }}</summary>
-            <p class="pb-thinking-timer">
-              Status:
-              @if (aiOvertime()) {
-                finalizing (elapsed {{ aiElapsedLabel() }})
-              } @else {
-                processing (ETA {{ aiEtaLabel() }}, elapsed {{ aiElapsedLabel() }})
-              }
-            </p>
-            <ol class="pb-thinking-steps">
-              <li [class.pb-thinking-done]="thinkingStep() >= 1">{{ copy().result.thinkingStepAnalyze }}</li>
-              <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepPlan }}</li>
-              <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepImage }}</li>
-            </ol>
-            <p class="pb-thinking-foot">{{ copy().result.thinkingFootnote }}</p>
-          </details>
-          <p class="pb-loading pb-result-ai-status">{{ copy().result.generatingAi }}</p>
-        } @else if (aiErr()) {
-          <p class="pb-msg">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
-        }
+      <div class="kia-result-photo-row">
+        <div class="frame w-full">
+          <div class="content w-full">
+            @if (imageDataUrl(); as src) {
+              <img
+                class="frame-preview"
+                [src]="src"
+                alt="Captured photo"
+                (load)="onResultImgLoad($event)"
+              />
+            } @else if (err()) {
+              <p class="kia-msg">{{ err() }}</p>
+            } @else {
+              <p class="sub-heading">{{ copy().result.loading }}</p>
+            }
+          </div>
+        </div>
+      </div>
 
-        @if (!aiGenerating()) {
+      @if (phase() === 'keepsake') {
+        <div class="kia-effects-row" role="list" aria-label="Photo effects">
           <button
             type="button"
-            class="pb-btn pb-btn-primary pb-result-ai-btn"
-            [disabled]="!canRunAiGeneration()"
-            (click)="generateAi()"
+            class="kia-effect-btn"
+            [class.activeEffect]="selectedEffect() === 'none'"
+            (click)="selectEffect('none')"
           >
-            {{ copy().result.generateAi }}
+            <img src="kia/noeffect.svg" alt="no effect" />
           </button>
-          @if (!booth.openAiConfigured()) {
-            <p class="pb-hint pb-result-ai-hint">OpenAI API key must be set in Admin → AI.</p>
+          @for (slot of effectSlots(); track slot.key) {
+            <button
+              type="button"
+              class="kia-effect-btn"
+              [class.activeEffect]="selectedEffect() === slot.key"
+              [disabled]="slot.locked"
+              (click)="selectEffect(slot.key)"
+            >
+              <img [src]="slot.icon" [alt]="slot.label" />
+            </button>
           }
-          @if (aiModelUsed(); as model) {
-            <p class="pb-hint pb-result-ai-model">Using model path: {{ model }}</p>
-          }
+        </div>
+
+        @if (aiGenerating()) {
+          <p class="sub-heading">{{ copy().result.generatingAi }}</p>
+        } @else if (aiErr()) {
+          <p class="kia-msg">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
         }
-      </div>
-    }
 
-    @if (path(); as p) {
-      <p class="pb-path-hint" [attr.title]="copy().result.savedPrefix + ' ' + p">
-        {{ copy().result.savedPrefix }} {{ p }}
-      </p>
-    }
-
-    <div class="pb-row pb-result-actions">
-      <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ copy().result.retake }}</button>
-      <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
+        <button
+          type="button"
+          class="kia-save-tick"
+          [disabled]="!imageDataUrl() || aiGenerating()"
+          (click)="confirmKeepsake()"
+          aria-label="Save"
+        >
+          <img src="kia/tickmark.svg" alt="" />
+        </button>
+      } @else {
+        <div class="kia-download-actions">
+          <button type="button" class="startButton" (click)="startAgain()">
+            {{ copy().result.retake }}
+          </button>
+          <button
+            type="button"
+            class="uploadButton"
+            [disabled]="!imageDataUrl()"
+            (click)="uploadToHub()"
+          >
+            {{ copy().result.submit }}
+          </button>
+        </div>
+      }
     </div>
-  </div>
+  </pb-kia-shell>
 </div>

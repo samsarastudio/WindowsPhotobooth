@@ -3,55 +3,31 @@ export interface PhotoboothBranding {
   logoFile: string | null;
 }
 
-export interface PhotoboothCopyAttract {
+/** QR scan landing (first screen). */
+export interface PhotoboothCopyQr {
   icon: string;
-  /** Brand line under logo (e.g. tagline). */
   tagline: string;
-  /** Scale multiplier for main attract text block (title + subtitle). */
-  mainScale: number;
-  /** Scale multiplier for top brand block (logo + tagline). */
-  topScale: number;
   title: string;
   subtitle: string;
-  /** Primary CTA label (e.g. Tap to Start). */
-  ctaLabel: string;
-  startAria: string;
+  scanSuccess: string;
+  scanPrompt: string;
+  scanning: string;
+  cameraTapHint: string;
+  invalidCode: string;
+  bypassCode: string;
   adminLink: string;
 }
 
-export interface PhotoboothCopyQr {
-  icon: string;
-  title: string;
-  subtitle: string;
-  /** Shown briefly after a valid scan / unlock code (keyboard flow). */
-  scanSuccess: string;
-  /** Small footer line under primary actions. */
-  footer: string;
-  codeLabel: string;
-  ok: string;
-  back: string;
-  invalidCode: string;
-  debugHint: string;
-  bypassCode: string;
-}
-
 export interface PhotoboothCopyCapture {
-  /** Legacy / admin — optional secondary heading when not using ready flow. */
-  sideTitle: string;
-  instructions: string;
   starting: string;
-  /** Main heading on capture (e.g. Get Ready). */
   readyTitle: string;
-  /** Lead line under heading (e.g. center yourself…). */
   readySubtitle: string;
-  /** Line below the preview stage (e.g. hold still). */
   footerHint: string;
-  /** Small line under countdown (e.g. Smile — capturing soon). */
-  smileHint: string;
 }
 
 export interface PhotoboothCopyResult {
   title: string;
+  subtitle: string;
   loading: string;
   savedPrefix: string;
   retake: string;
@@ -93,7 +69,6 @@ export interface PhotoboothCopyAiMode {
 export const PLAIN_PHOTO_MODE_ID = 'photocapture';
 
 export interface PhotoboothCopy {
-  attract: PhotoboothCopyAttract;
   qr: PhotoboothCopyQr;
   capture: PhotoboothCopyCapture;
   result: PhotoboothCopyResult;
@@ -175,47 +150,32 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
 ];
 
 export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
-  attract: {
-    icon: '📷',
-    tagline: 'Movement that inspires',
-    mainScale: 1,
-    topScale: 1,
-    title: 'Your Moment Starts Here',
-    subtitle: 'Tap to create your\npersonalized photo keepsake.',
-    ctaLabel: 'Tap to Start',
-    startAria: 'Tap to Start',
-    adminLink: 'Admin',
-  },
   qr: {
     icon: '🔐',
-    title: 'Scan your QR',
-    subtitle:
-      'Hold your phone to the photobooth scanner to begin your photo experience.',
+    tagline: 'Movement that inspires',
+    title: 'Capture Your KIA Moment',
+    subtitle: 'Personalized keepsake experience.',
     scanSuccess: 'QR verified',
-    footer: 'Have your registration QR ready.',
-    codeLabel: 'Code',
-    ok: 'OK',
-    back: 'Back',
-    invalidCode: 'Invalid code. Use 1234 to continue (debug).',
-    debugHint: 'Debug — type ok then Enter',
+    scanPrompt: 'Scan your QR code to get started',
+    scanning: 'Scanning…',
+    cameraTapHint: 'Tap the QR area to use the booth camera',
+    invalidCode: 'Invalid QR code. Please use your registration code.',
     bypassCode: '1234',
+    adminLink: 'Admin',
   },
   capture: {
-    sideTitle: 'How to pose',
-    instructions:
-      'Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends',
     starting: 'Starting camera…',
     readyTitle: 'Get Ready',
-    readySubtitle: 'Center yourself in the frame. Your photo begins in…',
-    footerHint: 'Look at the camera and hold still.',
-    smileHint: 'Smile — capturing soon',
+    readySubtitle: 'Strike Your Best Pose',
+    footerHint: 'Look at camera and hold still.',
   },
   result: {
-    title: 'Your photo',
+    title: 'Your KIA Keepsake is Ready',
+    subtitle: 'Download your photo.',
     loading: 'Loading…',
     savedPrefix: 'Saved:',
-    retake: 'Retake',
-    submit: 'Submit',
+    retake: 'Start Again',
+    submit: 'Upload to Hub',
     generateAi: 'Create AI version',
     generatingAi: 'Creating your AI image…',
     aiPreviewTitle: 'AI version',

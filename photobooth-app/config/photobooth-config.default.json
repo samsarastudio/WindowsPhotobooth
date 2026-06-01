@@ -27,45 +27,32 @@
     "boothId": ""
   },
   "copy": {
-    "attract": {
-      "icon": "📷",
-      "tagline": "Movement that inspires",
-      "mainScale": 1,
-      "topScale": 1,
-      "title": "Your Moment Starts Here",
-      "subtitle": "Tap to create your\npersonalized photo keepsake.",
-      "ctaLabel": "Tap to Start",
-      "startAria": "Tap to Start",
-      "adminLink": "Admin"
-    },
     "qr": {
       "icon": "🔐",
-      "title": "Scan your QR",
-      "subtitle": "Hold your phone to the photobooth scanner to begin your photo experience.",
+      "tagline": "Movement that inspires",
+      "title": "Capture Your KIA Moment",
+      "subtitle": "Personalized keepsake experience.",
       "scanSuccess": "QR verified",
-      "footer": "Have your registration QR ready.",
-      "codeLabel": "Code",
-      "ok": "OK",
-      "back": "Back",
+      "scanPrompt": "Scan your QR code to get started",
+      "scanning": "Scanning…",
+      "cameraTapHint": "Tap the QR area to use the booth camera",
       "invalidCode": "Invalid QR code. Please use your registration code.",
-      "debugHint": "Debug — type ok then Enter",
-      "bypassCode": "1234"
+      "bypassCode": "1234",
+      "adminLink": "Admin"
     },
     "capture": {
-      "sideTitle": "How to pose",
-      "instructions": "Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends",
       "starting": "Starting camera…",
       "readyTitle": "Get Ready",
-      "readySubtitle": "Center yourself in the frame. Your photo begins in…",
-      "footerHint": "Look at the camera and hold still.",
-      "smileHint": "Smile — capturing soon"
+      "readySubtitle": "Strike Your Best Pose",
+      "footerHint": "Look at camera and hold still."
     },
     "result": {
-      "title": "Your photo",
+      "title": "Your KIA Keepsake is Ready",
+      "subtitle": "Download your photo.",
       "loading": "Loading…",
       "savedPrefix": "Saved:",
-      "retake": "Retake",
-      "submit": "Submit",
+      "retake": "Start Again",
+      "submit": "Upload to Hub",
       "generateAi": "Create AI version",
       "generatingAi": "Creating your AI image…",
       "aiPreviewTitle": "AI version",

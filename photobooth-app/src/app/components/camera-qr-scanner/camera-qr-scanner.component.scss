@@ -2,8 +2,11 @@
   display: block;
   position: absolute;
   inset: 0;
-  border-radius: 12%;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
   overflow: hidden;
+  background: #0a0a0a;
 }
 
 .pb-camera-qr {

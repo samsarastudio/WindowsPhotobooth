@@ -111,59 +111,32 @@
     @if (tab === 'copy') {
       <div class="pb-admin-grid">
         <section class="pb-admin-card">
-          <h2>Attract</h2>
-          <label>Icon</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.icon" />
-          <label>Tagline</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.tagline" />
-          <label>Title</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.title" />
-          <label>Subtitle</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.subtitle" />
-          <label>Main text scale (0.6 - 1.6)</label>
-          <input class="pb-input" type="number" min="0.6" max="1.6" step="0.05" [(ngModel)]="draft.attract.mainScale" />
-          <label>Top block scale (logo + tagline, 0.6 - 1.6)</label>
-          <input class="pb-input" type="number" min="0.6" max="1.6" step="0.05" [(ngModel)]="draft.attract.topScale" />
-          <label>CTA label</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.ctaLabel" />
-          <label>Start (aria)</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.startAria" />
-          <label>Admin link label</label>
-          <input class="pb-input" [(ngModel)]="draft.attract.adminLink" />
-        </section>
-
-        <section class="pb-admin-card">
-          <h2>QR / unlock</h2>
-          <label>Icon</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.icon" />
+          <h2>Scan landing</h2>
+          <p class="pb-admin-hint">First screen — logo tagline, headings, and QR status text.</p>
+          <label>Tagline (under logo)</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.tagline" />
           <label>Title</label>
           <input class="pb-input" [(ngModel)]="draft.qr.title" />
-          <label>Subtitle</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.subtitle" />
+          <label>Subtitle (use Enter for a new line)</label>
+          <textarea class="pb-input pb-textarea" rows="2" [(ngModel)]="draft.qr.subtitle"></textarea>
+          <label>Idle prompt (under QR)</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.scanPrompt" />
+          <label>Active scan status</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.scanning" />
+          <label>Camera fallback tap hint</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.cameraTapHint" />
           <label>Scan success message</label>
           <input class="pb-input" [(ngModel)]="draft.qr.scanSuccess" />
-          <label>Footer line</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.footer" />
-          <label>Code label</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.codeLabel" />
-          <label>OK button</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.ok" />
-          <label>Back button</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.back" />
           <label>Invalid code message</label>
           <input class="pb-input" [(ngModel)]="draft.qr.invalidCode" />
-          <label>Debug hint</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.debugHint" />
-          <label>Bypass code</label>
+          <label>Bypass code (debug)</label>
           <input class="pb-input" [(ngModel)]="draft.qr.bypassCode" />
+          <label>Admin link label</label>
+          <input class="pb-input" [(ngModel)]="draft.qr.adminLink" />
         </section>
 
         <section class="pb-admin-card">
           <h2>Capture</h2>
-          <label>Side title</label>
-          <input class="pb-input" [(ngModel)]="draft.capture.sideTitle" />
-          <label>Instructions</label>
-          <textarea class="pb-input pb-textarea" rows="3" [(ngModel)]="draft.capture.instructions"></textarea>
           <label>Starting camera placeholder</label>
           <input class="pb-input" [(ngModel)]="draft.capture.starting" />
           <label>Ready title</label>
@@ -172,14 +145,14 @@
           <input class="pb-input" [(ngModel)]="draft.capture.readySubtitle" />
           <label>Footer hint</label>
           <input class="pb-input" [(ngModel)]="draft.capture.footerHint" />
-          <label>Smile hint</label>
-          <input class="pb-input" [(ngModel)]="draft.capture.smileHint" />
         </section>
 
         <section class="pb-admin-card">
           <h2>Result</h2>
           <label>Title</label>
           <input class="pb-input" [(ngModel)]="draft.result.title" />
+          <label>Subtitle</label>
+          <input class="pb-input" [(ngModel)]="draft.result.subtitle" />
           <label>Loading</label>
           <input class="pb-input" [(ngModel)]="draft.result.loading" />
           <label>Saved prefix</label>
@@ -368,7 +341,7 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Booth logo</h2>
           <p class="pb-hint">
-            Upload a rectangular logo (PNG, JPG, WebP, SVG). It replaces the camera / lock emoji on the attract and
+            Upload a rectangular logo (PNG, JPG, WebP, SVG). It replaces the default Kia logo on the scan landing and
             unlock screens. Wide logos scale down to fit; aspect ratio is preserved.
           </p>
           @if (branding.logoSrc(); as logo) {

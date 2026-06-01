@@ -31,8 +31,11 @@ function withPreviewDecodeKey(fileUrl: string, v: number): string {
   return `${fileUrl}${sep}v=${v}`;
 }
 
+import { KiaShellComponent } from '../../components/kia-shell/kia-shell.component';
+
 @Component({
   selector: 'pb-capture-page',
+  imports: [KiaShellComponent],
   templateUrl: './capture-page.component.html',
   styleUrl: './capture-page.component.scss',
 })

@@ -1,78 +1,78 @@
-<div class="pb-page pb-capture pb-kia-capture-page">
-  <div class="pb-kia-capture">
-    @if (selectedStyleLabel(); as styleName) {
-      <p class="pb-kia-style-chip">Style: {{ styleName }}</p>
-    }
-
-    <h1 class="pb-kia-ready-title">{{ copy().capture.readyTitle }}</h1>
-    <p class="pb-kia-ready-lead">{{ copy().capture.readySubtitle }}</p>
-
-    <div class="pb-kia-stage">
-      <div
-        class="pb-preview-wrap"
-        [class.pb-preview-wrap--sized]="previewAspectRatio() !== null"
-        [class.pb-preview-wrap--empty]="showPreviewPlaceholder()"
-        [style.--preview-ar]="previewAspectRatio() ?? 1.5"
-      >
-        @if (useWebcam()) {
-          <video
-            #videoEl
-            class="pb-preview"
-            autoplay
-            playsinline
-            muted
-            (loadedmetadata)="onVideoMeta($event)"
-          ></video>
-        } @else {
-          @if (showPreviewPlaceholder()) {
-            <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
-          } @else {
-            <div class="pb-preview-stack">
-              <img
-                class="pb-preview pb-preview--sdk-live pb-preview-layer"
-                [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
-                [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
-                alt="Live preview"
-                decoding="sync"
-                draggable="false"
-                fetchpriority="low"
-                (load)="onSdkPreviewLayerDecoded($event, 0)"
-              />
-              <img
-                class="pb-preview pb-preview--sdk-live pb-preview-layer"
-                [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
-                [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
-                alt=""
-                decoding="sync"
-                draggable="false"
-                fetchpriority="low"
-                (load)="onSdkPreviewLayerDecoded($event, 1)"
-              />
-            </div>
-          }
-        }
-      </div>
-
-      <div class="pb-kia-stage-rule" aria-hidden="true"></div>
-
-      <div class="pb-kia-count-column">
-        @if (countdown() !== null && countdown()! > 0) {
-          <span class="pb-count" aria-live="polite">{{ countdown() }}</span>
-          <div class="pb-kia-dots" aria-hidden="true">
-            <span class="pb-kia-dot"></span>
-            <span class="pb-kia-dot pb-kia-dot--mid"></span>
-            <span class="pb-kia-dot"></span>
-          </div>
-          <p class="pb-kia-smile">{{ copy().capture.smileHint }}</p>
-        } @else {
-          <p class="pb-kia-wait-copy">{{ copy().capture.instructions }}</p>
-        }
-        @if (hint(); as t) {
-          <p class="pb-hint">{{ t }}</p>
-        }
-      </div>
+<div class="pb-page pb-kia-experience pb-capture">
+  <pb-kia-shell>
+    <div kiaLogo class="kia-logo-wrap">
+      <img class="kia-logo" src="kia/logo.svg" alt="KIA Logo" loading="eager" decoding="async" />
     </div>
 
-    <p class="pb-kia-capture-footer">{{ copy().capture.footerHint }}</p>
-  </div>
+    <div class="kia-page-body">
+      <div class="kia-copy-block">
+        <h1 class="main-heading main-heading--pose">{{ copy().capture.readyTitle }}</h1>
+        <p class="sub-heading kia-sub-heading--tight">{{ copy().capture.readySubtitle }}</p>
+      </div>
+
+      <div class="kia-pose-stage">
+        <div class="kia-pose-frame-col">
+          <div class="frame w-full">
+            @if (countdown() !== null && countdown()! > 0) {
+              <div class="runner" aria-hidden="true"></div>
+            }
+            <div class="content w-full">
+              @if (useWebcam()) {
+                <video
+                  #videoEl
+                  class="kia-capture-preview"
+                  autoplay
+                  playsinline
+                  muted
+                  (loadedmetadata)="onVideoMeta($event)"
+                ></video>
+              } @else if (showPreviewPlaceholder()) {
+                <div class="kia-capture-preview kia-capture-preview--placeholder">
+                  {{ copy().capture.starting }}
+                </div>
+              } @else {
+                <div class="kia-capture-preview-stack">
+                  <img
+                    class="kia-capture-preview-layer"
+                    [class.kia-capture-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
+                    [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
+                    alt="Live preview"
+                    decoding="sync"
+                    draggable="false"
+                    (load)="onSdkPreviewLayerDecoded($event, 0)"
+                  />
+                  <img
+                    class="kia-capture-preview-layer"
+                    [class.kia-capture-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
+                    [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
+                    alt=""
+                    decoding="sync"
+                    draggable="false"
+                    (load)="onSdkPreviewLayerDecoded($event, 1)"
+                  />
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="kia-pose-timer-col">
+          <video
+            class="kia-timer-video"
+            src="kia/timer_video.mp4"
+            autoplay
+            loop
+            muted
+            playsinline
+            aria-hidden="true"
+          ></video>
+        </div>
+      </div>
+
+      <p class="sub-heading kia-sub-heading--footer">{{ copy().capture.footerHint }}</p>
+      @if (hint(); as t) {
+        <p class="kia-msg">{{ t }}</p>
+      }
+    </div>
+  </pb-kia-shell>
 </div>

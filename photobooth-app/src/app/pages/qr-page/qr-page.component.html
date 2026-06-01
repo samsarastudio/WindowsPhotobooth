@@ -1,104 +1,80 @@
-<div class="pb-page pb-qr pb-kia-qr-page pb-kia-attract-merged">
-  <div
-    class="pb-kia-qr"
-    [style.--pb-attract-main-scale]="copy().attract.mainScale"
-    [style.--pb-attract-top-scale]="copy().attract.topScale"
-  >
-    <header class="pb-kia-qr-brand">
+<div class="pb-page pb-kia-experience pb-qr">
+  <pb-kia-shell>
+    <div kiaLogo class="kia-logo-wrap">
       @if (branding.logoSrc(); as logo) {
-        <img
-          class="pb-kia-logo"
-          [src]="logo"
-          [attr.alt]="copy().attract.title"
-          loading="eager"
-          decoding="async"
-        />
+        <img class="kia-logo" [src]="logo" alt="KIA Logo" loading="eager" decoding="async" />
       } @else {
-        <span class="pb-kia-logo-fallback" aria-hidden="true">{{ copy().attract.icon }}</span>
+        <img class="kia-logo" src="kia/logo.svg" alt="KIA Logo" loading="eager" decoding="async" />
       }
-      <p class="pb-kia-tagline">{{ copy().attract.tagline }}</p>
-    </header>
+      <p class="kia-tagline">{{ copy().qr.tagline }}</p>
+    </div>
 
-    <div class="pb-kia-qr-stack">
-      <div class="pb-kia-qr-intro">
-        <h1 class="pb-kia-hero-title pb-kia-qr-title">{{ copy().attract.title }}</h1>
-        <p class="pb-kia-qr-lead">{{ copy().qr.subtitle }}</p>
+    <div class="kia-page-body">
+      <div class="kia-copy-block">
+        <h1 class="main-heading">{{ copy().qr.title }}</h1>
+        <p class="sub-heading kia-subtitle-multiline">{{ copy().qr.subtitle }}</p>
       </div>
 
-      <div
-        class="pb-kia-qr-art-shell"
-        [class.pb-kia-qr-art-shell--detecting]="qrDetecting()"
-        [class.pb-kia-qr-art-shell--success]="scanSuccess()"
-      >
-        <div class="pb-kia-qr-visual">
-          <div class="pb-kia-qr-tab-wrap">
-            <img
-              class="pb-kia-qr-tab"
-              src="kia/qr-panel.png"
-              alt=""
-              aria-hidden="true"
-              loading="eager"
-              decoding="async"
-            />
-            <div class="pb-kia-qr-tab-logo" aria-hidden="true">
-              @if (branding.logoSrc(); as tabLogo) {
-                <img class="pb-kia-tab-logo-img" [src]="tabLogo" alt="" />
-              } @else {
-                <span class="pb-kia-tab-logo-text">KIA</span>
-              }
-            </div>
-          </div>
-
-          <div class="pb-kia-qr-phone-wrap">
-            @if (useCameraQr()) {
+      <div class="kia-qr-scan-block">
+        <div class="kia-qr-image-wrap">
+          @if (showCameraQr()) {
+            <div class="kia-qr-camera-slot">
               <pb-camera-qr-scanner
                 [scanSuccess]="scanSuccess()"
                 (codeDetected)="onCameraQrCode($event)"
                 (detectingChange)="onQrDetecting($event)"
               />
-            } @else {
-              <img
-                class="pb-kia-qr-phone"
-                src="kia/qr-phone.png"
-                alt=""
-                aria-hidden="true"
-                loading="eager"
-                decoding="async"
-              />
-              <div
-                class="pb-kia-qr-phone-landmarks"
-                [class.pb-kia-qr-phone-landmarks--active]="qrDetecting() || scanSuccess()"
-                aria-hidden="true"
-              >
-                <span class="pb-landmark pb-landmark-tl"></span>
-                <span class="pb-landmark pb-landmark-tr"></span>
-                <span class="pb-landmark pb-landmark-bl"></span>
-                <span class="pb-landmark pb-landmark-br"></span>
-              </div>
-              @if (scanSuccess()) {
-                <div class="pb-kia-qr-phone-check" aria-hidden="true">
-                  <svg viewBox="0 0 52 52" class="pb-check-svg">
-                    <circle class="pb-check-circle" cx="26" cy="26" r="24" fill="none" />
-                    <path class="pb-check-mark" fill="none" d="M14 27 L22 35 L38 17" />
-                  </svg>
-                </div>
+              @if (!scanSuccess() && !validating()) {
+                <span class="kia-qr-scan-line" aria-hidden="true"></span>
               }
-            }
-          </div>
+            </div>
+          } @else {
+            <button
+              type="button"
+              class="kia-qr-tap-target"
+              [class.kia-qr-tap-target--active]="cameraFallbackEnabled()"
+              [disabled]="!cameraFallbackEnabled() || scanSuccess() || validating()"
+              (click)="onQrAreaActivate()"
+              [attr.aria-label]="cameraFallbackEnabled() ? copy().qr.cameraTapHint : 'QR scan area'"
+            >
+              <div class="kia-qr-frame">
+                <img
+                  class="kia-qr-image"
+                  src="kia/qr.png"
+                  alt=""
+                  aria-hidden="true"
+                  loading="eager"
+                  decoding="async"
+                />
+                @if (!scanSuccess()) {
+                  <span class="kia-qr-scan-line" aria-hidden="true"></span>
+                }
+              </div>
+            </button>
+          }
+          @if (scanSuccess()) {
+            <div
+              class="kia-qr-success-overlay"
+              role="img"
+              [attr.aria-label]="copy().qr.scanSuccess"
+            >
+              <svg viewBox="0 0 52 52" class="kia-qr-check-svg" aria-hidden="true">
+                <circle class="kia-qr-check-circle" cx="26" cy="26" r="24" fill="none" />
+                <path class="kia-qr-check-mark" fill="none" d="M14 27 L22 35 L38 17" />
+              </svg>
+            </div>
+          }
         </div>
+        <p class="sub-heading sub-heading--scan" role="status">{{ statusLine() }}</p>
+        @if (!showCameraQr() && cameraFallbackEnabled() && !scanSuccess()) {
+          <p class="kia-qr-tap-hint">{{ copy().qr.cameraTapHint }}</p>
+        }
+        @if (message()) {
+          <p class="kia-msg" role="alert">{{ message() }}</p>
+        }
       </div>
-
-      @if (validating()) {
-        <p class="pb-kia-qr-status" role="status">Verifying…</p>
-      } @else if (scanSuccess()) {
-        <p class="pb-kia-qr-success" role="status">{{ copy().qr.scanSuccess }}</p>
-      } @else if (message()) {
-        <p class="pb-msg pb-kia-qr-msg" role="alert">{{ message() }}</p>
-      }
-
-      <p class="pb-kia-qr-footer">{{ copy().qr.footer }}</p>
     </div>
+  </pb-kia-shell>
 
-    <a routerLink="/admin" class="pb-attract-admin">{{ copy().attract.adminLink }}</a>
-  </div>
+  <a routerLink="/admin" class="kia-admin-link">{{ copy().qr.adminLink }}</a>
 </div>

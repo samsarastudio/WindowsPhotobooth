@@ -1,0 +1,25 @@
+<div class="kia-screen">
+  <video
+    class="kia-bg-video"
+    src="kia/bg.mp4"
+    autoplay
+    loop
+    muted
+    playsinline
+    aria-hidden="true"
+  ></video>
+  <div class="kia-screen-content">
+    <div class="innerBox" [class.innerBox--result]="innerClass() === 'innerBox--result'">
+      <div class="leftBorder" aria-hidden="true"></div>
+      <div class="rightBorder" aria-hidden="true"></div>
+      <div class="topBorder" aria-hidden="true"></div>
+      <div class="bottomBorder" aria-hidden="true"></div>
+      <div class="innerBox-grid">
+        <div class="kia-inner-stack">
+          <ng-content select="[kiaLogo]" />
+          <ng-content />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
