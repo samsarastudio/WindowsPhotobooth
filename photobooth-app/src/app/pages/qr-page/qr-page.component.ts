@@ -30,6 +30,8 @@ import { BoothConfigService } from '../../services/booth-config.service';
 
 import { BoothSessionService } from '../../services/booth-session.service';
 
+import { KiaApiService } from '../../services/kia-api.service';
+
 import { AiStyleService } from '../../services/ai-style.service';
 
 import { ScannerService } from '../../services/scanner.service';
@@ -63,6 +65,8 @@ export class QrPageComponent implements OnInit, OnDestroy {
   private readonly booth = inject(BoothConfigService);
 
   private readonly session = inject(BoothSessionService);
+
+  private readonly kiaApi = inject(KiaApiService);
 
   private readonly aiStyle = inject(AiStyleService);
 
@@ -223,15 +227,8 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
 
   private isBypassCode(token: string): boolean {
-
-    const expected = this.copy().qr.bypassCode.trim();
-
-    const autoUnlockForMock =
-
-      expected === '1234' && token.length > 0 && token.startsWith('1');
-
-    return token === expected || autoUnlockForMock;
-
+    const expected = (this.booth.kiaApi().bypassCode || this.copy().qr.bypassCode).trim();
+    return token === expected;
   }
 
 
@@ -246,7 +243,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
 
 
-    const prefix = this.booth.sync().qrPrefix;
+    const prefix = this.booth.kiaApi().qrPrefix;
 
     const formatOk = matchesQrTokenFormat(token, prefix) || this.isBypassCode(token);
 
@@ -273,52 +270,32 @@ export class QrPageComponent implements OnInit, OnDestroy {
     try {
 
       if (this.isBypassCode(token)) {
-
-        await this.acceptToken(token);
-
-        return;
-
-      }
-
-
-
-      if (window.pbApi?.syncValidateToken) {
-
-        const res = await window.pbApi.syncValidateToken(token);
-
+        const res = await this.kiaApi.validateToken(token);
         if (res.valid) {
-
-          await this.acceptToken(token);
-
-          return;
-
+          await this.acceptToken(
+            token,
+            res.sessionData ?? null,
+            res.email ?? this.booth.kiaApi().devBypassEmail,
+          );
+        } else {
+          this.message.set(res.error || res.message || this.copy().qr.invalidCode);
         }
+        return;
+      }
 
-        if (res.offline && matchesQrTokenFormat(token, prefix)) {
 
-          await this.acceptToken(token);
 
-          return;
+      const res = await this.kiaApi.validateToken(token);
 
-        }
+      if (res.valid) {
 
-        this.message.set(res.message || res.error || this.copy().qr.invalidCode);
+        await this.acceptToken(token, res.sessionData ?? null, res.email ?? null);
 
         return;
 
       }
 
-
-
-      if (matchesQrTokenFormat(token, prefix)) {
-
-        await this.acceptToken(token);
-
-      } else {
-
-        this.message.set(this.copy().qr.invalidCode);
-
-      }
+      this.message.set(res.message || res.error || this.copy().qr.invalidCode);
 
     } finally {
 
@@ -334,9 +311,13 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
 
 
-  private async acceptToken(token: string): Promise<void> {
+  private async acceptToken(
+    token: string,
+    sessionData: string | null,
+    guestEmail: string | null = null,
+  ): Promise<void> {
 
-    this.session.start(token);
+    this.session.start(token, sessionData, guestEmail);
 
     this.message.set('');
 

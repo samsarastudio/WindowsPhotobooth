@@ -1,5 +1,5 @@
 <div class="pb-page pb-kia-experience pb-capture">
-  <pb-kia-shell>
+  <pb-kia-shell innerClass="innerBox--capture">
     <div kiaLogo class="kia-logo-wrap">
       <img class="kia-logo" src="kia/logo.svg" alt="KIA Logo" loading="eager" decoding="async" />
     </div>
@@ -12,11 +12,12 @@
 
       <div class="kia-pose-stage">
         <div class="kia-pose-frame-col">
-          <div class="frame w-full">
+          <div class="frame w-full" [class.frame--countdown]="countdown() !== null && countdown()! > 0">
             @if (countdown() !== null && countdown()! > 0) {
               <div class="runner" aria-hidden="true"></div>
             }
             <div class="content w-full">
+              <div class="kia-capture-preview-slot">
               @if (useWebcam()) {
                 <video
                   #videoEl
@@ -24,7 +25,6 @@
                   autoplay
                   playsinline
                   muted
-                  (loadedmetadata)="onVideoMeta($event)"
                 ></video>
               } @else if (showPreviewPlaceholder()) {
                 <div class="kia-capture-preview kia-capture-preview--placeholder">
@@ -52,6 +52,7 @@
                   />
                 </div>
               }
+              </div>
             </div>
           </div>
         </div>

@@ -90,17 +90,71 @@
         </section>
 
         <section class="pb-admin-card">
-          <h2>Backend / token sync</h2>
-          <label>API base URL (empty = offline prefix check only)</label>
-          <input class="pb-input" [(ngModel)]="draftSync.apiBaseUrl" placeholder="https://api.example.com" />
-          <label>Validate token path</label>
-          <input class="pb-input" [(ngModel)]="draftSync.validatePath" />
-          <label>Upload photos path</label>
-          <input class="pb-input" [(ngModel)]="draftSync.uploadPath" />
-          <label>QR token prefix</label>
-          <input class="pb-input" [(ngModel)]="draftSync.qrPrefix" placeholder="KIA-PHOTO-" />
-          <label>Booth ID</label>
-          <input class="pb-input" [(ngModel)]="draftSync.boothId" />
+          <h2>Kia Forum API</h2>
+          <p class="pb-admin-hint">
+            Dev: <code>https://dev-kiaforum2026.thetunagroup.com</code> — Prod:
+            <code>https://kiaexperience.info</code>
+          </p>
+          <label>API base URL</label>
+          <input
+            class="pb-input"
+            [(ngModel)]="draftKiaApi.baseUrl"
+            placeholder="https://dev-kiaforum2026.thetunagroup.com"
+          />
+          <label>Bearer token (optional bootstrap)</label>
+          <input
+            class="pb-input"
+            type="password"
+            [(ngModel)]="bearerTokenDraft"
+            [placeholder]="bearerConfigured() ? '•••••••• (saved — enter new to replace)' : 'Optional — guest email auth used when empty'"
+            autocomplete="off"
+          />
+          <p class="pb-admin-hint">
+            Dev bypass <code>12345</code> authenticates as
+            <code>{{ draftKiaApi.devBypassEmail }}</code>. Normal QR flow uses the guest email
+            returned from validate, then uploads when online.
+          </p>
+          <label>Dev bypass email</label>
+          <input
+            class="pb-input"
+            [(ngModel)]="draftKiaApi.devBypassEmail"
+            placeholder="test@csgnow.com"
+          />
+          <label>QR token prefix (offline validation)</label>
+          <input class="pb-input" [(ngModel)]="draftKiaApi.qrPrefix" placeholder="KIA-PHOTO-" />
+          <label>Bypass code (testing)</label>
+          <input class="pb-input" [(ngModel)]="draftKiaApi.bypassCode" />
+          <label>
+            <input type="checkbox" [(ngModel)]="draftKiaApi.offlineAllowPrefix" />
+            Allow prefix-format tokens when API is unreachable
+          </label>
+          <label>
+            <input type="checkbox" [(ngModel)]="draftKiaApi.debugMode" />
+            Show API debug log (bottom-right panel)
+          </label>
+          <label>Framed upload format</label>
+          <select class="pb-input" [(ngModel)]="draftKiaApi.uploadImageFormat">
+            <option value="png">PNG (transparent frame edges)</option>
+            <option value="jpeg">JPEG (white background)</option>
+          </select>
+          <p class="pb-admin-hint">
+            PNG preserves rounded transparent corners from frame overlays like Classic Yellow.
+            JPEG flattens onto white.
+          </p>
+          <p>
+            Upload queue: <strong>{{ uploadQueuePending() }}</strong> pending
+          </p>
+          <div class="pb-admin-row">
+            <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="busy()" (click)="refreshUploadQueue()">
+              Refresh queue
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="busy()" (click)="testKiaConnection()">
+              Test API connection
+            </button>
+          </div>
+          <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveKiaApi()">
+            Save API settings
+          </button>
           <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveScanner()">
             Save scanner settings
           </button>
@@ -161,6 +215,20 @@
           <input class="pb-input" [(ngModel)]="draft.result.retake" />
           <label>Submit</label>
           <input class="pb-input" [(ngModel)]="draft.result.submit" />
+          <label>Upload success title</label>
+          <input class="pb-input" [(ngModel)]="draft.result.uploadSuccessTitle" />
+          <label>Upload success hint</label>
+          <input class="pb-input" [(ngModel)]="draft.result.uploadSuccessHint" />
+          <label>Upload continue button</label>
+          <input class="pb-input" [(ngModel)]="draft.result.uploadContinue" />
+          <label>Uploading message</label>
+          <input class="pb-input" [(ngModel)]="draft.result.uploading" />
+          <label>Upload error message</label>
+          <input class="pb-input" [(ngModel)]="draft.result.uploadError" />
+          <label>Uploading screen minimum (seconds)</label>
+          <input class="pb-input" type="number" min="1" max="15" [(ngModel)]="draft.result.uploadMinDisplaySeconds" />
+          <label>Auto home after upload (seconds, 0 = off)</label>
+          <input class="pb-input" type="number" min="0" [(ngModel)]="draft.result.uploadAutoHomeSeconds" />
           <label>Create AI version (button)</label>
           <input class="pb-input" [(ngModel)]="draft.result.generateAi" />
           <label>Generating AI (status)</label>

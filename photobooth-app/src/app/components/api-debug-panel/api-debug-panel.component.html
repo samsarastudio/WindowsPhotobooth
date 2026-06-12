@@ -1,0 +1,50 @@
+@if (debug.enabled()) {
+  <aside class="pb-api-debug" aria-label="API debug log">
+    <header class="pb-api-debug__head">
+      <span class="pb-api-debug__title">API debug</span>
+      <button type="button" class="pb-api-debug__clear" (click)="onClear()">Clear</button>
+    </header>
+    <div #scrollBox class="pb-api-debug__body">
+      @if (debug.logs().length === 0) {
+        <p class="pb-api-debug__empty">Waiting for API calls…</p>
+      }
+      @for (entry of debug.logs(); track trackEntry($index, entry)) {
+        <article class="pb-api-debug__entry" [class.pb-api-debug__entry--err]="entry.ok === false">
+          <div class="pb-api-debug__meta">
+            <span class="pb-api-debug__time">{{ formatTime(entry.at) }}</span>
+            @if (entry.kind) {
+              <span class="pb-api-debug__kind">{{ entry.kind }}</span>
+            }
+            @if (entry.method) {
+              <span class="pb-api-debug__method">{{ entry.method }}</span>
+            }
+            @if (entry.statusCode !== undefined) {
+              <span class="pb-api-debug__status">{{ entry.statusCode }}</span>
+            }
+            @if (entry.durationMs !== undefined) {
+              <span class="pb-api-debug__dur">{{ entry.durationMs }}ms</span>
+            }
+          </div>
+          @if (entry.url) {
+            <div class="pb-api-debug__url">{{ entry.url }}</div>
+          }
+          @if (entry.error) {
+            <pre class="pb-api-debug__payload pb-api-debug__payload--err">{{ entry.error }}</pre>
+          }
+          @if (entry.request !== undefined) {
+            <details class="pb-api-debug__details">
+              <summary>Request</summary>
+              <pre class="pb-api-debug__payload">{{ entry.request | json }}</pre>
+            </details>
+          }
+          @if (entry.response !== undefined) {
+            <details class="pb-api-debug__details" open>
+              <summary>Response</summary>
+              <pre class="pb-api-debug__payload">{{ entry.response | json }}</pre>
+            </details>
+          }
+        </article>
+      }
+    </div>
+  </aside>
+}

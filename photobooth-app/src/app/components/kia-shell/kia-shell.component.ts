@@ -7,6 +7,11 @@ import { Component, input } from '@angular/core';
   styleUrl: './kia-shell.component.scss',
 })
 export class KiaShellComponent {
-  /** Extra class on innerBox (e.g. innerBox--result). */
+  /** Extra class on innerBox (e.g. innerBox--result, innerBox--capture). */
   readonly innerClass = input('');
+
+  innerBoxClass(): string {
+    const extra = this.innerClass().trim();
+    return extra ? `innerBox ${extra}` : 'innerBox';
+  }
 }

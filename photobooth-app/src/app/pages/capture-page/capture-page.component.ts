@@ -65,8 +65,6 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   readonly useWebcam = signal(false);
   readonly hint = signal<string | null>(null);
   readonly countdown = signal<number | null>(null);
-  /** Width ÷ height — frame hugs preview pixels without letterboxing when known. */
-  readonly previewAspectRatio = signal<number | null>(null);
   readonly showPreviewPlaceholder = computed(
     () => !this.useWebcam() && !this.sdkPreviewHasFrame(),
   );
@@ -301,7 +299,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
-  /** After decode: reveal buffered layer, then refresh aspect from the visible layer. */
+  /** After decode: reveal buffered layer when the pending swap matches. */
   onSdkPreviewLayerDecoded(ev: Event, layer: 0 | 1): void {
     const img = ev.target as HTMLImageElement;
     const decodedV = this.parseImgDecodeV(img);
@@ -322,16 +320,6 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
     if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
       return;
-    }
-    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-      this.previewAspectRatio.set(img.naturalWidth / img.naturalHeight);
-    }
-  }
-
-  onVideoMeta(ev: Event): void {
-    const v = ev.target as HTMLVideoElement;
-    if (v.videoWidth > 0 && v.videoHeight > 0) {
-      this.previewAspectRatio.set(v.videoWidth / v.videoHeight);
     }
   }
 

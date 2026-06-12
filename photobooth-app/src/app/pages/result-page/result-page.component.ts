@@ -1,446 +1,349 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-
 import { Router } from '@angular/router';
-
 import { KiaShellComponent } from '../../components/kia-shell/kia-shell.component';
-
 import { CameraService } from '../../services/camera.service';
-
 import { BoothConfigService } from '../../services/booth-config.service';
-
-import { AiStyleService } from '../../services/ai-style.service';
-
-import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
-
 import { BoothSessionService } from '../../services/booth-session.service';
+import { KiaApiService } from '../../services/kia-api.service';
+import { PhotoFramesService } from '../../services/photo-frames.service';
+import { ApiDebugLogService } from '../../services/api-debug-log.service';
+import type { BoothEffectSlot } from '../../services/photo-frames.service';
 
-import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
-
-
-
-type ResultPhase = 'keepsake' | 'download';
-
-type EffectKey = 'none' | 'effect1' | 'effect2' | 'locked3' | 'locked4' | 'locked5';
-
-
+type ResultPhase = 'keepsake' | 'uploading' | 'success';
+type EffectKey = 'none' | string;
 
 @Component({
-
   selector: 'pb-result-page',
-
   imports: [KiaShellComponent],
-
   templateUrl: './result-page.component.html',
-
   styleUrl: './result-page.component.scss',
-
 })
-
 export class ResultPageComponent implements OnInit, OnDestroy {
-
   readonly booth = inject(BoothConfigService);
-
-  private readonly aiStyle = inject(AiStyleService);
-
-  private readonly gallerySession = inject(AiGallerySessionService);
-
   private readonly boothSession = inject(BoothSessionService);
-
+  private readonly kiaApi = inject(KiaApiService);
+  private readonly photoFrames = inject(PhotoFramesService);
+  private readonly debugLog = inject(ApiDebugLogService);
   readonly copy = this.booth.copy;
 
-
-
   readonly phase = signal<ResultPhase>('keepsake');
-
   readonly selectedEffect = signal<EffectKey>('none');
-
-
+  readonly uploadError = signal<string | null>(null);
+  readonly autoHomeSecondsLeft = signal<number | null>(null);
 
   readonly path = signal<string | null>(null);
-
   readonly imageDataUrl = signal<string | null>(null);
-
+  readonly imageLoadFailed = signal(false);
   readonly err = signal<string | null>(null);
 
-  readonly resultAspectRatio = signal<number | null>(null);
+  readonly effectSlots = this.photoFrames.effectSlots;
+  readonly overlayPreviewUrl = signal<string | null>(null);
+  readonly overlayLoadFailed = signal(false);
 
+  readonly hasFrameSelected = computed(() => this.selectedEffect() !== 'none');
+  readonly showFrameOverlay = computed(
+    () => Boolean(this.overlayPreviewUrl()) && !this.overlayLoadFailed(),
+  );
 
-
-  readonly aiGenerating = signal(false);
-
-  readonly aiErr = signal<string | null>(null);
-
-  readonly aiModelUsed = signal<string | null>(null);
-
-  readonly thinkingStep = signal(0);
-
-  readonly aiEtaSec = signal(22);
-
-  readonly aiElapsedSec = signal(0);
-
-  readonly aiEtaLabel = computed(() => this.formatDuration(this.aiEtaSec()));
-
-  readonly aiElapsedLabel = computed(() => this.formatDuration(this.aiElapsedSec()));
-
-  readonly aiOvertime = computed(() => this.aiEtaSec() <= 0);
-
-
-
-  readonly effectSlots = computed(() => {
-
-    const modes = this.booth.aiModes();
-
-    return [
-
-      {
-
-        key: 'effect1' as const,
-
-        icon: 'kia/effect1.svg',
-
-        label: modes[0]?.label ?? 'effect1',
-
-        locked: modes.length < 1 || !this.booth.aiGenerationEnabled(),
-
-        modeId: modes[0]?.id ?? null,
-
-      },
-
-      {
-
-        key: 'effect2' as const,
-
-        icon: 'kia/effect2.svg',
-
-        label: modes[1]?.label ?? 'effect2',
-
-        locked: modes.length < 2 || !this.booth.aiGenerationEnabled(),
-
-        modeId: modes[1]?.id ?? null,
-
-      },
-
-      { key: 'locked3' as const, icon: 'kia/lockedeffect.svg', label: 'effect locked', locked: true, modeId: null },
-
-      { key: 'locked4' as const, icon: 'kia/lockedeffect.svg', label: 'effect locked', locked: true, modeId: null },
-
-      { key: 'locked5' as const, icon: 'kia/lockedeffect.svg', label: 'effect locked', locked: true, modeId: null },
-
-    ];
-
-  });
-
-
-
-  private aiTimer?: ReturnType<typeof setInterval>;
-
-
+  private autoHomeInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-
     private readonly router: Router,
-
     private readonly camera: CameraService,
-
   ) {
-
     const nav = this.router.getCurrentNavigation();
-
     const p = (nav?.extras?.state as { path?: string } | undefined)?.path;
-
     if (p) {
-
       this.path.set(p);
-
     }
-
   }
-
-
 
   async ngOnInit(): Promise<void> {
-
     if (!this.path()) {
-
       const st = history.state as { path?: string };
-
       if (st?.path) {
-
         this.path.set(st.path);
-
       }
-
     }
-
     const pp = this.path();
-
     if (!pp) {
-
       this.err.set('No image path — go back and capture again.');
-
       return;
-
     }
-
     if (!window.pbApi?.readFileBase64) {
-
       this.err.set('Preview needs Electron.');
-
       return;
-
     }
-
     try {
-
       const url = await window.pbApi.readFileBase64(pp);
-
       this.imageDataUrl.set(url);
-
+      this.imageLoadFailed.set(false);
     } catch (e) {
-
       this.err.set(String(e));
-
     }
-
     this.selectEffect('none');
-
+    await this.photoFrames.loadFrames();
+    const key = this.selectedEffect();
+    if (key !== 'none') {
+      await this.loadOverlayPreview(key);
+    }
   }
 
+  onPreviewError(): void {
+    this.imageLoadFailed.set(true);
+  }
 
-
-  selectEffect(key: EffectKey): void {
-
-    if (key.startsWith('locked')) return;
+  async selectEffect(key: EffectKey): Promise<void> {
+    const slot = this.effectSlots().find((s) => s.key === key);
+    if (!slot && key !== 'none') return;
 
     this.selectedEffect.set(key);
-
-    this.aiErr.set(null);
+    this.overlayLoadFailed.set(false);
 
     if (key === 'none') {
-
-      this.aiStyle.selectMode(PLAIN_PHOTO_MODE_ID);
-
+      this.overlayPreviewUrl.set(null);
+      this.boothSession.setSelectedFrameId(null);
       return;
-
     }
 
-    const slot = this.effectSlots().find((s) => s.key === key);
-
-    if (slot?.modeId) {
-
-      this.aiStyle.selectMode(slot.modeId);
-
-    }
-
+    this.boothSession.setSelectedFrameId(this.photoFrames.frameIdForKey(key));
+    await this.loadOverlayPreview(key);
   }
 
+  onOverlayError(): void {
+    this.overlayLoadFailed.set(true);
+    this.overlayPreviewUrl.set(null);
+    this.debugLog.log({
+      kind: 'frame-preview',
+      method: 'IMG',
+      ok: false,
+      url: this.selectedEffect(),
+      error: 'Frame overlay image failed to decode in browser',
+    });
+  }
 
+  private async loadOverlayPreview(key: EffectKey): Promise<void> {
+    const started = Date.now();
+    const slot: BoothEffectSlot | undefined = this.photoFrames.slotForKey(key);
+    if (!slot) {
+      this.debugLog.log({
+        kind: 'frame-preview',
+        method: 'LOAD',
+        ok: false,
+        error: `No slot for key ${key}`,
+        durationMs: Date.now() - started,
+      });
+      this.overlayPreviewUrl.set(null);
+      return;
+    }
+
+    this.debugLog.log({
+      kind: 'frame-preview',
+      method: 'LOAD',
+      url: key,
+      request: {
+        frameId: slot.frameId,
+        hasDataUrl: Boolean(slot.frameImage?.startsWith('data:')),
+        frameImagePath: slot.frameImagePath || null,
+        frameImageLen: slot.frameImage?.length ?? 0,
+      },
+    });
+
+    if (slot.frameImage?.startsWith('data:') && slot.frameImage.length > 100) {
+      this.overlayPreviewUrl.set(slot.frameImage);
+      this.debugLog.log({
+        kind: 'frame-preview',
+        method: 'LOAD',
+        ok: true,
+        url: key,
+        response: { source: 'cached-data-url', bytes: slot.frameImage.length },
+        durationMs: Date.now() - started,
+      });
+      return;
+    }
+
+    const ref = slot.frameImagePath || slot.frameImage;
+    if (ref && window.pbApi?.readFileBase64) {
+      try {
+        const url = await window.pbApi.readFileBase64(ref);
+        this.overlayPreviewUrl.set(url);
+        this.debugLog.log({
+          kind: 'frame-preview',
+          method: 'READ',
+          ok: true,
+          url: ref.slice(0, 120),
+          response: { source: 'readFileBase64', bytes: url.length },
+          durationMs: Date.now() - started,
+        });
+        return;
+      } catch (e) {
+        this.debugLog.log({
+          kind: 'frame-preview',
+          method: 'READ',
+          ok: false,
+          url: ref.slice(0, 120),
+          error: String(e),
+        });
+      }
+    }
+
+    if (window.pbApi?.kiaBundledFrameAsset) {
+      const bundled = await window.pbApi.kiaBundledFrameAsset(slot.frameId, 'frame_image');
+      this.debugLog.log({
+        kind: 'frame-asset',
+        method: 'BUNDLED',
+        ok: bundled.ok,
+        url: `frame-${slot.frameId}/frame_image`,
+        response: bundled,
+      });
+      if (bundled.ok && bundled.path && window.pbApi.readFileBase64) {
+        try {
+          const url = await window.pbApi.readFileBase64(bundled.path);
+          this.overlayPreviewUrl.set(url);
+          this.debugLog.log({
+            kind: 'frame-preview',
+            method: 'READ',
+            ok: true,
+            url: bundled.path.slice(0, 120),
+            response: { source: 'bundled', bytes: url.length },
+            durationMs: Date.now() - started,
+          });
+          return;
+        } catch (e) {
+          this.debugLog.log({
+            kind: 'frame-preview',
+            method: 'READ',
+            ok: false,
+            url: bundled.path?.slice(0, 120),
+            error: String(e),
+          });
+        }
+      }
+    }
+
+    this.overlayPreviewUrl.set(null);
+    this.overlayLoadFailed.set(true);
+    this.debugLog.log({
+      kind: 'frame-preview',
+      method: 'LOAD',
+      ok: false,
+      url: key,
+      error: 'All overlay sources failed',
+      durationMs: Date.now() - started,
+    });
+  }
 
   async confirmKeepsake(): Promise<void> {
+    this.uploadError.set(null);
+    this.phase.set('uploading');
 
-    const key = this.selectedEffect();
-
-    if (key === 'effect1' || key === 'effect2') {
-
-      const slot = this.effectSlots().find((s) => s.key === key);
-
-      if (slot?.modeId && this.booth.openAiConfigured()) {
-
-        await this.generateAi();
-
-        return;
-
-      }
-
-    }
-
-    this.phase.set('download');
-
-  }
-
-
-
-  async generateAi(): Promise<void> {
-
-    const pp = this.path();
-
-    const modeId = this.aiStyle.selectedModeId();
-
-    const mode = modeId ? this.booth.aiModes().find((m) => m.id === modeId) : null;
-
-    if (!pp || !mode || !window.pbApi?.openAiGenerateImage) {
-
-      this.phase.set('download');
-
+    const result = await this.enqueueForUpload();
+    if (!result.ok) {
+      this.uploadError.set(result.error || this.copy().result.uploadError);
+      this.phase.set('keepsake');
       return;
-
     }
 
-    this.aiGenerating.set(true);
+    const displaySec = Math.max(1, Number(this.copy().result.uploadMinDisplaySeconds) || 3);
+    await new Promise((resolve) => setTimeout(resolve, displaySec * 1000));
 
-    this.aiErr.set(null);
-
-    this.aiModelUsed.set(null);
-
-    this.thinkingStep.set(0);
-
-    this.startAiCountdown(22);
-
-    try {
-
-      const r = await window.pbApi.openAiGenerateImage({
-
-        imagePath: pp,
-
-        prompt: mode.prompt,
-
-      });
-
-      if (!r.ok || !r.path) {
-
-        this.aiErr.set(r.error ?? 'Generation failed.');
-
-        return;
-
-      }
-
-      this.aiModelUsed.set(r.model ?? null);
-
-      this.gallerySession.setPair(pp, r.path);
-
-      void this.router.navigate(['/ai-gallery']);
-
-    } catch (e) {
-
-      this.aiErr.set(String(e));
-
-    } finally {
-
-      this.stopAiCountdown();
-
-      this.aiGenerating.set(false);
-
-      this.thinkingStep.set(0);
-
-    }
-
+    this.phase.set('success');
+    this.startAutoHomeTimer();
   }
 
-
-
-  startAgain(): void {
-
-    this.stopAiCountdown();
-
-    this.gallerySession.clear();
-
-    this.aiStyle.clear();
-
-    this.boothSession.clear();
-
-    void this.camera.closeSession().catch(() => {});
-
-    void this.router.navigate(['/']);
-
-  }
-
-
-
-  async uploadToHub(): Promise<void> {
-
-    this.stopAiCountdown();
-
-    this.gallerySession.clear();
-
-    this.aiStyle.clear();
-
+  /** Queue upload in the background — do not wait for network (offline-safe). */
+  private async enqueueForUpload(): Promise<{ ok: boolean; error?: string }> {
     const pp = this.path();
+    if (!pp) {
+      return { ok: false, error: 'No photo to upload.' };
+    }
 
-    if (pp) this.boothSession.addPhoto(pp);
-
+    this.boothSession.addPhoto(pp);
     const ended = this.boothSession.finalize();
-
-    if (ended?.token && ended.photos.length > 0 && window.pbApi?.syncEnqueueSession) {
-
-      await window.pbApi.syncEnqueueSession({ token: ended.token, photos: ended.photos });
-
+    if (!ended?.token || ended.photos.length === 0) {
+      return { ok: false, error: 'Session expired — scan QR again.' };
     }
 
+    const frameId = ended.selectedFrameId ?? null;
+    const sessionToken = ended.sessionData?.trim() || ended.token.trim();
+    const guestEmail = ended.guestEmail?.trim() || null;
+    const frameSlot =
+      frameId != null ? this.photoFrames.slotForKey(`frame-${frameId}`) : undefined;
+
+    let uploadId: string | undefined;
+    let queued = false;
+    for (const imagePath of ended.photos) {
+      const enq = await this.kiaApi.enqueueMedia({
+        sessionToken,
+        frameId,
+        frameImagePath: frameSlot?.frameImagePath || null,
+        imagePath,
+        guestEmail,
+      });
+      if (!enq.ok) {
+        return { ok: false, error: enq.error || this.copy().result.uploadError };
+      }
+      uploadId = enq.uploadId;
+      queued = Boolean(enq.queued);
+    }
+
+    if (!uploadId) {
+      return { ok: false, error: this.copy().result.uploadError };
+    }
+
+    this.debugLog.log({
+      kind: 'upload',
+      method: 'ENQUEUE',
+      ok: true,
+      url: uploadId,
+      response: {
+        queued,
+        frameId,
+        background: true,
+        message: 'Upload queued — will sync when online',
+      },
+    });
+
+    return { ok: true };
+  }
+
+  continueAfterSuccess(): void {
+    this.goHome();
+  }
+
+  private startAutoHomeTimer(): void {
+    this.clearAutoHomeTimer();
+    const seconds = Number(this.copy().result.uploadAutoHomeSeconds) || 0;
+    if (seconds <= 0) {
+      this.autoHomeSecondsLeft.set(null);
+      return;
+    }
+    this.autoHomeSecondsLeft.set(seconds);
+    this.autoHomeInterval = setInterval(() => {
+      const left = (this.autoHomeSecondsLeft() ?? 0) - 1;
+      if (left <= 0) {
+        this.goHome();
+      } else {
+        this.autoHomeSecondsLeft.set(left);
+      }
+    }, 1000);
+  }
+
+  private clearAutoHomeTimer(): void {
+    if (this.autoHomeInterval) {
+      clearInterval(this.autoHomeInterval);
+      this.autoHomeInterval = null;
+    }
+  }
+
+  private goHome(): void {
+    this.clearAutoHomeTimer();
+    this.boothSession.clear();
     void this.camera.closeSession().catch(() => {});
-
     void this.router.navigate(['/']);
-
   }
-
-
-
-  onResultImgLoad(ev: Event): void {
-
-    const img = ev.target as HTMLImageElement;
-
-    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-
-      this.resultAspectRatio.set(img.naturalWidth / img.naturalHeight);
-
-    }
-
-  }
-
-
 
   ngOnDestroy(): void {
-
-    this.stopAiCountdown();
-
+    this.clearAutoHomeTimer();
   }
-
-
-
-  private startAiCountdown(seconds: number): void {
-
-    this.stopAiCountdown();
-
-    this.aiEtaSec.set(seconds);
-
-    this.aiElapsedSec.set(0);
-
-    this.aiTimer = setInterval(() => {
-
-      this.aiElapsedSec.update((v) => v + 1);
-
-      this.aiEtaSec.update((v) => Math.max(0, v - 1));
-
-    }, 1000);
-
-  }
-
-
-
-  private stopAiCountdown(): void {
-
-    if (this.aiTimer) {
-
-      clearInterval(this.aiTimer);
-
-      this.aiTimer = undefined;
-
-    }
-
-  }
-
-
-
-  private formatDuration(totalSec: number): string {
-
-    const safe = Math.max(0, Math.floor(totalSec));
-
-    const m = String(Math.floor(safe / 60)).padStart(2, '0');
-
-    const s = String(safe % 60).padStart(2, '0');
-
-    return `${m}:${s}`;
-
-  }
-
 }
-

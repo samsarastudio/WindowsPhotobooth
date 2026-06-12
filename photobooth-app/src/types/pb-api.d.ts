@@ -52,6 +52,9 @@ export interface PbSyncValidateResult {
   ok: boolean;
   valid: boolean;
   offline?: boolean;
+  usedPrefixFallback?: boolean;
+  sessionData?: string | null;
+  email?: string | null;
   error?: string;
   message?: string | null;
   statusCode?: number;
@@ -60,12 +63,110 @@ export interface PbSyncValidateResult {
 export interface PbSyncEnqueueEntry {
   token: string;
   photos: string[];
+  frameId?: number | null;
+}
+
+export interface PbKiaEnqueueMediaEntry {
+  sessionToken: string;
+  imagePath: string;
+  frameId?: number | null;
+  frameImagePath?: string | null;
+  bearerToken?: string | null;
+  guestEmail?: string | null;
+}
+
+export interface PbPhotoBoothFrame {
+  id: number;
+  name?: string;
+  label?: string;
+  slug?: string;
+  thumbnail?: string;
+  frame_image?: string;
+  frameImage?: string;
+  image_url?: string;
+  imageUrl?: string;
+  file_path?: string;
+  orientation?: string;
+  sort_order?: number;
+  is_active?: number | boolean;
+  is_premium?: number | boolean;
+  is_unlocked?: number | boolean;
+  unlock_points?: number | null;
+  points_required?: number;
+}
+
+export interface PbKiaFetchFramesResult {
+  ok: boolean;
+  frames: PbPhotoBoothFrame[];
+  fromCache?: boolean;
+  offline?: boolean;
+  /** api-live | cache-fallback | cache-offline */
+  frameListSource?: string;
+  framesCachedAt?: string | null;
+  bundledFrameIds?: number[];
+  error?: string;
+  debug?: {
+    source?: string;
+    count?: number;
+    unlocked?: number;
+    totalPoints?: string | null;
+    statusCode?: number;
+    cachedAt?: string | null;
+    message?: string;
+  };
+}
+
+export interface PbKiaGalleryItem {
+  id: number;
+  photo_booth_session_id: number;
+  photo_booth_frame_id: number | null;
+  file_path: string;
+  thumbnail: string | null;
+  sort_order: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PbKiaFetchGalleryResult {
+  ok: boolean;
+  items: PbKiaGalleryItem[];
+  offline?: boolean;
+  error?: string;
+}
+
+export interface PbKiaUploadQueueStatus {
+  ok: boolean;
+  pending: number;
+  items?: Array<{
+    id: string;
+    sessionToken: string;
+    attempts: number;
+    enqueuedAt: string;
+    lastError: string | null;
+  }>;
+  error?: string;
+}
+
+export interface PbKiaApiDebugEntry {
+  at: string;
+  kind?: string;
+  method?: string;
+  url?: string;
+  statusCode?: number;
+  ok?: boolean;
+  durationMs?: number;
+  request?: unknown;
+  response?: unknown;
+  error?: string;
 }
 
 export interface PbApi {
   getPaths(): Promise<PbPaths>;
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
   readFileBase64(filePath: string): Promise<string>;
+  fetchImageDataUrl(
+    url: string,
+  ): Promise<{ ok: boolean; dataUrl?: string; error?: string }>;
   saveJpeg(fullPath: string, base64Body: string): Promise<{ ok: boolean; path?: string }>;
   adminGetConfig(): Promise<{ ok: boolean; config?: PhotoboothConfigPublic; error?: string }>;
   adminSaveConfig(
@@ -108,6 +209,23 @@ export interface PbApi {
   onScannerError(handler: (payload: { error: string }) => void): () => void;
   syncValidateToken(token: string): Promise<PbSyncValidateResult>;
   syncEnqueueSession(entry: PbSyncEnqueueEntry): Promise<{ ok: boolean; error?: string }>;
+  kiaValidateToken(token: string): Promise<PbSyncValidateResult>;
+  kiaFetchFrames(): Promise<PbKiaFetchFramesResult>;
+  kiaBundledFrameAsset(
+    frameId: number,
+    kind: 'thumbnail' | 'frame_image',
+  ): Promise<{ ok: boolean; path?: string; error?: string }>;
+  kiaEnqueueMedia(
+    entry: PbKiaEnqueueMediaEntry,
+  ): Promise<{ ok: boolean; error?: string; uploadId?: string; queued?: boolean }>;
+  kiaWaitForUpload(
+    uploadId: string,
+    timeoutMs?: number,
+  ): Promise<{ ok: boolean; error?: string; lastPublish?: unknown }>;
+  kiaFetchGallery(): Promise<PbKiaFetchGalleryResult>;
+  kiaGetUploadQueueStatus(): Promise<PbKiaUploadQueueStatus>;
+  kiaTestConnection(): Promise<{ ok: boolean; statusCode?: number; message?: string; error?: string }>;
+  onKiaApiDebug(handler: (entry: PbKiaApiDebugEntry) => void): () => void;
 }
 
 declare global {

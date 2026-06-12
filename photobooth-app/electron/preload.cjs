@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('pbApi', {
   getPaths: () => ipcRenderer.invoke('app:getPaths'),
   cameraInvoke: (cmd) => ipcRenderer.invoke('camera:invoke', cmd),
   readFileBase64: (filePath) => ipcRenderer.invoke('file:readBase64', filePath),
+  fetchImageDataUrl: (url) => ipcRenderer.invoke('net:fetchImageDataUrl', url),
   saveJpeg: (fullPath, base64Body) => ipcRenderer.invoke('file:saveJpeg', fullPath, base64Body),
   adminGetConfig: () => ipcRenderer.invoke('admin:getConfig'),
   adminSaveConfig: (partial) => ipcRenderer.invoke('admin:saveConfig', partial),
@@ -41,4 +42,18 @@ contextBridge.exposeInMainWorld('pbApi', {
   },
   syncValidateToken: (token) => ipcRenderer.invoke('sync:validateToken', token),
   syncEnqueueSession: (entry) => ipcRenderer.invoke('sync:enqueueSession', entry),
+  kiaValidateToken: (token) => ipcRenderer.invoke('kia:validateToken', token),
+  kiaFetchFrames: () => ipcRenderer.invoke('kia:fetchFrames'),
+  kiaBundledFrameAsset: (frameId, kind) => ipcRenderer.invoke('kia:bundledFrameAsset', frameId, kind),
+  kiaEnqueueMedia: (entry) => ipcRenderer.invoke('kia:enqueueMedia', entry),
+  kiaWaitForUpload: (uploadId, timeoutMs) =>
+    ipcRenderer.invoke('kia:waitForUpload', uploadId, timeoutMs),
+  kiaFetchGallery: () => ipcRenderer.invoke('kia:fetchGallery'),
+  kiaGetUploadQueueStatus: () => ipcRenderer.invoke('kia:getUploadQueueStatus'),
+  kiaTestConnection: () => ipcRenderer.invoke('kia:testConnection'),
+  onKiaApiDebug: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('kia:apiDebug', handler);
+    return () => ipcRenderer.removeListener('kia:apiDebug', handler);
+  },
 });

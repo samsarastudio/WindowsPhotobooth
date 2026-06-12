@@ -14,6 +14,10 @@ import type {
 
   PhotoboothSyncConfig,
 
+  PhotoboothKiaApiConfig,
+
+  PhotoboothKiaApiPaths,
+
   QrScanMode,
 
 } from '../models/photobooth-config.model';
@@ -27,6 +31,10 @@ import {
   PHOTOBOOTH_DEFAULT_BRANDING,
 
   PHOTOBOOTH_DEFAULT_COPY,
+
+  PHOTOBOOTH_DEFAULT_KIA_API,
+
+  PHOTOBOOTH_DEFAULT_KIA_API_PATHS,
 
   PHOTOBOOTH_DEFAULT_SCANNER,
 
@@ -191,6 +199,116 @@ function normalizeSync(raw: unknown): PhotoboothSyncConfig {
 
 
 
+function normalizeKiaPaths(raw: unknown): PhotoboothKiaApiPaths {
+
+  const d = PHOTOBOOTH_DEFAULT_KIA_API_PATHS;
+
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+
+  return {
+
+    authenticate: typeof o['authenticate'] === 'string' ? o['authenticate'] : d.authenticate,
+
+    validate: typeof o['validate'] === 'string' ? o['validate'] : d.validate,
+
+    frames: typeof o['frames'] === 'string' ? o['frames'] : d.frames,
+
+    media: typeof o['media'] === 'string' ? o['media'] : d.media,
+
+    gallery: typeof o['gallery'] === 'string' ? o['gallery'] : d.gallery,
+
+    qrCode: typeof o['qrCode'] === 'string' ? o['qrCode'] : d.qrCode,
+
+  };
+
+}
+
+
+
+/** Merge `kiaApi` with legacy `sync` when upgrading saved configs. */
+
+function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig, copyBypass: string): PhotoboothKiaApiConfig {
+
+  const d = PHOTOBOOTH_DEFAULT_KIA_API;
+
+  const o = rawKia && typeof rawKia === 'object' ? (rawKia as Record<string, unknown>) : {};
+
+  let baseUrl = typeof o['baseUrl'] === 'string' ? o['baseUrl'].trim() : '';
+
+  if (!baseUrl && legacySync.apiBaseUrl.trim()) {
+
+    baseUrl = legacySync.apiBaseUrl.trim().replace(/\/$/, '');
+
+  }
+
+  if (!baseUrl) baseUrl = d.baseUrl;
+
+
+
+  const paths = normalizeKiaPaths(o['paths']);
+
+  if (legacySync.validatePath.includes('/kia/photo-booth')) {
+
+    if (legacySync.validatePath) paths.validate = legacySync.validatePath;
+
+    if (legacySync.uploadPath.includes('/kia/')) paths.media = legacySync.uploadPath;
+
+  }
+
+
+
+  const qrPrefix =
+
+    typeof o['qrPrefix'] === 'string' && o['qrPrefix'].trim()
+
+      ? o['qrPrefix']
+
+      : legacySync.qrPrefix || d.qrPrefix;
+
+
+
+  const bypassCode =
+
+    typeof o['bypassCode'] === 'string' && o['bypassCode'].trim()
+
+      ? o['bypassCode']
+
+      : copyBypass.trim() || d.bypassCode;
+
+
+
+  return {
+
+    baseUrl,
+
+    bearerToken: typeof o['bearerToken'] === 'string' ? o['bearerToken'] : d.bearerToken,
+
+    qrPrefix,
+
+    bypassCode,
+
+    devBypassEmail:
+      typeof o['devBypassEmail'] === 'string' && o['devBypassEmail'].trim()
+        ? o['devBypassEmail'].trim()
+        : d.devBypassEmail,
+
+    offlineAllowPrefix:
+
+      typeof o['offlineAllowPrefix'] === 'boolean' ? o['offlineAllowPrefix'] : d.offlineAllowPrefix,
+
+    debugMode: o['debugMode'] === true,
+
+    uploadImageFormat:
+      o['uploadImageFormat'] === 'jpeg' || o['uploadImageFormat'] === 'jpg' ? 'jpeg' : 'png',
+
+    paths,
+
+  };
+
+}
+
+
+
 function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
 
   if (!Array.isArray(raw)) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
@@ -255,6 +373,14 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 
     typeof rest['openAiConfigured'] === 'boolean' ? rest['openAiConfigured'] : false;
 
+  const bearerConfigured =
+
+    typeof rest['bearerConfigured'] === 'boolean' ? rest['bearerConfigured'] : false;
+
+  const sync = normalizeSync(rest['sync']);
+
+  const kiaApi = normalizeKiaApi(rest['kiaApi'], sync, copy.qr.bypassCode);
+
 
 
   return {
@@ -267,13 +393,17 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 
     scanner: normalizeScanner(rest['scanner']),
 
-    sync: normalizeSync(rest['sync']),
+    sync,
+
+    kiaApi,
 
     aiGenerationEnabled,
 
     aiModes,
 
     openAiConfigured,
+
+    bearerConfigured,
 
   };
 
@@ -311,6 +441,8 @@ export class BoothConfigService {
 
   readonly sync = computed(() => this.state()?.sync ?? PHOTOBOOTH_DEFAULT_SYNC);
 
+  readonly kiaApi = computed(() => this.state()?.kiaApi ?? PHOTOBOOTH_DEFAULT_KIA_API);
+
 
 
   async load(): Promise<void> {
@@ -345,11 +477,15 @@ export class BoothConfigService {
 
         sync: { ...PHOTOBOOTH_DEFAULT_SYNC },
 
+        kiaApi: { ...PHOTOBOOTH_DEFAULT_KIA_API, paths: { ...PHOTOBOOTH_DEFAULT_KIA_API_PATHS } },
+
         aiGenerationEnabled: false,
 
         aiModes: [...PHOTOBOOTH_DEFAULT_AI_MODES],
 
         openAiConfigured: false,
+
+        bearerConfigured: false,
 
       });
 

@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
 import { BoothSessionService } from '../../services/booth-session.service';
+import { KiaApiService } from '../../services/kia-api.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { CameraService } from '../../services/camera.service';
 
@@ -17,6 +18,7 @@ export class AiGalleryPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly session = inject(AiGallerySessionService);
   private readonly boothSession = inject(BoothSessionService);
+  private readonly kiaApi = inject(KiaApiService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly camera = inject(CameraService);
 
@@ -84,8 +86,18 @@ export class AiGalleryPageComponent implements OnInit {
     if (orig) this.boothSession.addPhoto(orig);
     if (ai) this.boothSession.addPhoto(ai);
     const ended = this.boothSession.finalize();
-    if (ended?.token && ended.photos.length > 0 && window.pbApi?.syncEnqueueSession) {
-      await window.pbApi.syncEnqueueSession({ token: ended.token, photos: ended.photos });
+    if (ended?.token && ended.photos.length > 0) {
+      const frameId = ended.selectedFrameId ?? null;
+      const sessionToken = ended.sessionData?.trim() || ended.token.trim();
+      const guestEmail = ended.guestEmail?.trim() || null;
+      for (const imagePath of ended.photos) {
+        await this.kiaApi.enqueueMedia({
+          sessionToken,
+          frameId,
+          imagePath,
+          guestEmail,
+        });
+      }
     }
     this.session.clear();
     this.aiStyle.clear();

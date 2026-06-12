@@ -80,8 +80,9 @@
 .pb-ai-gallery-thumb img {
   display: block;
   width: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 5;
   object-fit: cover;
+  object-position: top;
   background: #111;
 }
 
@@ -98,7 +99,7 @@
 }
 
 .pb-ai-gallery-frame {
-  --hero-ar: 1;
+  --hero-ar: 0.8;
   width: 100%;
   max-width: min(100%, calc(min(74vh, 980px) * var(--hero-ar)));
   max-height: min(52vh, calc(100dvh - 14rem));

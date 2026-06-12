@@ -26,6 +26,24 @@
     "qrPrefix": "KIA-PHOTO-",
     "boothId": ""
   },
+  "kiaApi": {
+    "baseUrl": "https://dev-kiaforum2026.thetunagroup.com",
+    "bearerToken": "",
+    "qrPrefix": "KIA-PHOTO-",
+    "bypassCode": "12345",
+    "devBypassEmail": "nandu@tuna.group",
+    "offlineAllowPrefix": true,
+    "debugMode": false,
+    "uploadImageFormat": "png",
+    "paths": {
+      "authenticate": "/api/kia/authenticate",
+      "validate": "/api/kia/photo-booth/validate",
+      "frames": "/api/kia/photo-booth/frames",
+      "media": "/api/kia/photo-booth/media",
+      "gallery": "/api/kia/photo-booth/gallery",
+      "qrCode": "/api/kia/photo-booth/qr-code"
+    }
+  },
   "copy": {
     "qr": {
       "icon": "🔐",
@@ -37,7 +55,7 @@
       "scanning": "Scanning…",
       "cameraTapHint": "Tap the QR area to use the booth camera",
       "invalidCode": "Invalid QR code. Please use your registration code.",
-      "bypassCode": "1234",
+      "bypassCode": "12345",
       "adminLink": "Admin"
     },
     "capture": {
@@ -66,7 +84,14 @@
       "thinkingStepAnalyze": "Analysing framing and composition",
       "thinkingStepPlan": "Applying your chosen style directions",
       "thinkingStepImage": "Rendering with the image API",
-      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT-5 reasoning text for image jobs."
+      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT-5 reasoning text for image jobs.",
+      "uploadSuccessTitle": "Upload completed successfully",
+      "uploadSuccessHint": "Check your KIA hub photogallery for the picture",
+      "uploadContinue": "Continue",
+      "uploading": "Uploading your photo…",
+      "uploadError": "Upload failed. Please try again.",
+      "uploadMinDisplaySeconds": 3,
+      "uploadAutoHomeSeconds": 10
     },
     "aiMode": {
       "title": "Choose a style",

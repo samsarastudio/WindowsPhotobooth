@@ -5,82 +5,111 @@
     </div>
 
     <div class="kia-page-body">
-      <div class="kia-copy-block">
-        <h1 class="main-heading">{{ copy().result.title }}</h1>
-        <p class="sub-heading">{{ copy().result.subtitle }}</p>
-      </div>
+      @if (phase() === 'success') {
+        <div class="kia-upload-success">
+          <h1 class="kia-upload-success__title">{{ copy().result.uploadSuccessTitle }}</h1>
+          <p class="kia-upload-success__hint">{{ copy().result.uploadSuccessHint }}</p>
+          @if (autoHomeSecondsLeft(); as secs) {
+            <p class="kia-upload-success__countdown">Returning to home in {{ secs }}s</p>
+          }
+          <button type="button" class="startButton kia-upload-success__continue" (click)="continueAfterSuccess()">
+            {{ copy().result.uploadContinue }}
+          </button>
+        </div>
+      } @else {
+        <div class="kia-copy-block">
+          <h1 class="main-heading">{{ copy().result.title }}</h1>
+          <p class="sub-heading">{{ copy().result.subtitle }}</p>
+        </div>
 
-      <div class="kia-result-photo-row">
-        <div class="frame w-full">
-          <div class="content w-full">
-            @if (imageDataUrl(); as src) {
-              <img
-                class="frame-preview"
-                [src]="src"
-                alt="Captured photo"
-                (load)="onResultImgLoad($event)"
-              />
-            } @else if (err()) {
-              <p class="kia-msg">{{ err() }}</p>
-            } @else {
-              <p class="sub-heading">{{ copy().result.loading }}</p>
-            }
+        <div class="kia-result-photo-row">
+          <div
+            class="frame w-full"
+            [class.kia-result-frame-active]="showFrameOverlay()"
+          >
+            <div class="content w-full">
+              @if (imageDataUrl(); as src) {
+                <div
+                  class="kia-result-preview-stack"
+                  [class.kia-result-preview-stack--framed]="showFrameOverlay()"
+                >
+                  <img
+                    class="frame-preview"
+                    [src]="src"
+                    alt="Captured photo"
+                    (error)="onPreviewError()"
+                  />
+                  @if (showFrameOverlay()) {
+                    <img
+                      class="kia-result-frame-overlay"
+                      [src]="overlayPreviewUrl()"
+                      alt=""
+                      aria-hidden="true"
+                      (error)="onOverlayError()"
+                    />
+                  }
+                </div>
+                @if (imageLoadFailed()) {
+                  <p class="kia-msg">Could not display the captured photo.</p>
+                }
+              } @else if (err()) {
+                <p class="kia-msg">{{ err() }}</p>
+              } @else {
+                <p class="sub-heading">{{ copy().result.loading }}</p>
+              }
+            </div>
           </div>
         </div>
-      </div>
 
-      @if (phase() === 'keepsake') {
-        <div class="kia-effects-row" role="list" aria-label="Photo effects">
-          <button
-            type="button"
-            class="kia-effect-btn"
-            [class.activeEffect]="selectedEffect() === 'none'"
-            (click)="selectEffect('none')"
-          >
-            <img src="kia/noeffect.svg" alt="no effect" />
-          </button>
-          @for (slot of effectSlots(); track slot.key) {
+        @if (phase() === 'uploading') {
+          <div class="kia-upload-progress" aria-live="polite">
+            <p class="sub-heading">{{ copy().result.uploading }}</p>
+          </div>
+        } @else if (phase() === 'keepsake') {
+          @if (uploadError(); as upErr) {
+            <p class="kia-msg kia-upload-error">{{ upErr }}</p>
+          }
+
+          <div class="kia-effects-row" role="list" aria-label="Photo frames">
             <button
               type="button"
               class="kia-effect-btn"
-              [class.activeEffect]="selectedEffect() === slot.key"
-              [disabled]="slot.locked"
-              (click)="selectEffect(slot.key)"
+              [class.activeEffect]="selectedEffect() === 'none'"
+              (click)="selectEffect('none')"
             >
-              <img [src]="slot.icon" [alt]="slot.label" />
+              <img src="kia/noeffect.svg" alt="no effect" />
             </button>
-          }
-        </div>
+            @for (slot of effectSlots(); track slot.key) {
+              <button
+                type="button"
+                class="kia-effect-btn"
+                [class.activeEffect]="selectedEffect() === slot.key"
+                (click)="selectEffect(slot.key)"
+                [attr.aria-label]="slot.label"
+              >
+                @if (slot.icon) {
+                  <img class="kia-effect-thumb" [src]="slot.icon" [alt]="slot.label" />
+              } @else {
+                <img
+                  class="kia-effect-thumb"
+                  src="kia/kiaprofile.svg"
+                  [alt]="slot.label"
+                />
+              }
+              </button>
+            }
+          </div>
 
-        @if (aiGenerating()) {
-          <p class="sub-heading">{{ copy().result.generatingAi }}</p>
-        } @else if (aiErr()) {
-          <p class="kia-msg">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
-        }
-
-        <button
-          type="button"
-          class="kia-save-tick"
-          [disabled]="!imageDataUrl() || aiGenerating()"
-          (click)="confirmKeepsake()"
-          aria-label="Save"
-        >
-          <img src="kia/tickmark.svg" alt="" />
-        </button>
-      } @else {
-        <div class="kia-download-actions">
-          <button type="button" class="startButton" (click)="startAgain()">
-            {{ copy().result.retake }}
-          </button>
           <button
             type="button"
-            class="uploadButton"
-            [disabled]="!imageDataUrl()"
-            (click)="uploadToHub()"
+            class="kia-save-tick"
+            [disabled]="!imageDataUrl() || imageLoadFailed()"
+            (click)="confirmKeepsake()"
+            aria-label="Save and upload"
           >
-            {{ copy().result.submit }}
+            <img src="kia/tickmark.svg" alt="" />
           </button>
-        </div>
+        }
       }
     </div>
   </pb-kia-shell>

@@ -51,6 +51,7 @@
   "build": {
     "appId": "com.photobooth.app",
     "productName": "PhotoBooth",
+    "icon": "build/icon.png",
     "asarUnpack": [
       "**/node_modules/sharp/**/*",
       "**/node_modules/@serialport/**/*"
@@ -59,6 +60,7 @@
       "output": "release"
     },
     "files": [
+      "build/icon.png",
       "dist/**/*",
       "electron/**/*",
       "package.json",
@@ -85,6 +87,10 @@
       {
         "from": "theme-template",
         "to": "theme-template"
+      },
+      {
+        "from": "assets/frames",
+        "to": "assets/frames"
       }
     ],
     "win": {

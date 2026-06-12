@@ -1,12 +1,33 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, net } = require('electron');
 const path = require('path');
-const { pathToFileURL, URL } = require('url');
+const { pathToFileURL, fileURLToPath, URL } = require('url');
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 const { spawn, execFileSync } = require('child_process');
 const readline = require('readline');
 const { ScannerService } = require('./scanner-service.cjs');
-const { SyncService } = require('./sync-service.cjs');
+const { KiaApiService } = require('./kia-api-service.cjs');
+const { bundledAssetPath } = require('./frame-fallbacks.cjs');
+const { cropPhotoTo45Top, cropBufferTo45Top } = require('./image-process.cjs');
+
+function loadSharp() {
+  try {
+    return require('sharp');
+  } catch (_) {
+    return null;
+  }
+}
+
+async function cropCaptureFile(filePath) {
+  const sharpMod = loadSharp();
+  if (!sharpMod || !filePath) return;
+  try {
+    await cropPhotoTo45Top(sharpMod, filePath);
+  } catch (e) {
+    console.error('[crop]', filePath, e);
+  }
+}
 
 /** Portable root: folder containing the app exe (portable) or photobooth-app in dev. */
 function getPortableRoot() {
@@ -260,27 +281,66 @@ let bridgeProc = null;
 let bridgeReadline = null;
 const bridgeQueue = [];
 const scannerService = new ScannerService();
-let syncService = null;
+let kiaApiService = null;
 
 function getSyncQueueDir() {
   return path.join(getPortableRoot(), 'sync-data');
 }
 
-function ensureSyncService() {
-  if (!syncService) {
-    syncService = new SyncService(getSyncQueueDir());
+function ensureKiaApiService() {
+  if (!kiaApiService) {
+    kiaApiService = new KiaApiService(getSyncQueueDir());
   }
-  return syncService;
+  return kiaApiService;
 }
 
-function applySyncConfigFromMerged(cfg) {
+function kiaApiFromMerged(cfg) {
+  const k = cfg?.kiaApi || {};
   const sync = cfg?.sync || {};
-  ensureSyncService().configure({
-    apiBaseUrl: sync.apiBaseUrl,
-    validatePath: sync.validatePath,
-    uploadPath: sync.uploadPath,
-    boothId: sync.boothId,
-  });
+  const copy = cfg?.copy || {};
+  const qrBypass =
+    copy?.qr && typeof copy.qr.bypassCode === 'string' ? copy.qr.bypassCode : '1234';
+  let baseUrl = typeof k.baseUrl === 'string' ? k.baseUrl.trim() : '';
+  if (!baseUrl && sync.apiBaseUrl) baseUrl = String(sync.apiBaseUrl).trim().replace(/\/$/, '');
+  if (!baseUrl) baseUrl = 'https://dev-kiaforum2026.thetunagroup.com';
+  const paths = k.paths || {};
+  return {
+    baseUrl,
+    bearerToken: typeof k.bearerToken === 'string' ? k.bearerToken : '',
+    qrPrefix: k.qrPrefix || sync.qrPrefix || 'KIA-PHOTO-',
+    bypassCode: k.bypassCode || qrBypass || '12345',
+    devBypassEmail:
+      typeof k.devBypassEmail === 'string' && k.devBypassEmail.trim()
+        ? k.devBypassEmail.trim()
+        : 'test@csgnow.com',
+    offlineAllowPrefix: k.offlineAllowPrefix !== false,
+    paths: {
+      authenticate: paths.authenticate || '/api/kia/authenticate',
+      validate: paths.validate || '/api/kia/photo-booth/validate',
+      frames: paths.frames || '/api/kia/photo-booth/frames',
+      media: paths.media || '/api/kia/photo-booth/media',
+      gallery: paths.gallery || '/api/kia/photo-booth/gallery',
+      qrCode: paths.qrCode || '/api/kia/photo-booth/qr-code',
+    },
+    debugMode: k.debugMode === true,
+    onDebug: broadcastKiaApiDebug,
+    bundledFramesRoot: getPortableRoot(),
+    uploadImageFormat:
+      String(k.uploadImageFormat || 'png').trim().toLowerCase() === 'jpeg' ||
+      String(k.uploadImageFormat || 'png').trim().toLowerCase() === 'jpg'
+        ? 'jpeg'
+        : 'png',
+  };
+}
+
+function applyKiaApiConfigFromMerged(cfg) {
+  ensureKiaApiService().configure(kiaApiFromMerged(cfg));
+}
+
+function broadcastKiaApiDebug(entry) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('kia:apiDebug', entry);
+  }
 }
 
 function broadcastScanner(channel, payload) {
@@ -376,12 +436,25 @@ function sendBridge(jsonObj) {
   });
 }
 
+function getAppIconPath() {
+  const candidates = [
+    path.join(__dirname, '..', 'build', 'icon.png'),
+    path.join(__dirname, '..', 'public', 'kia', 'booth-icon.png'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 function createWindow() {
+  const iconPath = getAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
     fullscreen: true,
     autoHideMenuBar: true,
+    ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -401,8 +474,13 @@ function createWindow() {
 app.whenReady().then(async () => {
   ensureConfigFiles();
   const cfg = loadMergedConfig();
-  applySyncConfigFromMerged(cfg);
-  ensureSyncService().start();
+  applyKiaApiConfigFromMerged(cfg);
+  ensureKiaApiService().start();
+  if (net?.on) {
+    net.on('online', () => {
+      void ensureKiaApiService().processQueue();
+    });
+  }
   createWindow();
   await startScannerFromConfig();
   app.on('activate', () => {
@@ -417,7 +495,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   killBridge();
-  if (syncService) syncService.stop();
+  if (kiaApiService) kiaApiService.stop();
   void scannerService.close();
 });
 
@@ -434,6 +512,9 @@ ipcMain.handle('app:getPaths', () => {
 
 ipcMain.handle('camera:invoke', async (_e, cmd) => {
   const res = await sendBridge(cmd);
+  if (res && res.ok && cmd.cmd === 'capture' && res.path) {
+    await cropCaptureFile(res.path);
+  }
   if (res && res.ok && cmd.cmd === 'preview' && res.path) {
     try {
       res.previewFileUrl = pathToFileURL(res.path).href;
@@ -446,17 +527,105 @@ ipcMain.handle('camera:invoke', async (_e, cmd) => {
 });
 
 ipcMain.handle('file:readBase64', async (_e, filePath) => {
-  const buf = fs.readFileSync(filePath);
-  const ext = path.extname(filePath).toLowerCase();
-  const mime =
-    ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  let abs = String(filePath || '').trim();
+  if (abs.startsWith('file://')) {
+    try {
+      abs = fileURLToPath(abs);
+    } catch (e) {
+      throw new Error(`Invalid file URL: ${abs}`);
+    }
+  } else {
+    abs = path.resolve(abs);
+  }
+  if (!fs.existsSync(abs)) {
+    throw new Error(`File not found: ${abs}`);
+  }
+  const buf = fs.readFileSync(abs);
+  if (!buf.length) {
+    throw new Error(`File is empty: ${abs}`);
+  }
+  let mime = 'image/jpeg';
+  if (buf[0] === 0x89 && buf[1] === 0x50) mime = 'image/png';
+  else if (buf[0] === 0x47 && buf[1] === 0x49) mime = 'image/gif';
+  else if (buf[0] === 0x52 && buf[1] === 0x49) mime = 'image/webp';
+  else {
+    const ext = path.extname(abs).toLowerCase();
+    if (ext === '.png') mime = 'image/png';
+    else if (ext === '.webp') mime = 'image/webp';
+  }
   return `data:${mime};base64,${buf.toString('base64')}`;
+});
+
+function fetchUrlBuffer(urlStr) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(urlStr);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    const lib = parsed.protocol === 'https:' ? https : http;
+    lib
+      .get(
+        urlStr,
+        {
+          headers: { Accept: 'image/*,*/*', 'User-Agent': 'PhotoBooth-KIA/1.0' },
+          timeout: 30000,
+        },
+        (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            fetchUrlBuffer(new URL(res.headers.location, urlStr).href).then(resolve).catch(reject);
+            return;
+          }
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`HTTP ${res.statusCode || 0}`));
+            res.resume();
+            return;
+          }
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => {
+            resolve({
+              buf: Buffer.concat(chunks),
+              contentType: res.headers['content-type'] || 'image/png',
+            });
+          });
+        },
+      )
+      .on('error', reject)
+      .on('timeout', function onTimeout() {
+        this.destroy(new Error('Request timeout'));
+      });
+  });
+}
+
+ipcMain.handle('net:fetchImageDataUrl', async (_e, urlStr) => {
+  const url = String(urlStr || '').trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return { ok: false, error: 'Invalid URL' };
+  }
+  try {
+    const svc = ensureKiaApiService();
+    const buf = await svc._fetchBinaryUrl(url);
+    if (!svc._looksLikeImage(buf)) {
+      return { ok: false, error: 'Response is not an image' };
+    }
+    let mime = 'image/png';
+    if (buf[0] === 0xff && buf[1] === 0xd8) mime = 'image/jpeg';
+    else if (buf[0] === 0x89 && buf[1] === 0x50) mime = 'image/png';
+    else if (buf[0] === 0x47 && buf[1] === 0x49) mime = 'image/gif';
+    return { ok: true, dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
 });
 
 ipcMain.handle('file:saveJpeg', async (_e, fullPath, base64Body) => {
   const dir = path.dirname(fullPath);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(fullPath, Buffer.from(base64Body, 'base64'));
+  await cropCaptureFile(fullPath);
   return { ok: true, path: fullPath };
 });
 
@@ -492,24 +661,24 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     if (!isPathUnder(absImage, captureRoot)) {
       return { ok: false, error: 'Invalid image path.' };
     }
+    await cropPhotoTo45Top(sharpMod, absImage);
     // Edit input hard limit: PNG and < 4 MB.
-    // Build a 4x6 landscape (3:2) letterboxed PNG and, if needed, progressively downscale until it fits.
+    // Build a 4:5 portrait letterboxed into 1024×1536 PNG; downscale until it fits.
     const MAX_IMAGE_BYTES = 4 * 1024 * 1024 - 8192; // Small safety margin.
     let pngBuf = null;
-    const LANDSCAPE_SIZES = [
-      [1536, 1024],
-      [1440, 960],
-      [1296, 864],
-      [1152, 768],
-      [1024, 682],
-      [960, 640],
-      [768, 512],
+    let squarePngBuf = null;
+    const PORTRAIT_CANVAS_SIZES = [
+      [1024, 1536],
+      [960, 1440],
+      [864, 1296],
+      [768, 1152],
+      [640, 960],
     ];
-    for (const [w, h] of LANDSCAPE_SIZES) {
+    for (const [w, h] of PORTRAIT_CANVAS_SIZES) {
       const candidate = await sharpMod(absImage)
         .resize(w, h, {
           fit: 'contain',
-          position: 'center',
+          position: 'north',
           background: { r: 255, g: 255, b: 255, alpha: 1 },
         })
         .ensureAlpha()
@@ -523,10 +692,28 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     if (!pngBuf) {
       return { ok: false, error: 'Prepared PNG is still above 4 MB.' };
     }
+    for (const side of [1024, 960, 864, 768, 640]) {
+      const candidate = await sharpMod(absImage)
+        .resize(side, side, {
+          fit: 'contain',
+          position: 'north',
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        })
+        .ensureAlpha()
+        .png({ compressionLevel: 9, effort: 10, palette: true })
+        .toBuffer();
+      if (candidate.length <= MAX_IMAGE_BYTES) {
+        squarePngBuf = candidate;
+        break;
+      }
+    }
+    if (!squarePngBuf) {
+      squarePngBuf = pngBuf;
+    }
     /** DALL·E 2 image edit prompt max length — keep suffix within budget. */
     const DALLE2_PROMPT_MAX = 1000;
     const suffix =
-      ' Use the entire visible scene (letterboxed in the square). Transform the whole composition—do not output a tighter zoom or headshot crop unless the uploaded image already is.';
+      ' Use the entire visible scene (portrait 4:5 framing). Transform the whole composition—do not output a tighter zoom or headshot crop unless the uploaded image already is.';
     const rawPrompt = String(prompt).trim();
     const newspaperHeadlineGuard =
       rawPrompt.toLowerCase().includes('newspaper') &&
@@ -558,7 +745,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       images: [{ image_url: inputDataUrl }],
       prompt: fullPrompt,
       n: 1,
-      size: '1536x1024',
+      size: '1024x1536',
       quality: 'high',
       input_fidelity: 'high',
     };
@@ -573,11 +760,11 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       const primaryErr = makeErr(gptRes.statusCode, gptJson, gptRes.body);
       // Compatibility fallback for accounts that only allow DALL-E 2 on edits.
       const form = new FormData();
-      form.append('image', pngBuf, { filename: 'photo.png', contentType: 'image/png' });
+      form.append('image', squarePngBuf, { filename: 'photo.png', contentType: 'image/png' });
       form.append('prompt', fullPrompt);
       form.append('model', 'dall-e-2');
       form.append('n', '1');
-      form.append('size', '1536x1024');
+      form.append('size', '1024x1024');
       form.append('response_format', 'b64_json');
       const d2Res = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, {
         Authorization: `Bearer ${apiKey.trim()}`,
@@ -610,6 +797,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     } else {
       return { ok: false, error: 'No image data in API response.' };
     }
+    outBuf = await cropBufferTo45Top(sharpMod, outBuf, { format: 'png' });
     const dir = path.dirname(absImage);
     const base = path.basename(absImage, path.extname(absImage));
     const outPath = path.join(dir, `${base}_ai.png`);
@@ -649,19 +837,125 @@ ipcMain.handle('scanner:close', async () => {
   }
 });
 
-ipcMain.handle('sync:validateToken', async (_e, token) => {
+function handleKiaValidate(token) {
+  applyKiaApiConfigFromMerged(loadMergedConfig());
+  return ensureKiaApiService().validateToken(token);
+}
+
+ipcMain.handle('kia:validateToken', async (_e, token) => {
   try {
-    applySyncConfigFromMerged(loadMergedConfig());
-    return await ensureSyncService().validateToken(token);
+    return await handleKiaValidate(token);
   } catch (e) {
     return { ok: false, valid: false, error: String(e), offline: true };
   }
 });
 
+ipcMain.handle('sync:validateToken', async (_e, token) => {
+  try {
+    return await handleKiaValidate(token);
+  } catch (e) {
+    return { ok: false, valid: false, error: String(e), offline: true };
+  }
+});
+
+ipcMain.handle('kia:fetchFrames', async () => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return await ensureKiaApiService().fetchFrames();
+  } catch (e) {
+    return { ok: false, frames: [], error: String(e), offline: true };
+  }
+});
+
+ipcMain.handle('kia:bundledFrameAsset', async (_e, frameId, kind) => {
+  const started = Date.now();
+  try {
+    const abs = bundledAssetPath(getPortableRoot(), frameId, kind === 'thumbnail' ? 'thumbnail' : 'frame_image');
+    if (!abs) {
+      broadcastKiaApiDebug({
+        at: new Date().toISOString(),
+        kind: 'frame-asset',
+        method: 'BUNDLED',
+        ok: false,
+        url: `frame-${frameId}/${kind}`,
+        error: 'Bundled frame asset not found',
+        durationMs: Date.now() - started,
+      });
+      return { ok: false, error: 'Bundled frame asset not found' };
+    }
+    const href = pathToFileURL(abs).href;
+    broadcastKiaApiDebug({
+      at: new Date().toISOString(),
+      kind: 'frame-asset',
+      method: 'BUNDLED',
+      ok: true,
+      url: `frame-${frameId}/${kind}`,
+      response: { path: href.slice(0, 120), abs },
+      durationMs: Date.now() - started,
+    });
+    return { ok: true, path: href };
+  } catch (e) {
+    broadcastKiaApiDebug({
+      at: new Date().toISOString(),
+      kind: 'frame-asset',
+      method: 'BUNDLED',
+      ok: false,
+      url: `frame-${frameId}/${kind}`,
+      error: String(e),
+      durationMs: Date.now() - started,
+    });
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('kia:enqueueMedia', async (_e, entry) => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return ensureKiaApiService().enqueueMedia(entry);
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('kia:waitForUpload', async (_e, uploadId, timeoutMs) => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return await ensureKiaApiService().waitForUpload(uploadId, timeoutMs);
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('kia:fetchGallery', async () => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return await ensureKiaApiService().fetchGallery();
+  } catch (e) {
+    return { ok: false, items: [], error: String(e), offline: true };
+  }
+});
+
+ipcMain.handle('kia:getUploadQueueStatus', async () => {
+  try {
+    return ensureKiaApiService().getUploadQueueStatus();
+  } catch (e) {
+    return { ok: false, pending: 0, error: String(e) };
+  }
+});
+
+ipcMain.handle('kia:testConnection', async () => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return await ensureKiaApiService().testConnection();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
 ipcMain.handle('sync:enqueueSession', async (_e, entry) => {
   try {
-    applySyncConfigFromMerged(loadMergedConfig());
-    return ensureSyncService().enqueueSession(entry);
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return ensureKiaApiService().enqueueSession(entry);
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -670,10 +964,19 @@ ipcMain.handle('sync:enqueueSession', async (_e, entry) => {
 function configForRenderer(full) {
   if (!full || typeof full !== 'object') return full;
   const { adminPin: _omit, openAiApiKey: _key, ...rest } = full;
+  const kiaApi = rest.kiaApi && typeof rest.kiaApi === 'object' ? { ...rest.kiaApi } : {};
+  if (kiaApi.bearerToken) {
+    delete kiaApi.bearerToken;
+  }
   return {
     ...rest,
+    kiaApi,
     openAiConfigured:
       typeof full.openAiApiKey === 'string' && full.openAiApiKey.trim().length > 0,
+    bearerConfigured:
+      full.kiaApi &&
+      typeof full.kiaApi.bearerToken === 'string' &&
+      full.kiaApi.bearerToken.trim().length > 0,
   };
 }
 
@@ -701,8 +1004,18 @@ ipcMain.handle('admin:saveConfig', async (_e, partial) => {
     const merged = deepMerge(loadMergedConfig(), partial || {});
     fs.mkdirSync(getConfigDir(), { recursive: true });
     fs.writeFileSync(getConfigPath(), JSON.stringify(merged, null, 2), 'utf8');
-    applySyncConfigFromMerged(merged);
-    ensureSyncService().start();
+    if (partial?.kiaApi && typeof partial.kiaApi === 'object') {
+      const prev = loadMergedConfig();
+      const incoming = partial.kiaApi;
+      if (
+        (!incoming.bearerToken || String(incoming.bearerToken).trim() === '') &&
+        prev.kiaApi?.bearerToken
+      ) {
+        merged.kiaApi = { ...merged.kiaApi, bearerToken: prev.kiaApi.bearerToken };
+      }
+    }
+    applyKiaApiConfigFromMerged(merged);
+    ensureKiaApiService().start();
     await startScannerFromConfig();
     return { ok: true, config: configForRenderer(merged) };
   } catch (e) {
