@@ -1,11 +1,12 @@
 export interface PhotoboothBranding {
-  /** Filename under `config/branding/` (e.g. `booth-logo.png`), or null for emoji icons. */
+  /** Filename under `config/branding/` (e.g. `booth-logo.png`), or null for bundled KIA logo. */
   logoFile: string | null;
+  /** Logo display scale on booth screens (50–200%, default 100). */
+  logoScalePercent: number;
 }
 
 /** QR scan landing (first screen). */
 export interface PhotoboothCopyQr {
-  icon: string;
   tagline: string;
   title: string;
   subtitle: string;
@@ -14,7 +15,6 @@ export interface PhotoboothCopyQr {
   scanning: string;
   cameraTapHint: string;
   invalidCode: string;
-  bypassCode: string;
   adminLink: string;
 }
 
@@ -29,27 +29,6 @@ export interface PhotoboothCopyResult {
   title: string;
   subtitle: string;
   loading: string;
-  savedPrefix: string;
-  retake: string;
-  submit: string;
-  /** Button to run OpenAI image generation */
-  generateAi: string;
-  generatingAi: string;
-  aiPreviewTitle: string;
-  aiErrorPrefix: string;
-  /** Gallery page (paired original + AI) */
-  aiGalleryTitle: string;
-  galleryThumbOriginal: string;
-  galleryThumbAi: string;
-  galleryBackToResult: string;
-  galleryFinish: string;
-  /** Expandable panel during generation — not live model “reasoning”; staged status only. */
-  thinkingSummary: string;
-  thinkingStepAnalyze: string;
-  thinkingStepPlan: string;
-  thinkingStepImage: string;
-  thinkingFootnote: string;
-  /** Shown after tick upload succeeds */
   uploadSuccessTitle: string;
   uploadSuccessHint: string;
   uploadContinue: string;
@@ -61,29 +40,14 @@ export interface PhotoboothCopyResult {
   uploadAutoHomeSeconds: number;
 }
 
-export interface PhotoboothCopyAiMode {
-  title: string;
-  subtitle: string;
-  back: string;
-  /**
-   * Label for the non-AI option (regular booth photo only).
-   * Use "Photocapture", "Default", etc. — not an admin `aiModes` row.
-   */
-  plainPhotoLabel: string;
-}
-
-/**
- * Reserved `AiStyleService` mode id: skip AI on the result screen; standard capture only.
- * Not stored in `aiModes[]` — the plain button is always shown when the AI step is enabled.
- */
-export const PLAIN_PHOTO_MODE_ID = 'photocapture';
-
 export interface PhotoboothCopy {
   qr: PhotoboothCopyQr;
   capture: PhotoboothCopyCapture;
   result: PhotoboothCopyResult;
-  aiMode: PhotoboothCopyAiMode;
 }
+
+/** Legacy AI style picker id — not part of KIA booth copy. */
+export const PLAIN_PHOTO_MODE_ID = 'photocapture';
 
 export interface PhotoboothAiMode {
   id: string;
@@ -201,6 +165,7 @@ export interface PhotoboothConfig {
 
 export const PHOTOBOOTH_DEFAULT_BRANDING: PhotoboothBranding = {
   logoFile: null,
+  logoScalePercent: 100,
 };
 
 export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
@@ -213,7 +178,6 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
 
 export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
   qr: {
-    icon: '🔐',
     tagline: 'Movement that inspires',
     title: 'Capture Your KIA Moment',
     subtitle: 'Personalized keepsake experience.',
@@ -222,7 +186,6 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     scanning: 'Scanning…',
     cameraTapHint: 'Tap the QR area to use the booth camera',
     invalidCode: 'Invalid QR code. Please use your registration code.',
-    bypassCode: '12345',
     adminLink: 'Admin',
   },
   capture: {
@@ -235,24 +198,6 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     title: 'Your KIA Keepsake is Ready',
     subtitle: 'Download your photo.',
     loading: 'Loading…',
-    savedPrefix: 'Saved:',
-    retake: 'Start Again',
-    submit: 'Upload to Hub',
-    generateAi: 'Create AI version',
-    generatingAi: 'Creating your AI image…',
-    aiPreviewTitle: 'AI version',
-    aiErrorPrefix: 'AI generation failed:',
-    aiGalleryTitle: 'Your photos',
-    galleryThumbOriginal: 'Original',
-    galleryThumbAi: 'AI style',
-    galleryBackToResult: 'Back to photo',
-    galleryFinish: 'Finish',
-    thinkingSummary: 'Preparing your image',
-    thinkingStepAnalyze: 'Analysing framing and composition',
-    thinkingStepPlan: 'Applying your chosen style directions',
-    thinkingStepImage: 'Rendering with the image API',
-    thinkingFootnote:
-      'Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs.',
     uploadSuccessTitle: 'Upload completed successfully',
     uploadSuccessHint: 'Check your KIA hub photogallery for the picture',
     uploadContinue: 'Continue',
@@ -260,11 +205,5 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     uploadError: 'Upload failed. Please try again.',
     uploadMinDisplaySeconds: 3,
     uploadAutoHomeSeconds: 10,
-  },
-  aiMode: {
-    title: 'Choose a style',
-    subtitle: 'Pick how we transform your photo',
-    back: 'Back',
-    plainPhotoLabel: 'Photocapture',
   },
 };

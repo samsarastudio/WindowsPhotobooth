@@ -1,4 +1,7 @@
 <div class="pb-page pb-admin-dash">
+  <div class="pb-admin-backdrop" aria-hidden="true">
+    <img src="admin/BackdropMain.png" alt="" decoding="async" />
+  </div>
   <div class="pb-admin-shell">
     <header class="pb-admin-topbar">
       <h1 class="pb-admin-title">PhotoBooth admin</h1>
@@ -16,17 +19,11 @@
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'copy'" (click)="setTab('copy')">
             Copy
           </button>
-          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'themes'" (click)="setTab('themes')">
-            Themes
-          </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'branding'" (click)="setTab('branding')">
             Logo
           </button>
-          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'ai'" (click)="setTab('ai')">
-            AI
-          </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'scanner'" (click)="setTab('scanner')">
-            Scanner
+            Scanner &amp; API
           </button>
         </nav>
       </aside>
@@ -36,405 +33,236 @@
           <p class="pb-admin-status">{{ s }}</p>
         }
 
-    @if (tab === 'scanner') {
-      <div class="pb-admin-grid">
-        <section class="pb-admin-card">
-          <h2>GFS4400 serial scanner</h2>
-          <p class="pb-admin-hint">
-            USB-COM presentation mode (9600 8N1, CR suffix). Booth listens for QR from app start.
-          </p>
-          <label>
-            <input type="checkbox" [(ngModel)]="draftScanner.enabled" />
-            Enable serial scanner
-          </label>
-          <label>COM port</label>
-          @if (scannerPortsMessage(); as portMsg) {
-            <p class="pb-admin-hint">{{ portMsg }}</p>
-          }
-          <select class="pb-input" [(ngModel)]="draftScanner.comPort">
-            <option value="">— Select port —</option>
-            @for (p of serialPorts(); track p.path) {
-              <option [value]="p.path">
-                {{ p.path }}@if (p.friendlyName || p.manufacturer) {
-                  — {{ p.friendlyName || p.manufacturer }}
+        @if (tab === 'copy') {
+          <div class="pb-admin-grid">
+            <section class="pb-admin-card">
+              <h2>Scan landing</h2>
+              <p class="pb-admin-hint">QR screen — logo tagline, headings, and scan status text.</p>
+              <label>Tagline (under logo)</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.tagline" />
+              <label>Title</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.title" />
+              <label>Subtitle (use Enter for a new line)</label>
+              <textarea class="pb-input pb-textarea" rows="2" [(ngModel)]="draft.qr.subtitle"></textarea>
+              <label>Idle prompt (under QR)</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.scanPrompt" />
+              <label>Active scan status</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.scanning" />
+              <label>Camera fallback tap hint</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.cameraTapHint" />
+              <label>Scan success message</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.scanSuccess" />
+              <label>Invalid code message</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.invalidCode" />
+              <label>Admin link label</label>
+              <input class="pb-input" [(ngModel)]="draft.qr.adminLink" />
+            </section>
+
+            <section class="pb-admin-card">
+              <h2>Capture</h2>
+              <label>Starting camera placeholder</label>
+              <input class="pb-input" [(ngModel)]="draft.capture.starting" />
+              <label>Ready title</label>
+              <input class="pb-input" [(ngModel)]="draft.capture.readyTitle" />
+              <label>Ready subtitle</label>
+              <input class="pb-input" [(ngModel)]="draft.capture.readySubtitle" />
+              <label>Footer hint</label>
+              <input class="pb-input" [(ngModel)]="draft.capture.footerHint" />
+            </section>
+
+            <section class="pb-admin-card">
+              <h2>Result &amp; upload</h2>
+              <label>Title</label>
+              <input class="pb-input" [(ngModel)]="draft.result.title" />
+              <label>Subtitle</label>
+              <input class="pb-input" [(ngModel)]="draft.result.subtitle" />
+              <label>Loading</label>
+              <input class="pb-input" [(ngModel)]="draft.result.loading" />
+              <label>Upload success title</label>
+              <input class="pb-input" [(ngModel)]="draft.result.uploadSuccessTitle" />
+              <label>Upload success hint</label>
+              <input class="pb-input" [(ngModel)]="draft.result.uploadSuccessHint" />
+              <label>Upload continue button</label>
+              <input class="pb-input" [(ngModel)]="draft.result.uploadContinue" />
+              <label>Uploading message</label>
+              <input class="pb-input" [(ngModel)]="draft.result.uploading" />
+              <label>Upload error message</label>
+              <input class="pb-input" [(ngModel)]="draft.result.uploadError" />
+              <label>Uploading screen minimum (seconds)</label>
+              <input class="pb-input" type="number" min="1" max="15" [(ngModel)]="draft.result.uploadMinDisplaySeconds" />
+              <label>Auto home after upload (seconds, 0 = off)</label>
+              <input class="pb-input" type="number" min="0" [(ngModel)]="draft.result.uploadAutoHomeSeconds" />
+            </section>
+          </div>
+          <div class="pb-admin-footer">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveCopy()">Save copy</button>
+          </div>
+        }
+
+        @if (tab === 'branding') {
+          <div class="pb-admin-grid">
+            <section class="pb-admin-card pb-admin-card-wide">
+              <h2>Booth logo</h2>
+              <p class="pb-admin-hint">
+                Shown on the QR, capture, and result screens. Upload PNG, JPG, SVG, or WebP. Leave empty to use the
+                bundled KIA logo.
+              </p>
+              <div class="pb-admin-logo-preview">
+                @if (branding.logoSrc(); as logo) {
+                  <img [src]="logo" alt="Current booth logo" [style.--kia-logo-scale]="draftBranding.logoScalePercent / 100" class="pb-admin-logo-preview-img" />
+                } @else {
+                  <img src="kia/logo.svg" alt="Default KIA logo" [style.--kia-logo-scale]="draftBranding.logoScalePercent / 100" class="pb-admin-logo-preview-img" />
                 }
-              </option>
-            }
-          </select>
-          <label>Or type COM port manually</label>
-          <input
-            class="pb-input"
-            [(ngModel)]="draftScanner.comPort"
-            placeholder="e.g. COM3"
-            spellcheck="false"
-            autocomplete="off"
-          />
-          <label>Baud rate</label>
-          <input class="pb-input" type="number" [(ngModel)]="draftScanner.baudRate" />
-          <label>
-            <input type="checkbox" [(ngModel)]="draftScanner.cameraQrFallbackEnabled" />
-            Use booth camera for QR when serial scanner is unavailable (not connected or no COM port)
-          </label>
-          <p>Status: <strong>{{ scannerStatus() }}</strong></p>
-          @if (lastScan(); as code) {
-            <p>Last scan: <code>{{ code }}</code></p>
-          }
-          <div class="pb-admin-row">
-            <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="refreshScannerAdmin()">
-              Refresh ports
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="testScannerPort()">
-              Test open port
-            </button>
-          </div>
-        </section>
-
-        <section class="pb-admin-card">
-          <h2>Kia Forum API</h2>
-          <p class="pb-admin-hint">
-            Dev: <code>https://dev-kiaforum2026.thetunagroup.com</code> — Prod:
-            <code>https://kiaexperience.info</code>
-          </p>
-          <label>API base URL</label>
-          <input
-            class="pb-input"
-            [(ngModel)]="draftKiaApi.baseUrl"
-            placeholder="https://dev-kiaforum2026.thetunagroup.com"
-          />
-          <label>Bearer token (optional bootstrap)</label>
-          <input
-            class="pb-input"
-            type="password"
-            [(ngModel)]="bearerTokenDraft"
-            [placeholder]="bearerConfigured() ? '•••••••• (saved — enter new to replace)' : 'Optional — guest email auth used when empty'"
-            autocomplete="off"
-          />
-          <p class="pb-admin-hint">
-            Dev bypass <code>12345</code> authenticates as
-            <code>{{ draftKiaApi.devBypassEmail }}</code>. Normal QR flow uses the guest email
-            returned from validate, then uploads when online.
-          </p>
-          <label>Dev bypass email</label>
-          <input
-            class="pb-input"
-            [(ngModel)]="draftKiaApi.devBypassEmail"
-            placeholder="test@csgnow.com"
-          />
-          <label>QR token prefix (offline validation)</label>
-          <input class="pb-input" [(ngModel)]="draftKiaApi.qrPrefix" placeholder="KIA-PHOTO-" />
-          <label>Bypass code (testing)</label>
-          <input class="pb-input" [(ngModel)]="draftKiaApi.bypassCode" />
-          <label>
-            <input type="checkbox" [(ngModel)]="draftKiaApi.offlineAllowPrefix" />
-            Allow prefix-format tokens when API is unreachable
-          </label>
-          <label>
-            <input type="checkbox" [(ngModel)]="draftKiaApi.debugMode" />
-            Show API debug log (bottom-right panel)
-          </label>
-          <label>Framed upload format</label>
-          <select class="pb-input" [(ngModel)]="draftKiaApi.uploadImageFormat">
-            <option value="png">PNG (transparent frame edges)</option>
-            <option value="jpeg">JPEG (white background)</option>
-          </select>
-          <p class="pb-admin-hint">
-            PNG preserves rounded transparent corners from frame overlays like Classic Yellow.
-            JPEG flattens onto white.
-          </p>
-          <p>
-            Upload queue: <strong>{{ uploadQueuePending() }}</strong> pending
-          </p>
-          <div class="pb-admin-row">
-            <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="busy()" (click)="refreshUploadQueue()">
-              Refresh queue
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="busy()" (click)="testKiaConnection()">
-              Test API connection
-            </button>
-          </div>
-          <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveKiaApi()">
-            Save API settings
-          </button>
-          <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveScanner()">
-            Save scanner settings
-          </button>
-        </section>
-      </div>
-    }
-
-    @if (tab === 'copy') {
-      <div class="pb-admin-grid">
-        <section class="pb-admin-card">
-          <h2>Scan landing</h2>
-          <p class="pb-admin-hint">First screen — logo tagline, headings, and QR status text.</p>
-          <label>Tagline (under logo)</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.tagline" />
-          <label>Title</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.title" />
-          <label>Subtitle (use Enter for a new line)</label>
-          <textarea class="pb-input pb-textarea" rows="2" [(ngModel)]="draft.qr.subtitle"></textarea>
-          <label>Idle prompt (under QR)</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.scanPrompt" />
-          <label>Active scan status</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.scanning" />
-          <label>Camera fallback tap hint</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.cameraTapHint" />
-          <label>Scan success message</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.scanSuccess" />
-          <label>Invalid code message</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.invalidCode" />
-          <label>Bypass code (debug)</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.bypassCode" />
-          <label>Admin link label</label>
-          <input class="pb-input" [(ngModel)]="draft.qr.adminLink" />
-        </section>
-
-        <section class="pb-admin-card">
-          <h2>Capture</h2>
-          <label>Starting camera placeholder</label>
-          <input class="pb-input" [(ngModel)]="draft.capture.starting" />
-          <label>Ready title</label>
-          <input class="pb-input" [(ngModel)]="draft.capture.readyTitle" />
-          <label>Ready subtitle</label>
-          <input class="pb-input" [(ngModel)]="draft.capture.readySubtitle" />
-          <label>Footer hint</label>
-          <input class="pb-input" [(ngModel)]="draft.capture.footerHint" />
-        </section>
-
-        <section class="pb-admin-card">
-          <h2>Result</h2>
-          <label>Title</label>
-          <input class="pb-input" [(ngModel)]="draft.result.title" />
-          <label>Subtitle</label>
-          <input class="pb-input" [(ngModel)]="draft.result.subtitle" />
-          <label>Loading</label>
-          <input class="pb-input" [(ngModel)]="draft.result.loading" />
-          <label>Saved prefix</label>
-          <input class="pb-input" [(ngModel)]="draft.result.savedPrefix" />
-          <label>Retake</label>
-          <input class="pb-input" [(ngModel)]="draft.result.retake" />
-          <label>Submit</label>
-          <input class="pb-input" [(ngModel)]="draft.result.submit" />
-          <label>Upload success title</label>
-          <input class="pb-input" [(ngModel)]="draft.result.uploadSuccessTitle" />
-          <label>Upload success hint</label>
-          <input class="pb-input" [(ngModel)]="draft.result.uploadSuccessHint" />
-          <label>Upload continue button</label>
-          <input class="pb-input" [(ngModel)]="draft.result.uploadContinue" />
-          <label>Uploading message</label>
-          <input class="pb-input" [(ngModel)]="draft.result.uploading" />
-          <label>Upload error message</label>
-          <input class="pb-input" [(ngModel)]="draft.result.uploadError" />
-          <label>Uploading screen minimum (seconds)</label>
-          <input class="pb-input" type="number" min="1" max="15" [(ngModel)]="draft.result.uploadMinDisplaySeconds" />
-          <label>Auto home after upload (seconds, 0 = off)</label>
-          <input class="pb-input" type="number" min="0" [(ngModel)]="draft.result.uploadAutoHomeSeconds" />
-          <label>Create AI version (button)</label>
-          <input class="pb-input" [(ngModel)]="draft.result.generateAi" />
-          <label>Generating AI (status)</label>
-          <input class="pb-input" [(ngModel)]="draft.result.generatingAi" />
-          <label>AI preview title</label>
-          <input class="pb-input" [(ngModel)]="draft.result.aiPreviewTitle" />
-          <label>AI error prefix</label>
-          <input class="pb-input" [(ngModel)]="draft.result.aiErrorPrefix" />
-          <label>AI gallery page title</label>
-          <input class="pb-input" [(ngModel)]="draft.result.aiGalleryTitle" />
-          <label>Gallery thumbnail — original</label>
-          <input class="pb-input" [(ngModel)]="draft.result.galleryThumbOriginal" />
-          <label>Gallery thumbnail — AI</label>
-          <input class="pb-input" [(ngModel)]="draft.result.galleryThumbAi" />
-          <label>Gallery “back to photo”</label>
-          <input class="pb-input" [(ngModel)]="draft.result.galleryBackToResult" />
-          <label>Gallery finish</label>
-          <input class="pb-input" [(ngModel)]="draft.result.galleryFinish" />
-          <label>AI progress panel title</label>
-          <input class="pb-input" [(ngModel)]="draft.result.thinkingSummary" />
-          <label>Progress step 1</label>
-          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepAnalyze" />
-          <label>Progress step 2</label>
-          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepPlan" />
-          <label>Progress step 3</label>
-          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepImage" />
-          <label>Progress footnote</label>
-          <textarea class="pb-input pb-textarea" rows="2" [(ngModel)]="draft.result.thinkingFootnote"></textarea>
-        </section>
-
-        <section class="pb-admin-card">
-          <h2>AI mode screen</h2>
-          <label>Title</label>
-          <input class="pb-input" [(ngModel)]="draft.aiMode.title" />
-          <label>Subtitle</label>
-          <input class="pb-input" [(ngModel)]="draft.aiMode.subtitle" />
-          <label>Back</label>
-          <input class="pb-input" [(ngModel)]="draft.aiMode.back" />
-          <label>Plain photo option (Photocapture / Default)</label>
-          <input class="pb-input" [(ngModel)]="draft.aiMode.plainPhotoLabel" />
-          <p class="pb-hint pb-hint-tight">
-            Shown first on the style screen; picks a normal booth photo with no AI step on the result page.
-          </p>
-        </section>
-      </div>
-      <div class="pb-admin-footer">
-        <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveCopy()">Save copy</button>
-      </div>
-    }
-
-    @if (tab === 'themes') {
-      <div class="pb-admin-themes">
-        <section class="pb-admin-card">
-          <h2>Active theme</h2>
-          <p class="pb-hint">WordPress-style packs live in the <code>themes/&lt;id&gt;/</code> folder (theme.json + styles.css).</p>
-          <label>Theme</label>
-          <select class="pb-input" [(ngModel)]="activeThemeId">
-            @if (themes().length === 0) {
-              <option [value]="activeThemeId">{{ activeThemeId }}</option>
-            }
-            @for (t of themes(); track t.id) {
-              <option [value]="t.id">{{ t.name }} ({{ t.id }})</option>
-            }
-          </select>
-          <div class="pb-row pb-row-wrap">
-            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveThemeSelection()">
-              Apply theme
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="installZip()">
-              Install from zip
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="downloadSelectedTheme()">
-              Download theme zip
-            </button>
-            <button
-              type="button"
-              class="pb-btn pb-btn-ghost"
-              [disabled]="busy() || activeThemeId === 'default'"
-              (click)="removeSelectedTheme()"
-            >
-              Remove theme
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" (click)="exportTemplate()">Download blank template zip</button>
-          </div>
-          <p class="pb-hint pb-hint-tight">
-            “Download theme zip” exports the selected theme folder. “Remove theme” deletes it from disk (not available
-            for <code>default</code>). If you remove the active theme, the app switches to default.
-          </p>
-        </section>
-      </div>
-    }
-
-    @if (tab === 'ai') {
-      <div class="pb-admin-ai">
-        <section class="pb-admin-card pb-admin-card-wide">
-          <h2>OpenAI image generation</h2>
-          <p class="pb-hint">
-            After QR unlock, guests pick a style, capture a photo, then run <strong>Create AI version</strong> on the
-            result screen. The API key stays in Electron only; it is never sent to the browser bundle. Uses the
-            <a href="https://platform.openai.com/docs/api-reference/images" rel="noreferrer" target="_blank"
-              >Images API</a
-            >
-            (edits) with your org’s key.
-          </p>
-          <label class="pb-admin-check">
-            <input type="checkbox" [(ngModel)]="draftAiEnabled" />
-            Enable AI style step after QR
-          </label>
-          <p class="pb-hint pb-hint-tight">
-            @if (booth.openAiConfigured()) {
-              An API key is stored on this machine.
-            } @else {
-              No API key stored — add one below to enable generation.
-            }
-          </p>
-          <label>OpenAI API key (optional — leave blank to keep current)</label>
-          <input
-            class="pb-input"
-            type="password"
-            autocomplete="off"
-            placeholder="sk-…"
-            [(ngModel)]="openAiKeyDraft"
-          />
-          <div class="pb-row pb-row-wrap">
-            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveAi()">
-              Save AI settings
-            </button>
-            <button
-              type="button"
-              class="pb-btn pb-btn-ghost"
-              [disabled]="busy() || !booth.openAiConfigured()"
-              (click)="clearOpenAiKey()"
-            >
-              Remove API key
-            </button>
-          </div>
-        </section>
-
-        <section class="pb-admin-card pb-admin-card-wide">
-          <h2>AI modes (after QR)</h2>
-          <p class="pb-hint">
-            Each mode is a button for guests. <strong>Prompt</strong> is sent with the captured photo to the image
-            model. The default <code>newspaper</code> mode uses the full vintage front-page prompt.
-          </p>
-          <div class="pb-row pb-row-wrap">
-            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addAiMode()">Add mode</button>
-          </div>
-          @for (m of draftAiModes; track $index) {
-            <div class="pb-admin-ai-row">
-              <h3>Mode {{ $index + 1 }}</h3>
-              <label>Id (stable key)</label>
-              <input class="pb-input" [(ngModel)]="m.id" />
-              <label>Button label</label>
-              <input class="pb-input" [(ngModel)]="m.label" />
-              <label>Prompt</label>
-              <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.prompt"></textarea>
-              <div class="pb-row pb-row-wrap">
-                <button type="button" class="pb-btn pb-btn-ghost" (click)="applyNewspaperPrompt($index)">
-                  Insert Newspaper prompt
+              </div>
+              <label>Logo size ({{ draftBranding.logoScalePercent }}%)</label>
+              <input
+                class="pb-input"
+                type="range"
+                min="50"
+                max="200"
+                step="5"
+                [(ngModel)]="draftBranding.logoScalePercent"
+              />
+              <p class="pb-admin-hint">50% – 200% of the default logo size on booth screens.</p>
+              <div class="pb-admin-row">
+                <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="pickLogo()">
+                  Choose logo image…
                 </button>
-                <button
-                  type="button"
-                  class="pb-btn pb-btn-ghost"
-                  [disabled]="draftAiModes.length <= 1"
-                  (click)="removeAiMode($index)"
-                >
-                  Remove
+                <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="clearLogo()">
+                  Use default KIA logo
+                </button>
+                <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="saveBranding()">
+                  Save logo size
                 </button>
               </div>
-            </div>
-          }
-        </section>
-      </div>
-    }
-
-    @if (tab === 'branding') {
-      <div class="pb-admin-branding">
-        <section class="pb-admin-card pb-admin-card-wide">
-          <h2>Booth logo</h2>
-          <p class="pb-hint">
-            Upload a rectangular logo (PNG, JPG, WebP, SVG). It replaces the default Kia logo on the scan landing and
-            unlock screens. Wide logos scale down to fit; aspect ratio is preserved.
-          </p>
-          @if (branding.logoSrc(); as logo) {
-            <div class="pb-admin-logo-preview">
-              <img [src]="logo" alt="Current logo preview" />
-            </div>
-          } @else {
-            <p class="pb-hint">No custom logo — emoji icons from copy settings are shown.</p>
-          }
-          <div class="pb-row pb-row-wrap">
-            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="uploadLogo()">
-              Upload logo…
-            </button>
-            <button
-              type="button"
-              class="pb-btn pb-btn-ghost"
-              [disabled]="busy() || !branding.hasLogo()"
-              (click)="removeLogo()"
-            >
-              Remove logo
-            </button>
+              <p class="pb-admin-hint pb-hint-tight">
+                The admin link on the scan screen is hidden by default. Hold the KIA logo for 12 seconds to reveal it
+                for 20 minutes.
+              </p>
+            </section>
           </div>
-        </section>
-      </div>
-    }
+        }
+
+        @if (tab === 'scanner') {
+          <div class="pb-admin-grid">
+            <section class="pb-admin-card">
+              <h2>GFS4400 serial scanner</h2>
+              <p class="pb-admin-hint">
+                USB-COM presentation mode (9600 8N1, CR suffix). Booth listens for QR from app start.
+              </p>
+              <label>
+                <input type="checkbox" [(ngModel)]="draftScanner.enabled" />
+                Enable serial scanner
+              </label>
+              <label>COM port</label>
+              @if (scannerPortsMessage(); as portMsg) {
+                <p class="pb-admin-hint">{{ portMsg }}</p>
+              }
+              <select class="pb-input" [(ngModel)]="draftScanner.comPort">
+                <option value="">— Select port —</option>
+                @for (p of serialPorts(); track p.path) {
+                  <option [value]="p.path">
+                    {{ p.path }}@if (p.friendlyName || p.manufacturer) {
+                      — {{ p.friendlyName || p.manufacturer }}
+                    }
+                  </option>
+                }
+              </select>
+              <label>Or type COM port manually</label>
+              <input
+                class="pb-input"
+                [(ngModel)]="draftScanner.comPort"
+                placeholder="e.g. COM3"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <label>Baud rate</label>
+              <input class="pb-input" type="number" [(ngModel)]="draftScanner.baudRate" />
+              <label>
+                <input type="checkbox" [(ngModel)]="draftScanner.cameraQrFallbackEnabled" />
+                Use booth camera for QR when serial scanner is unavailable
+              </label>
+              <p>Status: <strong>{{ scannerStatus() }}</strong></p>
+              @if (lastScan(); as code) {
+                <p>Last scan: <code>{{ code }}</code></p>
+              }
+              <div class="pb-admin-row">
+                <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="refreshScannerAdmin()">
+                  Refresh ports
+                </button>
+                <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" (click)="testScannerPort()">
+                  Test open port
+                </button>
+              </div>
+              <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveScanner()">
+                Save scanner settings
+              </button>
+            </section>
+
+            <section class="pb-admin-card">
+              <h2>Kia Forum API</h2>
+              <p class="pb-admin-hint">
+                Dev: <code>https://dev-kiaforum2026.thetunagroup.com</code> — Prod:
+                <code>https://kiaexperience.info</code>
+              </p>
+              <label>API base URL</label>
+              <input
+                class="pb-input"
+                [(ngModel)]="draftKiaApi.baseUrl"
+                placeholder="https://dev-kiaforum2026.thetunagroup.com"
+              />
+              <label>Bearer token (optional bootstrap)</label>
+              <input
+                class="pb-input"
+                type="password"
+                [(ngModel)]="bearerTokenDraft"
+                [placeholder]="bearerConfigured() ? '•••••••• (saved — enter new to replace)' : 'Optional — guest email auth used when empty'"
+                autocomplete="off"
+              />
+              <p class="pb-admin-hint">
+                Dev bypass authenticates as <code>{{ draftKiaApi.devBypassEmail }}</code>. Normal QR flow uses the
+                guest email from validate, then uploads when online.
+              </p>
+              <label>Dev bypass email</label>
+              <input
+                class="pb-input"
+                [(ngModel)]="draftKiaApi.devBypassEmail"
+                placeholder="nandu@tuna.group"
+              />
+              <label>QR token prefix (offline validation)</label>
+              <input class="pb-input" [(ngModel)]="draftKiaApi.qrPrefix" placeholder="KIA-PHOTO-" />
+              <label>Bypass code (testing)</label>
+              <input class="pb-input" [(ngModel)]="draftKiaApi.bypassCode" />
+              <label>
+                <input type="checkbox" [(ngModel)]="draftKiaApi.offlineAllowPrefix" />
+                Allow prefix-format tokens when API is unreachable
+              </label>
+              <label>
+                <input type="checkbox" [(ngModel)]="draftKiaApi.debugMode" />
+                Show API debug log (bottom-right panel)
+              </label>
+              <label>Framed upload format</label>
+              <select class="pb-input" [(ngModel)]="draftKiaApi.uploadImageFormat">
+                <option value="png">PNG (transparent frame edges)</option>
+                <option value="jpeg">JPEG (white background)</option>
+              </select>
+              <p>
+                Upload queue: <strong>{{ uploadQueuePending() }}</strong> pending
+              </p>
+              <div class="pb-admin-row">
+                <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="busy()" (click)="refreshUploadQueue()">
+                  Refresh queue
+                </button>
+                <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="busy()" (click)="testKiaConnection()">
+                  Test API connection
+                </button>
+              </div>
+              <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveKiaApi()">
+                Save API settings
+              </button>
+            </section>
+          </div>
+        }
       </section>
     </div>
   </div>

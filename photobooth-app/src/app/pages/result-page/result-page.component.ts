@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { KiaLogoComponent } from '../../components/kia-logo/kia-logo.component';
 import { KiaShellComponent } from '../../components/kia-shell/kia-shell.component';
 import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
@@ -14,7 +15,7 @@ type EffectKey = 'none' | string;
 
 @Component({
   selector: 'pb-result-page',
-  imports: [KiaShellComponent],
+  imports: [KiaShellComponent, KiaLogoComponent],
   templateUrl: './result-page.component.html',
   styleUrl: './result-page.component.scss',
 })
@@ -94,8 +95,10 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   async selectEffect(key: EffectKey): Promise<void> {
-    const slot = this.effectSlots().find((s) => s.key === key);
-    if (!slot && key !== 'none') return;
+    if (key !== 'none') {
+      const slot = this.effectSlots().find((s) => s.key === key);
+      if (!slot || slot.locked) return;
+    }
 
     this.selectedEffect.set(key);
     this.overlayLoadFailed.set(false);

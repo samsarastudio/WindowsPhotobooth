@@ -3,6 +3,7 @@
   justify-content: center;
   overflow: auto;
   padding: clamp(1rem, 2.8vmin, 1.6rem);
+  color: #ffffff;
 }
 
 .pb-admin-shell {
@@ -30,6 +31,7 @@
   font-size: clamp(1.12rem, 2.2vmin, 1.36rem);
   font-weight: 500;
   letter-spacing: 0.03em;
+  color: #ffffff;
 }
 
 .pb-admin-actions {
@@ -221,11 +223,12 @@
   align-items: center;
 }
 
-.pb-admin-logo-preview img {
+.pb-admin-logo-preview img,
+.pb-admin-logo-preview-img {
   max-width: 100%;
   width: auto;
   height: auto;
-  max-height: 160px;
+  max-height: calc(160px * var(--kia-logo-scale, 1));
   object-fit: contain;
 }
 
@@ -245,7 +248,7 @@
   }
 
   .pb-admin-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .pb-tab {

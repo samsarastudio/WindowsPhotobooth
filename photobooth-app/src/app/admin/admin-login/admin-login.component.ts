@@ -1,6 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { enterAdminRoute, leaveAdminRoute } from '../admin-route-body';
 import { setAdminSession } from '../admin.guard';
 
 @Component({
@@ -9,7 +10,7 @@ import { setAdminSession } from '../admin.guard';
   templateUrl: './admin-login.component.html',
   styleUrl: './admin-login.component.scss',
 })
-export class AdminLoginComponent implements OnInit {
+export class AdminLoginComponent implements OnInit, OnDestroy {
   pin = '';
   readonly err = signal<string | null>(null);
   readonly busy = signal(false);
@@ -20,6 +21,7 @@ export class AdminLoginComponent implements OnInit {
   constructor(private readonly router: Router) {}
 
   ngOnInit(): void {
+    enterAdminRoute();
     void fetch('/config/photobooth-config.default.json')
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
@@ -27,6 +29,10 @@ export class AdminLoginComponent implements OnInit {
         this.defaultPin.set(p ?? '2727');
       })
       .catch(() => this.defaultPin.set('2727'));
+  }
+
+  ngOnDestroy(): void {
+    leaveAdminRoute();
   }
 
   togglePinInfo(): void {

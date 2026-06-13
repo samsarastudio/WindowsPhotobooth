@@ -13,8 +13,6 @@ import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
 import { BoothSessionService } from '../../services/booth-session.service';
 import { BoothConfigService } from '../../services/booth-config.service';
-import { AiStyleService } from '../../services/ai-style.service';
-import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
 
 function previewTargetFps(): number {
@@ -31,11 +29,12 @@ function withPreviewDecodeKey(fileUrl: string, v: number): string {
   return `${fileUrl}${sep}v=${v}`;
 }
 
+import { KiaLogoComponent } from '../../components/kia-logo/kia-logo.component';
 import { KiaShellComponent } from '../../components/kia-shell/kia-shell.component';
 
 @Component({
   selector: 'pb-capture-page',
-  imports: [KiaShellComponent],
+  imports: [KiaShellComponent, KiaLogoComponent],
   templateUrl: './capture-page.component.html',
   styleUrl: './capture-page.component.scss',
 })
@@ -44,18 +43,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   private readonly booth = inject(BoothConfigService);
   private readonly session = inject(BoothSessionService);
-  private readonly aiStyle = inject(AiStyleService);
   readonly copy = this.booth.copy;
-
-  /** Label for the style chosen on `/ai-mode`, if any. */
-  readonly selectedStyleLabel = computed(() => {
-    const id = this.aiStyle.selectedModeId();
-    if (!id) return null;
-    if (id === PLAIN_PHOTO_MODE_ID) {
-      return this.copy().aiMode.plainPhotoLabel;
-    }
-    return this.booth.aiModes().find((m) => m.id === id)?.label ?? null;
-  });
 
   /** Double-buffered file preview — swap layer only after decode to avoid blank flicker. */
   readonly sdkPreviewActiveLayer = signal<0 | 1>(0);

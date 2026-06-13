@@ -17,6 +17,7 @@ export interface BoothFrameSlot {
   frameImage: string;
   /** file:// ref for upload composite — not a data URL */
   frameImagePath: string;
+  isUnlocked: boolean;
 }
 
 export interface BoothEffectSlot {
@@ -26,6 +27,7 @@ export interface BoothEffectSlot {
   frameId: number;
   frameImage: string;
   frameImagePath: string;
+  locked: boolean;
 }
 
 function frameLabel(frame: PbPhotoBoothFrame, index: number): string {
@@ -40,7 +42,7 @@ function isFileRef(url: string): boolean {
   return url.startsWith('file://');
 }
 
-function isUnlocked(frame: PbPhotoBoothFrame): boolean {
+function isFrameUnlocked(frame: PbPhotoBoothFrame): boolean {
   const raw = frame.is_unlocked;
   if (raw === true || raw === 1) return true;
   if (raw === false || raw === 0) return false;
@@ -51,7 +53,7 @@ function shouldShowFrame(frame: PbPhotoBoothFrame): boolean {
   const id = typeof frame.id === 'number' ? frame.id : Number(frame.id);
   if (!Number.isFinite(id)) return false;
   if (frame.is_active === 0 || frame.is_active === false) return false;
-  return isUnlocked(frame);
+  return true;
 }
 
 async function resolveDisplayImage(url: string): Promise<string> {
@@ -114,6 +116,7 @@ export class PhotoFramesService {
       frameId: f.id,
       frameImage: f.frameImage,
       frameImagePath: f.frameImagePath,
+      locked: !f.isUnlocked,
     })),
   );
 
@@ -180,6 +183,7 @@ export class PhotoFramesService {
       const frameImage = frameImagePath
         ? await resolveDisplayImage(frameImagePath)
         : (await resolveDisplayImage(frameRef)) || '';
+      const unlocked = isFrameUnlocked(f);
 
       parsed.push({
         id,
@@ -188,6 +192,7 @@ export class PhotoFramesService {
         iconPath,
         frameImage,
         frameImagePath,
+        isUnlocked: unlocked,
       });
 
       this.debugLog.log({
@@ -198,6 +203,7 @@ export class PhotoFramesService {
         response: {
           label: frameLabel(f, i),
           frameListSource: source,
+          isUnlocked: unlocked,
           frameImagePath: frameImagePath || null,
           iconPath: iconPath || null,
           iconBytes: icon.length,

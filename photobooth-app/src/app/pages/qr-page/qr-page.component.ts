@@ -21,11 +21,9 @@ import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { CameraQrScannerComponent } from '../../components/camera-qr-scanner/camera-qr-scanner.component';
-
+import { KiaLogoComponent } from '../../components/kia-logo/kia-logo.component';
 import { KiaShellComponent } from '../../components/kia-shell/kia-shell.component';
-
-import { BrandingLogoService } from '../../services/branding-logo.service';
-
+import { AdminLinkRevealService } from '../../services/admin-link-reveal.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 
 import { BoothSessionService } from '../../services/booth-session.service';
@@ -52,7 +50,7 @@ import { matchesQrTokenFormat, normalizeQrToken } from '../../services/qr-token.
 
   selector: 'pb-qr-page',
 
-  imports: [RouterLink, CameraQrScannerComponent, KiaShellComponent],
+  imports: [RouterLink, CameraQrScannerComponent, KiaShellComponent, KiaLogoComponent],
 
   templateUrl: './qr-page.component.html',
 
@@ -72,7 +70,9 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
   private readonly scanner = inject(ScannerService);
 
-  readonly branding = inject(BrandingLogoService);
+  private readonly adminReveal = inject(AdminLinkRevealService);
+
+  readonly adminLinkVisible = this.adminReveal.visible;
 
   readonly copy = this.booth.copy;
 
@@ -154,7 +154,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
     this.session.clear();
 
-    await this.branding.refresh();
+    this.adminReveal.init();
 
     this.scanner.startListening();
 
@@ -227,7 +227,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
 
   private isBypassCode(token: string): boolean {
-    const expected = (this.booth.kiaApi().bypassCode || this.copy().qr.bypassCode).trim();
+    const expected = this.booth.kiaApi().bypassCode.trim();
     return token === expected;
   }
 

@@ -298,8 +298,6 @@ function kiaApiFromMerged(cfg) {
   const k = cfg?.kiaApi || {};
   const sync = cfg?.sync || {};
   const copy = cfg?.copy || {};
-  const qrBypass =
-    copy?.qr && typeof copy.qr.bypassCode === 'string' ? copy.qr.bypassCode : '1234';
   let baseUrl = typeof k.baseUrl === 'string' ? k.baseUrl.trim() : '';
   if (!baseUrl && sync.apiBaseUrl) baseUrl = String(sync.apiBaseUrl).trim().replace(/\/$/, '');
   if (!baseUrl) baseUrl = 'https://dev-kiaforum2026.thetunagroup.com';
@@ -308,7 +306,7 @@ function kiaApiFromMerged(cfg) {
     baseUrl,
     bearerToken: typeof k.bearerToken === 'string' ? k.bearerToken : '',
     qrPrefix: k.qrPrefix || sync.qrPrefix || 'KIA-PHOTO-',
-    bypassCode: k.bypassCode || qrBypass || '12345',
+    bypassCode: k.bypassCode || '12345',
     devBypassEmail:
       typeof k.devBypassEmail === 'string' && k.devBypassEmail.trim()
         ? k.devBypassEmail.trim()

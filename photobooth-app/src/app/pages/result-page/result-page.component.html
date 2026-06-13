@@ -1,8 +1,6 @@
 <div class="pb-page pb-kia-experience pb-result">
   <pb-kia-shell [innerClass]="'innerBox--result'">
-    <div kiaLogo class="kia-logo-wrap">
-      <img class="kia-logo" src="kia/logo.svg" alt="KIA Logo" loading="eager" decoding="async" />
-    </div>
+    <pb-kia-logo kiaLogo />
 
     <div class="kia-page-body">
       @if (phase() === 'success') {
@@ -83,19 +81,40 @@
               <button
                 type="button"
                 class="kia-effect-btn"
-                [class.activeEffect]="selectedEffect() === slot.key"
+                [class.kia-effect-btn--locked]="slot.locked"
+                [class.activeEffect]="!slot.locked && selectedEffect() === slot.key"
+                [disabled]="slot.locked"
                 (click)="selectEffect(slot.key)"
-                [attr.aria-label]="slot.label"
+                [attr.aria-label]="slot.locked ? slot.label + ' (locked)' : slot.label"
+                [attr.aria-disabled]="slot.locked ? true : null"
               >
-                @if (slot.icon) {
+                @if (slot.locked) {
+                  <span class="kia-effect-locked-wrap">
+                    @if (slot.icon) {
+                      <img class="kia-effect-thumb kia-effect-thumb--locked" [src]="slot.icon" alt="" />
+                    } @else {
+                      <img
+                        class="kia-effect-thumb kia-effect-thumb--locked"
+                        src="kia/kiaprofile.svg"
+                        alt=""
+                      />
+                    }
+                    <img
+                      class="kia-effect-lock-overlay"
+                      src="kia/lockedeffect.svg"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  </span>
+                } @else if (slot.icon) {
                   <img class="kia-effect-thumb" [src]="slot.icon" [alt]="slot.label" />
-              } @else {
-                <img
-                  class="kia-effect-thumb"
-                  src="kia/kiaprofile.svg"
-                  [alt]="slot.label"
-                />
-              }
+                } @else {
+                  <img
+                    class="kia-effect-thumb"
+                    src="kia/kiaprofile.svg"
+                    [alt]="slot.label"
+                  />
+                }
               </button>
             }
           </div>

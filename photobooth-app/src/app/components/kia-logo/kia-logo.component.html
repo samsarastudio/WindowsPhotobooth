@@ -1,0 +1,24 @@
+<div
+  class="kia-logo-wrap"
+  [class.kia-logo-wrap--holdable]="holdable"
+  [style.--kia-logo-scale]="logoScale()"
+  (pointerdown)="onHoldStart($event)"
+  (pointerup)="onHoldEnd()"
+  (pointerleave)="onHoldEnd()"
+  (pointercancel)="onHoldEnd()"
+  (contextmenu)="onContextMenu($event)"
+>
+  @if (logoSrc(); as logo) {
+    <img class="kia-logo" [src]="logo" alt="KIA Logo" loading="eager" decoding="async" draggable="false" />
+  } @else {
+    <img
+      class="kia-logo"
+      src="kia/logo.svg"
+      alt="KIA Logo"
+      loading="eager"
+      decoding="async"
+      draggable="false"
+    />
+  }
+  <ng-content />
+</div>

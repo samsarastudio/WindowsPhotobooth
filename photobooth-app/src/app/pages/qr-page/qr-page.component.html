@@ -1,13 +1,8 @@
 <div class="pb-page pb-kia-experience pb-qr">
   <pb-kia-shell>
-    <div kiaLogo class="kia-logo-wrap">
-      @if (branding.logoSrc(); as logo) {
-        <img class="kia-logo" [src]="logo" alt="KIA Logo" loading="eager" decoding="async" />
-      } @else {
-        <img class="kia-logo" src="kia/logo.svg" alt="KIA Logo" loading="eager" decoding="async" />
-      }
+    <pb-kia-logo kiaLogo [holdable]="true">
       <p class="kia-tagline">{{ copy().qr.tagline }}</p>
-    </div>
+    </pb-kia-logo>
 
     <div class="kia-page-body">
       <div class="kia-copy-block">
@@ -76,5 +71,7 @@
     </div>
   </pb-kia-shell>
 
-  <a routerLink="/admin" class="kia-admin-link">{{ copy().qr.adminLink }}</a>
+  @if (adminLinkVisible()) {
+    <a routerLink="/admin" class="kia-admin-link kia-admin-link--visible">{{ copy().qr.adminLink }}</a>
+  }
 </div>

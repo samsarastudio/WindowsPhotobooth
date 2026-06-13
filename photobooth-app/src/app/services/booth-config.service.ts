@@ -48,7 +48,6 @@ type CopyPatch = {
   qr?: Partial<PhotoboothCopy['qr']>;
   capture?: Partial<PhotoboothCopy['capture']>;
   result?: Partial<PhotoboothCopy['result']>;
-  aiMode?: Partial<PhotoboothCopy['aiMode']>;
 };
 
 function mergeCopy(base: PhotoboothCopy, patch?: CopyPatch): PhotoboothCopy {
@@ -57,7 +56,6 @@ function mergeCopy(base: PhotoboothCopy, patch?: CopyPatch): PhotoboothCopy {
     qr: { ...base.qr, ...patch.qr },
     capture: { ...base.capture, ...patch.capture },
     result: { ...base.result, ...patch.result },
-    aiMode: { ...base.aiMode, ...patch.aiMode },
   };
 }
 
@@ -107,8 +105,6 @@ function normalizeCopy(raw: unknown): PhotoboothCopy {
 
     result: o['result'] as Partial<PhotoboothCopy['result']> | undefined,
 
-    aiMode: o['aiMode'] as Partial<PhotoboothCopy['aiMode']> | undefined,
-
   });
 
 }
@@ -122,13 +118,13 @@ function mergeBranding(patch?: Partial<PhotoboothBranding> | null): PhotoboothBr
   if (!patch) return base;
 
   return {
-
     ...base,
-
     ...patch,
-
     logoFile: patch.logoFile === undefined ? base.logoFile : patch.logoFile,
-
+    logoScalePercent:
+      typeof patch.logoScalePercent === 'number' && Number.isFinite(patch.logoScalePercent)
+        ? Math.min(200, Math.max(50, Math.round(patch.logoScalePercent)))
+        : base.logoScalePercent,
   };
 
 }
@@ -227,7 +223,7 @@ function normalizeKiaPaths(raw: unknown): PhotoboothKiaApiPaths {
 
 /** Merge `kiaApi` with legacy `sync` when upgrading saved configs. */
 
-function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig, copyBypass: string): PhotoboothKiaApiConfig {
+function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig): PhotoboothKiaApiConfig {
 
   const d = PHOTOBOOTH_DEFAULT_KIA_API;
 
@@ -268,12 +264,9 @@ function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig, copy
 
 
   const bypassCode =
-
     typeof o['bypassCode'] === 'string' && o['bypassCode'].trim()
-
       ? o['bypassCode']
-
-      : copyBypass.trim() || d.bypassCode;
+      : d.bypassCode;
 
 
 
@@ -379,7 +372,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 
   const sync = normalizeSync(rest['sync']);
 
-  const kiaApi = normalizeKiaApi(rest['kiaApi'], sync, copy.qr.bypassCode);
+  const kiaApi = normalizeKiaApi(rest['kiaApi'], sync);
 
 
 
@@ -411,7 +404,10 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 
 
 
-export type BoothAdminSavePartial = Partial<PhotoboothConfig> & { openAiApiKey?: string };
+export type BoothAdminSavePartial = Partial<Omit<PhotoboothConfig, 'branding'>> & {
+  branding?: Partial<PhotoboothBranding>;
+  openAiApiKey?: string;
+};
 
 
 
