@@ -4,6 +4,8 @@ import {
   OnDestroy,
   OnInit,
   ViewChild,
+  computed,
+  inject,
   input,
   output,
   signal,
@@ -13,6 +15,7 @@ import { BrowserQRCodeReader } from '@zxing/browser';
 import { NotFoundException } from '@zxing/library';
 import type { IScannerControls } from '@zxing/browser';
 import { CameraService } from '../../services/camera.service';
+import { BoothConfigService } from '../../services/booth-config.service';
 
 const DUPLICATE_COOLDOWN_MS = 3000;
 const SDK_DECODE_INTERVAL_MS = 400;
@@ -30,6 +33,12 @@ function withPreviewDecodeKey(fileUrl: string, v: number): string {
 export class CameraQrScannerComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl') videoRef?: ElementRef<HTMLVideoElement>;
   @ViewChild('sdkImgEl') sdkImgRef?: ElementRef<HTMLImageElement>;
+
+  private readonly booth = inject(BoothConfigService);
+
+  readonly cameraRotated = computed(
+    () => this.booth.camera().orientation !== 'landscape',
+  );
 
   readonly scanSuccess = input(false);
 

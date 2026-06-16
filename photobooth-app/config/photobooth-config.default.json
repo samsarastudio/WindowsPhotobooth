@@ -13,6 +13,10 @@
     "logoFile": null,
     "logoScalePercent": 100
   },
+  "camera": {
+    "orientation": "portrait",
+    "orientationVersion": 2
+  },
   "scanner": {
     "enabled": true,
     "comPort": "",
@@ -28,7 +32,7 @@
     "boothId": ""
   },
   "kiaApi": {
-    "baseUrl": "https://dev-kiaforum2026.thetunagroup.com",
+    "baseUrl": "https://admin.kiaexperience.info",
     "bearerToken": "",
     "qrPrefix": "KIA-PHOTO-",
     "bypassCode": "12345",

@@ -83,6 +83,7 @@ export interface PbPhotoBoothFrame {
   thumbnail?: string;
   frame_image?: string;
   frameImage?: string;
+  image?: string;
   image_url?: string;
   imageUrl?: string;
   file_path?: string;

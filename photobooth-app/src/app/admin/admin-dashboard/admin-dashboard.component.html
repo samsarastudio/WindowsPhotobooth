@@ -136,7 +136,7 @@
                 </button>
               </div>
               <p class="pb-admin-hint pb-hint-tight">
-                The admin link on the scan screen is hidden by default. Hold the KIA logo for 12 seconds to reveal it
+                The admin link on the scan screen is hidden by default. Hold the KIA logo for 6 seconds to reveal it
                 for 20 minutes.
               </p>
             </section>
@@ -145,6 +145,19 @@
 
         @if (tab === 'scanner') {
           <div class="pb-admin-grid">
+            <section class="pb-admin-card">
+              <h2>Booth camera</h2>
+              <p class="pb-admin-hint">
+                Match how the camera is physically mounted. Portrait (default) rotates the live preview and
+                captured photo 90° before the 4:5 crop. Use Landscape when the sensor is already upright.
+              </p>
+              <label>Camera orientation</label>
+              <select class="pb-input" [(ngModel)]="draftCamera.orientation">
+                <option value="portrait">Portrait (default)</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </section>
+
             <section class="pb-admin-card">
               <h2>GFS4400 serial scanner</h2>
               <p class="pb-admin-hint">
@@ -195,7 +208,7 @@
                 </button>
               </div>
               <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveScanner()">
-                Save scanner settings
+                Save scanner &amp; camera settings
               </button>
             </section>
 

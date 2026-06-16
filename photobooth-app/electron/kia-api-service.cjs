@@ -138,9 +138,13 @@ class KiaApiService {
     this._bundledFramesRoot = String(c.bundledFramesRoot || '').trim();
     const fmt = String(c.uploadImageFormat || 'png').trim().toLowerCase();
     this._uploadImageFormat = fmt === 'jpeg' || fmt === 'jpg' ? 'jpeg' : 'png';
-    this._baseUrl = String(c.baseUrl || '')
+    let baseUrl = String(c.baseUrl || '')
       .trim()
       .replace(/\/$/, '');
+    if (baseUrl.endsWith('/api')) {
+      baseUrl = baseUrl.slice(0, -4);
+    }
+    this._baseUrl = baseUrl;
     this._bearerToken = String(c.bearerToken || '').trim();
     this._qrPrefix = String(c.qrPrefix || 'KIA-PHOTO-').trim();
     this._bypassCode = String(c.bypassCode || '12345').trim();
@@ -606,30 +610,84 @@ class KiaApiService {
   }
 
   _parseFramesData(data) {
-    if (Array.isArray(data)) return data;
+    if (Array.isArray(data)) return data.map((f) => this._normalizeFrameRecord(f));
     if (typeof data === 'string') {
       try {
         const parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
+        return Array.isArray(parsed) ? parsed.map((f) => this._normalizeFrameRecord(f)) : [];
       } catch (_) {
         return [];
       }
     }
-    if (data && typeof data === 'object') return [data];
+    if (data && typeof data === 'object') return [this._normalizeFrameRecord(data)];
     return [];
+  }
+
+  /** Map API field aliases and resolve relative storage paths to absolute URLs. */
+  _normalizeFrameRecord(frame) {
+    if (!frame || typeof frame !== 'object') return frame;
+    const copy = { ...frame };
+    const frameImage =
+      copy.frame_image ||
+      copy.frameImage ||
+      copy.image ||
+      copy.image_url ||
+      copy.imageUrl ||
+      copy.file_path ||
+      '';
+    const thumbnail = copy.thumbnail || copy.thumb || copy.thumbnail_url || copy.thumbnailUrl || '';
+    copy.frame_image = this._resolveAssetUrl(frameImage);
+    copy.thumbnail = this._resolveAssetUrl(thumbnail);
+    return copy;
+  }
+
+  _resolveAssetUrl(ref) {
+    const s = String(ref || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s) || s.startsWith('file:')) return s;
+    if (!this._baseUrl) return s;
+    if (s.startsWith('/')) {
+      try {
+        return new URL(s, `${this._baseUrl}/`).href;
+      } catch (_) {
+        return s;
+      }
+    }
+    return s;
+  }
+
+  /** Only send booth JWT to our API host — S3/CDN URLs reject foreign Authorization headers. */
+  _shouldAttachBearer(urlStr) {
+    if (!this._baseUrl) return false;
+    try {
+      const target = new URL(urlStr);
+      const api = new URL(this._baseUrl);
+      return target.hostname === api.hostname;
+    } catch (_) {
+      return false;
+    }
   }
 
   _readFramesCache() {
     try {
       if (!fs.existsSync(this._framesCacheFile)) return { frames: [], fetchedAt: null };
       const raw = JSON.parse(fs.readFileSync(this._framesCacheFile, 'utf8'));
+      const frames = Array.isArray(raw.frames) ? raw.frames : [];
       return {
-        frames: Array.isArray(raw.frames) ? raw.frames : [],
+        frames: this._usableCachedFrames(frames),
         fetchedAt: raw.fetchedAt || null,
       };
     } catch (_) {
       return { frames: [], fetchedAt: null };
     }
+  }
+
+  _usableCachedFrames(frames) {
+    return (Array.isArray(frames) ? frames : []).filter((f) => {
+      if (!f || typeof f !== 'object') return false;
+      const normalized = this._normalizeFrameRecord(f);
+      return Boolean(normalized.frame_image || normalized.thumbnail);
+    });
   }
 
   _writeFramesCache(frames) {
@@ -646,6 +704,7 @@ class KiaApiService {
   }
 
   _fetchBinaryUrl(urlStr, bearerToken) {
+    const shouldAttachBearer = (href) => this._shouldAttachBearer(href);
     return new Promise((resolve, reject) => {
       let url;
       try {
@@ -656,13 +715,14 @@ class KiaApiService {
       }
       const lib = url.protocol === 'https:' ? https : http;
       const bearer = this._resolveBearer(bearerToken);
+      const attachBearer = Boolean(bearer && shouldAttachBearer(urlStr));
       const req = lib.get(
         urlStr,
         {
           headers: {
             Accept: 'image/*,*/*',
             'User-Agent': 'PhotoBooth-KIA/1.0',
-            ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+            ...(attachBearer ? { Authorization: `Bearer ${bearer}` } : {}),
           },
           timeout: 30000,
         },
@@ -693,12 +753,13 @@ class KiaApiService {
     function fetchBinaryFollow(href, bearer) {
       return new Promise((resolve, reject) => {
         const lib = href.startsWith('https:') ? https : http;
+        const attachBearer = Boolean(bearer && shouldAttachBearer(href));
         lib
           .get(href, {
             headers: {
               Accept: 'image/*,*/*',
               'User-Agent': 'PhotoBooth-KIA/1.0',
-              ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+              ...(attachBearer ? { Authorization: `Bearer ${bearer}` } : {}),
             },
             timeout: 30000,
           }, (res) => {
@@ -802,13 +863,13 @@ class KiaApiService {
           at: new Date().toISOString(),
           kind: 'frame-asset',
           method: 'DOWNLOAD',
-          ok: Boolean(fallback),
+          ok: Boolean(fallback || remote),
           url: remote.slice(0, 120),
           error: 'Response is not an image',
-          response: { fallback: fallback || null },
+          response: { fallback: fallback || null, keptRemote: !fallback && Boolean(remote) },
           durationMs: Date.now() - dlStarted,
         });
-        return fallback;
+        return fallback || remote;
       }
       fs.mkdirSync(path.dirname(cachePath), { recursive: true });
       fs.writeFileSync(cachePath, buf);
@@ -833,13 +894,13 @@ class KiaApiService {
         at: new Date().toISOString(),
         kind: 'frame-asset',
         method: 'DOWNLOAD',
-        ok: Boolean(fallback),
+        ok: Boolean(fallback || remote),
         url: remote.slice(0, 120),
         error: String(e.message || e),
-        response: { fallback: fallback || null },
+        response: { fallback: fallback || null, keptRemote: !fallback && Boolean(remote) },
         durationMs: Date.now() - dlStarted,
       });
-      return fallback || '';
+      return fallback || remote;
     }
   }
 
@@ -899,7 +960,7 @@ class KiaApiService {
     const out = [];
     for (const frame of list) {
       if (!frame || typeof frame !== 'object') continue;
-      const copy = { ...frame };
+      const copy = this._normalizeFrameRecord(frame);
       const frameId = copy.id;
       const hadApiThumbnail = Boolean(copy.thumbnail);
       if (copy.thumbnail) {

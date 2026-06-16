@@ -22,16 +22,28 @@ function cropRegionFor45Top(width, height) {
   return { left: 0, top: 0, width, height: cropH };
 }
 
+/** Degrees to rotate before crop — portrait booth mounts need 90° CW. */
+function orientationRotateDegrees(orientation) {
+  return orientation === 'landscape' ? 0 : 90;
+}
+
+async function applyOrientationRotate(sharpMod, inputBuf, orientation) {
+  const deg = orientationRotateDegrees(orientation);
+  if (!deg) return inputBuf;
+  return sharpMod(inputBuf).rotate(deg).toBuffer();
+}
+
 /**
  * Center-crop (width) or top-crop (height) to 4:5 and overwrite the file.
  * Supports JPEG and PNG inputs; JPEG output for .jpg/.jpeg, PNG for .png.
  */
-async function cropPhotoTo45Top(sharpMod, filePath, { overwrite = true } = {}) {
+async function cropPhotoTo45Top(sharpMod, filePath, { overwrite = true, orientation = 'portrait' } = {}) {
   if (!sharpMod || !filePath || !fs.existsSync(filePath)) {
     return { ok: false, error: 'Missing sharp module or file path.' };
   }
   const abs = path.resolve(filePath);
-  const inputBuf = fs.readFileSync(abs);
+  let inputBuf = fs.readFileSync(abs);
+  inputBuf = await applyOrientationRotate(sharpMod, inputBuf, orientation);
   const meta = await sharpMod(inputBuf).metadata();
   const width = meta.width;
   const height = meta.height;
@@ -67,10 +79,11 @@ async function cropPhotoTo45Top(sharpMod, filePath, { overwrite = true } = {}) {
 }
 
 /** Crop a buffer to 4:5 top-aligned; returns JPEG buffer by default. */
-async function cropBufferTo45Top(sharpMod, inputBuf, { format = 'jpeg' } = {}) {
-  const meta = await sharpMod(inputBuf).metadata();
+async function cropBufferTo45Top(sharpMod, inputBuf, { format = 'jpeg', orientation = 'portrait' } = {}) {
+  let buf = await applyOrientationRotate(sharpMod, inputBuf, orientation);
+  const meta = await sharpMod(buf).metadata();
   const region = cropRegionFor45Top(meta.width, meta.height);
-  let pipeline = sharpMod(inputBuf).extract(region);
+  let pipeline = sharpMod(buf).extract(region);
   if (format === 'png') {
     return pipeline.png({ compressionLevel: 9 }).toBuffer();
   }
@@ -169,6 +182,8 @@ module.exports = {
   PHOTO_WIDTH,
   PHOTO_HEIGHT,
   PHOTO_ASPECT,
+  orientationRotateDegrees,
+  applyOrientationRotate,
   cropRegionFor45Top,
   cropPhotoTo45Top,
   cropBufferTo45Top,

@@ -19,11 +19,28 @@ function loadSharp() {
   }
 }
 
+function loadCameraOrientation() {
+  try {
+    const cam = loadMergedConfig()?.camera || {};
+    const version = cam.orientationVersion;
+    const raw = cam.orientation;
+    if (version === 2 && (raw === 'portrait' || raw === 'landscape')) {
+      return raw;
+    }
+    if (raw === 'portrait') return 'portrait';
+    if (raw === 'portrait-default') return 'landscape';
+    if (raw === 'landscape') return 'portrait';
+    return 'portrait';
+  } catch (_) {
+    return 'portrait';
+  }
+}
+
 async function cropCaptureFile(filePath) {
   const sharpMod = loadSharp();
   if (!sharpMod || !filePath) return;
   try {
-    await cropPhotoTo45Top(sharpMod, filePath);
+    await cropPhotoTo45Top(sharpMod, filePath, { orientation: loadCameraOrientation() });
   } catch (e) {
     console.error('[crop]', filePath, e);
   }
@@ -300,7 +317,8 @@ function kiaApiFromMerged(cfg) {
   const copy = cfg?.copy || {};
   let baseUrl = typeof k.baseUrl === 'string' ? k.baseUrl.trim() : '';
   if (!baseUrl && sync.apiBaseUrl) baseUrl = String(sync.apiBaseUrl).trim().replace(/\/$/, '');
-  if (!baseUrl) baseUrl = 'https://dev-kiaforum2026.thetunagroup.com';
+  if (!baseUrl) baseUrl = 'https://admin.kiaexperience.info';
+  if (baseUrl.endsWith('/api')) baseUrl = baseUrl.slice(0, -4);
   const paths = k.paths || {};
   return {
     baseUrl,

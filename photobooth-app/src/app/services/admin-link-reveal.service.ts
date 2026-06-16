@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy, signal } from '@angular/core';
 
 const STORAGE_KEY = 'pb-admin-link-until';
-const HOLD_MS = 12_000;
+const HOLD_MS = 6_000;
 const VISIBLE_MS = 20 * 60 * 1000;
 
 @Injectable({ providedIn: 'root' })

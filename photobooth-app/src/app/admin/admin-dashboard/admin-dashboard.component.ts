@@ -3,12 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import type {
   PhotoboothBranding,
+  PhotoboothCameraConfig,
   PhotoboothCopy,
   PhotoboothKiaApiConfig,
   PhotoboothScannerConfig,
 } from '../../models/photobooth-config.model';
 import {
   PHOTOBOOTH_DEFAULT_BRANDING,
+  PHOTOBOOTH_DEFAULT_CAMERA,
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_KIA_API,
   PHOTOBOOTH_DEFAULT_KIA_API_PATHS,
@@ -31,6 +33,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   tab: 'copy' | 'branding' | 'scanner' = 'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
   draftBranding: PhotoboothBranding = structuredClone(PHOTOBOOTH_DEFAULT_BRANDING);
+  draftCamera: PhotoboothCameraConfig = structuredClone(PHOTOBOOTH_DEFAULT_CAMERA);
   draftScanner: PhotoboothScannerConfig = structuredClone(PHOTOBOOTH_DEFAULT_SCANNER);
   draftKiaApi: PhotoboothKiaApiConfig = structuredClone(PHOTOBOOTH_DEFAULT_KIA_API);
   bearerTokenDraft = '';
@@ -63,6 +66,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   private syncFromService(): void {
     this.draft = structuredClone(this.booth.copy());
     this.draftBranding = structuredClone(this.booth.branding());
+    this.draftCamera = structuredClone(this.booth.camera());
     const cfg = this.booth.config();
     this.draftScanner = structuredClone(cfg?.scanner ?? PHOTOBOOTH_DEFAULT_SCANNER);
     this.draftKiaApi = structuredClone(cfg?.kiaApi ?? PHOTOBOOTH_DEFAULT_KIA_API);
@@ -124,12 +128,18 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     this.status.set(null);
     this.busy.set(true);
     const comPort = this.draftScanner.comPort.trim().toUpperCase();
+    const orientation =
+      this.draftCamera.orientation === 'landscape' ? 'landscape' : 'portrait';
     const ok = await this.booth.save({
       scanner: { ...this.draftScanner, comPort },
+      camera: { orientation, orientationVersion: 2 },
     });
     this.busy.set(false);
-    this.status.set(ok ? 'Scanner settings saved.' : 'Save failed.');
-    if (ok) void this.refreshScannerAdmin();
+    this.status.set(ok ? 'Scanner and camera settings saved.' : 'Save failed.');
+    if (ok) {
+      this.syncFromService();
+      void this.refreshScannerAdmin();
+    }
   }
 
   async saveKiaApi(): Promise<void> {

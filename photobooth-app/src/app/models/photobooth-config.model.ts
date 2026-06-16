@@ -58,6 +58,16 @@ export interface PhotoboothAiMode {
 /** How the booth reads registration QR codes. */
 export type QrScanMode = 'serial' | 'camera' | 'auto';
 
+/** Booth camera mount: portrait rotates 90° for typical portrait booth; landscape = native sensor. */
+export type PhotoboothCameraOrientation = 'portrait' | 'landscape';
+
+export interface PhotoboothCameraConfig {
+  /** portrait (default) = rotate 90° CW; landscape = no rotation */
+  orientation: PhotoboothCameraOrientation;
+  /** 2 = current portrait/landscape semantics; omit on legacy configs for one-time migration */
+  orientationVersion?: number;
+}
+
 /** Datalogic GFS4400 USB-COM scanner (presentation / object sense). */
 export interface PhotoboothScannerConfig {
   enabled: boolean;
@@ -103,6 +113,10 @@ export interface PhotoboothKiaApiConfig {
   paths: PhotoboothKiaApiPaths;
 }
 
+export const PHOTOBOOTH_DEFAULT_CAMERA: PhotoboothCameraConfig = {
+  orientation: 'portrait',
+};
+
 export const PHOTOBOOTH_DEFAULT_SCANNER: PhotoboothScannerConfig = {
   enabled: true,
   comPort: '',
@@ -129,7 +143,7 @@ export const PHOTOBOOTH_DEFAULT_KIA_API_PATHS: PhotoboothKiaApiPaths = {
 };
 
 export const PHOTOBOOTH_DEFAULT_KIA_API: PhotoboothKiaApiConfig = {
-  baseUrl: 'https://dev-kiaforum2026.thetunagroup.com',
+  baseUrl: 'https://admin.kiaexperience.info',
   bearerToken: '',
   qrPrefix: 'KIA-PHOTO-',
   bypassCode: '12345',
@@ -149,6 +163,7 @@ export interface PhotoboothConfig {
   activeThemeId: string;
   branding: PhotoboothBranding;
   copy: PhotoboothCopy;
+  camera: PhotoboothCameraConfig;
   scanner: PhotoboothScannerConfig;
   /** @deprecated Use `kiaApi`; kept for saved JSON compatibility. */
   sync: PhotoboothSyncConfig;

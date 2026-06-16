@@ -1,4 +1,4 @@
-<div class="pb-camera-qr">
+<div class="pb-camera-qr" [class.pb-camera-qr--rotated]="cameraRotated()">
   @if (useWebcam()) {
     <video
       #videoEl

@@ -15,7 +15,10 @@
               <div class="runner" aria-hidden="true"></div>
             }
             <div class="content w-full">
-              <div class="kia-capture-preview-slot">
+              <div
+                class="kia-capture-preview-slot"
+                [class.kia-capture-preview-slot--rotated]="cameraRotated()"
+              >
               @if (useWebcam()) {
                 <video
                   #videoEl
@@ -35,7 +38,7 @@
                     [class.kia-capture-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
                     [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
                     alt="Live preview"
-                    decoding="sync"
+                    decoding="async"
                     draggable="false"
                     (load)="onSdkPreviewLayerDecoded($event, 0)"
                   />
@@ -44,7 +47,7 @@
                     [class.kia-capture-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
                     [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
                     alt=""
-                    decoding="sync"
+                    decoding="async"
                     draggable="false"
                     (load)="onSdkPreviewLayerDecoded($event, 1)"
                   />
@@ -57,12 +60,12 @@
 
         <div class="kia-pose-timer-col">
           <video
+            #timerVideoEl
             class="kia-timer-video"
             src="kia/timer_video.mp4"
-            autoplay
-            loop
             muted
             playsinline
+            preload="auto"
             aria-hidden="true"
           ></video>
         </div>

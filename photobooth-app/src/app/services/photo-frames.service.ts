@@ -166,7 +166,7 @@ export class PhotoFramesService {
 
       const thumbRef = f.thumbnail || '';
       const frameRef =
-        f.frame_image || f.frameImage || f.image_url || f.imageUrl || f.file_path || '';
+        f.frame_image || f.frameImage || f.image || f.image_url || f.imageUrl || f.file_path || '';
 
       let frameImagePath = isFileRef(frameRef) ? frameRef : '';
       if (!frameImagePath && window.pbApi?.kiaBundledFrameAsset) {

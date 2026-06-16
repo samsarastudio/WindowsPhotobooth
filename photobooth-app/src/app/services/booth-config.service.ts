@@ -8,6 +8,8 @@ import type {
 
   PhotoboothBranding,
 
+  PhotoboothCameraConfig,
+
   PhotoboothCopy,
 
   PhotoboothScannerConfig,
@@ -29,6 +31,8 @@ import {
   PHOTOBOOTH_DEFAULT_AI_MODES,
 
   PHOTOBOOTH_DEFAULT_BRANDING,
+
+  PHOTOBOOTH_DEFAULT_CAMERA,
 
   PHOTOBOOTH_DEFAULT_COPY,
 
@@ -130,6 +134,28 @@ function mergeBranding(patch?: Partial<PhotoboothBranding> | null): PhotoboothBr
 }
 
 
+
+function normalizeCamera(raw: unknown): PhotoboothCameraConfig {
+  const d = PHOTOBOOTH_DEFAULT_CAMERA;
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const version = o['orientationVersion'];
+  const rawOri = o['orientation'];
+
+  if (version === 2 && (rawOri === 'portrait' || rawOri === 'landscape')) {
+    return { orientation: rawOri, orientationVersion: 2 };
+  }
+  if (rawOri === 'portrait') {
+    return { orientation: 'portrait', orientationVersion: 2 };
+  }
+  // Legacy configs (pre Jun 2026): portrait-default = no rotate, landscape = rotate 90°.
+  if (rawOri === 'portrait-default') {
+    return { orientation: 'landscape', orientationVersion: 2 };
+  }
+  if (rawOri === 'landscape') {
+    return { orientation: 'portrait', orientationVersion: 2 };
+  }
+  return { orientation: d.orientation, orientationVersion: 2 };
+}
 
 function normalizeQrScanMode(raw: unknown): QrScanMode {
 
@@ -238,6 +264,13 @@ function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig): Pho
   }
 
   if (!baseUrl) baseUrl = d.baseUrl;
+
+  if (baseUrl.includes('dev-kiaforum2026.thetunagroup.com')) {
+    baseUrl = 'https://admin.kiaexperience.info';
+  }
+  if (baseUrl.endsWith('/api')) {
+    baseUrl = baseUrl.slice(0, -4);
+  }
 
 
 
@@ -384,6 +417,8 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 
     copy,
 
+    camera: normalizeCamera(rest['camera']),
+
     scanner: normalizeScanner(rest['scanner']),
 
     sync,
@@ -404,8 +439,9 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 
 
 
-export type BoothAdminSavePartial = Partial<Omit<PhotoboothConfig, 'branding'>> & {
+export type BoothAdminSavePartial = Partial<Omit<PhotoboothConfig, 'branding' | 'camera'>> & {
   branding?: Partial<PhotoboothBranding>;
+  camera?: Partial<PhotoboothCameraConfig>;
   openAiApiKey?: string;
 };
 
@@ -424,6 +460,8 @@ export class BoothConfigService {
   readonly copy = computed(() => this.state()?.copy ?? PHOTOBOOTH_DEFAULT_COPY);
 
   readonly branding = computed(() => this.state()?.branding ?? PHOTOBOOTH_DEFAULT_BRANDING);
+
+  readonly camera = computed(() => this.state()?.camera ?? PHOTOBOOTH_DEFAULT_CAMERA);
 
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'default');
 
@@ -468,6 +506,8 @@ export class BoothConfigService {
         branding: PHOTOBOOTH_DEFAULT_BRANDING,
 
         copy: PHOTOBOOTH_DEFAULT_COPY,
+
+        camera: { ...PHOTOBOOTH_DEFAULT_CAMERA },
 
         scanner: { ...PHOTOBOOTH_DEFAULT_SCANNER },
 

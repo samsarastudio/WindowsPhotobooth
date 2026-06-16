@@ -45,10 +45,11 @@ export class CameraService {
     return { previewBasePath: previewFile, useWebcam: false };
   }
 
-  async previewFrame(outPath: string): Promise<PbCameraResult> {
+  async previewFrame(outPath: string, slot: 0 | 1 = 0): Promise<PbCameraResult> {
     return window.pbApi!.cameraInvoke({
       cmd: 'preview',
       path: this.normalizePath(outPath),
+      previewSlot: slot,
     });
   }
 
