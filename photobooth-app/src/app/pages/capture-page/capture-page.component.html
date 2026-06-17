@@ -33,24 +33,26 @@
                 </div>
               } @else {
                 <div class="kia-capture-preview-stack">
-                  <img
-                    class="kia-capture-preview-layer"
-                    [class.kia-capture-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
-                    [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
-                    alt="Live preview"
-                    decoding="async"
-                    draggable="false"
-                    (load)="onSdkPreviewLayerDecoded($event, 0)"
-                  />
-                  <img
-                    class="kia-capture-preview-layer"
-                    [class.kia-capture-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
-                    [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
-                    alt=""
-                    decoding="async"
-                    draggable="false"
-                    (load)="onSdkPreviewLayerDecoded($event, 1)"
-                  />
+                  @if (sdkPreviewUrl0(); as u0) {
+                    <img
+                      class="kia-capture-preview-layer"
+                      [class.kia-capture-preview-layer--front]="sdkPreviewActiveLayer() === 0"
+                      [src]="u0"
+                      alt="Live preview"
+                      decoding="sync"
+                      draggable="false"
+                    />
+                  }
+                  @if (sdkPreviewUrl1(); as u1) {
+                    <img
+                      class="kia-capture-preview-layer"
+                      [class.kia-capture-preview-layer--front]="sdkPreviewActiveLayer() === 1"
+                      [src]="u1"
+                      alt=""
+                      decoding="sync"
+                      draggable="false"
+                    />
+                  }
                 </div>
               }
               </div>

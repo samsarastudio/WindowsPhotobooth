@@ -100,6 +100,8 @@ export type PhotoboothUploadImageFormat = 'png' | 'jpeg';
 /** Kia Forum photo-booth API (dev / prod base URL + Bearer). */
 export interface PhotoboothKiaApiConfig {
   baseUrl: string;
+  /** Optional separate host for POST /photo-booth/media only; empty = use baseUrl. */
+  uploadBaseUrl: string;
   bearerToken: string;
   qrPrefix: string;
   bypassCode: string;
@@ -143,7 +145,8 @@ export const PHOTOBOOTH_DEFAULT_KIA_API_PATHS: PhotoboothKiaApiPaths = {
 };
 
 export const PHOTOBOOTH_DEFAULT_KIA_API: PhotoboothKiaApiConfig = {
-  baseUrl: 'https://admin.kiaexperience.info',
+  baseUrl: 'https://dev-kiaforum2026.thetunagroup.com',
+  uploadBaseUrl: '',
   bearerToken: '',
   qrPrefix: 'KIA-PHOTO-',
   bypassCode: '12345',

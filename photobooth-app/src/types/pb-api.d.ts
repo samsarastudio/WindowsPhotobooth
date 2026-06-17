@@ -69,6 +69,8 @@ export interface PbSyncEnqueueEntry {
 export interface PbKiaEnqueueMediaEntry {
   sessionToken: string;
   imagePath: string;
+  scannedQrToken?: string | null;
+  pendingValidate?: boolean;
   frameId?: number | null;
   frameImagePath?: string | null;
   bearerToken?: string | null;
@@ -163,6 +165,7 @@ export interface PbKiaApiDebugEntry {
 
 export interface PbApi {
   getPaths(): Promise<PbPaths>;
+  shutdownSystem(): Promise<{ ok: boolean; error?: string }>;
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
   readFileBase64(filePath: string): Promise<string>;
   fetchImageDataUrl(

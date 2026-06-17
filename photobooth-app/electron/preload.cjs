@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pbApi', {
   getPaths: () => ipcRenderer.invoke('app:getPaths'),
+  shutdownSystem: () => ipcRenderer.invoke('app:shutdownSystem'),
   cameraInvoke: (cmd) => ipcRenderer.invoke('camera:invoke', cmd),
   readFileBase64: (filePath) => ipcRenderer.invoke('file:readBase64', filePath),
   fetchImageDataUrl: (url) => ipcRenderer.invoke('net:fetchImageDataUrl', url),

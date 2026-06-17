@@ -276,6 +276,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
             token,
             res.sessionData ?? null,
             res.email ?? this.booth.kiaApi().devBypassEmail,
+            Boolean(res.usedPrefixFallback || res.offline),
           );
         } else {
           this.message.set(res.error || res.message || this.copy().qr.invalidCode);
@@ -289,7 +290,12 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
       if (res.valid) {
 
-        await this.acceptToken(token, res.sessionData ?? null, res.email ?? null);
+        await this.acceptToken(
+          token,
+          res.sessionData ?? null,
+          res.email ?? null,
+          Boolean(res.usedPrefixFallback || res.offline),
+        );
 
         return;
 
@@ -315,9 +321,13 @@ export class QrPageComponent implements OnInit, OnDestroy {
     token: string,
     sessionData: string | null,
     guestEmail: string | null = null,
+    offlineValidated = false,
   ): Promise<void> {
 
-    this.session.start(token, sessionData, guestEmail);
+    this.session.start(token, sessionData, guestEmail, {
+      offlineValidated,
+      scannedQrToken: token,
+    });
 
     this.message.set('');
 

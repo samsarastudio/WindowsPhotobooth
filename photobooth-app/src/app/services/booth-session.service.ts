@@ -4,6 +4,9 @@ export interface BoothSession {
   token: string;
   sessionData?: string | null;
   guestEmail?: string | null;
+  scannedQrToken?: string | null;
+  /** QR was accepted locally without live API validate — upload queue will re-validate when online. */
+  offlineValidated?: boolean;
   selectedFrameId: number | null;
   startedAt: string;
   photos: string[];
@@ -17,12 +20,24 @@ export class BoothSessionService {
   readonly token = () => this._session()?.token ?? null;
   readonly hasSession = () => !!this._session();
 
-  start(token: string, sessionData?: string | null, guestEmail?: string | null): void {
-    const sessionToken = this.normalizeSessionToken(sessionData) || this.normalizeSessionToken(token);
+  start(
+    token: string,
+    sessionData?: string | null,
+    guestEmail?: string | null,
+    options?: { offlineValidated?: boolean; scannedQrToken?: string | null },
+  ): void {
+    const scannedQrToken =
+      this.normalizeSessionToken(options?.scannedQrToken) || token.trim() || null;
+    const normalizedSession = this.normalizeSessionToken(sessionData);
+    const sessionToken =
+      normalizedSession ||
+      (options?.offlineValidated === true ? null : this.normalizeSessionToken(token));
     this._session.set({
       token: token.trim(),
-      sessionData: sessionToken || null,
+      sessionData: sessionToken,
       guestEmail: guestEmail ?? null,
+      scannedQrToken,
+      offlineValidated: options?.offlineValidated === true,
       selectedFrameId: null,
       startedAt: new Date().toISOString(),
       photos: [],

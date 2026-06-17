@@ -148,12 +148,14 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     const kiaApi: PhotoboothKiaApiConfig = {
       ...this.draftKiaApi,
       baseUrl: this.draftKiaApi.baseUrl.trim().replace(/\/$/, ''),
+      uploadBaseUrl: this.draftKiaApi.uploadBaseUrl.trim().replace(/\/$/, ''),
       paths: { ...PHOTOBOOTH_DEFAULT_KIA_API_PATHS, ...this.draftKiaApi.paths },
       bearerToken: this.bearerTokenDraft.trim() || this.draftKiaApi.bearerToken,
     };
     const partial: Record<string, unknown> = {
       kiaApi: {
         baseUrl: kiaApi.baseUrl,
+        uploadBaseUrl: kiaApi.uploadBaseUrl,
         qrPrefix: kiaApi.qrPrefix,
         bypassCode: kiaApi.bypassCode,
         devBypassEmail: kiaApi.devBypassEmail.trim(),

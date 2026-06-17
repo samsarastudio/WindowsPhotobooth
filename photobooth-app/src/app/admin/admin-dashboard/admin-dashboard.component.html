@@ -224,6 +224,17 @@
                 [(ngModel)]="draftKiaApi.baseUrl"
                 placeholder="https://dev-kiaforum2026.thetunagroup.com"
               />
+              <label>Photo upload base URL (optional)</label>
+              <input
+                class="pb-input"
+                [(ngModel)]="draftKiaApi.uploadBaseUrl"
+                placeholder="Leave empty to use API base URL"
+              />
+              <p class="pb-admin-hint">
+                Used only for <code>POST …/photo-booth/media</code>. Set prod upload host here while keeping
+                validate, frames, and gallery on dev — e.g.
+                <code>https://admin.kiaexperience.info</code>
+              </p>
               <label>Bearer token (optional bootstrap)</label>
               <input
                 class="pb-input"

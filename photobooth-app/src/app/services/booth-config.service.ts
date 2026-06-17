@@ -264,12 +264,13 @@ function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig): Pho
   }
 
   if (!baseUrl) baseUrl = d.baseUrl;
-
-  if (baseUrl.includes('dev-kiaforum2026.thetunagroup.com')) {
-    baseUrl = 'https://admin.kiaexperience.info';
-  }
   if (baseUrl.endsWith('/api')) {
     baseUrl = baseUrl.slice(0, -4);
+  }
+
+  let uploadBaseUrl = typeof o['uploadBaseUrl'] === 'string' ? o['uploadBaseUrl'].trim() : '';
+  if (uploadBaseUrl.endsWith('/api')) {
+    uploadBaseUrl = uploadBaseUrl.slice(0, -4);
   }
 
 
@@ -306,6 +307,8 @@ function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig): Pho
   return {
 
     baseUrl,
+
+    uploadBaseUrl,
 
     bearerToken: typeof o['bearerToken'] === 'string' ? o['bearerToken'] : d.bearerToken,
 

@@ -261,15 +261,32 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       return { ok: false, error: 'No photo to upload.' };
     }
 
-    this.boothSession.addPhoto(pp);
-    const ended = this.boothSession.finalize();
-    if (!ended?.token || ended.photos.length === 0) {
+    const snap = this.boothSession.session();
+    if (!snap?.token) {
+      return { ok: false, error: 'Session expired — scan QR again.' };
+    }
+
+    if (!snap.photos.includes(pp)) {
+      this.boothSession.addPhoto(pp);
+    }
+
+    const live = this.boothSession.session();
+    if (!live?.token) {
+      return { ok: false, error: 'Session expired — scan QR again.' };
+    }
+
+    const photos = live.photos.includes(pp) ? live.photos : [...live.photos, pp];
+    const ended = { ...live, photos };
+    if (photos.length === 0) {
       return { ok: false, error: 'Session expired — scan QR again.' };
     }
 
     const frameId = ended.selectedFrameId ?? null;
-    const sessionToken = ended.sessionData?.trim() || ended.token.trim();
+    const sessionToken =
+      ended.sessionData?.trim() || ended.scannedQrToken?.trim() || ended.token.trim();
+    const scannedQrToken = ended.scannedQrToken?.trim() || ended.token.trim();
     const guestEmail = ended.guestEmail?.trim() || null;
+    const pendingValidate = Boolean(ended.offlineValidated) || !ended.sessionData?.trim();
     const frameSlot =
       frameId != null ? this.photoFrames.slotForKey(`frame-${frameId}`) : undefined;
 
@@ -278,6 +295,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     for (const imagePath of ended.photos) {
       const enq = await this.kiaApi.enqueueMedia({
         sessionToken,
+        scannedQrToken,
+        pendingValidate,
         frameId,
         frameImagePath: frameSlot?.frameImagePath || null,
         imagePath,
@@ -294,6 +313,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       return { ok: false, error: this.copy().result.uploadError };
     }
 
+    this.boothSession.clear();
+
     this.debugLog.log({
       kind: 'upload',
       method: 'ENQUEUE',
@@ -301,9 +322,12 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       url: uploadId,
       response: {
         queued,
+        pendingValidate,
         frameId,
         background: true,
-        message: 'Upload queued — will sync when online',
+        message: pendingValidate
+          ? 'Upload queued offline — will sync when online'
+          : 'Upload queued — will sync when online',
       },
     });
 

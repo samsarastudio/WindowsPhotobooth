@@ -40,12 +40,15 @@
     </p>
     <input
       id="pin"
-      class="pb-input"
+      class="pb-input pb-input--touch-pin"
       type="password"
-      inputmode="numeric"
-      autocomplete="current-password"
+      inputmode="none"
+      autocomplete="off"
+      readonly
+      maxlength="12"
       [(ngModel)]="pin"
-      (keyup.enter)="submit()"
+      (click)="onPinInput($event)"
+      (focus)="openNumpad()"
     />
 
     @if (err(); as m) {
@@ -58,5 +61,56 @@
       </button>
       <a routerLink="/" class="pb-btn pb-btn-ghost">Back</a>
     </div>
+
+    <div class="pb-admin-login__footer">
+      <button
+        type="button"
+        class="pb-btn pb-btn-danger-ghost"
+        [disabled]="shutdownBusy()"
+        (click)="openShutdownConfirm()"
+      >
+        Shutdown system
+      </button>
+    </div>
   </div>
+
+  @if (numpadOpen()) {
+    <button
+      type="button"
+      class="pb-numpad-backdrop"
+      aria-label="Close number pad"
+      (click)="closeNumpad()"
+    ></button>
+    <pb-touch-numpad [(value)]="pin" (closed)="closeNumpad()" />
+  }
+
+  @if (shutdownConfirmOpen()) {
+    <div class="pb-shutdown-dialog" role="dialog" aria-modal="true" aria-labelledby="shutdown-title">
+      <div class="pb-shutdown-dialog__panel">
+        <h2 id="shutdown-title" class="pb-shutdown-dialog__title">Shut down booth?</h2>
+        <p class="pb-shutdown-dialog__text">
+          This will close the PhotoBooth app and power off the computer. Only use this at the end
+          of the event.
+        </p>
+        <div class="pb-shutdown-dialog__actions">
+          <button
+            type="button"
+            class="pb-btn pb-btn-ghost"
+            [disabled]="shutdownBusy()"
+            (click)="closeShutdownConfirm()"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="pb-btn pb-btn-danger"
+            [disabled]="shutdownBusy()"
+            (click)="confirmShutdown()"
+          >
+            @if (shutdownBusy()) { Shutting down… } @else { Shut down now }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

@@ -15,13 +15,39 @@ const {
 
 const SYNC_INTERVAL_MS = 30_000;
 const MAX_UPLOAD_ATTEMPTS = 1000;
+const BOOTH_API_TIMEOUT_MS = 8_000;
+const UPLOAD_API_TIMEOUT_MS = 60_000;
 const DEFAULT_DEV_BYPASS_EMAIL = 'nandu@tuna.group';
 
-function isLikelyPhotoBoothSessionToken(value, bypassCode) {
+function isLikelyPhotoBoothSessionToken(value, bypassCode, qrPrefix) {
   const s = normalizeSessionToken(value);
   if (!s) return false;
   if (isBypassToken(s, bypassCode)) return false;
-  return matchesQrTokenFormat(s, 'KIA-PHOTO-') || s.length >= 12;
+  if (looksLikeEmail(s)) return false;
+  return matchesQrTokenFormat(s, qrPrefix || 'KIA-PHOTO-') || s.length >= 12;
+}
+
+function canEnqueueUpload(entry, bypassCode, qrPrefix) {
+  const sessionToken = normalizeSessionToken(entry?.sessionToken);
+  const scannedQrToken = normalizeSessionToken(entry?.scannedQrToken) || sessionToken;
+  const imagePath = entry && typeof entry.imagePath === 'string' ? entry.imagePath.trim() : '';
+  const pendingValidate = entry?.pendingValidate === true;
+  if (!imagePath) return { ok: false, error: 'Missing imagePath' };
+  if (!sessionToken && !scannedQrToken) {
+    return { ok: false, error: 'Missing sessionToken or imagePath' };
+  }
+  if (isLikelyPhotoBoothSessionToken(sessionToken, bypassCode, qrPrefix)) {
+    return { ok: true, sessionToken, scannedQrToken };
+  }
+  if (pendingValidate) {
+    if (isBypassToken(scannedQrToken, bypassCode) || isBypassToken(sessionToken, bypassCode)) {
+      return { ok: true, sessionToken: sessionToken || scannedQrToken, scannedQrToken };
+    }
+    if (matchesQrTokenFormat(scannedQrToken, qrPrefix) || matchesQrTokenFormat(sessionToken, qrPrefix)) {
+      return { ok: true, sessionToken: sessionToken || scannedQrToken, scannedQrToken };
+    }
+  }
+  return { ok: false, error: 'Invalid photo booth session token — scan QR again' };
 }
 
 function matchesQrTokenFormat(token, prefix) {
@@ -108,6 +134,7 @@ class KiaApiService {
     this._legacyQueueFile = path.join(dataDir, 'sync-queue.json');
     this._framesCacheFile = path.join(dataDir, 'frames-cache.json');
     this._baseUrl = '';
+    this._uploadBaseUrl = '';
     this._bearerToken = '';
     this._sessionBearer = '';
     this._qrPrefix = 'KIA-PHOTO-';
@@ -144,7 +171,14 @@ class KiaApiService {
     if (baseUrl.endsWith('/api')) {
       baseUrl = baseUrl.slice(0, -4);
     }
+    let uploadBaseUrl = String(c.uploadBaseUrl || '')
+      .trim()
+      .replace(/\/$/, '');
+    if (uploadBaseUrl.endsWith('/api')) {
+      uploadBaseUrl = uploadBaseUrl.slice(0, -4);
+    }
     this._baseUrl = baseUrl;
+    this._uploadBaseUrl = uploadBaseUrl;
     this._bearerToken = String(c.bearerToken || '').trim();
     this._qrPrefix = String(c.qrPrefix || 'KIA-PHOTO-').trim();
     this._bypassCode = String(c.bypassCode || '12345').trim();
@@ -181,7 +215,13 @@ class KiaApiService {
   _url(pathKey) {
     const p = this._paths[pathKey];
     const rel = p.startsWith('/') ? p : `/${p}`;
-    return `${this._baseUrl}${rel}`;
+    const base =
+      pathKey === 'media' && this._uploadBaseUrl ? this._uploadBaseUrl : this._baseUrl;
+    return `${base}${rel}`;
+  }
+
+  _uploadTargetBaseUrl() {
+    return this._uploadBaseUrl || this._baseUrl;
   }
 
   _hasBaseUrl() {
@@ -206,8 +246,10 @@ class KiaApiService {
 
   _pathForLog(urlStr) {
     const s = String(urlStr || '');
-    if (this._baseUrl && s.startsWith(this._baseUrl)) {
-      return s.slice(this._baseUrl.length) || '/';
+    for (const base of [this._baseUrl, this._uploadBaseUrl]) {
+      if (base && s.startsWith(base)) {
+        return s.slice(base.length) || '/';
+      }
     }
     try {
       return new URL(s).pathname + new URL(s).search;
@@ -243,10 +285,11 @@ class KiaApiService {
     return body || null;
   }
 
-  _request(method, urlStr, { jsonBody, multipart, bearerToken } = {}) {
+  _request(method, urlStr, { jsonBody, multipart, bearerToken, timeoutMs } = {}) {
     const started = Date.now();
     const pathForLog = this._pathForLog(urlStr);
     const reqSummary = this._summaryRequestBody(jsonBody, multipart);
+    const requestTimeout = Number(timeoutMs) > 0 ? Number(timeoutMs) : UPLOAD_API_TIMEOUT_MS;
     return new Promise((resolve, reject) => {
       let url;
       try {
@@ -279,7 +322,7 @@ class KiaApiService {
           port: url.port || (url.protocol === 'https:' ? 443 : 80),
           path: url.pathname + url.search,
           headers,
-          timeout: 60000,
+          timeout: requestTimeout,
         },
         (res) => {
           let data = '';
@@ -328,7 +371,38 @@ class KiaApiService {
     });
   }
 
-  async _authenticateEmail(email) {
+  _isSystemOffline() {
+    try {
+      const { net } = require('electron');
+      return net && typeof net.isOnline === 'function' && !net.isOnline();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  _offlinePrefixValidation(token) {
+    return {
+      ok: true,
+      valid: true,
+      offline: true,
+      usedPrefixFallback: true,
+      sessionData: token,
+    };
+  }
+
+  _canUseOfflinePrefix(token) {
+    return Boolean(
+      this._offlineAllowPrefix && matchesQrTokenFormat(token, this._qrPrefix),
+    );
+  }
+
+  _shouldOfflineFallbackAfterApiFailure(token, statusCode) {
+    if (!this._canUseOfflinePrefix(token)) return false;
+    if (!statusCode) return true;
+    return statusCode >= 500 || statusCode === 408 || statusCode === 429;
+  }
+
+  async _authenticateEmail(email, options = {}) {
     const normalized = String(email || '').trim();
     if (!normalized) {
       return { ok: false, error: 'Missing email for authentication.' };
@@ -339,6 +413,7 @@ class KiaApiService {
     try {
       const res = await this._request('POST', this._url('authenticate'), {
         jsonBody: { email: normalized },
+        timeoutMs: options.timeoutMs || BOOTH_API_TIMEOUT_MS,
       });
       const ok = res.statusCode >= 200 && res.statusCode < 300;
       const token =
@@ -358,11 +433,11 @@ class KiaApiService {
     }
   }
 
-  async _ensureBootstrapBearer() {
+  async _ensureBootstrapBearer(options = {}) {
     if (this._bearerToken || this._sessionBearer) {
       return { ok: true, token: this._bearerToken || this._sessionBearer };
     }
-    const auth = await this._authenticateEmail(this._devBypassEmail);
+    const auth = await this._authenticateEmail(this._devBypassEmail, options);
     if (auth.ok && auth.token) {
       return { ok: true, token: auth.token, bootstrap: true };
     }
@@ -408,10 +483,11 @@ class KiaApiService {
     };
   }
 
-  async _validateWithApi(token, bearerToken) {
+  async _validateWithApi(token, bearerToken, options = {}) {
     const res = await this._request('POST', this._url('validate'), {
       jsonBody: { token },
       bearerToken,
+      timeoutMs: options.timeoutMs || BOOTH_API_TIMEOUT_MS,
     });
     const ok = res.statusCode >= 200 && res.statusCode < 300;
     const valid = ok && res.json?.success === true;
@@ -442,21 +518,25 @@ class KiaApiService {
     if (!t) return { ok: false, valid: false, error: 'Empty token' };
 
     if (isBypassToken(t, this._bypassCode)) {
-      if (!this._hasBaseUrl()) {
+      if (!this._hasBaseUrl() || this._isSystemOffline()) {
         return {
           ok: true,
           valid: true,
           offline: true,
           usedPrefixFallback: true,
-          sessionData: t,
+          sessionData: null,
+          email: this._devBypassEmail,
         };
       }
       const devSession = await this._provisionDevBoothSession();
       if (!devSession.ok) {
+        if (this._canUseOfflinePrefix(t)) {
+          return this._offlinePrefixValidation(t);
+        }
         return {
           ok: false,
           valid: false,
-          offline: false,
+          offline: true,
           error: devSession.error || 'Dev booth session could not be created',
         };
       }
@@ -470,28 +550,20 @@ class KiaApiService {
     }
 
     if (!this._hasBaseUrl()) {
-      if (this._offlineAllowPrefix && matchesQrTokenFormat(t, this._qrPrefix)) {
-        return {
-          ok: true,
-          valid: true,
-          offline: true,
-          usedPrefixFallback: true,
-          sessionData: t,
-        };
+      if (this._canUseOfflinePrefix(t)) {
+        return this._offlinePrefixValidation(t);
       }
       return { ok: false, valid: false, error: 'API base URL not configured' };
     }
 
-    const bootstrap = await this._ensureBootstrapBearer();
+    if (this._isSystemOffline() && this._canUseOfflinePrefix(t)) {
+      return this._offlinePrefixValidation(t);
+    }
+
+    const bootstrap = await this._ensureBootstrapBearer({ timeoutMs: BOOTH_API_TIMEOUT_MS });
     if (!bootstrap.ok) {
-      if (this._offlineAllowPrefix && matchesQrTokenFormat(t, this._qrPrefix)) {
-        return {
-          ok: true,
-          valid: true,
-          offline: true,
-          usedPrefixFallback: true,
-          sessionData: t,
-        };
+      if (this._canUseOfflinePrefix(t)) {
+        return this._offlinePrefixValidation(t);
       }
       return {
         ok: false,
@@ -502,8 +574,13 @@ class KiaApiService {
     }
 
     try {
-      const validated = await this._validateWithApi(t, bootstrap.token);
+      const validated = await this._validateWithApi(t, bootstrap.token, {
+        timeoutMs: BOOTH_API_TIMEOUT_MS,
+      });
       if (!validated.valid) {
+        if (this._shouldOfflineFallbackAfterApiFailure(t, validated.statusCode)) {
+          return this._offlinePrefixValidation(t);
+        }
         return validated;
       }
 
@@ -531,14 +608,8 @@ class KiaApiService {
         message: validated.message,
       };
     } catch (e) {
-      if (this._offlineAllowPrefix && matchesQrTokenFormat(t, this._qrPrefix)) {
-        return {
-          ok: true,
-          valid: true,
-          offline: true,
-          usedPrefixFallback: true,
-          sessionData: t,
-        };
+      if (this._canUseOfflinePrefix(t)) {
+        return this._offlinePrefixValidation(t);
       }
       return { ok: false, valid: false, error: String(e), offline: true };
     }
@@ -569,7 +640,17 @@ class KiaApiService {
   _sanitizeQueueItem(item) {
     if (!item || typeof item !== 'object') return null;
     const sessionToken = normalizeSessionToken(item.sessionToken);
-    if (!sessionToken || !isLikelyPhotoBoothSessionToken(sessionToken, this._bypassCode)) {
+    const scannedQrToken = normalizeSessionToken(item.scannedQrToken) || sessionToken;
+    const tokenForCheck = sessionToken || scannedQrToken;
+    const pendingValidate = item.pendingValidate === true;
+    const tokenOk =
+      isLikelyPhotoBoothSessionToken(tokenForCheck, this._bypassCode, this._qrPrefix) ||
+      (pendingValidate &&
+        (isBypassToken(scannedQrToken, this._bypassCode) ||
+          isBypassToken(sessionToken, this._bypassCode) ||
+          matchesQrTokenFormat(scannedQrToken, this._qrPrefix) ||
+          matchesQrTokenFormat(sessionToken, this._qrPrefix)));
+    if (!tokenForCheck || !tokenOk) {
       return null;
     }
     let guestEmail =
@@ -579,8 +660,11 @@ class KiaApiService {
     }
     return {
       ...item,
-      sessionToken,
+      sessionToken: sessionToken || scannedQrToken,
+      scannedQrToken,
       guestEmail,
+      pendingValidate: item.pendingValidate === true,
+      validatedAt: item.validatedAt || null,
       frameId:
         item.frameId === null || item.frameId === undefined ? null : Number(item.frameId),
     };
@@ -658,11 +742,16 @@ class KiaApiService {
 
   /** Only send booth JWT to our API host — S3/CDN URLs reject foreign Authorization headers. */
   _shouldAttachBearer(urlStr) {
-    if (!this._baseUrl) return false;
     try {
       const target = new URL(urlStr);
-      const api = new URL(this._baseUrl);
-      return target.hostname === api.hostname;
+      const hosts = new Set();
+      for (const base of [this._baseUrl, this._uploadBaseUrl]) {
+        if (!base) continue;
+        try {
+          hosts.add(new URL(base).hostname);
+        } catch (_) {}
+      }
+      return hosts.has(target.hostname);
     } catch (_) {
       return false;
     }
@@ -1124,14 +1213,13 @@ class KiaApiService {
   }
 
   async enqueueMedia(entry) {
-    const sessionToken = normalizeSessionToken(entry?.sessionToken);
     const imagePath = entry && typeof entry.imagePath === 'string' ? entry.imagePath.trim() : '';
-    if (!sessionToken || !imagePath) {
-      return { ok: false, error: 'Missing sessionToken or imagePath' };
+    const gate = canEnqueueUpload(entry, this._bypassCode, this._qrPrefix);
+    if (!gate.ok) {
+      return { ok: false, error: gate.error || 'Missing sessionToken or imagePath' };
     }
-    if (!isLikelyPhotoBoothSessionToken(sessionToken, this._bypassCode)) {
-      return { ok: false, error: 'Invalid photo booth session token — scan QR again' };
-    }
+    let sessionToken = gate.sessionToken;
+    const scannedQrToken = gate.scannedQrToken || sessionToken;
     if (!fs.existsSync(imagePath)) {
       return { ok: false, error: 'Image file not found' };
     }
@@ -1153,10 +1241,18 @@ class KiaApiService {
       this._sessionBearer ||
       this._bearerToken ||
       null;
+    const pendingValidate =
+      entry?.pendingValidate === true ||
+      isBypassToken(scannedQrToken, this._bypassCode) ||
+      isBypassToken(sessionToken, this._bypassCode) ||
+      !isLikelyPhotoBoothSessionToken(sessionToken, this._bypassCode, this._qrPrefix);
     const queue = this._readQueue();
     queue.push({
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       sessionToken,
+      scannedQrToken,
+      pendingValidate,
+      validatedAt: pendingValidate ? null : new Date().toISOString(),
       frameId: Number.isFinite(frameId) ? frameId : null,
       imagePath: prepared.path,
       bearerToken,
@@ -1178,6 +1274,7 @@ class KiaApiService {
         pending: queue.length,
         frameId: Number.isFinite(frameId) ? frameId : null,
         offlineReady: true,
+        pendingValidate,
       },
     });
     void this.processQueue();
@@ -1238,11 +1335,73 @@ class KiaApiService {
     };
   }
 
+  async _resolveSessionTokenForUpload(item) {
+    const qrToken = normalizeSessionToken(item.scannedQrToken) || normalizeSessionToken(item.sessionToken);
+    if (!qrToken) return null;
+
+    if (isBypassToken(qrToken, this._bypassCode) || isBypassToken(item.sessionToken, this._bypassCode)) {
+      if (this._isSystemOffline()) {
+        return item.sessionToken || qrToken;
+      }
+      const devSession = await this._provisionDevBoothSession();
+      if (devSession.ok && devSession.sessionData) {
+        const resolved = normalizeSessionToken(devSession.sessionData) || devSession.qrToken || qrToken;
+        item.sessionToken = resolved;
+        item.scannedQrToken = devSession.qrToken || qrToken;
+        item.pendingValidate = false;
+        item.validatedAt = new Date().toISOString();
+        item.guestEmail = devSession.email || this._devBypassEmail;
+        if (this._sessionBearer) {
+          item.bearerToken = this._sessionBearer;
+        }
+        return resolved;
+      }
+      return item.sessionToken || qrToken;
+    }
+
+    const needsValidate =
+      item.pendingValidate === true || !item.validatedAt || !normalizeSessionToken(item.sessionToken);
+
+    if (!needsValidate && item.sessionToken) {
+      return item.sessionToken;
+    }
+
+    if (this._isSystemOffline()) {
+      return item.sessionToken || qrToken;
+    }
+
+    const bootstrap = await this._ensureBootstrapBearer({ timeoutMs: BOOTH_API_TIMEOUT_MS });
+    if (!bootstrap.ok) {
+      return item.sessionToken || qrToken;
+    }
+
+    const validated = await this._validateWithApi(qrToken, bootstrap.token, {
+      timeoutMs: BOOTH_API_TIMEOUT_MS,
+    });
+    if (!validated.valid) {
+      return item.sessionToken || qrToken;
+    }
+
+    const resolved = normalizeSessionToken(validated.sessionData) || qrToken;
+    item.sessionToken = resolved;
+    item.scannedQrToken = qrToken;
+    item.pendingValidate = false;
+    item.validatedAt = new Date().toISOString();
+    if (validated.email) {
+      item.guestEmail = validated.email;
+    }
+    if (this._sessionBearer) {
+      item.bearerToken = this._sessionBearer;
+    }
+    return resolved;
+  }
+
   async processQueue() {
     if (this._processing) return;
     const queue = this._readQueue();
     if (queue.length === 0) return;
     if (!this._hasBaseUrl()) return;
+    if (this._isSystemOffline()) return;
 
     this._processing = true;
     const remaining = [];
@@ -1253,10 +1412,15 @@ class KiaApiService {
           remaining.push(item);
           continue;
         }
+        await this._resolveSessionTokenForUpload(item);
         const uploaded = await this._uploadItem(item);
         if (!uploaded.ok) {
           item.attempts = (item.attempts || 0) + 1;
           item.lastError = uploaded.error || 'Upload failed';
+          if (/invalid photo booth session/i.test(String(uploaded.error || ''))) {
+            item.pendingValidate = true;
+            item.validatedAt = null;
+          }
           remaining.push(item);
         } else {
           this._lastPublish = {
@@ -1322,19 +1486,21 @@ class KiaApiService {
       let res = await this._request('POST', this._url('media'), {
         jsonBody,
         bearerToken,
+        timeoutMs: UPLOAD_API_TIMEOUT_MS,
       });
 
       if (res.statusCode === 401) {
         const email = item.guestEmail || this._devBypassEmail;
         item.bearerToken = null;
         this._sessionBearer = '';
-        const auth = await this._authenticateEmail(email);
+        const auth = await this._authenticateEmail(email, { timeoutMs: BOOTH_API_TIMEOUT_MS });
         if (auth.ok && auth.token) {
           item.bearerToken = auth.token;
           this._sessionBearer = auth.token;
           res = await this._request('POST', this._url('media'), {
             jsonBody,
             bearerToken: auth.token,
+            timeoutMs: UPLOAD_API_TIMEOUT_MS,
           });
         }
       }

@@ -57,6 +57,34 @@ static bool writeFileBinary(const char* filename, const void* data, size_t len) 
   return static_cast<bool>(f);
 }
 
+/** Write complete JPEG then rename — avoids partial reads while Electron loads file:// preview. */
+static bool writeFileAtomic(const char* filename, const void* data, size_t len) {
+  fs::path out(filename);
+  if (out.has_parent_path()) {
+    std::error_code ec;
+    fs::create_directories(out.parent_path(), ec);
+  }
+  fs::path tmp = out;
+  tmp += ".tmp";
+  if (!writeFileBinary(tmp.string().c_str(), data, len)) {
+    std::error_code ec;
+    fs::remove(tmp, ec);
+    return false;
+  }
+  std::error_code ec;
+  fs::rename(tmp, out, ec);
+  if (ec) {
+    fs::remove(out, ec);
+    ec.clear();
+    fs::rename(tmp, out, ec);
+  }
+  if (ec) {
+    fs::remove(tmp, ec);
+    return false;
+  }
+  return true;
+}
+
 static bool startEvfMode() {
   EdsUInt32 evfMode = 0;
   EdsError err = EdsGetPropertyData(g_camera, kEdsPropID_Evf_Mode, 0, sizeof(evfMode), &evfMode);
@@ -137,7 +165,7 @@ static bool pullEvfFrameToFile(const char* filename) {
         std::error_code ec;
         fs::create_directories(out.parent_path(), ec);
       }
-      ok = writeFileBinary(filename, ptr, static_cast<size_t>(length));
+      ok = writeFileAtomic(filename, ptr, static_cast<size_t>(length));
     }
   }
 

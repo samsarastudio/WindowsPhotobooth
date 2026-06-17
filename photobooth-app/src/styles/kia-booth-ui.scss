@@ -1046,6 +1046,7 @@ html[data-pb-theme='default'] body:has(.pb-kia-experience) {
   max-height: var(--kia-photo-max-h-capture);
   aspect-ratio: var(--kia-photo-aspect);
   margin-inline: auto;
+  background: #000;
 }
 
 .kia-capture-preview-slot > .kia-capture-preview,
@@ -1096,10 +1097,15 @@ html[data-pb-theme='default'] body:has(.pb-kia-experience) {
   display: block;
 }
 
+.pb-capture .frame .content {
+  background: #000;
+}
+
 .kia-capture-preview-stack {
   position: relative;
   overflow: hidden;
   border-radius: 6px;
+  background: #000;
 }
 
 .kia-capture-preview--placeholder {
@@ -1119,12 +1125,14 @@ html[data-pb-theme='default'] body:has(.pb-kia-experience) {
   height: 100%;
   object-fit: cover;
   object-position: top;
-  opacity: 0;
-  visibility: hidden;
+  opacity: 1;
+  visibility: visible;
+  z-index: 1;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 
-  &--visible {
-    opacity: 1;
-    visibility: visible;
+  &--front {
+    z-index: 2;
   }
 }
 

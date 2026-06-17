@@ -4,7 +4,7 @@ const { pathToFileURL, fileURLToPath, URL } = require('url');
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
-const { spawn, execFileSync } = require('child_process');
+const { spawn, execFileSync, exec } = require('child_process');
 const readline = require('readline');
 const { ScannerService } = require('./scanner-service.cjs');
 const { KiaApiService } = require('./kia-api-service.cjs');
@@ -317,11 +317,14 @@ function kiaApiFromMerged(cfg) {
   const copy = cfg?.copy || {};
   let baseUrl = typeof k.baseUrl === 'string' ? k.baseUrl.trim() : '';
   if (!baseUrl && sync.apiBaseUrl) baseUrl = String(sync.apiBaseUrl).trim().replace(/\/$/, '');
-  if (!baseUrl) baseUrl = 'https://admin.kiaexperience.info';
+  if (!baseUrl) baseUrl = 'https://dev-kiaforum2026.thetunagroup.com';
   if (baseUrl.endsWith('/api')) baseUrl = baseUrl.slice(0, -4);
+  let uploadBaseUrl = typeof k.uploadBaseUrl === 'string' ? k.uploadBaseUrl.trim() : '';
+  if (uploadBaseUrl.endsWith('/api')) uploadBaseUrl = uploadBaseUrl.slice(0, -4);
   const paths = k.paths || {};
   return {
     baseUrl,
+    uploadBaseUrl,
     bearerToken: typeof k.bearerToken === 'string' ? k.bearerToken : '',
     qrPrefix: k.qrPrefix || sync.qrPrefix || 'KIA-PHOTO-',
     bypassCode: k.bypassCode || '12345',
@@ -1011,6 +1014,24 @@ ipcMain.handle('admin:verifyPin', async (_e, pin) => {
     return { ok: true, valid: expected === String(pin ?? '') };
   } catch (e) {
     return { ok: false, error: String(e), valid: false };
+  }
+});
+
+ipcMain.handle('app:shutdownSystem', async () => {
+  try {
+    if (kiaApiService) kiaApiService.stop();
+    await scannerService.close();
+    if (process.platform === 'win32') {
+      exec('shutdown /s /t 0', { windowsHide: true });
+    } else if (process.platform === 'darwin') {
+      exec('shutdown -h now');
+    } else {
+      exec('systemctl poweroff');
+    }
+    setTimeout(() => app.quit(), 300);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
   }
 });
 

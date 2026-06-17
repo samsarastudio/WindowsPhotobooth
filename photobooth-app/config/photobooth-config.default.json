@@ -32,7 +32,8 @@
     "boothId": ""
   },
   "kiaApi": {
-    "baseUrl": "https://admin.kiaexperience.info",
+    "baseUrl": "https://dev-kiaforum2026.thetunagroup.com",
+    "uploadBaseUrl": "",
     "bearerToken": "",
     "qrPrefix": "KIA-PHOTO-",
     "bypassCode": "12345",

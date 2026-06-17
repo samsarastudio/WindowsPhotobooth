@@ -17,12 +17,12 @@ import { BoothConfigService } from '../../services/booth-config.service';
 import type { PbCameraResult } from '../../../types/pb-api';
 
 function previewTargetFps(): number {
-  if (typeof window === 'undefined' || !window.matchMedia) return 15;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 8;
+  if (typeof window === 'undefined' || !window.matchMedia) return 24;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 12;
   const coarse = window.matchMedia('(pointer: coarse)').matches;
   const lowCpu =
     typeof navigator !== 'undefined' && (navigator.hardwareConcurrency ?? 8) <= 4;
-  return coarse || lowCpu ? 12 : 15;
+  return coarse || lowCpu ? 18 : 24;
 }
 
 function withPreviewDecodeKey(fileUrl: string, v: number): string {
@@ -71,13 +71,12 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
   private viewReady = false;
   private cycleStarted = false;
   private previewFrameSeq = 0;
-  /** Monotonic id written into each preview URL `?v=` — drops stale `(load)` after rapid swaps. */
-  private layerSeq: [number, number] = [0, 0];
-  /** Pending double-buffer reveal: must match layer + same `?v=` as `layerSeq[layer]`. */
-  private pendingReveal: { layer: 0 | 1; decodeV: number } | null = null;
+  private displayedPreviewSeq = 0;
+  private previewWriteSlot: 0 | 1 = 0;
   private previewRafPending = false;
-  private countdownFinishing = false;
+  private previewInFlight = false;
   private countdownPreviewIntervalMs?: number;
+  private countdownFinishing = false;
   private timerListenerTarget?: HTMLVideoElement;
   private timerListeners?: {
     ended: () => void;
@@ -89,19 +88,13 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
   private timerStallWatch?: ReturnType<typeof setInterval>;
   private timerLastAdvanceMs = 0;
   private timerLastCurrentTime = 0;
-
-  /** 1×1 transparent gif so `<img [src]>` is always valid before the first EVF frame. */
-  readonly emptyPreviewSrc: SafeUrl;
+  private destroyed = false;
 
   constructor(
     private readonly camera: CameraService,
     private readonly router: Router,
     private readonly sanitizer: DomSanitizer,
-  ) {
-    this.emptyPreviewSrc = this.sanitizer.bypassSecurityTrustUrl(
-      'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-    );
-  }
+  ) {}
 
   async ngOnInit(): Promise<void> {
     const r = await this.camera.initAndOpenFirstCamera();
@@ -136,26 +129,43 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.previewPath) return;
     const fps = previewTargetFps();
     const intervalMs = Math.max(24, Math.round(1000 / fps));
+    if (this.previewTimer) {
+      clearInterval(this.previewTimer);
+    }
     this.previewTimer = setInterval(() => {
       void this.tickSdkPreview();
     }, intervalMs);
   }
 
-  /** One preview poll; RAF-coalesced so bursty timers do not pile up on slow devices. */
+  /** One preview poll; RAF-coalesced and serialized so frames do not overlap. */
   private async tickSdkPreview(): Promise<void> {
+    if (this.previewInFlight) return;
     if (this.previewRafPending) return;
     this.previewRafPending = true;
     requestAnimationFrame(async () => {
       this.previewRafPending = false;
+      if (this.previewInFlight) return;
+      this.previewInFlight = true;
       try {
-        const res = await this.camera.previewFrame(this.previewPath);
+        const slot = this.previewWriteSlot;
+        this.previewWriteSlot = slot === 0 ? 1 : 0;
+        const res = await this.camera.previewFrame(this.previewPathForSlot(slot), slot);
         this.applyPreviewResult(res);
       } catch (_) {
         /* preview errors are benign; bridge may miss a frame */
+      } finally {
+        this.previewInFlight = false;
       }
     });
   }
 
+  /** Alternate disk files so Electron never reads a JPEG while Canon is still writing it. */
+  private previewPathForSlot(slot: 0 | 1): string {
+    const stem = this.previewPath.replace(/(_[01])?\.jpg$/i, '');
+    return `${stem}_${slot}.jpg`;
+  }
+
+  /** Decode off-DOM first, then swap layers — avoids white flash from empty/partial `<img>` paints. */
   private applyPreviewResult(res: PbCameraResult): void {
     if (!res.ok) return;
     const v = ++this.previewFrameSeq;
@@ -166,36 +176,37 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
       raw = `${res.imageBase64}#pbv=${v}`;
     }
     if (!raw) return;
-    const safe = this.sanitizer.bypassSecurityTrustUrl(raw);
 
-    if (!this.sdkPreviewHasFrame()) {
-      this.layerSeq[0] = v;
-      this.sdkPreviewUrl0.set(safe);
-      this.sdkPreviewActiveLayer.set(0);
-      this.sdkPreviewHasFrame.set(true);
-      this.pendingReveal = null;
-      return;
-    }
+    const probe = new Image();
+    probe.decoding = 'sync';
+    probe.onload = (): void => {
+      if (v <= this.displayedPreviewSeq) return;
+      if (probe.naturalWidth <= 1 && probe.naturalHeight <= 1) return;
 
-    const active = this.sdkPreviewActiveLayer();
-    const inactive = active === 0 ? 1 : 0;
-    this.layerSeq[inactive] = v;
-    this.pendingReveal = { layer: inactive, decodeV: v };
-    if (inactive === 0) {
-      this.sdkPreviewUrl0.set(safe);
-    } else {
-      this.sdkPreviewUrl1.set(safe);
-    }
-  }
+      const safe = this.sanitizer.bypassSecurityTrustUrl(raw);
+      if (!this.sdkPreviewHasFrame()) {
+        this.sdkPreviewUrl0.set(safe);
+        this.sdkPreviewUrl1.set(safe);
+        this.sdkPreviewActiveLayer.set(0);
+        this.sdkPreviewHasFrame.set(true);
+        this.displayedPreviewSeq = v;
+        return;
+      }
 
-  /** Decode marker from URL so out-of-order image `load` does not reveal the wrong frame. */
-  private parseImgDecodeV(img: HTMLImageElement): number {
-    const s = img.currentSrc || img.src || '';
-    const q = s.match(/[?&]v=(\d+)/);
-    if (q) return parseInt(q[1], 10);
-    const h = s.match(/#pbv=(\d+)/);
-    if (h) return parseInt(h[1], 10);
-    return -1;
+      const inactive: 0 | 1 = this.sdkPreviewActiveLayer() === 0 ? 1 : 0;
+      if (inactive === 0) {
+        this.sdkPreviewUrl0.set(safe);
+      } else {
+        this.sdkPreviewUrl1.set(safe);
+      }
+      requestAnimationFrame(() => {
+        if (v <= this.displayedPreviewSeq) return;
+        this.sdkPreviewActiveLayer.set(inactive);
+        this.displayedPreviewSeq = v;
+      });
+    };
+    probe.onerror = () => {};
+    probe.src = raw;
   }
 
   private async startWebcam(): Promise<void> {
@@ -309,8 +320,9 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.useWebcam() || !this.previewTimer) return;
     if (this.countdownPreviewIntervalMs !== undefined) return;
     clearInterval(this.previewTimer);
-    this.countdownPreviewIntervalMs = Math.max(24, Math.round(1000 / previewTargetFps()));
-    const slowMs = Math.max(180, this.countdownPreviewIntervalMs * 3);
+    const normalMs = Math.max(24, Math.round(1000 / previewTargetFps()));
+    this.countdownPreviewIntervalMs = normalMs;
+    const slowMs = Math.max(120, normalMs * 2);
     this.previewTimer = setInterval(() => {
       void this.tickSdkPreview();
     }, slowMs);
@@ -414,17 +426,32 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.useWebcam() && !this.previewTimer) {
       this.startSdkPreview();
     }
+    void this.runCaptureCycleWhenPreviewReady();
+  }
+
+  /** Let EVF deliver at least one frame before the countdown hides live updates. */
+  private async runCaptureCycleWhenPreviewReady(): Promise<void> {
+    if (!this.useWebcam()) {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline && !this.sdkPreviewHasFrame()) {
+        if (!this.previewTimer) {
+          this.startSdkPreview();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+    }
+    if (!this.cycleStarted || this.destroyed) return;
     this.startCountdown();
   }
 
   private async captureShot(): Promise<void> {
     this.clearCountdown();
     this.countdownFinishing = false;
-    this.restorePreviewAfterCountdown();
     if (this.previewTimer) {
       clearInterval(this.previewTimer);
       this.previewTimer = undefined;
     }
+    this.countdownPreviewIntervalMs = undefined;
 
     const paths = await this.camera.getPaths();
     const captureDir = paths?.captureDir ?? '.';
@@ -496,31 +523,8 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
-  /** After decode: reveal buffered layer when the pending swap matches. */
-  onSdkPreviewLayerDecoded(ev: Event, layer: 0 | 1): void {
-    const img = ev.target as HTMLImageElement;
-    const decodedV = this.parseImgDecodeV(img);
-    if (decodedV < 0 || decodedV !== this.layerSeq[layer]) {
-      return;
-    }
-
-    const pr = this.pendingReveal;
-    if (pr !== null) {
-      if (pr.layer !== layer || pr.decodeV !== decodedV) {
-        return;
-      }
-      this.sdkPreviewActiveLayer.set(layer);
-      this.pendingReveal = null;
-    } else if (this.sdkPreviewActiveLayer() !== layer) {
-      return;
-    }
-
-    if (img.naturalWidth <= 1 && img.naturalHeight <= 1) {
-      return;
-    }
-  }
-
   ngOnDestroy(): void {
+    this.destroyed = true;
     if (this.previewTimer) clearInterval(this.previewTimer);
     this.clearCountdown();
     this.mediaStream?.getTracks().forEach((t) => t.stop());

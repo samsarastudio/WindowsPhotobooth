@@ -1,0 +1,16 @@
+<div class="pb-touch-numpad" role="group" aria-label="Number pad">
+  <div class="pb-touch-numpad__grid">
+    @for (key of keys; track key) {
+      <button type="button" class="pb-touch-numpad__key" (click)="appendDigit(key)">
+        {{ key }}
+      </button>
+    }
+    <button type="button" class="pb-touch-numpad__key pb-touch-numpad__key--action" (click)="backspace()">
+      ⌫
+    </button>
+    <button type="button" class="pb-touch-numpad__key" (click)="appendDigit('0')">0</button>
+    <button type="button" class="pb-touch-numpad__key pb-touch-numpad__key--done" (click)="done()">
+      Done
+    </button>
+  </div>
+</div>
