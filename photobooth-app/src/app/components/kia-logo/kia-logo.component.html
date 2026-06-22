@@ -1,13 +1,4 @@
-<div
-  class="kia-logo-wrap"
-  [class.kia-logo-wrap--holdable]="holdable"
-  [style.--kia-logo-scale]="logoScale()"
-  (pointerdown)="onHoldStart($event)"
-  (pointerup)="onHoldEnd()"
-  (pointerleave)="onHoldEnd()"
-  (pointercancel)="onHoldEnd()"
-  (contextmenu)="onContextMenu($event)"
->
+<div class="kia-logo-wrap" [style.--kia-logo-scale]="logoScale()">
   @if (logoSrc(); as logo) {
     <img class="kia-logo" [src]="logo" alt="KIA Logo" loading="eager" decoding="async" draggable="false" />
   } @else {

@@ -60,7 +60,8 @@
       "scanning": "Scanning…",
       "cameraTapHint": "Tap the QR area to use the booth camera",
       "invalidCode": "Invalid QR code. Please use your registration code.",
-      "adminLink": "Admin"
+      "adminLink": "Admin",
+      "adminLinkVisibleSeconds": 300
     },
     "capture": {
       "starting": "Starting camera…",

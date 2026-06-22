@@ -154,7 +154,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
     this.session.clear();
 
-    this.adminReveal.init();
+    this.adminReveal.onBoothHome();
 
     this.scanner.startListening();
 

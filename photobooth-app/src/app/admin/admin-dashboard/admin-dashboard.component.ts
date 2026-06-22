@@ -16,10 +16,11 @@ import {
   PHOTOBOOTH_DEFAULT_KIA_API_PATHS,
   PHOTOBOOTH_DEFAULT_SCANNER,
 } from '../../models/photobooth-config.model';
-import { KiaApiService } from '../../services/kia-api.service';
-import type { PbScannerPortInfo } from '../../../types/pb-api';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { BrandingLogoService } from '../../services/branding-logo.service';
+import { AdminLinkRevealService } from '../../services/admin-link-reveal.service';
+import { KiaApiService } from '../../services/kia-api.service';
+import type { PbKiaUploadQueueItem, PbScannerPortInfo } from '../../../types/pb-api';
 import { setAdminSession } from '../admin.guard';
 import { enterAdminRoute, leaveAdminRoute } from '../admin-route-body';
 
@@ -38,6 +39,8 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   draftKiaApi: PhotoboothKiaApiConfig = structuredClone(PHOTOBOOTH_DEFAULT_KIA_API);
   bearerTokenDraft = '';
   readonly uploadQueuePending = signal(0);
+  readonly uploadQueueItems = signal<PbKiaUploadQueueItem[]>([]);
+  readonly uploadQueueBusy = signal(false);
   readonly bearerConfigured = signal(false);
   serialPorts = signal<PbScannerPortInfo[]>([]);
   scannerPortsMessage = signal<string | null>(null);
@@ -51,6 +54,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
     readonly branding: BrandingLogoService,
     private readonly router: Router,
     private readonly kiaApi: KiaApiService,
+    private readonly adminReveal: AdminLinkRevealService,
   ) {}
 
   ngOnInit(): void {
@@ -81,6 +85,9 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   setTab(t: 'copy' | 'branding' | 'scanner'): void {
     this.tab = t;
+    if (t === 'copy') {
+      void this.refreshUploadQueue();
+    }
     if (t === 'scanner') {
       void this.refreshScannerAdmin();
       void this.refreshUploadQueue();
@@ -179,7 +186,40 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   async refreshUploadQueue(): Promise<void> {
     const r = await this.kiaApi.getUploadQueueStatus();
-    if (r.ok) this.uploadQueuePending.set(r.pending);
+    if (r.ok) {
+      this.uploadQueuePending.set(r.pending);
+      this.uploadQueueItems.set(r.items ?? []);
+    }
+  }
+
+  async retryAllUploads(): Promise<void> {
+    this.uploadQueueBusy.set(true);
+    this.status.set(null);
+    try {
+      const r = await this.kiaApi.processUploadQueue();
+      await this.refreshUploadQueue();
+      if (r.ok) {
+        const left = r.pending ?? this.uploadQueuePending();
+        this.status.set(
+          left > 0
+            ? `Retry finished — ${left} item(s) still pending. See errors below.`
+            : 'All queued uploads completed.',
+        );
+      } else {
+        this.status.set(r.error || 'Retry failed.');
+      }
+    } finally {
+      this.uploadQueueBusy.set(false);
+    }
+  }
+
+  formatQueueTime(iso: string | null | undefined): string {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
   }
 
   async testKiaConnection(): Promise<void> {
@@ -297,6 +337,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
 
   logout(): void {
     setAdminSession(false);
+    this.adminReveal.hide();
     void this.router.navigate(['/admin/login']);
   }
 }

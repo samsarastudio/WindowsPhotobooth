@@ -1,7 +1,8 @@
-import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TouchNumpadComponent } from '../../components/touch-numpad/touch-numpad.component';
+import { AdminLinkRevealService } from '../../services/admin-link-reveal.service';
 import { enterAdminRoute, leaveAdminRoute } from '../admin-route-body';
 import { setAdminSession } from '../admin.guard';
 
@@ -22,7 +23,10 @@ export class AdminLoginComponent implements OnInit, OnDestroy {
   readonly defaultPin = signal<string | null>(null);
   readonly pinInfoOpen = signal(false);
 
-  constructor(private readonly router: Router) {}
+  constructor(
+    private readonly router: Router,
+    private readonly adminReveal: AdminLinkRevealService,
+  ) {}
 
   ngOnInit(): void {
     enterAdminRoute();
@@ -100,6 +104,7 @@ export class AdminLoginComponent implements OnInit, OnDestroy {
       const r = await window.pbApi.adminVerifyPin(this.pin);
       if (r.ok && r.valid) {
         setAdminSession(true);
+        this.adminReveal.hide();
         await this.router.navigate(['/admin']);
         return;
       }

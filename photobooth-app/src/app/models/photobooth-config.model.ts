@@ -16,6 +16,8 @@ export interface PhotoboothCopyQr {
   cameraTapHint: string;
   invalidCode: string;
   adminLink: string;
+  /** How long the Admin link stays visible after the secret triple-tap (seconds). */
+  adminLinkVisibleSeconds: number;
 }
 
 export interface PhotoboothCopyCapture {
@@ -205,6 +207,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     cameraTapHint: 'Tap the QR area to use the booth camera',
     invalidCode: 'Invalid QR code. Please use your registration code.',
     adminLink: 'Admin',
+    adminLinkVisibleSeconds: 300,
   },
   capture: {
     starting: 'Starting camera…',

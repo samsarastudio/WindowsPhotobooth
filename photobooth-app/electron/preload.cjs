@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('pbApi', {
     ipcRenderer.invoke('kia:waitForUpload', uploadId, timeoutMs),
   kiaFetchGallery: () => ipcRenderer.invoke('kia:fetchGallery'),
   kiaGetUploadQueueStatus: () => ipcRenderer.invoke('kia:getUploadQueueStatus'),
+  kiaProcessUploadQueue: () => ipcRenderer.invoke('kia:processUploadQueue'),
   kiaTestConnection: () => ipcRenderer.invoke('kia:testConnection'),
   onKiaApiDebug: (cb) => {
     const handler = (_e, payload) => cb(payload);

@@ -3,6 +3,7 @@ import type {
   PbKiaEnqueueMediaEntry,
   PbKiaFetchFramesResult,
   PbKiaFetchGalleryResult,
+  PbKiaProcessUploadQueueResult,
   PbKiaUploadQueueStatus,
   PbSyncValidateResult,
 } from '../../types/pb-api';
@@ -57,6 +58,13 @@ export class KiaApiService {
       return window.pbApi.kiaGetUploadQueueStatus();
     }
     return Promise.resolve({ ok: false, pending: 0 });
+  }
+
+  processUploadQueue(): Promise<PbKiaProcessUploadQueueResult> {
+    if (window.pbApi?.kiaProcessUploadQueue) {
+      return window.pbApi.kiaProcessUploadQueue();
+    }
+    return Promise.resolve({ ok: false, error: 'Upload queue unavailable' });
   }
 
   testConnection(): Promise<{ ok: boolean; statusCode?: number; message?: string; error?: string }> {

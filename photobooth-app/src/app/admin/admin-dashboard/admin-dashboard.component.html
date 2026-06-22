@@ -56,6 +56,17 @@
               <input class="pb-input" [(ngModel)]="draft.qr.invalidCode" />
               <label>Admin link label</label>
               <input class="pb-input" [(ngModel)]="draft.qr.adminLink" />
+              <label>Admin link visible after secret tap (seconds)</label>
+              <input
+                class="pb-input"
+                type="number"
+                min="30"
+                max="86400"
+                [(ngModel)]="draft.qr.adminLinkVisibleSeconds"
+              />
+              <p class="pb-admin-hint pb-hint-tight">
+                Triple-tap the top-left corner of the QR screen to reveal Admin. Default 300 seconds (5 minutes).
+              </p>
             </section>
 
             <section class="pb-admin-card">
@@ -92,6 +103,72 @@
               <input class="pb-input" type="number" min="1" max="15" [(ngModel)]="draft.result.uploadMinDisplaySeconds" />
               <label>Auto home after upload (seconds, 0 = off)</label>
               <input class="pb-input" type="number" min="0" [(ngModel)]="draft.result.uploadAutoHomeSeconds" />
+            </section>
+
+            <section class="pb-admin-card pb-admin-card-wide pb-admin-upload-queue">
+              <div class="pb-admin-upload-queue__head">
+                <div>
+                  <h2>Pending photo uploads</h2>
+                  <p class="pb-admin-hint">
+                    Offline or failed uploads waiting to sync. {{ uploadQueuePending() }} in queue.
+                  </p>
+                </div>
+                <div class="pb-admin-row">
+                  <button
+                    type="button"
+                    class="pb-btn pb-btn-ghost pb-btn-sm"
+                    [disabled]="uploadQueueBusy()"
+                    (click)="refreshUploadQueue()"
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    type="button"
+                    class="pb-btn pb-btn-primary pb-btn-sm"
+                    [disabled]="uploadQueueBusy() || uploadQueuePending() === 0"
+                    (click)="retryAllUploads()"
+                  >
+                    @if (uploadQueueBusy()) { Retrying… } @else { Retry all }
+                  </button>
+                </div>
+              </div>
+
+              @if (uploadQueueItems().length === 0) {
+                <p class="pb-admin-hint pb-admin-upload-queue__empty">No pending uploads.</p>
+              } @else {
+                <ul class="pb-admin-upload-list">
+                  @for (item of uploadQueueItems(); track item.id) {
+                    <li class="pb-admin-upload-list__item">
+                      <div class="pb-admin-upload-list__main">
+                        <span class="pb-admin-upload-list__email">{{ item.guestEmail || '—' }}</span>
+                        <span class="pb-admin-upload-list__file">{{ item.imageFileName || 'photo' }}</span>
+                      </div>
+                      <div class="pb-admin-upload-list__meta">
+                        <span
+                          class="pb-admin-upload-list__status"
+                          [class.pb-admin-upload-list__status--error]="item.status === 'error'"
+                        >
+                          {{ item.status === 'error' ? 'Error' : 'Pending' }}
+                          @if (item.attempts > 0) {
+                            · {{ item.attempts }} attempt{{ item.attempts === 1 ? '' : 's' }}
+                          }
+                        </span>
+                        <span class="pb-admin-upload-list__time" title="Queued">
+                          Queued {{ formatQueueTime(item.enqueuedAt) }}
+                        </span>
+                        @if (item.lastAttemptAt) {
+                          <span class="pb-admin-upload-list__time" title="Last retry">
+                            Last try {{ formatQueueTime(item.lastAttemptAt) }}
+                          </span>
+                        }
+                      </div>
+                      @if (item.lastError) {
+                        <p class="pb-admin-upload-list__error">{{ item.lastError }}</p>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
             </section>
           </div>
           <div class="pb-admin-footer">
@@ -136,8 +213,8 @@
                 </button>
               </div>
               <p class="pb-admin-hint pb-hint-tight">
-                The admin link on the scan screen is hidden by default. Hold the KIA logo for 6 seconds to reveal it
-                for 20 minutes.
+                The admin link on the scan screen is hidden by default. Triple-tap the top-left corner quickly to reveal
+                it (duration set under Copy → Admin link visible seconds).
               </p>
             </section>
           </div>

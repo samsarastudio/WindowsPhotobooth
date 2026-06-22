@@ -137,16 +137,30 @@ export interface PbKiaFetchGalleryResult {
   error?: string;
 }
 
+export interface PbKiaUploadQueueItem {
+  id: string;
+  sessionToken: string;
+  guestEmail: string | null;
+  imageFileName: string | null;
+  attempts: number;
+  enqueuedAt: string;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  status: 'pending' | 'error';
+  hasBearer?: boolean;
+}
+
 export interface PbKiaUploadQueueStatus {
   ok: boolean;
   pending: number;
-  items?: Array<{
-    id: string;
-    sessionToken: string;
-    attempts: number;
-    enqueuedAt: string;
-    lastError: string | null;
-  }>;
+  items?: PbKiaUploadQueueItem[];
+  error?: string;
+}
+
+export interface PbKiaProcessUploadQueueResult {
+  ok: boolean;
+  pending?: number;
+  processed?: number;
   error?: string;
 }
 
@@ -228,6 +242,7 @@ export interface PbApi {
   ): Promise<{ ok: boolean; error?: string; lastPublish?: unknown }>;
   kiaFetchGallery(): Promise<PbKiaFetchGalleryResult>;
   kiaGetUploadQueueStatus(): Promise<PbKiaUploadQueueStatus>;
+  kiaProcessUploadQueue(): Promise<PbKiaProcessUploadQueueResult>;
   kiaTestConnection(): Promise<{ ok: boolean; statusCode?: number; message?: string; error?: string }>;
   onKiaApiDebug(handler: (entry: PbKiaApiDebugEntry) => void): () => void;
 }

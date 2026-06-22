@@ -433,9 +433,14 @@ class KiaApiService {
     }
   }
 
+  /**
+   * Service-account bearer for validate / qr-code / frames bootstrap.
+   * Must NOT reuse _sessionBearer — that is the prior guest's token and causes
+   * intermittent HTTP 401 "Unauthenticated" on the next QR scan.
+   */
   async _ensureBootstrapBearer(options = {}) {
-    if (this._bearerToken || this._sessionBearer) {
-      return { ok: true, token: this._bearerToken || this._sessionBearer };
+    if (this._bearerToken) {
+      return { ok: true, token: this._bearerToken, bootstrap: false };
     }
     const auth = await this._authenticateEmail(this._devBypassEmail, options);
     if (auth.ok && auth.token) {
@@ -489,6 +494,17 @@ class KiaApiService {
       bearerToken,
       timeoutMs: options.timeoutMs || BOOTH_API_TIMEOUT_MS,
     });
+
+    // Stale admin bootstrap bearer or expired service token — re-auth once and retry.
+    if (res.statusCode === 401 && !options._authRetried) {
+      const fresh = await this._authenticateEmail(this._devBypassEmail, {
+        timeoutMs: options.timeoutMs || BOOTH_API_TIMEOUT_MS,
+      });
+      if (fresh.ok && fresh.token) {
+        return this._validateWithApi(token, fresh.token, { ...options, _authRetried: true });
+      }
+    }
+
     const ok = res.statusCode >= 200 && res.statusCode < 300;
     const valid = ok && res.json?.success === true;
     if (!valid) {
@@ -516,6 +532,9 @@ class KiaApiService {
       .trim()
       .toUpperCase();
     if (!t) return { ok: false, valid: false, error: 'Empty token' };
+
+    // Each scan is a new guest — do not carry the previous guest bearer into validate.
+    this.clearSessionBearer();
 
     if (isBypassToken(t, this._bypassCode)) {
       if (!this._hasBaseUrl() || this._isSystemOffline()) {
@@ -1324,15 +1343,47 @@ class KiaApiService {
       ok: true,
       pending: queue.length,
       lastPublish: this._lastPublish,
-      items: queue.map((i) => ({
-        id: i.id,
-        sessionToken: i.sessionToken,
-        attempts: i.attempts || 0,
-        enqueuedAt: i.enqueuedAt,
-        lastError: i.lastError,
-        hasBearer: Boolean(i.bearerToken || this._sessionBearer || this._bearerToken),
-      })),
+      items: queue.map((i) => this._summarizeQueueItem(i)),
     };
+  }
+
+  _summarizeQueueItem(i) {
+    const imagePath = typeof i.imagePath === 'string' ? i.imagePath : '';
+    const fileName = imagePath ? path.basename(imagePath) : null;
+    const attempts = i.attempts || 0;
+    const lastError = i.lastError || null;
+    return {
+      id: i.id,
+      sessionToken: i.sessionToken,
+      guestEmail: i.guestEmail || null,
+      imageFileName: fileName,
+      attempts,
+      enqueuedAt: i.enqueuedAt,
+      lastAttemptAt: i.lastAttemptAt || null,
+      lastError,
+      status: lastError ? 'error' : 'pending',
+      hasBearer: Boolean(i.bearerToken || this._sessionBearer || this._bearerToken),
+    };
+  }
+
+  async processUploadQueue() {
+    const before = this._readQueue().length;
+    if (before === 0) {
+      return { ok: true, pending: 0, processed: 0 };
+    }
+    if (!this._hasBaseUrl()) {
+      return { ok: false, error: 'API base URL not configured', pending: before };
+    }
+    if (this._isSystemOffline()) {
+      return { ok: false, error: 'Booth is offline — connect to the network and retry.', pending: before };
+    }
+    try {
+      await this.processQueue();
+      const after = this._readQueue().length;
+      return { ok: true, pending: after, processed: Math.max(0, before - after) };
+    } catch (e) {
+      return { ok: false, error: String(e), pending: this._readQueue().length };
+    }
   }
 
   async _resolveSessionTokenForUpload(item) {
@@ -1417,6 +1468,7 @@ class KiaApiService {
         if (!uploaded.ok) {
           item.attempts = (item.attempts || 0) + 1;
           item.lastError = uploaded.error || 'Upload failed';
+          item.lastAttemptAt = new Date().toISOString();
           if (/invalid photo booth session/i.test(String(uploaded.error || ''))) {
             item.pendingValidate = true;
             item.validatedAt = null;

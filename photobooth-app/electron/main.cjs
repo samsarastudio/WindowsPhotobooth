@@ -962,6 +962,15 @@ ipcMain.handle('kia:getUploadQueueStatus', async () => {
   }
 });
 
+ipcMain.handle('kia:processUploadQueue', async () => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return await ensureKiaApiService().processUploadQueue();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
 ipcMain.handle('kia:testConnection', async () => {
   try {
     applyKiaApiConfigFromMerged(loadMergedConfig());
