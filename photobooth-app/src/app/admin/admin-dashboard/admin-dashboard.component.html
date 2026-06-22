@@ -79,6 +79,14 @@
               <input class="pb-input" [(ngModel)]="draft.capture.readySubtitle" />
               <label>Footer hint</label>
               <input class="pb-input" [(ngModel)]="draft.capture.footerHint" />
+              <label>Countdown timer length</label>
+              <select class="pb-input" [(ngModel)]="draft.capture.countdownTimerSeconds">
+                <option [ngValue]="6">6 seconds (default)</option>
+                <option [ngValue]="4">4 seconds</option>
+              </select>
+              <p class="pb-admin-hint pb-hint-tight">
+                Plays the timer video on the capture screen before the photo is taken automatically.
+              </p>
             </section>
 
             <section class="pb-admin-card">

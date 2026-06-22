@@ -14,6 +14,10 @@ import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
 import { BoothSessionService } from '../../services/booth-session.service';
 import { BoothConfigService } from '../../services/booth-config.service';
+import {
+  COUNTDOWN_TIMER_VIDEO_SRC,
+  type PhotoboothCountdownTimerSeconds,
+} from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
 
 function previewTargetFps(): number {
@@ -46,6 +50,14 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly booth = inject(BoothConfigService);
   private readonly session = inject(BoothSessionService);
   readonly copy = this.booth.copy;
+
+  readonly countdownTimerSeconds = computed(
+    (): PhotoboothCountdownTimerSeconds => this.copy().capture.countdownTimerSeconds ?? 6,
+  );
+
+  readonly timerVideoSrc = computed(
+    () => COUNTDOWN_TIMER_VIDEO_SRC[this.countdownTimerSeconds()],
+  );
 
   readonly cameraRotated = computed(
     () => this.booth.camera().orientation !== 'landscape',
@@ -234,12 +246,16 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private timerFallbackMs(): number {
+    return this.countdownTimerSeconds() * 1000 + 200;
+  }
+
   private timerDurationMs(el: HTMLVideoElement): number {
     const d = el.duration;
     if (Number.isFinite(d) && d > 0) {
       return Math.ceil(d * 1000) + 200;
     }
-    return 6500;
+    return this.timerFallbackMs();
   }
 
   private detachTimerListeners(): void {
@@ -393,7 +409,7 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     const el = this.timerVideoRef?.nativeElement;
     if (!el) {
       this.countdown.set(1);
-      this.captureTimeout = setTimeout(() => this.finishCountdown(), 6500);
+      this.captureTimeout = setTimeout(() => this.finishCountdown(), this.timerFallbackMs());
       return;
     }
 
@@ -419,7 +435,7 @@ export class CapturePageComponent implements OnInit, AfterViewInit, OnDestroy {
     el.addEventListener('canplay', onReady);
     el.load();
 
-    this.armCountdownWatchdog(el, 7500);
+    this.armCountdownWatchdog(el, this.timerFallbackMs() + 1000);
   }
 
   private beginCaptureCycle(): void {

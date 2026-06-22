@@ -54,11 +54,18 @@ type CopyPatch = {
   result?: Partial<PhotoboothCopy['result']>;
 };
 
+function normalizeCountdownTimerSeconds(raw: unknown): 4 | 6 {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return n === 4 ? 4 : 6;
+}
+
 function mergeCopy(base: PhotoboothCopy, patch?: CopyPatch): PhotoboothCopy {
   if (!patch) return base;
+  const capture = { ...base.capture, ...patch.capture };
+  capture.countdownTimerSeconds = normalizeCountdownTimerSeconds(capture.countdownTimerSeconds);
   return {
     qr: { ...base.qr, ...patch.qr },
-    capture: { ...base.capture, ...patch.capture },
+    capture,
     result: { ...base.result, ...patch.result },
   };
 }

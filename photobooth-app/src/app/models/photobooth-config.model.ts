@@ -20,11 +20,21 @@ export interface PhotoboothCopyQr {
   adminLinkVisibleSeconds: number;
 }
 
+/** Countdown timer video length on the capture screen. */
+export type PhotoboothCountdownTimerSeconds = 4 | 6;
+
+export const COUNTDOWN_TIMER_VIDEO_SRC: Record<PhotoboothCountdownTimerSeconds, string> = {
+  4: 'kia/timer_video_4s.mp4',
+  6: 'kia/timer_video.mp4',
+};
+
 export interface PhotoboothCopyCapture {
   starting: string;
   readyTitle: string;
   readySubtitle: string;
   footerHint: string;
+  /** Which bundled timer video to play before auto-capture (4 or 6 seconds). */
+  countdownTimerSeconds: PhotoboothCountdownTimerSeconds;
 }
 
 export interface PhotoboothCopyResult {
@@ -214,6 +224,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     readyTitle: 'Get Ready',
     readySubtitle: 'Strike Your Best Pose',
     footerHint: 'Look at camera and hold still.',
+    countdownTimerSeconds: 6,
   },
   result: {
     title: 'Your KIA Keepsake is Ready',

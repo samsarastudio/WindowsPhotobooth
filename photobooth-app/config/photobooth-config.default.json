@@ -67,7 +67,8 @@
       "starting": "Starting camera…",
       "readyTitle": "Get Ready",
       "readySubtitle": "Strike Your Best Pose",
-      "footerHint": "Look at camera and hold still."
+      "footerHint": "Look at camera and hold still.",
+      "countdownTimerSeconds": 6
     },
     "result": {
       "title": "Your KIA Keepsake is Ready",
