@@ -3,6 +3,7 @@ import type {
   PbKiaEnqueueMediaEntry,
   PbKiaFetchFramesResult,
   PbKiaFetchGalleryResult,
+  PbKiaImportUploadQueueResult,
   PbKiaProcessUploadQueueResult,
   PbKiaUploadQueueStatus,
   PbSyncValidateResult,
@@ -65,6 +66,27 @@ export class KiaApiService {
       return window.pbApi.kiaProcessUploadQueue();
     }
     return Promise.resolve({ ok: false, error: 'Upload queue unavailable' });
+  }
+
+  removeUploadQueueItem(uploadId: string): Promise<{ ok: boolean; pending?: number; error?: string }> {
+    if (window.pbApi?.kiaRemoveUploadQueueItem) {
+      return window.pbApi.kiaRemoveUploadQueueItem(uploadId);
+    }
+    return Promise.resolve({ ok: false, error: 'Upload queue unavailable' });
+  }
+
+  async importUploadQueueFromOldBuild(): Promise<PbKiaImportUploadQueueResult> {
+    if (!window.pbApi?.kiaPickOldBuildFolder || !window.pbApi?.kiaImportUploadQueueFromFolder) {
+      return { ok: false, error: 'Import requires the Electron app.' };
+    }
+    const pick = await window.pbApi.kiaPickOldBuildFolder();
+    if (!pick.ok) {
+      return pick.canceled ? { ok: false, canceled: true } : { ok: false, error: pick.error || 'Folder pick failed' };
+    }
+    if (!pick.path) {
+      return { ok: false, error: 'No folder selected.' };
+    }
+    return window.pbApi.kiaImportUploadQueueFromFolder(pick.path);
   }
 
   testConnection(): Promise<{ ok: boolean; statusCode?: number; message?: string; error?: string }> {

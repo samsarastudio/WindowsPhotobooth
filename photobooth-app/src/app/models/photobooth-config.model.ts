@@ -112,7 +112,7 @@ export type PhotoboothUploadImageFormat = 'png' | 'jpeg';
 /** Kia Forum photo-booth API (dev / prod base URL + Bearer). */
 export interface PhotoboothKiaApiConfig {
   baseUrl: string;
-  /** Optional separate host for POST /photo-booth/media only; empty = use baseUrl. */
+  /** Optional separate host for POST upload only; empty = use baseUrl. */
   uploadBaseUrl: string;
   bearerToken: string;
   qrPrefix: string;
@@ -122,7 +122,7 @@ export interface PhotoboothKiaApiConfig {
   offlineAllowPrefix: boolean;
   /** When true, show a live API response log panel in the booth UI. */
   debugMode: boolean;
-  /** Framed upload output: PNG keeps frame transparency; JPEG flattens to white. */
+  /** Framed upload output: JPEG recommended for API size; PNG auto-falls back to JPEG if too large. */
   uploadImageFormat: PhotoboothUploadImageFormat;
   paths: PhotoboothKiaApiPaths;
 }
@@ -142,7 +142,7 @@ export const PHOTOBOOTH_DEFAULT_SCANNER: PhotoboothScannerConfig = {
 export const PHOTOBOOTH_DEFAULT_SYNC: PhotoboothSyncConfig = {
   apiBaseUrl: '',
   validatePath: '/api/photobooth/validate-token',
-  uploadPath: '/api/photobooth/upload',
+  uploadPath: '/api/kia/photobooth/upload',
   qrPrefix: 'KIA-PHOTO-',
   boothId: '',
 };
@@ -151,7 +151,7 @@ export const PHOTOBOOTH_DEFAULT_KIA_API_PATHS: PhotoboothKiaApiPaths = {
   authenticate: '/api/kia/authenticate',
   validate: '/api/kia/photo-booth/validate',
   frames: '/api/kia/photo-booth/frames',
-  media: '/api/kia/photo-booth/media',
+  media: '/api/kia/photobooth/upload',
   gallery: '/api/kia/photo-booth/gallery',
   qrCode: '/api/kia/photo-booth/qr-code',
 };
@@ -165,7 +165,7 @@ export const PHOTOBOOTH_DEFAULT_KIA_API: PhotoboothKiaApiConfig = {
   devBypassEmail: 'nandu@tuna.group',
   offlineAllowPrefix: true,
   debugMode: false,
-  uploadImageFormat: 'png',
+  uploadImageFormat: 'jpeg',
   paths: { ...PHOTOBOOTH_DEFAULT_KIA_API_PATHS },
 };
 

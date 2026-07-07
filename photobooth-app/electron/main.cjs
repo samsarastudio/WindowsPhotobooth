@@ -337,7 +337,7 @@ function kiaApiFromMerged(cfg) {
       authenticate: paths.authenticate || '/api/kia/authenticate',
       validate: paths.validate || '/api/kia/photo-booth/validate',
       frames: paths.frames || '/api/kia/photo-booth/frames',
-      media: paths.media || '/api/kia/photo-booth/media',
+      media: paths.media || '/api/kia/photobooth/upload',
       gallery: paths.gallery || '/api/kia/photo-booth/gallery',
       qrCode: paths.qrCode || '/api/kia/photo-booth/qr-code',
     },
@@ -966,6 +966,34 @@ ipcMain.handle('kia:processUploadQueue', async () => {
   try {
     applyKiaApiConfigFromMerged(loadMergedConfig());
     return await ensureKiaApiService().processUploadQueue();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('kia:removeUploadQueueItem', async (_e, uploadId) => {
+  try {
+    return ensureKiaApiService().removeUploadQueueItem(uploadId);
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('kia:pickOldBuildFolder', async () => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Select previous booth build folder',
+    message: 'Choose win-unpacked from an older PhotoBooth release (contains sync-data and capture).',
+    properties: ['openDirectory'],
+  });
+  if (r.canceled || !r.filePaths?.length) return { ok: false, canceled: true };
+  return { ok: true, path: r.filePaths[0] };
+});
+
+ipcMain.handle('kia:importUploadQueueFromFolder', async (_e, folderPath) => {
+  try {
+    applyKiaApiConfigFromMerged(loadMergedConfig());
+    return ensureKiaApiService().importUploadQueueFromOldBuild(folderPath, getCaptureDir());
   } catch (e) {
     return { ok: false, error: String(e) };
   }

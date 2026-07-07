@@ -284,12 +284,24 @@ function normalizeKiaApi(rawKia: unknown, legacySync: PhotoboothSyncConfig): Pho
 
   const paths = normalizeKiaPaths(o['paths']);
 
+  const legacyUpload = legacySync.uploadPath.trim();
+  if (
+    legacyUpload &&
+    (legacyUpload.includes('photobooth/upload') || legacyUpload.includes('/kia/'))
+  ) {
+    paths.media = legacyUpload;
+  }
+
   if (legacySync.validatePath.includes('/kia/photo-booth')) {
-
     if (legacySync.validatePath) paths.validate = legacySync.validatePath;
+  }
 
-    if (legacySync.uploadPath.includes('/kia/')) paths.media = legacySync.uploadPath;
-
+  // Migrate legacy bearer-auth upload paths to session-token upload.
+  if (
+    paths.media === '/api/kia/photo-booth/media' ||
+    paths.media === '/api/photobooth/upload'
+  ) {
+    paths.media = '/api/kia/photobooth/upload';
   }
 
 

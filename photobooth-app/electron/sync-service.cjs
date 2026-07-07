@@ -17,7 +17,7 @@ class SyncService {
     this._queueFile = path.join(queueDir, 'sync-queue.json');
     this._apiBaseUrl = '';
     this._validatePath = '/api/photobooth/validate-token';
-    this._uploadPath = '/api/photobooth/upload';
+    this._uploadPath = '/api/kia/photobooth/upload';
     this._boothId = '';
     this._timer = null;
     this._processing = false;
@@ -26,7 +26,7 @@ class SyncService {
   configure({ apiBaseUrl, validatePath, uploadPath, boothId }) {
     this._apiBaseUrl = String(apiBaseUrl || '').trim().replace(/\/$/, '');
     this._validatePath = String(validatePath || '/api/photobooth/validate-token');
-    this._uploadPath = String(uploadPath || '/api/photobooth/upload');
+    this._uploadPath = String(uploadPath || '/api/kia/photobooth/upload');
     this._boothId = String(boothId || '').trim();
   }
 

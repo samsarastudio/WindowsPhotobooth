@@ -27,7 +27,7 @@
   "sync": {
     "apiBaseUrl": "",
     "validatePath": "/api/photobooth/validate-token",
-    "uploadPath": "/api/photobooth/upload",
+    "uploadPath": "/api/kia/photobooth/upload",
     "qrPrefix": "KIA-PHOTO-",
     "boothId": ""
   },
@@ -40,12 +40,12 @@
     "devBypassEmail": "nandu@tuna.group",
     "offlineAllowPrefix": true,
     "debugMode": false,
-    "uploadImageFormat": "png",
+    "uploadImageFormat": "jpeg",
     "paths": {
       "authenticate": "/api/kia/authenticate",
       "validate": "/api/kia/photo-booth/validate",
       "frames": "/api/kia/photo-booth/frames",
-      "media": "/api/kia/photo-booth/media",
+      "media": "/api/kia/photobooth/upload",
       "gallery": "/api/kia/photo-booth/gallery",
       "qrCode": "/api/kia/photo-booth/qr-code"
     }

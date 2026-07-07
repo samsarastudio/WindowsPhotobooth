@@ -140,6 +140,7 @@ export interface PbKiaFetchGalleryResult {
 export interface PbKiaUploadQueueItem {
   id: string;
   sessionToken: string;
+  scannedQrToken?: string | null;
   guestEmail: string | null;
   imageFileName: string | null;
   attempts: number;
@@ -148,6 +149,17 @@ export interface PbKiaUploadQueueItem {
   lastError: string | null;
   status: 'pending' | 'error';
   hasBearer?: boolean;
+}
+
+export interface PbKiaImportUploadQueueResult {
+  ok: boolean;
+  imported?: number;
+  skipped?: number;
+  pending?: number;
+  errors?: string[];
+  queueFile?: string;
+  error?: string;
+  canceled?: boolean;
 }
 
 export interface PbKiaUploadQueueStatus {
@@ -243,6 +255,9 @@ export interface PbApi {
   kiaFetchGallery(): Promise<PbKiaFetchGalleryResult>;
   kiaGetUploadQueueStatus(): Promise<PbKiaUploadQueueStatus>;
   kiaProcessUploadQueue(): Promise<PbKiaProcessUploadQueueResult>;
+  kiaRemoveUploadQueueItem(uploadId: string): Promise<{ ok: boolean; pending?: number; error?: string }>;
+  kiaPickOldBuildFolder(): Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
+  kiaImportUploadQueueFromFolder(folderPath: string): Promise<PbKiaImportUploadQueueResult>;
   kiaTestConnection(): Promise<{ ok: boolean; statusCode?: number; message?: string; error?: string }>;
   onKiaApiDebug(handler: (entry: PbKiaApiDebugEntry) => void): () => void;
 }

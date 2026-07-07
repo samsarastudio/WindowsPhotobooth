@@ -52,6 +52,10 @@ contextBridge.exposeInMainWorld('pbApi', {
   kiaFetchGallery: () => ipcRenderer.invoke('kia:fetchGallery'),
   kiaGetUploadQueueStatus: () => ipcRenderer.invoke('kia:getUploadQueueStatus'),
   kiaProcessUploadQueue: () => ipcRenderer.invoke('kia:processUploadQueue'),
+  kiaRemoveUploadQueueItem: (uploadId) => ipcRenderer.invoke('kia:removeUploadQueueItem', uploadId),
+  kiaPickOldBuildFolder: () => ipcRenderer.invoke('kia:pickOldBuildFolder'),
+  kiaImportUploadQueueFromFolder: (folderPath) =>
+    ipcRenderer.invoke('kia:importUploadQueueFromFolder', folderPath),
   kiaTestConnection: () => ipcRenderer.invoke('kia:testConnection'),
   onKiaApiDebug: (cb) => {
     const handler = (_e, payload) => cb(payload);

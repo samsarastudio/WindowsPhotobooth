@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
 const { URL, pathToFileURL, fileURLToPath } = require('url');
-const { composePhotoWithFrame, createFramePickerThumbnail } = require('./image-process.cjs');
+const { composePhotoWithFrame, createFramePickerThumbnail, optimizeImageForUpload } = require('./image-process.cjs');
 const {
   bundledAssetFileUrl,
   bundledAssetPath,
@@ -145,7 +145,7 @@ class KiaApiService {
       authenticate: '/api/kia/authenticate',
       validate: '/api/kia/photo-booth/validate',
       frames: '/api/kia/photo-booth/frames',
-      media: '/api/kia/photo-booth/media',
+      media: '/api/kia/photobooth/upload',
       gallery: '/api/kia/photo-booth/gallery',
       qrCode: '/api/kia/photo-booth/qr-code',
     };
@@ -224,6 +224,12 @@ class KiaApiService {
     return this._uploadBaseUrl || this._baseUrl;
   }
 
+  /** POST /api/kia/photobooth/upload — session_token only, no bearer. */
+  _usesSessionTokenUpload() {
+    const p = String(this._paths.media || '').trim().toLowerCase();
+    return p.includes('photobooth/upload');
+  }
+
   _hasBaseUrl() {
     return Boolean(this._baseUrl);
   }
@@ -285,7 +291,7 @@ class KiaApiService {
     return body || null;
   }
 
-  _request(method, urlStr, { jsonBody, multipart, bearerToken, timeoutMs } = {}) {
+  _request(method, urlStr, { jsonBody, multipart, bearerToken, timeoutMs, auth = true } = {}) {
     const started = Date.now();
     const pathForLog = this._pathForLog(urlStr);
     const reqSummary = this._summaryRequestBody(jsonBody, multipart);
@@ -298,7 +304,7 @@ class KiaApiService {
         reject(e);
         return;
       }
-      const bearer = this._resolveBearer(bearerToken);
+      const bearer = auth === false ? '' : this._resolveBearer(bearerToken);
       const lib = url.protocol === 'https:' ? https : http;
       const headers = {
         Accept: 'application/json',
@@ -1202,33 +1208,68 @@ class KiaApiService {
 
   async _prepareUploadImage(imagePath, frameId, frameImagePath) {
     const absPhoto = path.resolve(imagePath);
-    if (frameId == null || !Number.isFinite(frameId)) {
-      return { ok: true, path: absPhoto, composed: false };
+    let workPath = absPhoto;
+    let composed = false;
+
+    if (frameId != null && Number.isFinite(frameId)) {
+      const framePath = this._frameImagePathForId(frameId, frameImagePath);
+      if (!framePath) {
+        console.warn('[kia-api] frame image missing for frame', frameId, '- uploading photo without composite');
+      } else {
+        let sharpMod;
+        try {
+          sharpMod = require('sharp');
+        } catch (_) {
+          sharpMod = null;
+        }
+        if (sharpMod) {
+          const ext = this._uploadImageFormat === 'jpeg' ? '.jpg' : '.png';
+          const outPath = path.join(
+            path.dirname(absPhoto),
+            `${path.basename(absPhoto, path.extname(absPhoto))}_framed_${frameId}${ext}`,
+          );
+          const framed = await composePhotoWithFrame(sharpMod, absPhoto, framePath, outPath, {
+            format: this._uploadImageFormat,
+          });
+          if (!framed.ok) {
+            console.warn('[kia-api] frame composite failed:', framed.error);
+          } else {
+            workPath = framed.path;
+            composed = true;
+          }
+        }
+      }
     }
-    const framePath = this._frameImagePathForId(frameId, frameImagePath);
-    if (!framePath) {
-      console.warn('[kia-api] frame image missing for frame', frameId, '- uploading photo without composite');
-      return { ok: true, path: absPhoto, composed: false };
-    }
+
     let sharpMod;
     try {
       sharpMod = require('sharp');
     } catch (_) {
-      return { ok: true, path: absPhoto, composed: false };
+      return { ok: true, path: workPath, composed };
     }
-    const ext = this._uploadImageFormat === 'jpeg' ? '.jpg' : '.png';
-    const outPath = path.join(
+
+    const uploadExt = this._uploadImageFormat === 'jpeg' ? '.jpg' : '.png';
+    const uploadPath = path.join(
       path.dirname(absPhoto),
-      `${path.basename(absPhoto, path.extname(absPhoto))}_framed_${frameId}${ext}`,
+      `${path.basename(absPhoto, path.extname(absPhoto))}_upload${uploadExt}`,
     );
-    const composed = await composePhotoWithFrame(sharpMod, absPhoto, framePath, outPath, {
+    const optimized = await optimizeImageForUpload(sharpMod, workPath, uploadPath, {
       format: this._uploadImageFormat,
     });
-    if (!composed.ok) {
-      console.warn('[kia-api] frame composite failed:', composed.error);
-      return { ok: true, path: absPhoto, composed: false };
+    if (!optimized.ok) {
+      console.warn('[kia-api] upload optimize failed:', optimized.error);
+      return { ok: true, path: workPath, composed };
     }
-    return { ok: true, path: composed.path, composed: true };
+    if (optimized.bytes > 0) {
+      console.log(
+        '[kia-api] upload image optimized:',
+        path.basename(optimized.path),
+        `${(optimized.bytes / 1024).toFixed(0)} KB`,
+        optimized.format,
+        optimized.resized ? 'resized' : 'size-kept',
+      );
+    }
+    return { ok: true, path: optimized.path, composed, optimized: true, bytes: optimized.bytes };
   }
 
   async enqueueMedia(entry) {
@@ -1347,6 +1388,175 @@ class KiaApiService {
     };
   }
 
+  removeUploadQueueItem(uploadId) {
+    const id = String(uploadId || '').trim();
+    if (!id) return { ok: false, error: 'Missing upload id' };
+    const queue = this._readQueue();
+    const next = queue.filter((q) => q.id !== id);
+    if (next.length === queue.length) {
+      return { ok: false, error: 'Queue item not found' };
+    }
+    this._writeQueue(next);
+    return { ok: true, pending: next.length };
+  }
+
+  _findOldUploadQueueFile(oldBuildRoot) {
+    const root = path.resolve(String(oldBuildRoot || '').trim());
+    if (!root) return null;
+    const candidates = [
+      path.join(root, 'sync-data', 'upload-queue.json'),
+      path.join(root, 'win-unpacked', 'sync-data', 'upload-queue.json'),
+      path.join(root, 'upload-queue.json'),
+    ];
+    for (const file of candidates) {
+      if (fs.existsSync(file)) return file;
+    }
+    return null;
+  }
+
+  _boothRootFromQueueFile(queueFile) {
+    const syncDir = path.dirname(queueFile);
+    if (path.basename(syncDir).toLowerCase() === 'sync-data') {
+      return path.dirname(syncDir);
+    }
+    return path.resolve(path.dirname(queueFile));
+  }
+
+  _resolveOldImagePath(boothRoot, imagePath) {
+    const p = String(imagePath || '').trim();
+    if (!p) return null;
+    if (fs.existsSync(p)) return p;
+    const base = path.basename(p);
+    const roots = [boothRoot, path.join(boothRoot, 'win-unpacked')];
+    for (const root of roots) {
+      for (const sub of ['capture', '.', 'sync-data']) {
+        const cand = path.join(root, sub, base);
+        if (fs.existsSync(cand)) return cand;
+      }
+    }
+    return null;
+  }
+
+  importUploadQueueFromOldBuild(oldBuildRoot, captureDir) {
+    const queueFile = this._findOldUploadQueueFile(oldBuildRoot);
+    if (!queueFile) {
+      return {
+        ok: false,
+        error:
+          'No upload-queue.json found. Choose the previous win-unpacked folder (or a parent folder that contains sync-data).',
+      };
+    }
+
+    let rawItems;
+    try {
+      rawItems = JSON.parse(fs.readFileSync(queueFile, 'utf8'));
+    } catch (e) {
+      return { ok: false, error: `Could not read old upload queue: ${e}` };
+    }
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      return { ok: false, error: 'Old upload queue is empty.' };
+    }
+
+    const boothRoot = this._boothRootFromQueueFile(queueFile);
+    const captureRoot = path.resolve(String(captureDir || '').trim());
+    if (!captureRoot) {
+      return { ok: false, error: 'Capture folder not configured.' };
+    }
+    fs.mkdirSync(captureRoot, { recursive: true });
+
+    const queue = this._readQueue();
+    const existingKeys = new Set(
+      queue.map(
+        (i) =>
+          `${normalizeSessionToken(i.sessionToken) || normalizeSessionToken(i.scannedQrToken)}|${path.basename(i.imagePath || '')}`,
+      ),
+    );
+
+    let imported = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const raw of rawItems) {
+      const sanitized = this._sanitizeQueueItem(raw);
+      if (!sanitized) {
+        skipped += 1;
+        errors.push('Skipped item with invalid or missing session token');
+        continue;
+      }
+
+      const sessionToken = normalizeSessionToken(sanitized.sessionToken);
+      const scannedQrToken = normalizeSessionToken(sanitized.scannedQrToken) || sessionToken;
+      const src = this._resolveOldImagePath(boothRoot, sanitized.imagePath);
+      if (!src) {
+        skipped += 1;
+        errors.push(`Photo not found: ${path.basename(String(sanitized.imagePath || ''))}`);
+        continue;
+      }
+
+      const base = path.basename(src);
+      const dedupeKey = `${sessionToken}|${base}`;
+      if (existingKeys.has(dedupeKey)) {
+        skipped += 1;
+        continue;
+      }
+
+      const dest = path.join(
+        captureRoot,
+        `imported_${Date.now()}_${Math.random().toString(36).slice(2, 6)}_${base}`,
+      );
+      try {
+        fs.copyFileSync(src, dest);
+      } catch (e) {
+        skipped += 1;
+        errors.push(`Copy failed for ${base}: ${e}`);
+        continue;
+      }
+
+      const tokenReady = isLikelyPhotoBoothSessionToken(
+        sessionToken,
+        this._bypassCode,
+        this._qrPrefix,
+      );
+      queue.push({
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        sessionToken,
+        scannedQrToken,
+        pendingValidate: !tokenReady,
+        validatedAt: tokenReady ? new Date().toISOString() : null,
+        frameId: sanitized.frameId ?? null,
+        imagePath: dest,
+        bearerToken: null,
+        guestEmail: sanitized.guestEmail || null,
+        enqueuedAt: new Date().toISOString(),
+        attempts: 0,
+        lastError: null,
+        lastAttemptAt: null,
+      });
+      existingKeys.add(dedupeKey);
+      imported += 1;
+    }
+
+    if (imported === 0) {
+      return {
+        ok: false,
+        error: errors[0] || 'No items could be imported.',
+        skipped,
+        errors,
+      };
+    }
+
+    this._writeQueue(queue);
+    void this.processQueue();
+    return {
+      ok: true,
+      imported,
+      skipped,
+      errors,
+      pending: queue.length,
+      queueFile,
+    };
+  }
+
   _summarizeQueueItem(i) {
     const imagePath = typeof i.imagePath === 'string' ? i.imagePath : '';
     const fileName = imagePath ? path.basename(imagePath) : null;
@@ -1355,6 +1565,7 @@ class KiaApiService {
     return {
       id: i.id,
       sessionToken: i.sessionToken,
+      scannedQrToken: i.scannedQrToken || i.sessionToken || null,
       guestEmail: i.guestEmail || null,
       imageFileName: fileName,
       attempts,
@@ -1389,6 +1600,15 @@ class KiaApiService {
   async _resolveSessionTokenForUpload(item) {
     const qrToken = normalizeSessionToken(item.scannedQrToken) || normalizeSessionToken(item.sessionToken);
     if (!qrToken) return null;
+
+    if (this._usesSessionTokenUpload()) {
+      const existing = normalizeSessionToken(item.sessionToken) || qrToken;
+      if (isLikelyPhotoBoothSessionToken(existing, this._bypassCode, this._qrPrefix)) {
+        item.sessionToken = existing;
+        item.pendingValidate = false;
+        return existing;
+      }
+    }
 
     if (isBypassToken(qrToken, this._bypassCode) || isBypassToken(item.sessionToken, this._bypassCode)) {
       if (this._isSystemOffline()) {
@@ -1517,9 +1737,18 @@ class KiaApiService {
     if (!fs.existsSync(item.imagePath)) {
       return { ok: false, error: 'File missing' };
     }
-    const bearerToken = await this._refreshItemBearer(item);
-    if (!bearerToken) {
-      return { ok: false, error: 'No API bearer available for upload' };
+    const sessionOnly = this._usesSessionTokenUpload();
+    let bearerToken = '';
+    if (!sessionOnly) {
+      bearerToken = await this._refreshItemBearer(item);
+      if (!bearerToken) {
+        return { ok: false, error: 'No API bearer available for upload' };
+      }
+    }
+
+    const sessionToken = normalizeSessionToken(item.sessionToken);
+    if (!sessionToken) {
+      return { ok: false, error: 'Missing photo booth session token' };
     }
 
     try {
@@ -1528,20 +1757,22 @@ class KiaApiService {
         ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
       const imageB64 = fs.readFileSync(item.imagePath).toString('base64');
       const jsonBody = {
-        session_token: item.sessionToken,
+        session_token: sessionToken,
         image: imageB64,
       };
       if (item.frameId != null && Number.isFinite(item.frameId)) {
         jsonBody.frame_id = item.frameId;
       }
 
-      let res = await this._request('POST', this._url('media'), {
+      const requestOpts = {
         jsonBody,
-        bearerToken,
         timeoutMs: UPLOAD_API_TIMEOUT_MS,
-      });
+        ...(sessionOnly ? { auth: false } : { bearerToken }),
+      };
 
-      if (res.statusCode === 401) {
+      let res = await this._request('POST', this._url('media'), requestOpts);
+
+      if (!sessionOnly && res.statusCode === 401) {
         const email = item.guestEmail || this._devBypassEmail;
         item.bearerToken = null;
         this._sessionBearer = '';

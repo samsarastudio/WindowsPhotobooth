@@ -41,6 +41,7 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
   readonly uploadQueuePending = signal(0);
   readonly uploadQueueItems = signal<PbKiaUploadQueueItem[]>([]);
   readonly uploadQueueBusy = signal(false);
+  readonly uploadQueueImportBusy = signal(false);
   readonly bearerConfigured = signal(false);
   serialPorts = signal<PbScannerPortInfo[]>([]);
   scannerPortsMessage = signal<string | null>(null);
@@ -210,6 +211,48 @@ export class AdminDashboardComponent implements OnInit, OnDestroy {
       }
     } finally {
       this.uploadQueueBusy.set(false);
+    }
+  }
+
+  async removeQueueItem(item: PbKiaUploadQueueItem): Promise<void> {
+    const token = item.scannedQrToken || item.sessionToken || '—';
+    const file = item.imageFileName || 'photo';
+    const ok = confirm(
+      `Remove this upload from the queue?\n\nSession: ${token}\nFile: ${file}\n\nThe photo file on disk is not deleted.`,
+    );
+    if (!ok) return;
+
+    this.uploadQueueBusy.set(true);
+    this.status.set(null);
+    try {
+      const r = await this.kiaApi.removeUploadQueueItem(item.id);
+      await this.refreshUploadQueue();
+      this.status.set(r.ok ? 'Removed from upload queue.' : r.error || 'Remove failed.');
+    } finally {
+      this.uploadQueueBusy.set(false);
+    }
+  }
+
+  async importBacklogFromOldBuild(): Promise<void> {
+    const ok = confirm(
+      'Import pending uploads from a previous booth build?\n\nPhotos will be copied into this booth\'s capture folder. Each item keeps its session token (the QR code scanned at the booth).',
+    );
+    if (!ok) return;
+
+    this.uploadQueueImportBusy.set(true);
+    this.status.set(null);
+    try {
+      const r = await this.kiaApi.importUploadQueueFromOldBuild();
+      if (r.canceled) return;
+      await this.refreshUploadQueue();
+      if (r.ok) {
+        const skipped = r.skipped ? `, ${r.skipped} skipped` : '';
+        this.status.set(`Imported ${r.imported ?? 0} photo(s) into the upload queue${skipped}.`);
+      } else {
+        this.status.set(r.error || 'Import failed.');
+      }
+    } finally {
+      this.uploadQueueImportBusy.set(false);
     }
   }
 

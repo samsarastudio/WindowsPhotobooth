@@ -119,27 +119,40 @@
                   <h2>Pending photo uploads</h2>
                   <p class="pb-admin-hint">
                     Offline or failed uploads waiting to sync. {{ uploadQueuePending() }} in queue.
+                    Each item stores the guest <strong>session token</strong> (the QR code scanned at the booth).
                   </p>
                 </div>
-                <div class="pb-admin-row">
+                <div class="pb-admin-upload-queue__actions">
                   <button
                     type="button"
                     class="pb-btn pb-btn-ghost pb-btn-sm"
-                    [disabled]="uploadQueueBusy()"
+                    [disabled]="uploadQueueBusy() || uploadQueueImportBusy()"
                     (click)="refreshUploadQueue()"
                   >
                     Refresh
                   </button>
                   <button
                     type="button"
+                    class="pb-btn pb-btn-ghost pb-btn-sm"
+                    [disabled]="uploadQueueBusy() || uploadQueueImportBusy()"
+                    (click)="importBacklogFromOldBuild()"
+                  >
+                    @if (uploadQueueImportBusy()) { Importing… } @else { Import backlog… }
+                  </button>
+                  <button
+                    type="button"
                     class="pb-btn pb-btn-primary pb-btn-sm"
-                    [disabled]="uploadQueueBusy() || uploadQueuePending() === 0"
+                    [disabled]="uploadQueueBusy() || uploadQueueImportBusy() || uploadQueuePending() === 0"
                     (click)="retryAllUploads()"
                   >
                     @if (uploadQueueBusy()) { Retrying… } @else { Retry all }
                   </button>
                 </div>
               </div>
+              <p class="pb-admin-hint pb-admin-upload-queue__import-hint">
+                <strong>Import backlog</strong> — choose a previous <code>win-unpacked</code> folder. Photos are
+                copied here and <code>upload-queue.json</code> entries are recreated with the same session tokens.
+              </p>
 
               @if (uploadQueueItems().length === 0) {
                 <p class="pb-admin-hint pb-admin-upload-queue__empty">No pending uploads.</p>
@@ -147,32 +160,49 @@
                 <ul class="pb-admin-upload-list">
                   @for (item of uploadQueueItems(); track item.id) {
                     <li class="pb-admin-upload-list__item">
-                      <div class="pb-admin-upload-list__main">
-                        <span class="pb-admin-upload-list__email">{{ item.guestEmail || '—' }}</span>
-                        <span class="pb-admin-upload-list__file">{{ item.imageFileName || 'photo' }}</span>
-                      </div>
-                      <div class="pb-admin-upload-list__meta">
-                        <span
-                          class="pb-admin-upload-list__status"
-                          [class.pb-admin-upload-list__status--error]="item.status === 'error'"
-                        >
-                          {{ item.status === 'error' ? 'Error' : 'Pending' }}
-                          @if (item.attempts > 0) {
-                            · {{ item.attempts }} attempt{{ item.attempts === 1 ? '' : 's' }}
+                      <div class="pb-admin-upload-list__row">
+                        <div class="pb-admin-upload-list__body">
+                          <div class="pb-admin-upload-list__main">
+                            <span class="pb-admin-upload-list__email">{{ item.guestEmail || '—' }}</span>
+                            <span class="pb-admin-upload-list__file">{{ item.imageFileName || 'photo' }}</span>
+                          </div>
+                          <div class="pb-admin-upload-list__token" title="Session token (QR scan value)">
+                            {{ item.scannedQrToken || item.sessionToken }}
+                          </div>
+                          <div class="pb-admin-upload-list__meta">
+                            <span
+                              class="pb-admin-upload-list__status"
+                              [class.pb-admin-upload-list__status--error]="item.status === 'error'"
+                            >
+                              {{ item.status === 'error' ? 'Error' : 'Pending' }}
+                              @if (item.attempts > 0) {
+                                · {{ item.attempts }} attempt{{ item.attempts === 1 ? '' : 's' }}
+                              }
+                            </span>
+                            <span class="pb-admin-upload-list__time" title="Queued">
+                              Queued {{ formatQueueTime(item.enqueuedAt) }}
+                            </span>
+                            @if (item.lastAttemptAt) {
+                              <span class="pb-admin-upload-list__time" title="Last retry">
+                                Last try {{ formatQueueTime(item.lastAttemptAt) }}
+                              </span>
+                            }
+                          </div>
+                          @if (item.lastError) {
+                            <p class="pb-admin-upload-list__error">{{ item.lastError }}</p>
                           }
-                        </span>
-                        <span class="pb-admin-upload-list__time" title="Queued">
-                          Queued {{ formatQueueTime(item.enqueuedAt) }}
-                        </span>
-                        @if (item.lastAttemptAt) {
-                          <span class="pb-admin-upload-list__time" title="Last retry">
-                            Last try {{ formatQueueTime(item.lastAttemptAt) }}
-                          </span>
-                        }
+                        </div>
+                        <button
+                          type="button"
+                          class="pb-admin-upload-list__remove"
+                          title="Remove from queue"
+                          aria-label="Remove from queue"
+                          [disabled]="uploadQueueBusy() || uploadQueueImportBusy()"
+                          (click)="removeQueueItem(item)"
+                        >
+                          ×
+                        </button>
                       </div>
-                      @if (item.lastError) {
-                        <p class="pb-admin-upload-list__error">{{ item.lastError }}</p>
-                      }
                     </li>
                   }
                 </ul>
@@ -352,8 +382,8 @@
               </label>
               <label>Framed upload format</label>
               <select class="pb-input" [(ngModel)]="draftKiaApi.uploadImageFormat">
-                <option value="png">PNG (transparent frame edges)</option>
-                <option value="jpeg">JPEG (white background)</option>
+                <option value="jpeg">JPEG (recommended — smaller uploads, white background)</option>
+                <option value="png">PNG (transparent frame edges; auto-converts to JPEG if too large)</option>
               </select>
               <p>
                 Upload queue: <strong>{{ uploadQueuePending() }}</strong> pending
