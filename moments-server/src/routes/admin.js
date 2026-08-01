@@ -1,0 +1,91 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { Router } from 'express';
+import { config } from '../config.js';
+import {
+  getDb,
+  isSessionExpired,
+  loadSettings,
+  publicSession,
+  saveSettings,
+} from '../db.js';
+import { requireAdminPin } from '../auth.js';
+import { purgeExpiredSessions } from '../purge.js';
+
+export const adminRouter = Router();
+
+adminRouter.use(requireAdminPin);
+
+adminRouter.get('/settings', (_req, res) => {
+  res.json({ ok: true, settings: loadSettings() });
+});
+
+adminRouter.patch('/settings', (req, res) => {
+  const days = Number(req.body?.defaultTtlDays);
+  if (!Number.isFinite(days) || days < 1 || days > 3650) {
+    return res.status(400).json({ ok: false, error: 'defaultTtlDays must be 1–3650' });
+  }
+  const settings = saveSettings({ defaultTtlDays: Math.floor(days) });
+  return res.json({ ok: true, settings });
+});
+
+adminRouter.get('/sessions', (_req, res) => {
+  const rows = getDb()
+    .prepare('SELECT * FROM sessions ORDER BY created_at DESC')
+    .all();
+  const now = new Date();
+  const sessions = rows.map((row) => {
+    const count = getDb()
+      .prepare('SELECT COUNT(*) AS c FROM photos WHERE session_id = ?')
+      .get(row.id).c;
+    return {
+      ...publicSession(row, []),
+      photoCount: count,
+      expired: isSessionExpired(row, now),
+    };
+  });
+  return res.json({ ok: true, sessions });
+});
+
+adminRouter.patch('/sessions/:slug', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
+  if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });
+
+  let expiresAt = row.expires_at;
+  if (typeof req.body?.expiresAt === 'string' && req.body.expiresAt.trim()) {
+    const d = new Date(req.body.expiresAt);
+    if (Number.isNaN(d.getTime())) {
+      return res.status(400).json({ ok: false, error: 'Invalid expiresAt' });
+    }
+    expiresAt = d.toISOString();
+  } else if (typeof req.body?.ttlDays === 'number' && req.body.ttlDays > 0) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + Math.floor(req.body.ttlDays));
+    expiresAt = d.toISOString();
+  }
+
+  let title = row.title;
+  if (typeof req.body?.title === 'string' && req.body.title.trim()) {
+    title = req.body.title.trim();
+  }
+
+  getDb()
+    .prepare('UPDATE sessions SET expires_at = ?, title = ? WHERE id = ?')
+    .run(expiresAt, title, row.id);
+  const updated = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(row.id);
+  return res.json({ ok: true, session: publicSession(updated, []) });
+});
+
+adminRouter.delete('/sessions/:slug', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
+  if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });
+  getDb().prepare('DELETE FROM sessions WHERE id = ?').run(row.id);
+  const dir = path.join(config.photosDir, row.slug);
+  fs.rmSync(dir, { recursive: true, force: true });
+  return res.json({ ok: true, removed: row.slug });
+});
+
+adminRouter.post('/purge-expired', (_req, res) => {
+  const result = purgeExpiredSessions();
+  return res.json({ ok: true, ...result });
+});

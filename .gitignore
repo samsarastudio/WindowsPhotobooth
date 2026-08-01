@@ -7,6 +7,11 @@ photobooth-app/node_modules/
 photobooth-app/.angular/
 photobooth-app/build/
 
+# Moments gallery
+moments-server/node_modules/
+moments-server/data/
+moments-server/.env
+
 # Native bridge CMake output
 photobooth-app/native/edsdk-bridge/build/
 
