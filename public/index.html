@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>inmoment gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/gallery.css" />
+  </head>
+  <body>
+    <div class="leaf leaf-tr" aria-hidden="true"></div>
+    <div class="leaf leaf-bl" aria-hidden="true"></div>
+
+    <header class="top">
+      <div class="brand">
+        <p class="eyebrow">inmoment</p>
+        <h1 id="sessionTitle">Gallery</h1>
+        <p id="sessionMeta" class="meta"></p>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btnSlideshow">Slideshow</button>
+      </div>
+    </header>
+
+    <main>
+      <p id="status" class="status" hidden></p>
+      <p id="empty" class="empty" hidden>Photos will appear here as they’re taken…</p>
+      <div id="grid" class="grid" aria-live="polite"></div>
+    </main>
+
+    <div id="lightbox" class="lightbox" hidden>
+      <button type="button" class="lb-close" id="lbClose" aria-label="Close">×</button>
+      <button type="button" class="lb-nav prev" id="lbPrev" aria-label="Previous">‹</button>
+      <figure>
+        <img id="lbImg" alt="" />
+        <figcaption>
+          <span id="lbVariant"></span>
+          <a id="lbDownload" class="btn primary" download>Save photo</a>
+        </figcaption>
+      </figure>
+      <button type="button" class="lb-nav next" id="lbNext" aria-label="Next">›</button>
+    </div>
+
+    <div id="slideshow" class="slideshow" hidden>
+      <img id="ssImg" alt="" />
+      <div class="ss-bar">
+        <button type="button" class="btn ghost" id="ssPrev">Prev</button>
+        <button type="button" class="btn primary" id="ssToggle">Pause</button>
+        <button type="button" class="btn ghost" id="ssNext">Next</button>
+        <button type="button" class="btn ghost" id="ssExit">Exit</button>
+      </div>
+    </div>
+
+    <script src="/js/gallery.js" type="module"></script>
+  </body>
+</html>

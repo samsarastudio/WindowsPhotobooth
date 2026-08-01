@@ -1,0 +1,14 @@
+# Example Cloudflare Tunnel ingress snippet for Moments.
+# Merge with your existing inmomentservices.com rules for :3000 / :3001 / :5000.
+
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /home/pi/.cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: moments.inmomentservices.com
+    service: http://127.0.0.1:3020
+  # - hostname: inmomentservices.com
+  #   service: http://127.0.0.1:3000
+  # - hostname: ...
+  #   service: http://127.0.0.1:3001
+  - service: http_status:404

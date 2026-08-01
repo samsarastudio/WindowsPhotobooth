@@ -1,0 +1,18 @@
+[Unit]
+Description=InMoment Moments gallery server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/moments-server
+Environment=NODE_ENV=production
+EnvironmentFile=/home/pi/moments-server/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=3
+
+# Do not use ports 3000, 3001, or 5000 — set PORT=3020 in .env
+
+[Install]
+WantedBy=multi-user.target
