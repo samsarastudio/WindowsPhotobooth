@@ -3,6 +3,8 @@ export interface PbPaths {
   captureDir: string;
   themesDir?: string;
   configPath?: string;
+  logsDir?: string;
+  logFile?: string;
   hasBridge: boolean;
 }
 
@@ -34,6 +36,13 @@ export interface PbThemeListItem {
 
 export interface PbApi {
   getPaths(): Promise<PbPaths>;
+  log(payload: {
+    level?: 'info' | 'warn' | 'error' | 'debug';
+    scope?: string;
+    message: string;
+    detail?: unknown;
+  }): Promise<{ ok: boolean; logFile?: string; error?: string }>;
+  openLogsFolder(): Promise<{ ok: boolean; path?: string; error?: string }>;
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
   readFileBase64(filePath: string): Promise<string>;
   saveJpeg(fullPath: string, base64Body: string): Promise<{ ok: boolean; path?: string }>;
@@ -41,6 +50,9 @@ export interface PbApi {
   adminSaveConfig(
     partial: Record<string, unknown>,
   ): Promise<{ ok: boolean; config?: PhotoboothConfigPublic; error?: string }>;
+  adminTestOpenAiKey(
+    draftKey?: string,
+  ): Promise<{ ok: boolean; message?: string; error?: string }>;
   adminListThemes(): Promise<{ ok: boolean; themes?: PbThemeListItem[]; error?: string }>;
   adminGetThemeStylesheetUrl(): Promise<{ ok: boolean; url?: string | null; error?: string }>;
   adminPickThemeZip(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
@@ -62,10 +74,60 @@ export interface PbApi {
   ): Promise<{ ok: boolean; logoFile?: string; url?: string; error?: string }>;
   adminClearLogo(): Promise<{ ok: boolean; error?: string }>;
   adminGetBrandingLogoUrl(): Promise<{ ok: boolean; url?: string | null; error?: string }>;
+  adminPickAiLogoImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+  adminInstallAiLogo(
+    sourcePath: string,
+  ): Promise<{ ok: boolean; aiLogoFile?: string; url?: string; error?: string }>;
+  adminClearAiLogo(): Promise<{ ok: boolean; error?: string }>;
+  adminGetAiBrandLogoUrl(): Promise<{ ok: boolean; url?: string | null; error?: string }>;
+  adminListAiBackgrounds(modeId: string): Promise<{
+    ok: boolean;
+    modeId?: string;
+    backgrounds?: { filename: string; url: string }[];
+    error?: string;
+  }>;
+  adminPickAiBackgroundImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+  adminInstallAiBackground(
+    modeId: string,
+    sourcePath: string,
+  ): Promise<{ ok: boolean; modeId?: string; filename?: string; url?: string; error?: string }>;
+  adminDeleteAiBackground(
+    modeId: string,
+    filename: string,
+  ): Promise<{ ok: boolean; removed?: string; error?: string }>;
   openAiGenerateImage(payload: {
     imagePath: string;
     prompt: string;
-  }): Promise<{ ok: boolean; path?: string; model?: string; error?: string }>;
+    modeId?: string;
+    useInpainting?: boolean;
+    randomizeBackground?: boolean;
+    inpaintPrompt?: string;
+  }): Promise<{
+    ok: boolean;
+    path?: string;
+    model?: string;
+    backgroundUsed?: string | null;
+    inpainting?: boolean;
+    brandApplied?: boolean;
+    error?: string;
+  }>;
+  listPhotoFrames(): Promise<{
+    ok: boolean;
+    frames?: { filename: string; label: string; url: string }[];
+    error?: string;
+  }>;
+  applyPhotoFrame(payload: {
+    imagePath: string;
+    frameFile: string;
+    photoScale?: number;
+  }): Promise<{ ok: boolean; path?: string; frameFile?: string; error?: string }>;
+  adminPickPhotoFrameImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+  adminInstallPhotoFrame(
+    sourcePath: string,
+  ): Promise<{ ok: boolean; filename?: string; url?: string; error?: string }>;
+  adminDeletePhotoFrame(
+    filename: string,
+  ): Promise<{ ok: boolean; removed?: string; error?: string }>;
 }
 
 declare global {

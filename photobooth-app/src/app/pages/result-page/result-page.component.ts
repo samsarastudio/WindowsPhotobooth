@@ -56,6 +56,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     return this.booth.aiModes().find((m) => m.id === id) ?? null;
   });
 
+  readonly usesInpainting = computed(() => this.selectedMode()?.useInpainting === true);
+
   constructor(
     private readonly router: Router,
     private readonly camera: CameraService,
@@ -104,17 +106,29 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     this.aiErr.set(null);
     this.aiModelUsed.set(null);
     this.thinkingStep.set(0);
-    this.startAiCountdown(22);
+    this.startAiCountdown(this.usesInpainting() ? 28 : 22);
     try {
       await new Promise<void>((r) => setTimeout(r, 220));
       this.thinkingStep.set(1);
       await new Promise<void>((r) => setTimeout(r, 380));
-      this.thinkingStep.set(2);
-      await new Promise<void>((r) => setTimeout(r, 320));
-      this.thinkingStep.set(3);
+      if (this.usesInpainting()) {
+        this.thinkingStep.set(2);
+        await new Promise<void>((r) => setTimeout(r, 420));
+        this.thinkingStep.set(3);
+        await new Promise<void>((r) => setTimeout(r, 320));
+        this.thinkingStep.set(4);
+      } else {
+        this.thinkingStep.set(2);
+        await new Promise<void>((r) => setTimeout(r, 320));
+        this.thinkingStep.set(3);
+      }
       const r = await window.pbApi.openAiGenerateImage({
         imagePath: pp,
         prompt: mode.prompt,
+        modeId: mode.id,
+        useInpainting: mode.useInpainting === true,
+        randomizeBackground: mode.randomizeBackground !== false,
+        inpaintPrompt: mode.inpaintPrompt,
       });
       if (!r.ok || !r.path) {
         this.aiErr.set(r.error ?? 'Generation failed.');

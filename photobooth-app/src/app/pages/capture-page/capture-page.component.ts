@@ -12,6 +12,7 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
+import { BoothLogService } from '../../services/booth-log.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
@@ -40,6 +41,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   private readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
+  private readonly boothLog = inject(BoothLogService);
   readonly copy = this.booth.copy;
 
   /** Label for the style chosen on `/ai-mode`, if any. */
@@ -58,25 +60,36 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   readonly sdkPreviewUrl1 = signal<SafeUrl | null>(null);
   readonly sdkPreviewHasFrame = signal(false);
   readonly useWebcam = signal(false);
+  readonly webcamOpening = signal(false);
+  readonly cameraReady = signal(false);
+  readonly cameraFailed = signal(false);
+  readonly logFilePath = signal<string | null>(null);
   readonly hint = signal<string | null>(null);
   readonly countdown = signal<number | null>(null);
   /** Width ÷ height — frame hugs preview pixels without letterboxing when known. */
   readonly previewAspectRatio = signal<number | null>(null);
+  /** Placeholder while SDK boots or before webcam stream is attached. */
   readonly showPreviewPlaceholder = computed(
-    () => !this.useWebcam() && !this.sdkPreviewHasFrame(),
+    () =>
+      !this.cameraFailed() &&
+      !this.cameraReady() &&
+      !(this.useWebcam() && !this.webcamOpening()),
   );
 
   private previewTimer?: ReturnType<typeof setInterval>;
   private countdownTimer?: ReturnType<typeof setInterval>;
+  private readyWatchTimer?: ReturnType<typeof setTimeout>;
   private mediaStream?: MediaStream;
   private previewPath = '';
   private started = false;
+  private destroyed = false;
   private previewFrameSeq = 0;
   /** Monotonic id written into each preview URL `?v=` — drops stale `(load)` after rapid swaps. */
   private layerSeq: [number, number] = [0, 0];
   /** Pending double-buffer reveal: must match layer + same `?v=` as `layerSeq[layer]`. */
   private pendingReveal: { layer: 0 | 1; decodeV: number } | null = null;
   private previewRafPending = false;
+  private webcamDeviceId: string | null = null;
 
   /** 1×1 transparent gif so `<img [src]>` is always valid before the first EVF frame. */
   readonly emptyPreviewSrc: SafeUrl;
@@ -92,21 +105,47 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit(): Promise<void> {
+    this.hint.set(this.copy().capture.starting);
+    const logPath = await this.boothLog.refreshLogPath();
+    this.logFilePath.set(logPath);
+    await this.boothLog.info('capture', 'page open', { logFile: logPath });
     const r = await this.camera.initAndOpenFirstCamera();
+    if (this.destroyed) return;
     this.previewPath = r.previewBasePath;
+    this.webcamDeviceId = r.webcamDeviceId ?? null;
     if (r.lastError) {
-      this.hint.set(`Camera SDK unavailable (${r.lastError}). Using webcam if allowed.`);
+      this.hint.set(`Camera SDK unavailable (${r.lastError}). Trying system camera…`);
+      await this.boothLog.warn('capture', 'SDK unavailable, trying webcam', r.lastError);
     }
     this.useWebcam.set(r.useWebcam);
+    this.started = true;
 
     if (r.useWebcam) {
-      setTimeout(() => void this.startWebcam(), 120);
+      await this.startWebcam();
     } else {
       this.startSdkPreview();
+      this.watchForPreviewReady();
     }
+  }
 
-    this.started = true;
-    this.beginCaptureCycle();
+  async retryCamera(): Promise<void> {
+    await this.boothLog.info('capture', 'retryCamera');
+    this.cameraFailed.set(false);
+    this.cameraReady.set(false);
+    this.webcamOpening.set(false);
+    this.clearCountdown();
+    this.hint.set(this.copy().capture.starting);
+    this.mediaStream?.getTracks().forEach((t) => t.stop());
+    this.mediaStream = undefined;
+    if (this.previewTimer) {
+      clearInterval(this.previewTimer);
+      this.previewTimer = undefined;
+    }
+    await this.camera.closeSession();
+    // Force webcam on retry — tablets almost always need the system camera.
+    this.useWebcam.set(true);
+    this.webcamDeviceId = this.booth.camera().webcamDeviceId;
+    await this.startWebcam();
   }
 
   private startSdkPreview(): void {
@@ -151,6 +190,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       this.sdkPreviewActiveLayer.set(0);
       this.sdkPreviewHasFrame.set(true);
       this.pendingReveal = null;
+      this.markCameraReady();
       return;
     }
 
@@ -176,27 +216,113 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async startWebcam(): Promise<void> {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: false,
-      });
-      this.mediaStream = stream;
-      let tries = 0;
-      const attach = () => {
+    this.webcamOpening.set(true);
+    this.useWebcam.set(true);
+    const { stream, error } = await this.camera.openWebcamStream(this.webcamDeviceId);
+    if (this.destroyed) {
+      stream?.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    if (!stream) {
+      this.webcamOpening.set(false);
+      this.failCamera(
+        error
+          ? `System camera unavailable (${error}). Check Windows privacy settings for Camera, then retry.`
+          : 'System camera unavailable. Check Windows privacy settings for Camera, then retry.',
+      );
+      return;
+    }
+    this.mediaStream = stream;
+    this.webcamOpening.set(false);
+    let tries = 0;
+    const attach = () => {
+      if (this.destroyed) return;
+      const el = this.videoRef?.nativeElement;
+      if (el) {
+        el.srcObject = stream;
+        el.play().catch(() => {});
+        this.watchForPreviewReady();
+        return;
+      }
+      if (tries++ < 60) {
+        setTimeout(attach, 50);
+      } else {
+        this.failCamera('Camera opened but preview could not attach. Tap retry.');
+      }
+    };
+    // Allow Angular to render the <video> after webcamOpening flips false.
+    setTimeout(attach, 0);
+  }
+
+  private watchForPreviewReady(): void {
+    if (this.readyWatchTimer) clearTimeout(this.readyWatchTimer);
+    const deadline = Date.now() + 15000;
+    const tick = () => {
+      if (this.destroyed || this.cameraReady() || this.cameraFailed()) return;
+      if (this.useWebcam()) {
         const el = this.videoRef?.nativeElement;
-        if (el) {
-          el.srcObject = stream;
-          el.play().catch(() => {});
+        if (el && el.videoWidth > 0 && el.videoHeight > 0) {
+          this.previewAspectRatio.set(el.videoWidth / el.videoHeight);
+          this.markCameraReady();
           return;
         }
-        if (tries++ < 40) {
-          setTimeout(attach, 50);
+      } else if (this.sdkPreviewHasFrame()) {
+        this.markCameraReady();
+        return;
+      }
+      if (Date.now() >= deadline) {
+        if (!this.useWebcam()) {
+          // SDK preview never arrived — fall back to system camera.
+          void this.boothLog.warn('capture', 'SDK preview timeout — switching to webcam');
+          if (this.previewTimer) {
+            clearInterval(this.previewTimer);
+            this.previewTimer = undefined;
+          }
+          void this.camera.closeSession();
+          this.hint.set('Canon live view unavailable. Switching to system camera…');
+          this.useWebcam.set(true);
+          void this.startWebcam();
+          return;
         }
-      };
-      attach();
-    } catch {
-      this.hint.set('Webcam access denied or unavailable.');
+        this.failCamera(
+          'Camera preview timed out. On tablets, allow Camera access for this app in Windows Settings → Privacy → Camera.',
+        );
+        return;
+      }
+      this.readyWatchTimer = setTimeout(tick, 200);
+    };
+    tick();
+  }
+
+  private markCameraReady(): void {
+    if (this.cameraReady() || this.cameraFailed()) return;
+    this.cameraReady.set(true);
+    this.hint.set(null);
+    void this.boothLog.info('capture', 'camera ready', {
+      useWebcam: this.useWebcam(),
+      aspect: this.previewAspectRatio(),
+    });
+    this.beginCaptureCycle();
+  }
+
+  private failCamera(message: string): void {
+    this.cameraFailed.set(true);
+    this.cameraReady.set(false);
+    this.clearCountdown();
+    this.hint.set(message);
+    void this.boothLog.error('capture', 'camera failed', {
+      message,
+      logFile: this.logFilePath(),
+    });
+    void this.boothLog.refreshLogPath().then((p) => this.logFilePath.set(p));
+  }
+
+  async openLogs(): Promise<void> {
+    const r = await this.boothLog.openLogsFolder();
+    if (!r.ok) {
+      this.hint.set(
+        `Could not open logs folder. Look next to the app exe for logs\\photobooth.log (${r.error ?? ''})`,
+      );
     }
   }
 
@@ -225,6 +351,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private beginCaptureCycle(): void {
+    if (!this.cameraReady() || this.cameraFailed()) return;
     if (!this.useWebcam() && !this.previewTimer) {
       this.startSdkPreview();
     }
@@ -251,7 +378,9 @@ export class CapturePageComponent implements OnInit, OnDestroy {
         await this.camera.closeSession();
         await this.navigateResult(path);
       } else {
-        this.beginCaptureCycle();
+        this.hint.set('Could not grab a frame — waiting for camera…');
+        this.cameraReady.set(false);
+        this.watchForPreviewReady();
       }
       return;
     }
@@ -292,6 +421,10 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async navigateResult(filePath: string): Promise<void> {
+    if (this.booth.photoFrames().enabled) {
+      await this.router.navigate(['/frame'], { state: { path: filePath } });
+      return;
+    }
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
@@ -326,11 +459,14 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     const v = ev.target as HTMLVideoElement;
     if (v.videoWidth > 0 && v.videoHeight > 0) {
       this.previewAspectRatio.set(v.videoWidth / v.videoHeight);
+      this.markCameraReady();
     }
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     if (this.previewTimer) clearInterval(this.previewTimer);
+    if (this.readyWatchTimer) clearTimeout(this.readyWatchTimer);
     this.clearCountdown();
     this.mediaStream?.getTracks().forEach((t) => t.stop());
     if (this.started) {

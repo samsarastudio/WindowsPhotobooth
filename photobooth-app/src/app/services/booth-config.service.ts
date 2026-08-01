@@ -1,25 +1,30 @@
 import { Injectable, computed, signal } from '@angular/core';
 import type {
   PhotoboothAiMode,
+  PhotoboothCameraConfig,
   PhotoboothConfig,
   PhotoboothBranding,
   PhotoboothCopy,
+  PhotoboothPhotoFramesConfig,
 } from '../models/photobooth-config.model';
 import {
   PLAIN_PHOTO_MODE_ID,
   PHOTOBOOTH_DEFAULT_AI_MODES,
   PHOTOBOOTH_DEFAULT_BRANDING,
+  PHOTOBOOTH_DEFAULT_CAMERA,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
 } from '../models/photobooth-config.model';
 
 function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): PhotoboothCopy {
-  if (!patch) return base;
+  if (!patch) return structuredClone(base);
   return {
     attract: { ...base.attract, ...patch.attract },
     qr: { ...base.qr, ...patch.qr },
     capture: { ...base.capture, ...patch.capture },
     result: { ...base.result, ...patch.result },
     aiMode: { ...base.aiMode, ...patch.aiMode },
+    frame: { ...base.frame, ...patch.frame },
   };
 }
 
@@ -56,10 +61,20 @@ function normalizeAttractControls(attract: PhotoboothCopy['attract']): Photoboot
 function mergeBranding(patch?: Partial<PhotoboothBranding> | null): PhotoboothBranding {
   const base = PHOTOBOOTH_DEFAULT_BRANDING;
   if (!patch) return base;
+  const brandNameRaw = patch.brandName;
+  const brandName =
+    brandNameRaw === null || brandNameRaw === undefined
+      ? base.brandName
+      : typeof brandNameRaw === 'string'
+        ? brandNameRaw.trim() || null
+        : base.brandName;
   return {
     ...base,
     ...patch,
     logoFile: patch.logoFile === undefined ? base.logoFile : patch.logoFile,
+    aiLogoFile: patch.aiLogoFile === undefined ? base.aiLogoFile : patch.aiLogoFile,
+    brandName,
+    applyBrandToAi: typeof patch.applyBrandToAi === 'boolean' ? patch.applyBrandToAi : base.applyBrandToAi,
   };
 }
 
@@ -72,11 +87,91 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
     const id = typeof o['id'] === 'string' ? o['id'].trim() : '';
     const label = typeof o['label'] === 'string' ? o['label'].trim() : '';
     const prompt = typeof o['prompt'] === 'string' ? o['prompt'].trim() : '';
+    const useInpainting = o['useInpainting'] === true;
+    const randomizeBackground =
+      o['randomizeBackground'] === false ? false : useInpainting ? true : o['randomizeBackground'] === true;
+    const inpaintRaw = typeof o['inpaintPrompt'] === 'string' ? o['inpaintPrompt'].trim() : '';
     if (id && label && prompt && id !== PLAIN_PHOTO_MODE_ID) {
-      out.push({ id, label, prompt });
+      out.push({
+        id,
+        label,
+        prompt,
+        ...(useInpainting ? { useInpainting: true, randomizeBackground } : {}),
+        ...(inpaintRaw ? { inpaintPrompt: inpaintRaw } : {}),
+      });
     }
   }
   return out.length > 0 ? out : [...PHOTOBOOTH_DEFAULT_AI_MODES];
+}
+
+function normalizeDefaultAiModeId(raw: unknown, aiModes: PhotoboothAiMode[]): string | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (typeof raw !== 'string') return null;
+  const id = raw.trim();
+  if (!id) return null;
+  if (id === PLAIN_PHOTO_MODE_ID) return PLAIN_PHOTO_MODE_ID;
+  return aiModes.some((m) => m.id === id) ? id : null;
+}
+
+function normalizeCameraConfig(patch?: Partial<PhotoboothCameraConfig> | null): PhotoboothCameraConfig {
+  const base = PHOTOBOOTH_DEFAULT_CAMERA;
+  if (!patch) return { ...base };
+  const sourceRaw = patch.source;
+  const source =
+    sourceRaw === 'sdk' || sourceRaw === 'webcam' || sourceRaw === 'auto' ? sourceRaw : base.source;
+  let sdkCameraIndex =
+    typeof patch.sdkCameraIndex === 'number' && Number.isFinite(patch.sdkCameraIndex)
+      ? Math.max(0, Math.floor(patch.sdkCameraIndex))
+      : base.sdkCameraIndex;
+  const webcamRaw = patch.webcamDeviceId;
+  const webcamDeviceId =
+    webcamRaw === null || webcamRaw === undefined
+      ? base.webcamDeviceId
+      : typeof webcamRaw === 'string' && webcamRaw.trim()
+        ? webcamRaw.trim()
+        : null;
+  return { source, sdkCameraIndex, webcamDeviceId };
+}
+
+function normalizePhotoFramesConfig(
+  patch?: Partial<PhotoboothPhotoFramesConfig> | null,
+): PhotoboothPhotoFramesConfig {
+  const base = PHOTOBOOTH_DEFAULT_PHOTO_FRAMES;
+  if (!patch) return { ...base, guestFrameFiles: [...base.guestFrameFiles] };
+  const photoScaleRaw = patch.photoScale;
+  const photoScale =
+    typeof photoScaleRaw === 'number' && Number.isFinite(photoScaleRaw)
+      ? Math.min(1, Math.max(0.5, photoScaleRaw))
+      : base.photoScale;
+  const defRaw = patch.defaultFrameFile;
+  const defaultFrameFile =
+    defRaw === null || defRaw === undefined
+      ? base.defaultFrameFile
+      : typeof defRaw === 'string' && defRaw.trim()
+        ? pathBasenameSafe(defRaw.trim())
+        : null;
+  let guestFrameFiles: string[] = [...base.guestFrameFiles];
+  if (Array.isArray(patch.guestFrameFiles)) {
+    guestFrameFiles = patch.guestFrameFiles
+      .filter((f): f is string => typeof f === 'string' && !!f.trim())
+      .map((f) => pathBasenameSafe(f.trim()));
+    // Allow sentinel __none__ through (means show no frames to guests)
+    if (patch.guestFrameFiles.includes('__none__')) {
+      guestFrameFiles = ['__none__'];
+    }
+  }
+  return {
+    enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
+    photoScale,
+    defaultFrameFile,
+    guestFrameFiles,
+  };
+}
+
+function pathBasenameSafe(name: string): string {
+  const base = name.replace(/\\/g, '/').split('/').pop() || name;
+  if (base.includes('..')) return 'frame.png';
+  return base;
 }
 
 function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
@@ -95,23 +190,41 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const branding = mergeBranding(
     (rest['branding'] as Partial<PhotoboothBranding> | undefined) ?? undefined,
   );
+  const camera = normalizeCameraConfig(
+    (rest['camera'] as Partial<PhotoboothCameraConfig> | undefined) ?? undefined,
+  );
+  const photoFrames = normalizePhotoFramesConfig(
+    (rest['photoFrames'] as Partial<PhotoboothPhotoFramesConfig> | undefined) ?? undefined,
+  );
+  const requireQrUnlock =
+    typeof rest['requireQrUnlock'] === 'boolean' ? rest['requireQrUnlock'] : false;
   const aiGenerationEnabled =
     typeof rest['aiGenerationEnabled'] === 'boolean' ? rest['aiGenerationEnabled'] : false;
   const aiModes = normalizeAiModes(rest['aiModes']);
+  const defaultAiModeId = normalizeDefaultAiModeId(rest['defaultAiModeId'], aiModes);
   const openAiConfigured =
     typeof rest['openAiConfigured'] === 'boolean' ? rest['openAiConfigured'] : false;
 
   return {
-    activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'default',
+    activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'inmoment',
     branding,
+    camera,
+    photoFrames,
     copy,
+    requireQrUnlock,
     aiGenerationEnabled,
+    defaultAiModeId,
     aiModes,
     openAiConfigured,
   };
 }
 
-export type BoothAdminSavePartial = Partial<PhotoboothConfig> & { openAiApiKey?: string };
+export type BoothAdminSavePartial = Partial<Omit<PhotoboothConfig, 'branding' | 'camera' | 'photoFrames'>> & {
+  openAiApiKey?: string;
+  branding?: Partial<PhotoboothBranding>;
+  camera?: Partial<PhotoboothCameraConfig>;
+  photoFrames?: Partial<PhotoboothPhotoFramesConfig>;
+};
 
 @Injectable({ providedIn: 'root' })
 export class BoothConfigService {
@@ -120,8 +233,25 @@ export class BoothConfigService {
   readonly config = computed(() => this.state());
   readonly copy = computed(() => this.state()?.copy ?? PHOTOBOOTH_DEFAULT_COPY);
   readonly branding = computed(() => this.state()?.branding ?? PHOTOBOOTH_DEFAULT_BRANDING);
-  readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'default');
+  readonly camera = computed(() => this.state()?.camera ?? PHOTOBOOTH_DEFAULT_CAMERA);
+  readonly photoFrames = computed(
+    () => this.state()?.photoFrames ?? PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
+  );
+  readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
+  readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'inmoment');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
+  readonly defaultAiModeId = computed(() => this.state()?.defaultAiModeId ?? null);
+  /** Resolved default mode when configured; null means guest picks on the style screen. */
+  readonly fixedAiModeId = computed(() => {
+    const id = this.defaultAiModeId();
+    if (!id) return null;
+    if (id === PLAIN_PHOTO_MODE_ID) return PLAIN_PHOTO_MODE_ID;
+    return this.aiModes().some((m) => m.id === id) ? id : null;
+  });
+  readonly skipAiModeSelection = computed(() => this.fixedAiModeId() !== null);
+  readonly shouldShowAiModeStep = computed(
+    () => this.aiGenerationEnabled() && !this.skipAiModeSelection() && this.aiModes().length > 0,
+  );
   readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
   readonly openAiConfigured = computed(() => this.state()?.openAiConfigured ?? false);
 
@@ -136,10 +266,14 @@ export class BoothConfigService {
     const res = await fetch('/config/photobooth-config.default.json');
     if (!res.ok) {
       this.state.set({
-        activeThemeId: 'default',
+        activeThemeId: 'inmoment',
         branding: PHOTOBOOTH_DEFAULT_BRANDING,
+        camera: { ...PHOTOBOOTH_DEFAULT_CAMERA },
+        photoFrames: { ...PHOTOBOOTH_DEFAULT_PHOTO_FRAMES },
         copy: PHOTOBOOTH_DEFAULT_COPY,
+        requireQrUnlock: false,
         aiGenerationEnabled: false,
+        defaultAiModeId: null,
         aiModes: [...PHOTOBOOTH_DEFAULT_AI_MODES],
         openAiConfigured: false,
       });

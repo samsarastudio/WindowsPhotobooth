@@ -229,6 +229,90 @@
   object-fit: contain;
 }
 
+.pb-admin-bg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.pb-admin-bg-thumb {
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pb-admin-bg-thumb img {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.pb-admin-bg-thumb figcaption {
+  font-size: 0.72rem;
+  opacity: 0.85;
+  word-break: break-all;
+}
+
+.pb-admin-subhead {
+  margin: 1.2rem 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.pb-admin-frame-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.pb-admin-frame-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.pb-admin-frame-card.is-default {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.pb-admin-frame-card img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #111;
+}
+
+.pb-admin-frame-meta {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pb-admin-frame-meta strong {
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.pb-admin-frame-meta code {
+  font-size: 0.72rem;
+  opacity: 0.75;
+  word-break: break-all;
+}
+
+.pb-brand-uses {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
 .pb-row-wrap {
   flex-wrap: wrap;
   margin-top: 0.5rem;

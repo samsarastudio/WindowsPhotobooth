@@ -1,8 +1,24 @@
 {
-  "activeThemeId": "default",
+  "activeThemeId": "inmoment",
   "adminPin": "2727",
+  "requireQrUnlock": false,
   "aiGenerationEnabled": false,
+  "defaultAiModeId": null,
+  "photoFrames": {
+    "enabled": true,
+    "photoScale": 1,
+    "defaultFrameFile": "onam-grma-2026.png",
+    "guestFrameFiles": []
+  },
   "aiModes": [
+    {
+      "id": "dj",
+      "label": "DJ",
+      "useInpainting": true,
+      "randomizeBackground": true,
+      "inpaintPrompt": "Seamlessly blend the person into this DJ booth environment as the featured DJ. Preserve their exact face, features, skin tone, and likeness — do not change identity. Match scene lighting, shadows, perspective, and color grade. Reproduce the brand logo on booth furniture, product boxes, and signage. Add subtle {brand} branding on DJ headphones or shirt where natural. Photorealistic exclusive event photo. No mascots.",
+      "prompt": "Transform the person into a professional DJ at an exclusive event with {brand} branding on the booth and products. Preserve their exact face and likeness. Photorealistic event lighting. No mascots."
+    },
     {
       "id": "newspaper",
       "label": "Newspaper",
@@ -10,15 +26,23 @@
     }
   ],
   "branding": {
-    "logoFile": null
+    "logoFile": null,
+    "aiLogoFile": null,
+    "brandName": null,
+    "applyBrandToAi": true
+  },
+  "camera": {
+    "source": "auto",
+    "sdkCameraIndex": 0,
+    "webcamDeviceId": null
   },
   "copy": {
     "attract": {
       "icon": "📷",
-      "tagline": "Movement that inspires",
+      "tagline": "Capturing memories",
       "mainScale": 1,
       "topScale": 1,
-      "title": "Your Moment Starts Here",
+      "title": "inmoment",
       "subtitle": "Tap to create your\npersonalized photo keepsake.",
       "ctaLabel": "Tap to Start",
       "startAria": "Tap to Start",
@@ -51,7 +75,7 @@
       "loading": "Loading…",
       "savedPrefix": "Saved:",
       "retake": "Retake",
-      "submit": "Submit",
+      "submit": "Done",
       "generateAi": "Create AI version",
       "generatingAi": "Creating your AI image…",
       "aiPreviewTitle": "AI version",
@@ -64,14 +88,22 @@
       "thinkingSummary": "Preparing your image",
       "thinkingStepAnalyze": "Analysing framing and composition",
       "thinkingStepPlan": "Applying your chosen style directions",
+      "thinkingStepBackground": "Selecting branded environment and compositing your photo",
       "thinkingStepImage": "Rendering with the image API",
-      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT-5 reasoning text for image jobs."
+      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs."
     },
     "aiMode": {
       "title": "Choose a style",
       "subtitle": "Pick how we transform your photo",
       "back": "Back",
       "plainPhotoLabel": "Photocapture"
+    },
+    "frame": {
+      "title": "Choose a frame",
+      "subtitle": "Pick a keepsake border for your photo",
+      "continueLabel": "Use this frame",
+      "skipLabel": "Skip frame",
+      "applying": "Applying frame…"
     }
   }
 }

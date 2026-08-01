@@ -62,6 +62,13 @@ html[data-pb-theme='default'] .pb-backdrop-el {
   display: none !important;
 }
 
+html[data-pb-theme='inmoment'] .pb-doodle-paper,
+html[data-pb-theme='inmoment'] .pb-doodle-circuit,
+html[data-pb-theme='inmoment'] .pb-backdrop-wash,
+html[data-pb-theme='inmoment'] .pb-backdrop-el {
+  display: none !important;
+}
+
 html[data-pb-theme='circuit'] .pb-doodle-paper,
 html[data-pb-theme='circuit'] .pb-backdrop-wash {
   display: none !important;

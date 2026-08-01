@@ -11,10 +11,16 @@
       <div
         class="pb-preview-wrap"
         [class.pb-preview-wrap--sized]="previewAspectRatio() !== null"
-        [class.pb-preview-wrap--empty]="showPreviewPlaceholder()"
+        [class.pb-preview-wrap--empty]="showPreviewPlaceholder() || cameraFailed()"
         [style.--preview-ar]="previewAspectRatio() ?? 1.5"
       >
-        @if (useWebcam()) {
+        @if (showPreviewPlaceholder()) {
+          <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
+        } @else if (cameraFailed()) {
+          <div class="pb-preview pb-preview-placeholder pb-preview-placeholder--error">
+            Camera needed
+          </div>
+        } @else if (useWebcam()) {
           <video
             #videoEl
             class="pb-preview"
@@ -23,40 +29,51 @@
             muted
             (loadedmetadata)="onVideoMeta($event)"
           ></video>
-        } @else {
-          @if (showPreviewPlaceholder()) {
-            <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
-          } @else {
-            <div class="pb-preview-stack">
-              <img
-                class="pb-preview pb-preview--sdk-live pb-preview-layer"
-                [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
-                [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
-                alt="Live preview"
-                decoding="sync"
-                draggable="false"
-                fetchpriority="low"
-                (load)="onSdkPreviewLayerDecoded($event, 0)"
-              />
-              <img
-                class="pb-preview pb-preview--sdk-live pb-preview-layer"
-                [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
-                [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
-                alt=""
-                decoding="sync"
-                draggable="false"
-                fetchpriority="low"
-                (load)="onSdkPreviewLayerDecoded($event, 1)"
-              />
-            </div>
-          }
+        } @else if (sdkPreviewHasFrame()) {
+          <div class="pb-preview-stack">
+            <img
+              class="pb-preview pb-preview--sdk-live pb-preview-layer"
+              [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 0"
+              [src]="sdkPreviewUrl0() ?? emptyPreviewSrc"
+              alt="Live preview"
+              decoding="sync"
+              draggable="false"
+              fetchpriority="low"
+              (load)="onSdkPreviewLayerDecoded($event, 0)"
+            />
+            <img
+              class="pb-preview pb-preview--sdk-live pb-preview-layer"
+              [class.pb-preview-layer--visible]="sdkPreviewActiveLayer() === 1"
+              [src]="sdkPreviewUrl1() ?? emptyPreviewSrc"
+              alt=""
+              decoding="sync"
+              draggable="false"
+              fetchpriority="low"
+              (load)="onSdkPreviewLayerDecoded($event, 1)"
+            />
+          </div>
         }
       </div>
 
       <div class="pb-kia-stage-rule" aria-hidden="true"></div>
 
       <div class="pb-kia-count-column">
-        @if (countdown() !== null && countdown()! > 0) {
+        @if (cameraFailed()) {
+          <p class="pb-kia-wait-copy">{{ hint() }}</p>
+          @if (logFilePath(); as logPath) {
+            <p class="pb-hint">Offline log: {{ logPath }}</p>
+          }
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" (click)="retryCamera()">
+              Retry camera
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" (click)="openLogs()">
+              Open logs folder
+            </button>
+          </div>
+        } @else if (!cameraReady()) {
+          <p class="pb-kia-wait-copy">{{ hint() || copy().capture.starting }}</p>
+        } @else if (countdown() !== null && countdown()! > 0) {
           <span class="pb-count" aria-live="polite">{{ countdown() }}</span>
           <div class="pb-kia-dots" aria-hidden="true">
             <span class="pb-kia-dot"></span>
@@ -64,11 +81,14 @@
             <span class="pb-kia-dot"></span>
           </div>
           <p class="pb-kia-smile">{{ copy().capture.smileHint }}</p>
+          @if (hint(); as t) {
+            <p class="pb-hint">{{ t }}</p>
+          }
         } @else {
           <p class="pb-kia-wait-copy">{{ copy().capture.instructions }}</p>
-        }
-        @if (hint(); as t) {
-          <p class="pb-hint">{{ t }}</p>
+          @if (hint(); as t) {
+            <p class="pb-hint">{{ t }}</p>
+          }
         }
       </div>
     </div>

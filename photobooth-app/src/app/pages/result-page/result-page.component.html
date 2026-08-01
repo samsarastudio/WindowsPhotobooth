@@ -34,8 +34,14 @@
             </p>
             <ol class="pb-thinking-steps">
               <li [class.pb-thinking-done]="thinkingStep() >= 1">{{ copy().result.thinkingStepAnalyze }}</li>
-              <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepPlan }}</li>
-              <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepImage }}</li>
+              @if (usesInpainting()) {
+                <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepBackground }}</li>
+                <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepPlan }}</li>
+                <li [class.pb-thinking-done]="thinkingStep() >= 4">{{ copy().result.thinkingStepImage }}</li>
+              } @else {
+                <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepPlan }}</li>
+                <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepImage }}</li>
+              }
             </ol>
             <p class="pb-thinking-foot">{{ copy().result.thinkingFootnote }}</p>
           </details>

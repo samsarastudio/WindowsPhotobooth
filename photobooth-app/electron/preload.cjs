@@ -2,11 +2,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pbApi', {
   getPaths: () => ipcRenderer.invoke('app:getPaths'),
+  log: (payload) => ipcRenderer.invoke('app:log', payload),
+  openLogsFolder: () => ipcRenderer.invoke('app:openLogsFolder'),
   cameraInvoke: (cmd) => ipcRenderer.invoke('camera:invoke', cmd),
   readFileBase64: (filePath) => ipcRenderer.invoke('file:readBase64', filePath),
   saveJpeg: (fullPath, base64Body) => ipcRenderer.invoke('file:saveJpeg', fullPath, base64Body),
   adminGetConfig: () => ipcRenderer.invoke('admin:getConfig'),
   adminSaveConfig: (partial) => ipcRenderer.invoke('admin:saveConfig', partial),
+  adminTestOpenAiKey: (draftKey) => ipcRenderer.invoke('admin:testOpenAiKey', draftKey),
   adminListThemes: () => ipcRenderer.invoke('admin:listThemes'),
   adminGetThemeStylesheetUrl: () => ipcRenderer.invoke('admin:getThemeStylesheetUrl'),
   adminPickThemeZip: () => ipcRenderer.invoke('admin:pickThemeZip'),
@@ -19,5 +22,20 @@ contextBridge.exposeInMainWorld('pbApi', {
   adminInstallLogo: (sourcePath) => ipcRenderer.invoke('admin:installLogo', sourcePath),
   adminClearLogo: () => ipcRenderer.invoke('admin:clearLogo'),
   adminGetBrandingLogoUrl: () => ipcRenderer.invoke('admin:getBrandingLogoUrl'),
+  adminPickAiLogoImage: () => ipcRenderer.invoke('admin:pickAiLogoImage'),
+  adminInstallAiLogo: (sourcePath) => ipcRenderer.invoke('admin:installAiLogo', sourcePath),
+  adminClearAiLogo: () => ipcRenderer.invoke('admin:clearAiLogo'),
+  adminGetAiBrandLogoUrl: () => ipcRenderer.invoke('admin:getAiBrandLogoUrl'),
+  adminListAiBackgrounds: (modeId) => ipcRenderer.invoke('admin:listAiBackgrounds', modeId),
+  adminPickAiBackgroundImage: () => ipcRenderer.invoke('admin:pickAiBackgroundImage'),
+  adminInstallAiBackground: (modeId, sourcePath) =>
+    ipcRenderer.invoke('admin:installAiBackground', modeId, sourcePath),
+  adminDeleteAiBackground: (modeId, filename) =>
+    ipcRenderer.invoke('admin:deleteAiBackground', modeId, filename),
   openAiGenerateImage: (payload) => ipcRenderer.invoke('openai:generateImage', payload),
+  listPhotoFrames: () => ipcRenderer.invoke('frames:list'),
+  applyPhotoFrame: (payload) => ipcRenderer.invoke('frames:apply', payload),
+  adminPickPhotoFrameImage: () => ipcRenderer.invoke('admin:pickPhotoFrameImage'),
+  adminInstallPhotoFrame: (sourcePath) => ipcRenderer.invoke('admin:installPhotoFrame', sourcePath),
+  adminDeletePhotoFrame: (filename) => ipcRenderer.invoke('admin:deletePhotoFrame', filename),
 });

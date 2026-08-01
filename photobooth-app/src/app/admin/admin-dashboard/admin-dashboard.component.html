@@ -22,6 +22,12 @@
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'branding'" (click)="setTab('branding')">
             Logo
           </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'camera'" (click)="setTab('camera')">
+            Camera
+          </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'frames'" (click)="setTab('frames')">
+            Frames
+          </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'ai'" (click)="setTab('ai')">
             AI
           </button>
@@ -135,9 +141,11 @@
           <input class="pb-input" [(ngModel)]="draft.result.thinkingSummary" />
           <label>Progress step 1</label>
           <input class="pb-input" [(ngModel)]="draft.result.thinkingStepAnalyze" />
-          <label>Progress step 2</label>
-          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepPlan" />
+          <label>Progress step 2 (inpainting background)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepBackground" />
           <label>Progress step 3</label>
+          <input class="pb-input" [(ngModel)]="draft.result.thinkingStepPlan" />
+          <label>Progress step 4</label>
           <input class="pb-input" [(ngModel)]="draft.result.thinkingStepImage" />
           <label>Progress footnote</label>
           <textarea class="pb-input pb-textarea" rows="2" [(ngModel)]="draft.result.thinkingFootnote"></textarea>
@@ -210,17 +218,32 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>OpenAI image generation</h2>
           <p class="pb-hint">
-            After QR unlock, guests pick a style, capture a photo, then run <strong>Create AI version</strong> on the
-            result screen. The API key stays in Electron only; it is never sent to the browser bundle. Uses the
-            <a href="https://platform.openai.com/docs/api-reference/images" rel="noreferrer" target="_blank"
-              >Images API</a
-            >
-            (edits) with your org’s key.
+            Optional AI transform after capture. Frame overlays are managed in
+            <strong>Admin → Frames</strong>.
           </p>
           <label class="pb-admin-check">
-            <input type="checkbox" [(ngModel)]="draftAiEnabled" />
-            Enable AI style step after QR
+            <input type="checkbox" [(ngModel)]="draftRequireQrUnlock" />
+            Require QR / code unlock before capture
           </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftAiEnabled" />
+            Enable AI style step after unlock
+          </label>
+          <label>Default mode</label>
+          <select class="pb-input" [(ngModel)]="draftDefaultAiModeId">
+            <option [ngValue]="null">Guest chooses (show style screen)</option>
+            <option [ngValue]="plainPhotoModeId">
+              Plain photo only — skip style screen, no AI transform
+            </option>
+            @for (m of draftAiModes; track m.id) {
+              <option [ngValue]="m.id">{{ m.label }} ({{ m.id }}) — fixed default</option>
+            }
+          </select>
+          <p class="pb-hint pb-hint-tight">
+            When a fixed AI mode is selected, guests skip the style screen and only that mode runs.
+            Upload the AI reference logo in Admin → Logo. Use <code>&#123;brand&#125;</code> in prompts
+            for the brand name field there.
+          </p>
           <p class="pb-hint pb-hint-tight">
             @if (booth.openAiConfigured()) {
               An API key is stored on this machine.
@@ -243,6 +266,14 @@
             <button
               type="button"
               class="pb-btn pb-btn-ghost"
+              [disabled]="busy() || (!openAiKeyDraft.trim() && !booth.openAiConfigured())"
+              (click)="testOpenAiKey()"
+            >
+              Test API key
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
               [disabled]="busy() || !booth.openAiConfigured()"
               (click)="clearOpenAiKey()"
             >
@@ -254,11 +285,17 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>AI modes (after QR)</h2>
           <p class="pb-hint">
-            Each mode is a button for guests. <strong>Prompt</strong> is sent with the captured photo to the image
-            model. The default <code>newspaper</code> mode uses the full vintage front-page prompt.
+            Each mode is a button for guests (unless a fixed default is set). Enable
+            <strong>inpainting</strong> to composite the guest photo onto pre-made branded backgrounds
+            — one background is picked at random per guest when randomize is on.
           </p>
           <div class="pb-row pb-row-wrap">
-            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addAiMode()">Add mode</button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addAiMode()">
+              Add mode
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addDjMode()">
+              Add DJ template
+            </button>
           </div>
           @for (m of draftAiModes; track $index) {
             <div class="pb-admin-ai-row">
@@ -267,11 +304,60 @@
               <input class="pb-input" [(ngModel)]="m.id" />
               <label>Button label</label>
               <input class="pb-input" [(ngModel)]="m.label" />
-              <label>Prompt</label>
+              <label class="pb-admin-check">
+                <input type="checkbox" [(ngModel)]="m.useInpainting" />
+                Use inpainting with background images
+              </label>
+              @if (m.useInpainting) {
+                <label class="pb-admin-check">
+                  <input type="checkbox" [(ngModel)]="m.randomizeBackground" />
+                  Randomize background per guest
+                </label>
+                <label>Inpaint prompt (blend instructions)</label>
+                <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.inpaintPrompt"></textarea>
+                <p class="pb-hint pb-hint-tight">
+                  Backgrounds live in <code>config/ai-backgrounds/{{ m.id }}/</code> next to the app.
+                </p>
+                <div class="pb-admin-bg-grid">
+                  @for (bg of backgroundsForMode(m.id); track bg.filename) {
+                    <figure class="pb-admin-bg-thumb">
+                      <img [src]="bg.url" [alt]="bg.filename" loading="lazy" />
+                      <figcaption>{{ bg.filename }}</figcaption>
+                      <button
+                        type="button"
+                        class="pb-btn pb-btn-ghost pb-btn-sm"
+                        [disabled]="busy()"
+                        (click)="deleteAiBackground(m.id, bg.filename)"
+                      >
+                        Remove
+                      </button>
+                    </figure>
+                  } @empty {
+                    <p class="pb-hint">No backgrounds yet — upload at least one for inpainting.</p>
+                  }
+                </div>
+                <div class="pb-row pb-row-wrap">
+                  <button
+                    type="button"
+                    class="pb-btn pb-btn-primary"
+                    [disabled]="busy() || !m.id.trim()"
+                    (click)="uploadAiBackground(m.id)"
+                  >
+                    Upload background…
+                  </button>
+                  <button type="button" class="pb-btn pb-btn-ghost" (click)="refreshAiBackgrounds(m.id)">
+                    Refresh list
+                  </button>
+                </div>
+              }
+              <label>Prompt @if (m.useInpainting) { (fallback if inpainting off) }</label>
               <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.prompt"></textarea>
               <div class="pb-row pb-row-wrap">
                 <button type="button" class="pb-btn pb-btn-ghost" (click)="applyNewspaperPrompt($index)">
                   Insert Newspaper prompt
+                </button>
+                <button type="button" class="pb-btn pb-btn-ghost" (click)="applyDjInpaintPrompt($index)">
+                  Insert DJ inpaint prompt
                 </button>
                 <button
                   type="button"
@@ -291,21 +377,21 @@
     @if (tab === 'branding') {
       <div class="pb-admin-branding">
         <section class="pb-admin-card pb-admin-card-wide">
-          <h2>Booth logo</h2>
+          <h2>App logo</h2>
           <p class="pb-hint">
-            Upload a rectangular logo (PNG, JPG, WebP, SVG). It replaces the camera / lock emoji on the attract and
-            unlock screens. Wide logos scale down to fit; aspect ratio is preserved.
+            Logo shown on guest-facing screens only — attract, QR unlock, and the style picker.
+            This is separate from the AI reference logo below.
           </p>
           @if (branding.logoSrc(); as logo) {
             <div class="pb-admin-logo-preview">
-              <img [src]="logo" alt="Current logo preview" />
+              <img [src]="logo" alt="App logo preview" />
             </div>
           } @else {
-            <p class="pb-hint">No custom logo — emoji icons from copy settings are shown.</p>
+            <p class="pb-hint">No app logo — emoji icons from copy settings are shown on screen.</p>
           }
           <div class="pb-row pb-row-wrap">
             <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="uploadLogo()">
-              Upload logo…
+              Upload app logo…
             </button>
             <button
               type="button"
@@ -313,9 +399,251 @@
               [disabled]="busy() || !branding.hasLogo()"
               (click)="removeLogo()"
             >
-              Remove logo
+              Remove app logo
             </button>
           </div>
+        </section>
+
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>AI brand reference</h2>
+          <p class="pb-hint">
+            Logo used only for AI generation — composited onto backgrounds and sent as an
+            <code>image[]</code> reference for signage, product boxes, headphones, and clothing.
+            Use <code>&#123;brand&#125;</code> in AI prompts for the brand name field below.
+          </p>
+          @if (branding.aiLogoSrc(); as aiLogo) {
+            <div class="pb-admin-logo-preview">
+              <img [src]="aiLogo" alt="AI reference logo preview" />
+            </div>
+          } @else {
+            <p class="pb-hint">No AI reference logo uploaded.</p>
+          }
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="uploadAiLogo()">
+              Upload AI reference logo…
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
+              [disabled]="busy() || !branding.hasAiLogo()"
+              (click)="removeAiLogo()"
+            >
+              Remove AI reference logo
+            </button>
+          </div>
+
+          <label>Brand name (for prompts)</label>
+          <input
+            class="pb-input"
+            placeholder="Your brand name"
+            [(ngModel)]="draftBranding.brandName"
+          />
+          <p class="pb-hint pb-hint-tight">
+            Replaces <code>&#123;brand&#125;</code> in AI mode prompts when a text label is needed
+            alongside the reference logo.
+          </p>
+
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftBranding.applyBrandToAi" />
+            Apply AI reference logo to generated photos
+          </label>
+          <p class="pb-hint pb-hint-tight">
+            When enabled, the AI reference logo is composited onto backgrounds and included in the
+            OpenAI edit request. Requires an AI reference logo above.
+          </p>
+
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveBranding()">
+              Save brand settings
+            </button>
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (tab === 'frames') {
+      <div class="pb-admin-frames">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Photo frame overlays</h2>
+          <p class="pb-hint">
+            Choose which decorative frames guests see after capture. The photo sits under the frame
+            artwork (black or transparent hole). This is separate from AI styles.
+          </p>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftFramesEnabled" />
+            Show frame picker on the guest booth after capture
+          </label>
+          <label>Default frame (pre-selected for guests)</label>
+          <select class="pb-input" [(ngModel)]="draftDefaultFrameFile">
+            <option [ngValue]="null">First enabled frame</option>
+            @for (f of photoFramesList(); track f.filename) {
+              <option [ngValue]="f.filename" [disabled]="!f.guestEnabled">
+                {{ f.label }} ({{ f.filename }})
+              </option>
+            }
+          </select>
+          <label>Photo size inside frame (1 = fill opening)</label>
+          <input
+            class="pb-input"
+            type="number"
+            min="0.5"
+            max="1"
+            step="0.01"
+            [(ngModel)]="draftPhotoScale"
+          />
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveFrames()">
+              Save frame settings
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="uploadPhotoFrame()">
+              Upload frame
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="selectAllGuestFrames()">
+              Enable all for guests
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="clearGuestFrames()">
+              Disable all for guests
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="refreshPhotoFrames()">
+              Refresh list
+            </button>
+          </div>
+        </section>
+
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Frames on this machine</h2>
+          <p class="pb-hint pb-hint-tight">
+            Stored in <code>config/photo-frames/</code>. Check <strong>Show to guests</strong> for each
+            overlay you want on the booth picker.
+          </p>
+          @if (photoFramesList().length === 0) {
+            <p class="pb-hint">No frames found. Upload a PNG with a black or transparent photo hole.</p>
+          }
+          <div class="pb-admin-frame-grid">
+            @for (f of photoFramesList(); track f.filename) {
+              <article class="pb-admin-frame-card" [class.is-default]="draftDefaultFrameFile === f.filename">
+                <img [src]="f.url" [alt]="f.label" />
+                <div class="pb-admin-frame-meta">
+                  <strong>{{ f.label }}</strong>
+                  <code>{{ f.filename }}</code>
+                  <label class="pb-admin-check">
+                    <input
+                      type="checkbox"
+                      [ngModel]="f.guestEnabled"
+                      (ngModelChange)="toggleGuestFrame(f.filename, $event)"
+                    />
+                    Show to guests
+                  </label>
+                  <div class="pb-row pb-row-wrap">
+                    <button
+                      type="button"
+                      class="pb-btn pb-btn-ghost pb-btn-sm"
+                      [disabled]="busy()"
+                      (click)="draftDefaultFrameFile = f.filename"
+                    >
+                      Set default
+                    </button>
+                    <button
+                      type="button"
+                      class="pb-btn pb-btn-ghost pb-btn-sm"
+                      [disabled]="busy()"
+                      (click)="deletePhotoFrame(f.filename)"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (tab === 'camera') {
+      <div class="pb-admin-camera">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Camera source</h2>
+          <p class="pb-hint">
+            Choose which camera the booth uses for capture. When the Canon EDSDK bridge is installed,
+            <strong>Auto</strong> uses the SDK; otherwise the system webcam is used. Force webcam for
+            debugging without a DSLR.
+          </p>
+          <p class="pb-hint pb-hint-tight">
+            @if (hasBridge()) {
+              Canon EDSDK bridge detected on this machine.
+            } @else {
+              No EDSDK bridge — only system webcams are available unless you add
+              <code>edsdk-bridge.exe</code> next to the app.
+            }
+          </p>
+
+          <label>Source mode</label>
+          <select class="pb-input" [(ngModel)]="draftCamera.source">
+            <option value="auto">Auto — SDK when available, else webcam</option>
+            <option value="sdk" [disabled]="!hasBridge()">Force Canon SDK</option>
+            <option value="webcam">Force system webcam (debug)</option>
+          </select>
+
+          @if (hasBridge() && (draftCamera.source === 'auto' || draftCamera.source === 'sdk')) {
+            <label>Canon camera (SDK index)</label>
+            <div class="pb-row pb-row-wrap">
+              <select class="pb-input" [(ngModel)]="draftCamera.sdkCameraIndex">
+                @if (sdkCameras().length === 0) {
+                  <option [ngValue]="0">Index 0 (refresh to list)</option>
+                }
+                @for (cam of sdkCameras(); track $index) {
+                  <option [ngValue]="$index">{{ $index }} — {{ cam }}</option>
+                }
+              </select>
+              <button
+                type="button"
+                class="pb-btn pb-btn-ghost"
+                [disabled]="busy()"
+                (click)="refreshCameraDevices()"
+              >
+                Refresh list
+              </button>
+            </div>
+          }
+
+          @if (draftCamera.source === 'webcam' || draftCamera.source === 'auto' || !hasBridge()) {
+            <label>System webcam</label>
+            <div class="pb-row pb-row-wrap">
+              <select class="pb-input" [(ngModel)]="draftCamera.webcamDeviceId">
+                <option [ngValue]="null">Default (browser picks)</option>
+                @for (cam of webcamDevices(); track cam.deviceId) {
+                  <option [ngValue]="cam.deviceId">{{ cam.label }}</option>
+                }
+              </select>
+              <button
+                type="button"
+                class="pb-btn pb-btn-ghost"
+                [disabled]="busy()"
+                (click)="refreshCameraDevices()"
+              >
+                Refresh list
+              </button>
+            </div>
+            <p class="pb-hint pb-hint-tight">
+              Browser may ask for camera permission the first time you refresh or open this tab.
+            </p>
+          }
+
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveCamera()">
+              Save camera settings
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="openLogsFolder()">
+              Open logs folder
+            </button>
+          </div>
+          @if (logFilePath(); as logPath) {
+            <p class="pb-hint pb-hint-tight">
+              Offline diagnostics write to <code>{{ logPath }}</code> (no internet needed). Copy that
+              file if support needs to see camera errors.
+            </p>
+          }
         </section>
       </div>
     }

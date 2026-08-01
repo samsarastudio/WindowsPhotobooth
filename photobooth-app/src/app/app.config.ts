@@ -22,7 +22,7 @@ export const appConfig: ApplicationConfig = {
       return booth
         .load()
         .then(() => theme.applyFromConfig())
-        .then(() => branding.refresh());
+        .then(() => branding.refreshAll());
     }),
   ],
 };

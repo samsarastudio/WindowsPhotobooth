@@ -42,7 +42,13 @@ export class QrPageComponent implements OnInit, OnDestroy {
   }
 
   private nextAfterUnlock(): void {
-    if (this.booth.aiGenerationEnabled() && this.booth.aiModes().length > 0) {
+    const fixed = this.booth.fixedAiModeId();
+    if (fixed) {
+      this.aiStyle.selectMode(fixed);
+      void this.router.navigate(['/capture']);
+      return;
+    }
+    if (this.booth.shouldShowAiModeStep()) {
       void this.router.navigate(['/ai-mode']);
     } else {
       void this.router.navigate(['/capture']);

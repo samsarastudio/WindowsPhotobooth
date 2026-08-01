@@ -8,7 +8,9 @@
     "start": "ng serve",
     "build": "ng build --configuration production",
     "electron:dev": "concurrently \"ng serve\" \"wait-on http://localhost:4200 && electron .\"",
-    "electron:build": "npm run build && electron-builder --win portable"
+    "electron:build": "npm run build && electron-builder --win portable && node scripts/package-deploy.cjs",
+    "electron:build:folder": "npm run build && electron-builder --win dir && node scripts/package-deploy.cjs",
+    "package:deploy": "node scripts/package-deploy.cjs"
   },
   "private": true,
   "dependencies": {
@@ -93,7 +95,8 @@
       "signAndEditExecutable": false
     },
     "portable": {
-      "artifactName": "PhotoBooth-Portable-${version}.exe"
+      "artifactName": "PhotoBooth-Portable-${version}.exe",
+      "unpackDirName": "PhotoBooth"
     }
   }
 }

@@ -28,7 +28,11 @@
 html[data-pb-theme='default'] body {
   color: var(--pb-ink);
   background-color: var(--pb-bg-base);
-  background-image: url("./kia/backdrop-main.png");
+  background-image:
+    url("./kia/backdrop-main.png"),
+    radial-gradient(ellipse 120% 85% at 50% 105%, rgba(255, 200, 140, 0.22), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(80, 80, 90, 0.35), transparent 50%),
+    linear-gradient(180deg, #121214 0%, #030303 55%);
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: cover;

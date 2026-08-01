@@ -22,6 +22,12 @@ export class AiModePageComponent implements OnInit {
   readonly plainModeId = PLAIN_PHOTO_MODE_ID;
 
   ngOnInit(): void {
+    const fixed = this.booth.fixedAiModeId();
+    if (fixed) {
+      this.aiStyle.selectMode(fixed);
+      void this.router.navigate(['/capture']);
+      return;
+    }
     if (!this.booth.aiGenerationEnabled()) {
       void this.router.navigate(['/capture']);
     }
