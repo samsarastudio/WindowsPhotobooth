@@ -13,6 +13,16 @@ This host already runs apps on **3000**, **3001**, and **5000**. Moments uses **
 
 Cloudflare Tunnel should map **`moments.inmomentservices.com` → `http://127.0.0.1:3020`** without changing apex `inmomentservices.com` routing.
 
+## Gallery admin
+
+Open `/admin`, unlock with `ADMIN_PIN`.
+
+Sections: **Overview** · **Albums** · **Photos** · **Frames** · **Mosaic wall** · **Settings**
+
+- **Add sample photos** seeds a demo album + placeholder frame for testing
+- Delete whole albums or individual photos
+- Frames list shows overlays currently on the server (booth syncs these)
+
 ## Gallery URLs
 
 | URL | What guests see |
