@@ -13,6 +13,7 @@ export function getDb() {
 export function initDb() {
   fs.mkdirSync(config.dataDir, { recursive: true });
   fs.mkdirSync(config.photosDir, { recursive: true });
+  fs.mkdirSync(config.framesDir, { recursive: true });
   db = new Database(config.dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
@@ -45,19 +46,28 @@ export function initDb() {
 }
 
 export function loadSettings() {
+  const defaults = {
+    defaultTtlDays: config.defaultTtlDays,
+    wallTitle: 'Wall of moments',
+    wallOverlay: '',
+    wallColumns: 14,
+    wallEmptyRatio: 0.22,
+  };
   try {
     if (!fs.existsSync(config.settingsPath)) {
-      return { defaultTtlDays: config.defaultTtlDays };
+      return { ...defaults };
     }
     const raw = JSON.parse(fs.readFileSync(config.settingsPath, 'utf8'));
     return {
+      ...defaults,
+      ...raw,
       defaultTtlDays:
         typeof raw.defaultTtlDays === 'number' && raw.defaultTtlDays > 0
           ? raw.defaultTtlDays
-          : config.defaultTtlDays,
+          : defaults.defaultTtlDays,
     };
   } catch {
-    return { defaultTtlDays: config.defaultTtlDays };
+    return { ...defaults };
   }
 }
 

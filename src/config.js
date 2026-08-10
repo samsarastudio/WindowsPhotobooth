@@ -29,6 +29,9 @@ export const config = {
   get photosDir() {
     return path.join(this.dataDir, 'photos');
   },
+  get framesDir() {
+    return path.join(this.dataDir, 'frames');
+  },
   get settingsPath() {
     return path.join(this.dataDir, 'settings.json');
   },

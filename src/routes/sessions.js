@@ -13,6 +13,7 @@ import {
 } from '../db.js';
 import { requireUploadToken } from '../auth.js';
 import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
+import { notifyWallPhoto } from './wall.js';
 
 const VARIANTS = new Set(['original', 'framed', 'ai']);
 
@@ -167,6 +168,11 @@ sessionsRouter.post(
 
     const photo = publicPhoto(session.slug, row);
     broadcastPhotoAdded(session.slug, photo);
+    notifyWallPhoto({
+      ...photo,
+      sessionSlug: session.slug,
+      sessionTitle: session.title,
+    });
     return res.status(201).json({ ok: true, photo });
   },
 );

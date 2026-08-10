@@ -6,9 +6,12 @@ import { config } from './config.js';
 import { initDb, getDb, isSessionExpired } from './db.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { adminRouter } from './routes/admin.js';
+import { framesRouter, adminFramesRouter, ensureFramesDir } from './routes/frames.js';
+import { wallRouter, adminWallRouter } from './routes/wall.js';
 import { purgeExpiredSessions } from './purge.js';
 
 initDb();
+ensureFramesDir();
 
 const app = express();
 app.disable('x-powered-by');
@@ -25,7 +28,20 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/sessions', sessionsRouter);
+app.use('/api/frames', framesRouter);
+app.use('/api/wall', wallRouter);
+app.use('/api/admin/frames', adminFramesRouter);
+app.use('/api/admin/wall', adminWallRouter);
 app.use('/api/admin', adminRouter);
+
+app.get('/media/frames/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (filename.includes('..')) return res.status(400).end();
+  const filePath = path.join(config.framesDir, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.sendFile(filePath);
+});
 
 app.get('/media/:slug/:filename', (req, res) => {
   const slug = path.basename(req.params.slug);
@@ -48,7 +64,7 @@ app.get(['/admin', '/admin/*'], (_req, res) => {
   res.sendFile(path.join(config.publicDir, 'admin.html'));
 });
 
-app.get(['/', '/:slug', '/:slug/p/:photoId'], (req, res, next) => {
+app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/media')) return next();
   res.sendFile(path.join(config.publicDir, 'index.html'));
 });

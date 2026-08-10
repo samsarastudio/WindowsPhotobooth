@@ -348,3 +348,127 @@ main {
     display: none;
   }
 }
+
+/* Mosaic wall */
+body.is-mosaic {
+  background: #faf9f7;
+}
+
+body.is-mosaic .leaf {
+  opacity: 0.35;
+}
+
+.mosaic {
+  position: relative;
+  margin: 0 calc(-1 * clamp(1rem, 4vw, 2.5rem));
+  padding: 0 0 2rem;
+}
+
+.mosaic-head {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 0.5rem 1rem 1rem;
+  pointer-events: none;
+}
+
+.mosaic-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c45c5c;
+}
+
+.mosaic-overlay {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(3rem, 12vw, 7rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(196, 92, 92, 0.28);
+  white-space: nowrap;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mosaic-grid {
+  --mosaic-cols: 14;
+  display: grid;
+  grid-template-columns: repeat(var(--mosaic-cols), minmax(0, 1fr));
+  gap: 3px;
+  padding: 0 clamp(0.35rem, 1vw, 0.75rem);
+  background: #fff;
+}
+
+.mosaic-cell {
+  aspect-ratio: 3 / 4;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+.mosaic-cell.filled {
+  cursor: pointer;
+  animation: mosaicIn 480ms ease both;
+}
+
+.mosaic-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mosaic-cell.empty {
+  background: #fff;
+}
+
+@keyframes mosaicIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.frame-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.frame-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.55rem;
+  background: #fff;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.frame-card img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #111;
+}
+
+.frame-card code {
+  font-size: 0.72rem;
+  word-break: break-all;
+}
