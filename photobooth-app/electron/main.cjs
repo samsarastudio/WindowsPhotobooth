@@ -2122,39 +2122,162 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
   }
 });
 
-ipcMain.handle('gallery:syncFrames', async (_e, payload) => {
+async function fetchRemoteFrames(base) {
+  const res = await fetch(`${base}/api/frames`);
+  let data = null;
   try {
-    const base = galleryBaseUrl(payload?.apiBaseUrl);
-    if (!base) return { ok: false, error: 'Gallery API URL is required.' };
-    const res = await fetch(`${base}/api/frames`);
-    let data = null;
+    data = await res.json();
+  } catch (_) {}
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || `HTTP ${res.status}`);
+  }
+  return Array.isArray(data.frames) ? data.frames : [];
+}
+
+async function publishLocalFrameFile(base, token, filename) {
+  const safe = path.basename(String(filename || ''));
+  if (!safe || safe.includes('..')) return { ok: false, error: 'Invalid filename' };
+  const full = path.join(getPhotoFramesDir(), safe);
+  if (!isPathUnderOrEqual(full, getPhotoFramesDir()) || !fs.existsSync(full)) {
+    return { ok: false, error: 'Frame not found locally.' };
+  }
+  const FormData = require('form-data');
+  const buf = fs.readFileSync(full);
+  const ext = path.extname(full).toLowerCase();
+  const mime =
+    ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  const form = new FormData();
+  form.append('frame', buf, {
+    filename: safe,
+    contentType: mime,
+    knownLength: buf.length,
+  });
+  form.append('filename', safe);
+  const bodyBuf = form.getBuffer();
+  const res = await fetch(`${base}/api/frames`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...form.getHeaders(),
+      'Content-Length': String(bodyBuf.length),
+    },
+    body: bodyBuf,
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {}
+  if (!res.ok || !data?.ok) {
+    return { ok: false, error: data?.error || `HTTP ${res.status}` };
+  }
+  return { ok: true, frame: data.frame };
+}
+
+async function deleteRemoteFrameFile(base, token, filename) {
+  const safe = path.basename(String(filename || ''));
+  if (!safe || safe.includes('..')) return { ok: false, error: 'Invalid filename' };
+  const res = await fetch(`${base}/api/frames/${encodeURIComponent(safe)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {}
+  if (!res.ok || !data?.ok) {
+    return { ok: false, error: data?.error || `HTTP ${res.status}` };
+  }
+  return { ok: true, removed: data.removed || safe };
+}
+
+async function pullRemoteFramesToLocal(base, remoteFrames) {
+  const dir = getPhotoFramesDir();
+  const synced = [];
+  const failed = [];
+  for (const frame of remoteFrames || []) {
+    const filename = path.basename(String(frame.filename || ''));
+    if (!filename || filename.includes('..')) continue;
+    const url = frame.downloadUrl || `${base}${frame.url}`;
     try {
-      data = await res.json();
-    } catch (_) {}
-    if (!res.ok || !data?.ok) {
-      return { ok: false, error: data?.error || `HTTP ${res.status}` };
+      const imgRes = await fetch(url);
+      if (!imgRes.ok) {
+        failed.push({ filename, error: `HTTP ${imgRes.status}` });
+        continue;
+      }
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      fs.writeFileSync(path.join(dir, filename), buf);
+      synced.push(filename);
+    } catch (e) {
+      failed.push({ filename, error: String(e) });
     }
-    const dir = getPhotoFramesDir();
-    const synced = [];
-    const failed = [];
-    for (const frame of data.frames || []) {
-      const filename = path.basename(String(frame.filename || ''));
-      if (!filename || filename.includes('..')) continue;
-      const url = frame.downloadUrl || `${base}${frame.url}`;
-      try {
-        const imgRes = await fetch(url);
-        if (!imgRes.ok) {
-          failed.push({ filename, error: `HTTP ${imgRes.status}` });
-          continue;
-        }
-        const buf = Buffer.from(await imgRes.arrayBuffer());
-        fs.writeFileSync(path.join(dir, filename), buf);
-        synced.push(filename);
-      } catch (e) {
-        failed.push({ filename, error: String(e) });
+  }
+  return { synced, failed };
+}
+
+/**
+ * Two-way frame sync with Moments:
+ * 1) Push local frames (when token provided) so booth overlays appear on the gallery host
+ * 2) Pull remote frames so Moments admin uploads show on the booth
+ * 3) Optionally prune local files missing from the remote set (Moments deletes)
+ */
+async function syncFramesWithMoments(payload) {
+  const base = galleryBaseUrl(payload?.apiBaseUrl);
+  if (!base) return { ok: false, error: 'Gallery API URL is required.' };
+  const token = String(payload?.uploadToken || '').trim();
+  const pushLocal = payload?.pushLocal !== false;
+  const pruneLocal = payload?.pruneLocal === true;
+
+  let remote = await fetchRemoteFrames(base);
+  const remoteNames = new Set(
+    remote.map((f) => path.basename(String(f.filename || ''))).filter(Boolean),
+  );
+
+  const published = [];
+  const publishFailed = [];
+  if (token && pushLocal) {
+    for (const filename of listPhotoFrameFiles()) {
+      const r = await publishLocalFrameFile(base, token, filename);
+      if (r.ok) published.push(filename);
+      else publishFailed.push({ filename, error: r.error || 'Publish failed' });
+    }
+    if (published.length) {
+      remote = await fetchRemoteFrames(base);
+      remoteNames.clear();
+      for (const f of remote) {
+        const n = path.basename(String(f.filename || ''));
+        if (n) remoteNames.add(n);
       }
     }
-    return { ok: true, synced, failed, count: synced.length };
+  }
+
+  const { synced, failed } = await pullRemoteFramesToLocal(base, remote);
+
+  const pruned = [];
+  if (pruneLocal) {
+    const dir = getPhotoFramesDir();
+    for (const filename of listPhotoFrameFiles()) {
+      if (remoteNames.has(filename)) continue;
+      try {
+        fs.unlinkSync(path.join(dir, filename));
+        pruned.push(filename);
+      } catch (_) {}
+    }
+  }
+
+  return {
+    ok: true,
+    synced,
+    published,
+    pruned,
+    failed: [...publishFailed, ...failed],
+    count: synced.length,
+    publishedCount: published.length,
+  };
+}
+
+ipcMain.handle('gallery:syncFrames', async (_e, payload) => {
+  try {
+    return await syncFramesWithMoments(payload || {});
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -2169,40 +2292,7 @@ ipcMain.handle('gallery:publishFrame', async (_e, payload) => {
       return { ok: false, error: 'Gallery API URL and upload token are required.' };
     }
     if (!filename) return { ok: false, error: 'Missing filename' };
-    const full = path.join(getPhotoFramesDir(), filename);
-    if (!isPathUnderOrEqual(full, getPhotoFramesDir()) || !fs.existsSync(full)) {
-      return { ok: false, error: 'Frame not found locally.' };
-    }
-    const FormData = require('form-data');
-    const buf = fs.readFileSync(full);
-    const ext = path.extname(full).toLowerCase();
-    const mime =
-      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-    const form = new FormData();
-    form.append('frame', buf, {
-      filename,
-      contentType: mime,
-      knownLength: buf.length,
-    });
-    form.append('filename', filename);
-    const bodyBuf = form.getBuffer();
-    const res = await fetch(`${base}/api/frames`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...form.getHeaders(),
-        'Content-Length': String(bodyBuf.length),
-      },
-      body: bodyBuf,
-    });
-    let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {}
-    if (!res.ok || !data?.ok) {
-      return { ok: false, error: data?.error || `HTTP ${res.status}` };
-    }
-    return { ok: true, frame: data.frame };
+    return await publishLocalFrameFile(base, token, filename);
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -2217,18 +2307,7 @@ ipcMain.handle('gallery:deleteRemoteFrame', async (_e, payload) => {
       return { ok: false, error: 'Gallery API URL and upload token are required.' };
     }
     if (!filename) return { ok: false, error: 'Missing filename' };
-    const res = await fetch(`${base}/api/frames/${encodeURIComponent(filename)}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {}
-    if (!res.ok || !data?.ok) {
-      return { ok: false, error: data?.error || `HTTP ${res.status}` };
-    }
-    return { ok: true, removed: data.removed };
+    return await deleteRemoteFrameFile(base, token, filename);
   } catch (e) {
     return { ok: false, error: String(e) };
   }

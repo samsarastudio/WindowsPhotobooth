@@ -149,7 +149,7 @@ export class AdminDashboardComponent implements OnInit {
       void this.refreshCameraDevices();
     }
     if (t === 'frames') {
-      void this.refreshPhotoFrames();
+      void this.refreshPhotoFramesAndSync();
     }
     if (t === 'print') {
       void this.refreshPrinters();
@@ -411,7 +411,12 @@ export class AdminDashboardComponent implements OnInit {
           this.draftDefaultFrameFile = inst.filename;
         }
         await this.refreshPhotoFrames();
-        this.status.set(`Uploaded frame ${inst.filename}. Save frame settings to apply guest list.`);
+        const published = await this.publishFrameQuiet(inst.filename);
+        this.status.set(
+          published
+            ? `Uploaded and published ${inst.filename} to Moments.`
+            : `Uploaded frame ${inst.filename}. Save frame settings to apply guest list.`,
+        );
       } else {
         this.status.set(inst.error ?? 'Upload failed.');
       }
@@ -434,6 +439,14 @@ export class AdminDashboardComponent implements OnInit {
         if (this.draftDefaultFrameFile === filename) {
           this.draftDefaultFrameFile = null;
         }
+        const creds = this.momentsGalleryCreds();
+        if (creds?.uploadToken && window.pbApi.galleryDeleteRemoteFrame) {
+          await window.pbApi.galleryDeleteRemoteFrame({
+            apiBaseUrl: creds.apiBaseUrl,
+            uploadToken: creds.uploadToken,
+            filename,
+          });
+        }
         await this.refreshPhotoFrames();
         this.status.set(`Removed ${filename}.`);
       } else {
@@ -454,6 +467,47 @@ export class AdminDashboardComponent implements OnInit {
     return { apiBaseUrl, uploadToken };
   }
 
+  private async publishFrameQuiet(filename: string): Promise<boolean> {
+    const creds = this.momentsGalleryCreds();
+    if (!creds?.uploadToken || !window.pbApi?.galleryPublishFrame) return false;
+    const r = await window.pbApi.galleryPublishFrame({
+      apiBaseUrl: creds.apiBaseUrl,
+      uploadToken: creds.uploadToken,
+      filename,
+    });
+    return !!r.ok;
+  }
+
+  /** Pull Moments frames and push local overlays so both sides match. */
+  private async mirrorFramesWithMoments(quiet = false): Promise<boolean> {
+    const creds = this.momentsGalleryCreds();
+    if (!creds || !window.pbApi?.gallerySyncFrames) return false;
+    const r = await window.pbApi.gallerySyncFrames({
+      apiBaseUrl: creds.apiBaseUrl,
+      uploadToken: creds.uploadToken || undefined,
+      pushLocal: !!creds.uploadToken,
+      pruneLocal: false,
+    });
+    if (!quiet) {
+      if (r.ok) {
+        const pub = r.publishedCount ?? r.published?.length ?? 0;
+        this.status.set(
+          `Synced with Moments: pulled ${r.count ?? 0}, published ${pub}` +
+            (r.failed?.length ? ` (${r.failed.length} failed)` : '') +
+            '.',
+        );
+      } else {
+        this.status.set(r.error ?? 'Sync failed.');
+      }
+    }
+    return !!r.ok;
+  }
+
+  async refreshPhotoFramesAndSync(): Promise<void> {
+    await this.mirrorFramesWithMoments(true);
+    await this.refreshPhotoFrames();
+  }
+
   async syncFramesFromMoments(): Promise<void> {
     const creds = this.momentsGalleryCreds();
     if (!creds || !window.pbApi?.gallerySyncFrames) {
@@ -462,15 +516,8 @@ export class AdminDashboardComponent implements OnInit {
     }
     this.busy.set(true);
     try {
-      const r = await window.pbApi.gallerySyncFrames({ apiBaseUrl: creds.apiBaseUrl });
-      if (r.ok) {
-        await this.refreshPhotoFrames();
-        this.status.set(
-          `Synced ${r.count ?? 0} frame(s) from Moments${r.failed?.length ? ` (${r.failed.length} failed)` : ''}.`,
-        );
-      } else {
-        this.status.set(r.error ?? 'Sync failed.');
-      }
+      await this.mirrorFramesWithMoments(false);
+      await this.refreshPhotoFrames();
     } finally {
       this.busy.set(false);
     }
@@ -501,7 +548,7 @@ export class AdminDashboardComponent implements OnInit {
       this.status.set('Set Gallery API URL + upload token in Admin → Gallery first.');
       return;
     }
-    if (!confirm(`Delete "${filename}" from the Moments server?`)) return;
+    if (!confirm(`Delete "${filename}" from Moments and this machine?`)) return;
     this.busy.set(true);
     try {
       const r = await window.pbApi.galleryDeleteRemoteFrame({
@@ -509,7 +556,15 @@ export class AdminDashboardComponent implements OnInit {
         uploadToken: creds.uploadToken,
         filename,
       });
-      this.status.set(r.ok ? `Deleted ${filename} on Moments.` : r.error ?? 'Remote delete failed.');
+      if (r.ok && window.pbApi.adminDeletePhotoFrame) {
+        await window.pbApi.adminDeletePhotoFrame(filename);
+        this.draftGuestFrameFiles = this.draftGuestFrameFiles.filter((f) => f !== filename);
+        if (this.draftDefaultFrameFile === filename) {
+          this.draftDefaultFrameFile = null;
+        }
+        await this.refreshPhotoFrames();
+      }
+      this.status.set(r.ok ? `Deleted ${filename} on Moments and locally.` : r.error ?? 'Remote delete failed.');
     } finally {
       this.busy.set(false);
     }

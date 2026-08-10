@@ -655,7 +655,7 @@
               Upload frame
             </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="syncFramesFromMoments()">
-              Sync from Moments
+              Sync with Moments
             </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="selectAllGuestFrames()">
               Enable all for guests
@@ -672,8 +672,9 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Frames on this machine</h2>
           <p class="pb-hint pb-hint-tight">
-            Stored in <code>config/photo-frames/</code>. Use <strong>Publish</strong> to push a local
-            overlay to Moments, or <strong>Delete on server</strong> to remove it from the gallery host.
+            Stored in <code>config/photo-frames/</code>. Uploads and Sync push overlays to Moments
+            automatically (Gallery API URL + upload token required). Sync also pulls frames added in
+            Moments admin.
           </p>
           @if (photoFramesList().length === 0) {
             <p class="pb-hint">No frames found. Sync from Moments or upload a PNG with a black or transparent photo hole.</p>

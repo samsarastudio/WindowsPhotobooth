@@ -154,11 +154,19 @@ export interface PbApi {
     variant?: string;
     error?: string;
   }>;
-  gallerySyncFrames(payload: { apiBaseUrl: string }): Promise<{
+  gallerySyncFrames(payload: {
+    apiBaseUrl: string;
+    uploadToken?: string;
+    pushLocal?: boolean;
+    pruneLocal?: boolean;
+  }): Promise<{
     ok: boolean;
     synced?: string[];
+    published?: string[];
+    pruned?: string[];
     failed?: { filename: string; error: string }[];
     count?: number;
+    publishedCount?: number;
     error?: string;
   }>;
   galleryPublishFrame(payload: {

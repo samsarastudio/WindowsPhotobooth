@@ -58,6 +58,7 @@ export class FramePageComponent implements OnInit {
       this.err.set('Frames require Electron.');
       return;
     }
+    await this.pullFramesFromMoments();
     const r = await window.pbApi.listPhotoFrames();
     if (!r.ok || !r.frames?.length) {
       this.err.set(r.error ?? 'No frames found. Add PNGs under config/photo-frames/.');
@@ -89,6 +90,23 @@ export class FramePageComponent implements OnInit {
       this.frames()[0]?.filename ||
       null;
     this.selected.set(pick);
+  }
+
+  /** Pull overlays from Moments so admin uploads appear on the booth. */
+  private async pullFramesFromMoments(): Promise<void> {
+    const g = this.booth.gallery();
+    const apiBaseUrl = (g.apiBaseUrl || '').replace(/\/$/, '');
+    if (!g.enabled || !apiBaseUrl || !window.pbApi?.gallerySyncFrames) return;
+    try {
+      await window.pbApi.gallerySyncFrames({
+        apiBaseUrl,
+        uploadToken: g.uploadToken || undefined,
+        pushLocal: !!g.uploadToken,
+        pruneLocal: false,
+      });
+    } catch {
+      /* offline Moments should not block the frame picker */
+    }
   }
 
   selectFrame(filename: string): void {
