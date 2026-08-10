@@ -170,6 +170,7 @@ function renderMosaic() {
 }
 
 function upsertPhoto(photo) {
+  if (!photo?.id || photo.variant === 'original') return;
   const i = photos.findIndex((p) => p.id === photo.id);
   if (i >= 0) photos[i] = photo;
   else photos.push(photo);
@@ -267,7 +268,7 @@ async function loadSession(slug) {
   } catch {
     /* optional */
   }
-  photos = data.session.photos || [];
+  photos = (data.session.photos || []).filter((p) => p.variant !== 'original');
   els.meta.textContent = `Expires ${new Date(data.session.expiresAt).toLocaleString()} · ${photos.length} photos`;
   connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
 
@@ -290,7 +291,7 @@ async function loadWall() {
   }
   setStatus('', false);
   wallCfg = { ...wallCfg, ...(data.wall || {}) };
-  photos = data.photos || [];
+  photos = (data.photos || []).filter((p) => p.variant !== 'original');
   els.title.textContent = wallCfg.title || 'Wall of moments';
   els.meta.textContent = `${photos.length} photos · ${data.sessions?.length || 0} active sessions`;
   connectStream('/api/wall/stream');
