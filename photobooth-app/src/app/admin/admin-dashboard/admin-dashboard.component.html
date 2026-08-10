@@ -498,6 +498,18 @@
             Today’s gallery:
             @if (todayGalleryUrl()) {
               <a [href]="todayGalleryUrl()" target="_blank" rel="noopener">{{ todayGalleryUrl() }}</a>
+              ·
+              <a [href]="todayGalleryUrl() + '/wall'" target="_blank" rel="noopener">mosaic wall</a>
+              ·
+              <a [href]="todayGalleryUrl() + '/slideshow'" target="_blank" rel="noopener">slideshow</a>
+            } @else {
+              set a base URL first
+            }
+          </p>
+          <p class="pb-hint pb-hint-tight">
+            All sessions mosaic:
+            @if (momentsWallUrl()) {
+              <a [href]="momentsWallUrl()" target="_blank" rel="noopener">{{ momentsWallUrl() }}</a>
             } @else {
               set a base URL first
             }
@@ -609,8 +621,9 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Photo frame overlays</h2>
           <p class="pb-hint">
-            Choose which decorative frames guests see after capture. The photo sits under the frame
-            artwork (black or transparent hole). This is separate from AI styles.
+            Choose which decorative frames guests see after capture. Manage the master library on
+            Moments Admin (<code>/admin</code>), then sync here — or upload locally and publish to the
+            server.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftFramesEnabled" />
@@ -641,6 +654,9 @@
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="uploadPhotoFrame()">
               Upload frame
             </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="syncFramesFromMoments()">
+              Sync from Moments
+            </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="selectAllGuestFrames()">
               Enable all for guests
             </button>
@@ -656,11 +672,11 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Frames on this machine</h2>
           <p class="pb-hint pb-hint-tight">
-            Stored in <code>config/photo-frames/</code>. Check <strong>Show to guests</strong> for each
-            overlay you want on the booth picker.
+            Stored in <code>config/photo-frames/</code>. Use <strong>Publish</strong> to push a local
+            overlay to Moments, or <strong>Delete on server</strong> to remove it from the gallery host.
           </p>
           @if (photoFramesList().length === 0) {
-            <p class="pb-hint">No frames found. Upload a PNG with a black or transparent photo hole.</p>
+            <p class="pb-hint">No frames found. Sync from Moments or upload a PNG with a black or transparent photo hole.</p>
           }
           <div class="pb-admin-frame-grid">
             @for (f of photoFramesList(); track f.filename) {
@@ -690,9 +706,25 @@
                       type="button"
                       class="pb-btn pb-btn-ghost pb-btn-sm"
                       [disabled]="busy()"
+                      (click)="publishFrameToMoments(f.filename)"
+                    >
+                      Publish
+                    </button>
+                    <button
+                      type="button"
+                      class="pb-btn pb-btn-ghost pb-btn-sm"
+                      [disabled]="busy()"
                       (click)="deletePhotoFrame(f.filename)"
                     >
-                      Delete
+                      Delete local
+                    </button>
+                    <button
+                      type="button"
+                      class="pb-btn pb-btn-ghost pb-btn-sm"
+                      [disabled]="busy()"
+                      (click)="deleteRemoteFrame(f.filename)"
+                    >
+                      Delete on server
                     </button>
                   </div>
                 </div>

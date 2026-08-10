@@ -2122,6 +2122,118 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
   }
 });
 
+ipcMain.handle('gallery:syncFrames', async (_e, payload) => {
+  try {
+    const base = galleryBaseUrl(payload?.apiBaseUrl);
+    if (!base) return { ok: false, error: 'Gallery API URL is required.' };
+    const res = await fetch(`${base}/api/frames`);
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (_) {}
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: data?.error || `HTTP ${res.status}` };
+    }
+    const dir = getPhotoFramesDir();
+    const synced = [];
+    const failed = [];
+    for (const frame of data.frames || []) {
+      const filename = path.basename(String(frame.filename || ''));
+      if (!filename || filename.includes('..')) continue;
+      const url = frame.downloadUrl || `${base}${frame.url}`;
+      try {
+        const imgRes = await fetch(url);
+        if (!imgRes.ok) {
+          failed.push({ filename, error: `HTTP ${imgRes.status}` });
+          continue;
+        }
+        const buf = Buffer.from(await imgRes.arrayBuffer());
+        fs.writeFileSync(path.join(dir, filename), buf);
+        synced.push(filename);
+      } catch (e) {
+        failed.push({ filename, error: String(e) });
+      }
+    }
+    return { ok: true, synced, failed, count: synced.length };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('gallery:publishFrame', async (_e, payload) => {
+  try {
+    const base = galleryBaseUrl(payload?.apiBaseUrl);
+    const token = String(payload?.uploadToken || '').trim();
+    const filename = path.basename(String(payload?.filename || ''));
+    if (!base || !token) {
+      return { ok: false, error: 'Gallery API URL and upload token are required.' };
+    }
+    if (!filename) return { ok: false, error: 'Missing filename' };
+    const full = path.join(getPhotoFramesDir(), filename);
+    if (!isPathUnderOrEqual(full, getPhotoFramesDir()) || !fs.existsSync(full)) {
+      return { ok: false, error: 'Frame not found locally.' };
+    }
+    const FormData = require('form-data');
+    const buf = fs.readFileSync(full);
+    const ext = path.extname(full).toLowerCase();
+    const mime =
+      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+    const form = new FormData();
+    form.append('frame', buf, {
+      filename,
+      contentType: mime,
+      knownLength: buf.length,
+    });
+    form.append('filename', filename);
+    const bodyBuf = form.getBuffer();
+    const res = await fetch(`${base}/api/frames`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...form.getHeaders(),
+        'Content-Length': String(bodyBuf.length),
+      },
+      body: bodyBuf,
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (_) {}
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: data?.error || `HTTP ${res.status}` };
+    }
+    return { ok: true, frame: data.frame };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('gallery:deleteRemoteFrame', async (_e, payload) => {
+  try {
+    const base = galleryBaseUrl(payload?.apiBaseUrl);
+    const token = String(payload?.uploadToken || '').trim();
+    const filename = path.basename(String(payload?.filename || ''));
+    if (!base || !token) {
+      return { ok: false, error: 'Gallery API URL and upload token are required.' };
+    }
+    if (!filename) return { ok: false, error: 'Missing filename' };
+    const res = await fetch(`${base}/api/frames/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (_) {}
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: data?.error || `HTTP ${res.status}` };
+    }
+    return { ok: true, removed: data.removed };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
 ipcMain.handle('print:listPrinters', async () => {
   try {
     /** Enrich with Win32 driver/port so admin can spot Microsoft IPP vs real Canon. */

@@ -267,6 +267,11 @@ export class AdminDashboardComponent implements OnInit {
     return base ? `${base}/${this.todayGallerySlug()}` : '';
   }
 
+  momentsWallUrl(): string {
+    const base = (this.draftGallery.apiBaseUrl || '').replace(/\/$/, '');
+    return base ? `${base}/wall` : '';
+  }
+
   async saveGallery(): Promise<void> {
     this.status.set(null);
     this.busy.set(true);
@@ -434,6 +439,77 @@ export class AdminDashboardComponent implements OnInit {
       } else {
         this.status.set(r.error ?? 'Could not remove frame.');
       }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private momentsGalleryCreds(): { apiBaseUrl: string; uploadToken: string } | null {
+    const g = this.draftGallery?.apiBaseUrl
+      ? this.draftGallery
+      : this.booth.gallery();
+    const apiBaseUrl = (g.apiBaseUrl || '').replace(/\/$/, '');
+    const uploadToken = g.uploadToken || '';
+    if (!apiBaseUrl) return null;
+    return { apiBaseUrl, uploadToken };
+  }
+
+  async syncFramesFromMoments(): Promise<void> {
+    const creds = this.momentsGalleryCreds();
+    if (!creds || !window.pbApi?.gallerySyncFrames) {
+      this.status.set('Set Gallery API base URL in Admin → Gallery first.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const r = await window.pbApi.gallerySyncFrames({ apiBaseUrl: creds.apiBaseUrl });
+      if (r.ok) {
+        await this.refreshPhotoFrames();
+        this.status.set(
+          `Synced ${r.count ?? 0} frame(s) from Moments${r.failed?.length ? ` (${r.failed.length} failed)` : ''}.`,
+        );
+      } else {
+        this.status.set(r.error ?? 'Sync failed.');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async publishFrameToMoments(filename: string): Promise<void> {
+    const creds = this.momentsGalleryCreds();
+    if (!creds?.uploadToken || !window.pbApi?.galleryPublishFrame) {
+      this.status.set('Set Gallery API URL + upload token in Admin → Gallery first.');
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const r = await window.pbApi.galleryPublishFrame({
+        apiBaseUrl: creds.apiBaseUrl,
+        uploadToken: creds.uploadToken,
+        filename,
+      });
+      this.status.set(r.ok ? `Published ${filename} to Moments.` : r.error ?? 'Publish failed.');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async deleteRemoteFrame(filename: string): Promise<void> {
+    const creds = this.momentsGalleryCreds();
+    if (!creds?.uploadToken || !window.pbApi?.galleryDeleteRemoteFrame) {
+      this.status.set('Set Gallery API URL + upload token in Admin → Gallery first.');
+      return;
+    }
+    if (!confirm(`Delete "${filename}" from the Moments server?`)) return;
+    this.busy.set(true);
+    try {
+      const r = await window.pbApi.galleryDeleteRemoteFrame({
+        apiBaseUrl: creds.apiBaseUrl,
+        uploadToken: creds.uploadToken,
+        filename,
+      });
+      this.status.set(r.ok ? `Deleted ${filename} on Moments.` : r.error ?? 'Remote delete failed.');
     } finally {
       this.busy.set(false);
     }

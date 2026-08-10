@@ -154,6 +154,23 @@ export interface PbApi {
     variant?: string;
     error?: string;
   }>;
+  gallerySyncFrames(payload: { apiBaseUrl: string }): Promise<{
+    ok: boolean;
+    synced?: string[];
+    failed?: { filename: string; error: string }[];
+    count?: number;
+    error?: string;
+  }>;
+  galleryPublishFrame(payload: {
+    apiBaseUrl: string;
+    uploadToken: string;
+    filename: string;
+  }): Promise<{ ok: boolean; frame?: { filename: string }; error?: string }>;
+  galleryDeleteRemoteFrame(payload: {
+    apiBaseUrl: string;
+    uploadToken: string;
+    filename: string;
+  }): Promise<{ ok: boolean; removed?: string; error?: string }>;
   listPrinters(): Promise<{
     ok: boolean;
     printers?: {

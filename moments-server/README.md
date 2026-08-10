@@ -13,6 +13,25 @@ This host already runs apps on **3000**, **3001**, and **5000**. Moments uses **
 
 Cloudflare Tunnel should map **`moments.inmomentservices.com` → `http://127.0.0.1:3020`** without changing apex `inmomentservices.com` routing.
 
+## Gallery URLs
+
+| URL | What guests see |
+|-----|-----------------|
+| `/{session}` | Photo grid for that day/session |
+| `/{session}/wall` | Mosaic wall for that session |
+| `/{session}/slideshow` | Auto slideshow for that session |
+| `/wall` | Mosaic of **all** photos from active (non-expired) sessions |
+| `/wall/slideshow` | Slideshow of all active-session photos |
+| `/{session}/p/{photoId}` | Deep link / lightbox to one photo |
+
+## Photo frames (booth overlays)
+
+Manage PNGs in Moments Admin → **Photo frames**, or from the photobooth **Admin → Frames** with Sync / Publish / Delete on server.
+
+- Public list: `GET /api/frames`
+- Media: `/media/frames/{filename}`
+- Upload/delete: upload token or admin PIN
+
 ## Git deploy on the Pi (backend-only branch)
 
 The monorepo publishes a special branch **`moments-server`** whose *root* is only this package (no photobooth app). Use that branch on the Pi so `git pull` never fetches booth code.

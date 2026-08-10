@@ -16,13 +16,15 @@
     <div class="leaf leaf-tr" aria-hidden="true"></div>
     <div class="leaf leaf-bl" aria-hidden="true"></div>
 
-    <header class="top">
+    <header class="top" id="topBar">
       <div class="brand">
         <p class="eyebrow">inmoment</p>
         <h1 id="sessionTitle">Gallery</h1>
         <p id="sessionMeta" class="meta"></p>
       </div>
       <div class="actions">
+        <button type="button" class="btn ghost" id="btnGrid">Grid</button>
+        <button type="button" class="btn ghost" id="btnWall">Mosaic wall</button>
         <button type="button" class="btn ghost" id="btnSlideshow">Slideshow</button>
       </div>
     </header>
@@ -31,6 +33,13 @@
       <p id="status" class="status" hidden></p>
       <p id="empty" class="empty" hidden>Photos will appear here as they’re taken…</p>
       <div id="grid" class="grid" aria-live="polite"></div>
+      <div id="mosaic" class="mosaic" hidden aria-live="polite">
+        <div class="mosaic-head">
+          <h2 id="wallTitle">Wall of moments</h2>
+          <p id="wallOverlay" class="mosaic-overlay" hidden></p>
+        </div>
+        <div id="mosaicGrid" class="mosaic-grid"></div>
+      </div>
     </main>
 
     <div id="lightbox" class="lightbox" hidden>
