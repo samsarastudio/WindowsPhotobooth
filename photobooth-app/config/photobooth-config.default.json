@@ -10,6 +10,20 @@
     "defaultFrameFile": "onam-grma-2026.png",
     "guestFrameFiles": []
   },
+  "gallery": {
+    "enabled": false,
+    "apiBaseUrl": "https://moments.inmomentservices.com",
+    "uploadToken": "",
+    "sessionPrefix": "onam",
+    "uploadOriginal": true,
+    "uploadFramed": true,
+    "uploadAi": true
+  },
+  "print": {
+    "enabled": false,
+    "printerName": null,
+    "bleedScale": 1.06
+  },
   "aiModes": [
     {
       "id": "dj",
@@ -90,7 +104,16 @@
       "thinkingStepPlan": "Applying your chosen style directions",
       "thinkingStepBackground": "Selecting branded environment and compositing your photo",
       "thinkingStepImage": "Rendering with the image API",
-      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs."
+      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs.",
+      "share": "Share",
+      "sharing": "Uploading…",
+      "shareQrTitle": "Scan to view your photo",
+      "shareBack": "Back",
+      "uploadFailed": "Could not upload to gallery",
+      "print": "Print",
+      "printing": "Printing…",
+      "printed": "Printed",
+      "printFailed": "Print failed"
     },
     "aiMode": {
       "title": "Choose a style",

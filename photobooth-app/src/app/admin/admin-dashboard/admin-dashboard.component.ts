@@ -1,7 +1,14 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import type { PhotoboothAiMode, PhotoboothBranding, PhotoboothCameraConfig, PhotoboothCopy } from '../../models/photobooth-config.model';
+import type {
+  PhotoboothAiMode,
+  PhotoboothBranding,
+  PhotoboothCameraConfig,
+  PhotoboothCopy,
+  PhotoboothGalleryConfig,
+  PhotoboothPrintConfig,
+} from '../../models/photobooth-config.model';
 import {
   NEWSPAPER_AI_PROMPT,
   DJ_INPAINT_PROMPT,
@@ -10,6 +17,8 @@ import {
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_GALLERY,
+  PHOTOBOOTH_DEFAULT_PRINT,
   PLAIN_PHOTO_MODE_ID,
 } from '../../models/photobooth-config.model';
 import { BrandingLogoService } from '../../services/branding-logo.service';
@@ -38,6 +47,16 @@ interface WebcamDeviceOption {
   label: string;
 }
 
+interface PrinterOption {
+  name: string;
+  displayName: string;
+  isDefault: boolean;
+  driverName?: string;
+  portName?: string;
+  isIppClass?: boolean;
+  isCanonDriver?: boolean;
+}
+
 interface AdminFrameItem {
   filename: string;
   label: string;
@@ -53,10 +72,12 @@ interface AdminFrameItem {
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
-  tab: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'ai' = 'copy';
+  tab: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai' = 'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
   draftBranding: PhotoboothBranding = structuredClone(PHOTOBOOTH_DEFAULT_BRANDING);
   draftCamera: PhotoboothCameraConfig = structuredClone(PHOTOBOOTH_DEFAULT_CAMERA);
+  draftGallery: PhotoboothGalleryConfig = structuredClone(PHOTOBOOTH_DEFAULT_GALLERY);
+  draftPrint: PhotoboothPrintConfig = structuredClone(PHOTOBOOTH_DEFAULT_PRINT);
   activeThemeId = 'default';
   draftAiEnabled = false;
   draftRequireQrUnlock = false;
@@ -74,6 +95,7 @@ export class AdminDashboardComponent implements OnInit {
   logFilePath = signal<string | null>(null);
   sdkCameras = signal<string[]>([]);
   webcamDevices = signal<WebcamDeviceOption[]>([]);
+  printers = signal<PrinterOption[]>([]);
   themes = signal<ThemeListItem[]>([]);
   photoFramesList = signal<AdminFrameItem[]>([]);
   aiBackgrounds = signal<Record<string, AiBackgroundItem[]>>({});
@@ -108,10 +130,14 @@ export class AdminDashboardComponent implements OnInit {
     this.draftAiModes = structuredClone(cfg?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
     this.draftBranding = structuredClone(cfg?.branding ?? PHOTOBOOTH_DEFAULT_BRANDING);
     this.draftCamera = structuredClone(cfg?.camera ?? PHOTOBOOTH_DEFAULT_CAMERA);
+    this.draftGallery = structuredClone(cfg?.gallery ?? PHOTOBOOTH_DEFAULT_GALLERY);
+    this.draftPrint = structuredClone(cfg?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
     this.openAiKeyDraft = '';
   }
 
-  setTab(t: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'ai'): void {
+  setTab(
+    t: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai',
+  ): void {
     this.tab = t;
     if (t === 'themes') {
       void this.refreshThemes();
@@ -124,6 +150,9 @@ export class AdminDashboardComponent implements OnInit {
     }
     if (t === 'frames') {
       void this.refreshPhotoFrames();
+    }
+    if (t === 'print') {
+      void this.refreshPrinters();
     }
     if (t === 'ai') {
       void this.refreshAllAiBackgrounds();
@@ -222,6 +251,138 @@ export class AdminDashboardComponent implements OnInit {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  todayGallerySlug(): string {
+    const prefix = this.draftGallery.sessionPrefix || 'session';
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${prefix}-${y}-${m}-${day}`;
+  }
+
+  todayGalleryUrl(): string {
+    const base = (this.draftGallery.apiBaseUrl || '').replace(/\/$/, '');
+    return base ? `${base}/${this.todayGallerySlug()}` : '';
+  }
+
+  async saveGallery(): Promise<void> {
+    this.status.set(null);
+    this.busy.set(true);
+    try {
+      const ok = await this.booth.save({
+        gallery: { ...this.draftGallery },
+      });
+      if (ok) {
+        this.syncFromService();
+        this.status.set('Gallery settings saved.');
+      } else {
+        this.status.set('Save failed (run in Electron).');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async refreshPrinters(): Promise<void> {
+    if (!window.pbApi?.listPrinters) {
+      this.printers.set([]);
+      this.status.set('Printer list requires Electron (packaged or electron:dev).');
+      return;
+    }
+    const r = await window.pbApi.listPrinters();
+    if (!r.ok || !r.printers) {
+      this.printers.set([]);
+      if (r.error) this.status.set(r.error);
+      return;
+    }
+    this.printers.set(
+      r.printers.map((p) => ({
+        name: p.name,
+        displayName: p.displayName || p.name,
+        isDefault: !!p.isDefault,
+        driverName: p.driverName || '',
+        portName: p.portName || '',
+        isIppClass: !!p.isIppClass,
+        isCanonDriver: !!p.isCanonDriver,
+      })),
+    );
+    if (
+      this.draftPrint.printerName &&
+      !r.printers.some((p) => p.name === this.draftPrint.printerName)
+    ) {
+      this.status.set(
+        `Saved printer “${this.draftPrint.printerName}” is not currently available. Pick another or use Windows default.`,
+      );
+    } else {
+      const selected = r.printers.find((p) => p.name === this.draftPrint.printerName);
+      if (selected?.isIppClass) {
+        this.status.set(
+          'Selected printer uses Microsoft IPP/WSD — often grayscale + wrong layout. Prefer the USB Canon SELPHY queue, or add Wi‑Fi with the real Canon driver (see notes below).',
+        );
+      }
+    }
+  }
+
+  printerLabel(p: PrinterOption): string {
+    const tags: string[] = [];
+    if (p.isDefault) tags.push('Windows default');
+    if (p.isCanonDriver) tags.push('Canon driver');
+    if (p.isIppClass) tags.push('IPP — avoid');
+    const tag = tags.length ? ` [${tags.join(', ')}]` : '';
+    const drv = p.driverName ? ` — ${p.driverName}` : '';
+    return `${p.displayName}${tag}${drv}`;
+  }
+
+  selectedPrinter(): PrinterOption | null {
+    const name = this.draftPrint.printerName;
+    if (!name) return null;
+    return this.printers().find((p) => p.name === name) ?? null;
+  }
+
+  async savePrint(): Promise<void> {
+    this.status.set(null);
+    this.busy.set(true);
+    try {
+      const ok = await this.booth.save({
+        print: {
+          enabled: !!this.draftPrint.enabled,
+          printerName: this.draftPrint.printerName?.trim() || null,
+          bleedScale: this.draftPrint.bleedScale ?? 1.06,
+        },
+      });
+      if (ok) {
+        this.syncFromService();
+        const sel = this.selectedPrinter();
+        if (this.draftPrint.enabled && sel?.isIppClass) {
+          this.status.set(
+            'Saved — but this queue is IPP. Expect grayscale/wrong layout until you switch to USB Canon or a Canon TCP/IP queue.',
+          );
+        } else {
+          this.status.set(
+            this.draftPrint.enabled
+              ? 'Print enabled (SELPHY 6×4, borderless bleed). Guests see a one-shot Print button.'
+              : 'Print settings saved (printing disabled).',
+          );
+        }
+      } else {
+        this.status.set('Save failed (run in Electron).');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async openWindowsPrinters(): Promise<void> {
+    if (!window.pbApi) {
+      this.status.set('Open Windows Settings → Printers & scanners manually.');
+      return;
+    }
+    // Reuse logs folder opener pattern — add a dedicated IPC would be nicer; use shell via log for now
+    this.status.set(
+      'Open Windows Settings → Bluetooth & devices → Printers & scanners. Prefer the USB Canon SELPHY entry, or add Wi‑Fi with Canon’s driver (not “IPP”).',
+    );
   }
 
   async uploadPhotoFrame(): Promise<void> {

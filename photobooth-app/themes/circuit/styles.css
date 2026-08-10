@@ -275,7 +275,7 @@ body {
   contain: layout style paint;
 }
 
-/* Horizontal LED strips — cyan + brand red accent */
+/* Horizontal LED strips — static accents (no continuous scan; avoids idle GPU heat) */
 .pb-backdrop-el--1 {
   top: 11%;
   left: -5%;
@@ -285,13 +285,12 @@ body {
     90deg,
     transparent 0%,
     rgba(34, 211, 238, 0.12) 18%,
-    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.45) 50%,
     rgba(187, 22, 43, 0.2) 82%,
     transparent 100%
   );
-  background-size: 260% 100%;
-  box-shadow: 0 0 18px rgba(34, 211, 238, 0.35);
-  animation: pb-circuit-led-scan 4s linear infinite;
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.28);
+  opacity: 0.85;
 }
 
 .pb-backdrop-el--2 {
@@ -303,16 +302,14 @@ body {
     90deg,
     transparent 0%,
     rgba(34, 211, 238, 0.18) 35%,
-    rgba(56, 189, 248, 0.55) 50%,
+    rgba(56, 189, 248, 0.45) 50%,
     rgba(34, 211, 238, 0.18) 65%,
     transparent 100%
   );
-  background-size: 220% 100%;
-  animation: pb-circuit-led-scan 5.2s linear infinite reverse;
-  opacity: 0.88;
+  opacity: 0.75;
 }
 
-/* PCB-style traces */
+/* PCB-style traces — static */
 .pb-backdrop-el--3 {
   width: 135%;
   height: 2px;
@@ -328,8 +325,7 @@ body {
     transparent 19px,
     transparent 44px
   );
-  opacity: 0.38;
-  animation: pb-circuit-power-drift 32s ease-in-out infinite alternate;
+  opacity: 0.35;
 }
 
 .pb-backdrop-el--4 {
@@ -347,8 +343,7 @@ body {
     transparent 27px,
     transparent 52px
   );
-  opacity: 0.42;
-  animation: pb-circuit-power-drift-b 38s ease-in-out infinite alternate-reverse;
+  opacity: 0.4;
 }
 
 @keyframes pb-circuit-led-scan {

@@ -14,6 +14,7 @@ import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { BoothLogService } from '../../services/booth-log.service';
 import { AiStyleService } from '../../services/ai-style.service';
+import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
 
@@ -42,6 +43,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   private readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly boothLog = inject(BoothLogService);
+  private readonly galleryUpload = inject(GalleryUploadService);
   readonly copy = this.booth.copy;
 
   /** Label for the style chosen on `/ai-mode`, if any. */
@@ -79,6 +81,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   private previewTimer?: ReturnType<typeof setInterval>;
   private countdownTimer?: ReturnType<typeof setInterval>;
   private readyWatchTimer?: ReturnType<typeof setTimeout>;
+  private visibilityHandler?: () => void;
   private mediaStream?: MediaStream;
   private previewPath = '';
   private started = false;
@@ -126,6 +129,21 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       this.startSdkPreview();
       this.watchForPreviewReady();
     }
+    this.visibilityHandler = () => {
+      if (document.hidden) {
+        this.pauseSdkPreview();
+      } else if (!this.destroyed && !this.useWebcam() && !this.cameraFailed() && this.started) {
+        this.startSdkPreview();
+      }
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  private pauseSdkPreview(): void {
+    if (this.previewTimer) {
+      clearInterval(this.previewTimer);
+      this.previewTimer = undefined;
+    }
   }
 
   async retryCamera(): Promise<void> {
@@ -149,7 +167,8 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private startSdkPreview(): void {
-    if (!this.previewPath) return;
+    if (!this.previewPath || this.destroyed || document.hidden) return;
+    if (this.previewTimer) return;
     const fps = previewTargetFps();
     const intervalMs = Math.max(24, Math.round(1000 / fps));
     this.previewTimer = setInterval(() => {
@@ -159,10 +178,11 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   /** One preview poll; RAF-coalesced so bursty timers do not pile up on slow devices. */
   private async tickSdkPreview(): Promise<void> {
-    if (this.previewRafPending) return;
+    if (this.destroyed || document.hidden || this.previewRafPending) return;
     this.previewRafPending = true;
     requestAnimationFrame(async () => {
       this.previewRafPending = false;
+      if (this.destroyed || document.hidden || !this.previewTimer) return;
       try {
         const res = await this.camera.previewFrame(this.previewPath);
         this.applyPreviewResult(res);
@@ -425,6 +445,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       await this.router.navigate(['/frame'], { state: { path: filePath } });
       return;
     }
+    this.galleryUpload.queueUpload(filePath, 'original');
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
@@ -465,6 +486,10 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = undefined;
+    }
     if (this.previewTimer) clearInterval(this.previewTimer);
     if (this.readyWatchTimer) clearTimeout(this.readyWatchTimer);
     this.clearCountdown();

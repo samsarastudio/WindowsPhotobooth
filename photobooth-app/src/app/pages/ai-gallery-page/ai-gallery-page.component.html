@@ -53,9 +53,28 @@
       <button type="button" class="pb-btn pb-btn-ghost" (click)="backToResult()">
         {{ copy().result.galleryBackToResult }}
       </button>
+      @if (showPrint()) {
+        <button
+          type="button"
+          class="pb-btn pb-btn-primary"
+          [disabled]="!canPrint()"
+          (click)="printOnce()"
+        >
+          @if (printBusy()) {
+            {{ copy().result.printing }}
+          } @else if (printDone()) {
+            {{ copy().result.printed }}
+          } @else {
+            {{ copy().result.print }}
+          }
+        </button>
+      }
       <button type="button" class="pb-btn pb-btn-primary" (click)="finish()">
         {{ copy().result.galleryFinish }}
       </button>
     </div>
+    @if (printErr(); as pe) {
+      <p class="pb-msg">{{ copy().result.printFailed }}: {{ pe }}</p>
+    }
   </div>
 </div>

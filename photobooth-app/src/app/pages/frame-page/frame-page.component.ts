@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { BoothConfigService } from '../../services/booth-config.service';
+import { GalleryUploadService } from '../../services/gallery-upload.service';
 
 interface FrameItem {
   filename: string;
@@ -15,6 +16,7 @@ interface FrameItem {
 })
 export class FramePageComponent implements OnInit {
   private readonly booth = inject(BoothConfigService);
+  private readonly galleryUpload = inject(GalleryUploadService);
   private readonly router = inject(Router);
   readonly copy = this.booth.copy;
 
@@ -106,6 +108,8 @@ export class FramePageComponent implements OnInit {
         photoScale: this.booth.photoFrames().photoScale,
       });
       if (r.ok && r.path) {
+        this.galleryUpload.queueUpload(photo, 'original');
+        this.galleryUpload.queueUpload(r.path, 'framed');
         await this.router.navigate(['/result'], { state: { path: r.path } });
       } else {
         this.err.set(r.error ?? 'Could not apply frame.');
@@ -118,6 +122,7 @@ export class FramePageComponent implements OnInit {
   async skipFrame(): Promise<void> {
     const photo = this.photoPath();
     if (!photo) return;
+    this.galleryUpload.queueUpload(photo, 'original');
     await this.router.navigate(['/result'], { state: { path: photo } });
   }
 }

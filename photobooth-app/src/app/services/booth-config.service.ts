@@ -5,7 +5,9 @@ import type {
   PhotoboothConfig,
   PhotoboothBranding,
   PhotoboothCopy,
+  PhotoboothGalleryConfig,
   PhotoboothPhotoFramesConfig,
+  PhotoboothPrintConfig,
 } from '../models/photobooth-config.model';
 import {
   PLAIN_PHOTO_MODE_ID,
@@ -13,7 +15,9 @@ import {
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_GALLERY,
   PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
+  PHOTOBOOTH_DEFAULT_PRINT,
 } from '../models/photobooth-config.model';
 
 function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): PhotoboothCopy {
@@ -138,24 +142,22 @@ function normalizePhotoFramesConfig(
 ): PhotoboothPhotoFramesConfig {
   const base = PHOTOBOOTH_DEFAULT_PHOTO_FRAMES;
   if (!patch) return { ...base, guestFrameFiles: [...base.guestFrameFiles] };
-  const photoScaleRaw = patch.photoScale;
-  const photoScale =
-    typeof photoScaleRaw === 'number' && Number.isFinite(photoScaleRaw)
-      ? Math.min(1, Math.max(0.5, photoScaleRaw))
+  let photoScale =
+    typeof patch.photoScale === 'number' && !Number.isNaN(patch.photoScale)
+      ? patch.photoScale
       : base.photoScale;
-  const defRaw = patch.defaultFrameFile;
-  const defaultFrameFile =
-    defRaw === null || defRaw === undefined
-      ? base.defaultFrameFile
-      : typeof defRaw === 'string' && defRaw.trim()
-        ? pathBasenameSafe(defRaw.trim())
-        : null;
+  photoScale = Math.min(1, Math.max(0.5, photoScale));
+  let defaultFrameFile =
+    typeof patch.defaultFrameFile === 'string' && patch.defaultFrameFile.trim()
+      ? pathBasenameSafe(patch.defaultFrameFile.trim())
+      : patch.defaultFrameFile === null
+        ? null
+        : base.defaultFrameFile;
   let guestFrameFiles: string[] = [...base.guestFrameFiles];
   if (Array.isArray(patch.guestFrameFiles)) {
     guestFrameFiles = patch.guestFrameFiles
-      .filter((f): f is string => typeof f === 'string' && !!f.trim())
-      .map((f) => pathBasenameSafe(f.trim()));
-    // Allow sentinel __none__ through (means show no frames to guests)
+      .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      .map((x) => pathBasenameSafe(x.trim()));
     if (patch.guestFrameFiles.includes('__none__')) {
       guestFrameFiles = ['__none__'];
     }
@@ -165,6 +167,59 @@ function normalizePhotoFramesConfig(
     photoScale,
     defaultFrameFile,
     guestFrameFiles,
+  };
+}
+
+function normalizeGalleryConfig(
+  patch?: Partial<PhotoboothGalleryConfig> | null,
+): PhotoboothGalleryConfig {
+  const base = PHOTOBOOTH_DEFAULT_GALLERY;
+  if (!patch) return { ...base };
+  const apiBaseUrl =
+    typeof patch.apiBaseUrl === 'string' && patch.apiBaseUrl.trim()
+      ? patch.apiBaseUrl.trim().replace(/\/$/, '')
+      : base.apiBaseUrl;
+  const sessionPrefix =
+    typeof patch.sessionPrefix === 'string' && patch.sessionPrefix.trim()
+      ? patch.sessionPrefix
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '') || base.sessionPrefix
+      : base.sessionPrefix;
+  return {
+    enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
+    apiBaseUrl,
+    uploadToken: typeof patch.uploadToken === 'string' ? patch.uploadToken : base.uploadToken,
+    sessionPrefix,
+    uploadOriginal:
+      typeof patch.uploadOriginal === 'boolean' ? patch.uploadOriginal : base.uploadOriginal,
+    uploadFramed: typeof patch.uploadFramed === 'boolean' ? patch.uploadFramed : base.uploadFramed,
+    uploadAi: typeof patch.uploadAi === 'boolean' ? patch.uploadAi : base.uploadAi,
+  };
+}
+
+function normalizePrintConfig(
+  patch?: Partial<PhotoboothPrintConfig> | null,
+): PhotoboothPrintConfig {
+  const base = PHOTOBOOTH_DEFAULT_PRINT;
+  if (!patch) return { ...base };
+  const nameRaw = patch.printerName;
+  const printerName =
+    nameRaw === null || nameRaw === undefined
+      ? base.printerName
+      : typeof nameRaw === 'string' && nameRaw.trim()
+        ? nameRaw.trim()
+        : null;
+  let bleedScale =
+    typeof patch.bleedScale === 'number' && Number.isFinite(patch.bleedScale)
+      ? patch.bleedScale
+      : base.bleedScale;
+  bleedScale = Math.min(1.12, Math.max(1.0, bleedScale));
+  return {
+    enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
+    printerName,
+    bleedScale,
   };
 }
 
@@ -196,6 +251,12 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const photoFrames = normalizePhotoFramesConfig(
     (rest['photoFrames'] as Partial<PhotoboothPhotoFramesConfig> | undefined) ?? undefined,
   );
+  const gallery = normalizeGalleryConfig(
+    (rest['gallery'] as Partial<PhotoboothGalleryConfig> | undefined) ?? undefined,
+  );
+  const print = normalizePrintConfig(
+    (rest['print'] as Partial<PhotoboothPrintConfig> | undefined) ?? undefined,
+  );
   const requireQrUnlock =
     typeof rest['requireQrUnlock'] === 'boolean' ? rest['requireQrUnlock'] : false;
   const aiGenerationEnabled =
@@ -210,6 +271,8 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     branding,
     camera,
     photoFrames,
+    gallery,
+    print,
     copy,
     requireQrUnlock,
     aiGenerationEnabled,
@@ -219,11 +282,15 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   };
 }
 
-export type BoothAdminSavePartial = Partial<Omit<PhotoboothConfig, 'branding' | 'camera' | 'photoFrames'>> & {
+export type BoothAdminSavePartial = Partial<
+  Omit<PhotoboothConfig, 'branding' | 'camera' | 'photoFrames' | 'gallery' | 'print'>
+> & {
   openAiApiKey?: string;
   branding?: Partial<PhotoboothBranding>;
   camera?: Partial<PhotoboothCameraConfig>;
   photoFrames?: Partial<PhotoboothPhotoFramesConfig>;
+  gallery?: Partial<PhotoboothGalleryConfig>;
+  print?: Partial<PhotoboothPrintConfig>;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -237,6 +304,8 @@ export class BoothConfigService {
   readonly photoFrames = computed(
     () => this.state()?.photoFrames ?? PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
   );
+  readonly gallery = computed(() => this.state()?.gallery ?? PHOTOBOOTH_DEFAULT_GALLERY);
+  readonly print = computed(() => this.state()?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
   readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'inmoment');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
@@ -270,6 +339,8 @@ export class BoothConfigService {
         branding: PHOTOBOOTH_DEFAULT_BRANDING,
         camera: { ...PHOTOBOOTH_DEFAULT_CAMERA },
         photoFrames: { ...PHOTOBOOTH_DEFAULT_PHOTO_FRAMES },
+        gallery: { ...PHOTOBOOTH_DEFAULT_GALLERY },
+        print: { ...PHOTOBOOTH_DEFAULT_PRINT },
         copy: PHOTOBOOTH_DEFAULT_COPY,
         requireQrUnlock: false,
         aiGenerationEnabled: false,

@@ -1,9 +1,11 @@
-import { Component, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import QRCode from 'qrcode';
 import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
+import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
 @Component({
@@ -15,6 +17,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly gallerySession = inject(AiGallerySessionService);
+  readonly galleryUpload = inject(GalleryUploadService);
   readonly copy = this.booth.copy;
 
   readonly path = signal<string | null>(null);
@@ -25,20 +28,40 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly aiGenerating = signal(false);
   readonly aiErr = signal<string | null>(null);
   readonly aiModelUsed = signal<string | null>(null);
-  /** UI phases while waiting on the Images API — not streamed model reasoning. */
   readonly thinkingStep = signal(0);
-  /** Approximate countdown shown while generation runs. */
   readonly aiEtaSec = signal(22);
   readonly aiElapsedSec = signal(0);
   readonly aiEtaLabel = computed(() => this.formatDuration(this.aiEtaSec()));
   readonly aiElapsedLabel = computed(() => this.formatDuration(this.aiElapsedSec()));
   readonly aiOvertime = computed(() => this.aiEtaSec() <= 0);
 
-  private aiTimer?: ReturnType<typeof setInterval>;
+  readonly shareOpen = signal(false);
+  readonly shareQrDataUrl = signal<string | null>(null);
+  readonly shareBusy = signal(false);
 
-  /**
-   * Guest chose an AI style (not plain photocapture) while AI flow is enabled.
-   */
+  readonly printBusy = signal(false);
+  readonly printDone = signal(false);
+  readonly printErr = signal<string | null>(null);
+
+  readonly uploadRecord = computed(() => this.galleryUpload.recordFor(this.path()));
+  readonly canShare = computed(() => {
+    if (!this.galleryUpload.enabled()) return false;
+    const r = this.uploadRecord();
+    return r?.status === 'ok' && !!r.shareUrl;
+  });
+  readonly shareUploading = computed(() => {
+    if (!this.galleryUpload.enabled()) return false;
+    const r = this.uploadRecord();
+    return !r || r.status === 'pending';
+  });
+  readonly showPrint = computed(() => this.booth.print().enabled === true);
+  readonly canPrint = computed(
+    () => this.showPrint() && !!this.path() && !this.printBusy() && !this.printDone(),
+  );
+
+  private aiTimer?: ReturnType<typeof setInterval>;
+  private sharePoll?: ReturnType<typeof setInterval>;
+
   readonly showAiSection = computed(() => {
     if (!this.booth.aiGenerationEnabled()) return false;
     const id = this.aiStyle.selectedModeId();
@@ -91,6 +114,18 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     } catch (e) {
       this.err.set(String(e));
     }
+
+    // Poll briefly so Share appears when a background upload finishes.
+    if (this.galleryUpload.enabled()) {
+      this.sharePoll = setInterval(() => {
+        // touch computed by reading record
+        void this.galleryUpload.recordFor(this.path());
+        if (this.canShare() && this.sharePoll) {
+          clearInterval(this.sharePoll);
+          this.sharePoll = undefined;
+        }
+      }, 400);
+    }
   }
 
   async generateAi(): Promise<void> {
@@ -135,6 +170,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.aiModelUsed.set(r.model ?? null);
+      this.galleryUpload.queueUpload(r.path, 'ai');
       this.gallerySession.setPair(pp, r.path);
       void this.router.navigate(['/ai-gallery']);
     } catch (e) {
@@ -146,8 +182,59 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async openShare(): Promise<void> {
+    const url = this.galleryUpload.shareUrlFor(this.path());
+    if (!url) return;
+    this.shareBusy.set(true);
+    try {
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 320,
+        margin: 2,
+        color: { dark: '#1c1a17', light: '#ffffff' },
+      });
+      this.shareQrDataUrl.set(dataUrl);
+      this.shareOpen.set(true);
+    } catch (e) {
+      this.aiErr.set(String(e));
+    } finally {
+      this.shareBusy.set(false);
+    }
+  }
+
+  closeShare(): void {
+    this.shareOpen.set(false);
+  }
+
+  async printOnce(): Promise<void> {
+    if (!this.canPrint()) return;
+    const pp = this.path();
+    if (!pp || !window.pbApi?.printPhoto) {
+      this.printErr.set('Printing requires Electron.');
+      return;
+    }
+    this.printBusy.set(true);
+    this.printErr.set(null);
+    try {
+      const deviceName = this.booth.print().printerName;
+      const r = await window.pbApi.printPhoto({
+        filePath: pp,
+        deviceName: deviceName || undefined,
+      });
+      if (!r.ok) {
+        this.printErr.set(r.error ?? 'Print failed.');
+        return;
+      }
+      this.printDone.set(true);
+    } catch (e) {
+      this.printErr.set(String(e));
+    } finally {
+      this.printBusy.set(false);
+    }
+  }
+
   retake(): void {
     this.gallerySession.clear();
+    this.galleryUpload.clearGuestSession();
     this.aiErr.set(null);
     void this.camera.closeSession().catch(() => {});
     void this.router.navigate(['/capture']);
@@ -156,6 +243,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   submit(): void {
     this.stopAiCountdown();
     this.gallerySession.clear();
+    this.galleryUpload.clearGuestSession();
     this.aiStyle.clear();
     void this.camera.closeSession().catch(() => {});
     void this.router.navigate(['/']);
@@ -170,6 +258,10 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopAiCountdown();
+    if (this.sharePoll) {
+      clearInterval(this.sharePoll);
+      this.sharePoll = undefined;
+    }
   }
 
   private startAiCountdown(seconds: number): void {

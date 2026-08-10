@@ -28,6 +28,12 @@
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'frames'" (click)="setTab('frames')">
             Frames
           </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'gallery'" (click)="setTab('gallery')">
+            Gallery
+          </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'print'" (click)="setTab('print')">
+            Print
+          </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'ai'" (click)="setTab('ai')">
             AI
           </button>
@@ -137,6 +143,14 @@
           <input class="pb-input" [(ngModel)]="draft.result.galleryBackToResult" />
           <label>Gallery finish</label>
           <input class="pb-input" [(ngModel)]="draft.result.galleryFinish" />
+          <label>Print (one-shot button)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.print" />
+          <label>Printing status</label>
+          <input class="pb-input" [(ngModel)]="draft.result.printing" />
+          <label>Printed status</label>
+          <input class="pb-input" [(ngModel)]="draft.result.printed" />
+          <label>Print failed prefix</label>
+          <input class="pb-input" [(ngModel)]="draft.result.printFailed" />
           <label>AI progress panel title</label>
           <input class="pb-input" [(ngModel)]="draft.result.thinkingSummary" />
           <label>Progress step 1</label>
@@ -455,6 +469,135 @@
           <div class="pb-row pb-row-wrap">
             <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveBranding()">
               Save brand settings
+            </button>
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (tab === 'gallery') {
+      <div class="pb-admin-gallery">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Moments gallery upload</h2>
+          <p class="pb-hint">
+            Push every capture variant (original, framed, AI) to the Moments server. Sessions are
+            auto-created per day as <code>{{ todayGallerySlug() }}</code>. Expiry is managed in
+            gallery Admin at <code>/admin</code> on the Moments host.
+          </p>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGallery.enabled" />
+            Enable gallery upload
+          </label>
+          <label>API base URL</label>
+          <input class="pb-input" [(ngModel)]="draftGallery.apiBaseUrl" placeholder="https://moments.inmomentservices.com" />
+          <label>Upload token</label>
+          <input class="pb-input" type="password" [(ngModel)]="draftGallery.uploadToken" autocomplete="off" />
+          <label>Session prefix (daily slug)</label>
+          <input class="pb-input" [(ngModel)]="draftGallery.sessionPrefix" />
+          <p class="pb-hint pb-hint-tight">
+            Today’s gallery:
+            @if (todayGalleryUrl()) {
+              <a [href]="todayGalleryUrl()" target="_blank" rel="noopener">{{ todayGalleryUrl() }}</a>
+            } @else {
+              set a base URL first
+            }
+          </p>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGallery.uploadOriginal" />
+            Upload originals
+          </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGallery.uploadFramed" />
+            Upload framed composites
+          </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGallery.uploadAi" />
+            Upload AI variants
+          </label>
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveGallery()">
+              Save gallery settings
+            </button>
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (tab === 'print') {
+      <div class="pb-admin-print">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Photo printing (Canon SELPHY)</h2>
+          <p class="pb-hint">
+            Postcard <strong>6×4</strong> (6&quot; wide × 4&quot; high), color, borderless. Kiosk-safe (no Windows print dialog).
+          </p>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftPrint.enabled" />
+            Enable printing on the result / final page
+          </label>
+          <label>Printer queue</label>
+          <select class="pb-input" [(ngModel)]="draftPrint.printerName">
+            <option [ngValue]="null">Windows default printer</option>
+            @for (p of printers(); track p.name) {
+              <option [ngValue]="p.name">{{ printerLabel(p) }}</option>
+            }
+          </select>
+          @if (selectedPrinter(); as sp) {
+            <p class="pb-hint pb-hint-tight">
+              Driver: <code>{{ sp.driverName || 'unknown' }}</code>
+              · Port: <code>{{ sp.portName || 'unknown' }}</code>
+              @if (sp.isCanonDriver) {
+                · <strong>Canon driver — good</strong>
+              }
+              @if (sp.isIppClass) {
+                · <strong>IPP/WSD — often grayscale + portrait (not recommended)</strong>
+              }
+            </p>
+          }
+          <label>Borderless bleed (USB white-edge fix)</label>
+          <input
+            class="pb-input"
+            type="number"
+            min="1"
+            max="1.12"
+            step="0.01"
+            [(ngModel)]="draftPrint.bleedScale"
+          />
+          <p class="pb-hint pb-hint-tight">
+            Default <code>1.06</code> overscans ~6% past the postcard edges so USB SELPHY prints don’t show a thin white border.
+            Use <code>1.03</code>–<code>1.08</code> if you still see white or too much crop.
+          </p>
+
+          <h3 class="pb-admin-subhead">USB (recommended / backup)</h3>
+          <p class="pb-hint pb-hint-tight">
+            Plug SELPHY in by USB and choose the queue whose driver name contains <strong>Canon</strong> /
+            <strong>SELPHY</strong>. That path is confirmed correct for color + 6×4.
+          </p>
+
+          <h3 class="pb-admin-subhead">Wi‑Fi / IPP (fix if wrong)</h3>
+          <p class="pb-hint pb-hint-tight">
+            Windows “IPP” or “Microsoft IPP Class Driver” queues often print <strong>grayscale</strong>,
+            <strong>portrait</strong>, and crop badly. That is a driver problem — not the booth app.
+            To use Wi‑Fi correctly:
+          </p>
+          <ol class="pb-hint pb-admin-steps">
+            <li>Install the official <strong>Canon SELPHY CP1500</strong> driver/software from Canon.</li>
+            <li>In Windows Printers &amp; scanners, remove the IPP/WSD SELPHY queue if it misbehaves.</li>
+            <li>
+              Add the printer again with the <strong>Canon</strong> driver on a
+              <strong>Standard TCP/IP</strong> port (SELPHY’s IP), not “Internet Printing Protocol”.
+            </li>
+            <li>Refresh printers here and select that Canon Wi‑Fi queue — or keep USB as the booth default.</li>
+          </ol>
+
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="savePrint()">
+              Save print settings
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="refreshPrinters()">
+              Refresh printers
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" (click)="openWindowsPrinters()">
+              How to fix Wi‑Fi driver
             </button>
           </div>
         </section>

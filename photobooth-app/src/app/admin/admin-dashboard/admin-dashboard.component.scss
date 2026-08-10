@@ -264,6 +264,12 @@
   font-size: 0.95rem;
 }
 
+.pb-admin-steps {
+  margin: 0.35rem 0 0.85rem 1.15rem;
+  padding: 0;
+  line-height: 1.45;
+}
+
 .pb-admin-frame-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

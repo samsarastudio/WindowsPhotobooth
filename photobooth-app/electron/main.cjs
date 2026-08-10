@@ -3,8 +3,12 @@ const path = require('path');
 const { pathToFileURL, URL } = require('url');
 const https = require('https');
 const fs = require('fs');
-const { spawn, execFileSync } = require('child_process');
+const os = require('os');
+const { spawn, execFile, execFileSync } = require('child_process');
+const { promisify } = require('util');
 const readline = require('readline');
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Writable data beside the portable launcher (config, capture, user themes).
@@ -973,10 +977,40 @@ let mainWindow = null;
 let bridgeProc = null;
 let bridgeReadline = null;
 const bridgeQueue = [];
+/** Delayed full release after `close` — cancelled if another camera cmd arrives (close→init). */
+let bridgeReleaseTimer = null;
+
+function cancelBridgeRelease() {
+  if (bridgeReleaseTimer) {
+    clearTimeout(bridgeReleaseTimer);
+    bridgeReleaseTimer = null;
+  }
+}
+
+function scheduleBridgeRelease() {
+  cancelBridgeRelease();
+  bridgeReleaseTimer = setTimeout(() => {
+    bridgeReleaseTimer = null;
+    void (async () => {
+      try {
+        if (bridgeProc && !bridgeProc.killed) {
+          await sendBridge({ cmd: 'shutdown' });
+        }
+      } catch (e) {
+        appendAppLog('warn', 'edsdk-bridge', 'deferred shutdown', String(e));
+      } finally {
+        killBridge();
+      }
+    })();
+  }, 800);
+}
 
 function killBridge() {
+  cancelBridgeRelease();
   if (bridgeReadline) {
-    bridgeReadline.close();
+    try {
+      bridgeReadline.close();
+    } catch (_) {}
     bridgeReadline = null;
   }
   if (bridgeProc) {
@@ -984,6 +1018,26 @@ function killBridge() {
       bridgeProc.kill();
     } catch (_) {}
     bridgeProc = null;
+  }
+  while (bridgeQueue.length) {
+    const p = bridgeQueue.shift();
+    try {
+      p.reject(new Error('Bridge killed'));
+    } catch (_) {}
+  }
+}
+
+/** Orphan bridges hold the Canon USB lock and make the next session fail. */
+function killOrphanBridgeProcesses() {
+  if (process.platform !== 'win32') return;
+  try {
+    execFileSync('taskkill', ['/F', '/IM', 'edsdk-bridge.exe', '/T'], {
+      windowsHide: true,
+      stdio: 'ignore',
+    });
+    appendAppLog('info', 'edsdk-bridge', 'cleared orphan edsdk-bridge.exe processes');
+  } catch (_) {
+    /* none running — taskkill exits non-zero */
   }
 }
 
@@ -1001,6 +1055,9 @@ function ensureBridgeProcess() {
     });
     return false;
   }
+
+  // Ensure no leftover bridge from a crashed/previous run owns the camera.
+  killOrphanBridgeProcesses();
 
   appendAppLog('info', 'edsdk-bridge', 'spawning', { exe, cwd: path.dirname(exe) });
   const cwd = path.dirname(exe);
@@ -1032,11 +1089,19 @@ function ensureBridgeProcess() {
   bridgeProc.on('exit', (code, signal) => {
     appendAppLog('warn', 'edsdk-bridge', 'process exited', { code, signal });
     bridgeProc = null;
-    bridgeReadline = null;
-    while (bridgeQueue.length) {
-      const p = bridgeQueue.shift();
-      p.reject(new Error('Bridge exited'));
-    }
+    // Let a final stdout line resolve before rejecting leftovers (shutdown race).
+    setImmediate(() => {
+      if (bridgeReadline) {
+        try {
+          bridgeReadline.close();
+        } catch (_) {}
+        bridgeReadline = null;
+      }
+      while (bridgeQueue.length) {
+        const p = bridgeQueue.shift();
+        p.reject(new Error('Bridge exited'));
+      }
+    });
   });
 
   return true;
@@ -1046,6 +1111,10 @@ const BRIDGE_CMD_TIMEOUT_MS = 8000;
 
 function sendBridge(jsonObj) {
   return new Promise((resolve) => {
+    // Any live camera command cancels a pending idle release (e.g. close → init).
+    if (jsonObj?.cmd !== 'shutdown') {
+      cancelBridgeRelease();
+    }
     if (!ensureBridgeProcess()) {
       resolve({ ok: false, err: 'NO_BRIDGE', msg: 'edsdk-bridge.exe not found next to app' });
       return;
@@ -1207,6 +1276,11 @@ ipcMain.handle('camera:invoke', async (_e, cmd) => {
       res.readErr = String(err);
       appendAppLog('warn', 'camera', 'preview url failed', String(err));
     }
+  }
+  // After close, release the bridge once idle so Canon isn't held warm between guests.
+  // Debounced + cancelled by the next cmd so close→init on capture open still works.
+  if (cmdName === 'close' && res && res.ok) {
+    scheduleBridgeRelease();
   }
   return res;
 });
@@ -1921,5 +1995,424 @@ ipcMain.handle('admin:exportThemeTemplate', async () => {
     return { ok: true, path: out };
   } catch (e) {
     return { ok: false, error: String(e) };
+  }
+});
+
+function galleryBaseUrl(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/\/$/, '');
+}
+
+async function galleryFetchJson(url, opts) {
+  const res = await fetch(url, opts);
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {
+    data = null;
+  }
+  return { res, data };
+}
+
+ipcMain.handle('gallery:ensureDaySession', async (_e, payload) => {
+  try {
+    const base = galleryBaseUrl(payload?.apiBaseUrl);
+    const token = String(payload?.uploadToken || '').trim();
+    const eventPrefix = String(payload?.eventPrefix || 'session').trim() || 'session';
+    if (!base || !token) {
+      return { ok: false, error: 'Gallery API URL and upload token are required.' };
+    }
+    const { res, data } = await galleryFetchJson(`${base}/api/sessions/day`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventPrefix }),
+    });
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: data?.error || `HTTP ${res.status}` };
+    }
+    return {
+      ok: true,
+      slug: data.session?.slug,
+      galleryUrl: data.session?.galleryUrl,
+      expiresAt: data.session?.expiresAt,
+    };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
+  try {
+    const base = galleryBaseUrl(payload?.apiBaseUrl);
+    const token = String(payload?.uploadToken || '').trim();
+    const eventPrefix = String(payload?.eventPrefix || 'session').trim() || 'session';
+    const variant = String(payload?.variant || 'original');
+    const filePath = String(payload?.filePath || '');
+    if (!base || !token) {
+      return { ok: false, error: 'Gallery API URL and upload token are required.' };
+    }
+    if (!filePath) return { ok: false, error: 'Missing filePath' };
+    const abs = path.resolve(filePath);
+    const captureRoot = path.resolve(getCaptureDir());
+    if (!isPathUnder(abs, captureRoot)) {
+      return { ok: false, error: 'Photo path outside capture directory.' };
+    }
+    if (!fs.existsSync(abs)) return { ok: false, error: 'Photo file not found.' };
+
+    const ensure = await galleryFetchJson(`${base}/api/sessions/day`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventPrefix }),
+    });
+    if (!ensure.res.ok || !ensure.data?.ok) {
+      return { ok: false, error: ensure.data?.error || `Session HTTP ${ensure.res.status}` };
+    }
+    const slug = ensure.data.session?.slug;
+    if (!slug) return { ok: false, error: 'No session slug returned' };
+
+    const FormData = require('form-data');
+    const buf = fs.readFileSync(abs);
+    const ext = path.extname(abs).toLowerCase();
+    const mime =
+      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+    const form = new FormData();
+    form.append('photo', buf, {
+      filename: path.basename(abs),
+      contentType: mime,
+      knownLength: buf.length,
+    });
+    form.append('variant', variant);
+    form.append('sourceLocalName', path.basename(abs));
+
+    const uploadUrl = `${base}/api/sessions/${encodeURIComponent(slug)}/photos`;
+    const bodyBuf = form.getBuffer();
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...form.getHeaders(),
+        'Content-Length': String(bodyBuf.length),
+      },
+      body: bodyBuf,
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (_) {}
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: data?.error || `Upload HTTP ${res.status}` };
+    }
+    return {
+      ok: true,
+      slug,
+      photoId: data.photo?.id,
+      shareUrl: data.photo?.shareUrl,
+      url: data.photo?.url,
+      variant: data.photo?.variant,
+    };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('print:listPrinters', async () => {
+  try {
+    /** Enrich with Win32 driver/port so admin can spot Microsoft IPP vs real Canon. */
+    let winDetails = [];
+    try {
+      const { stdout } = await execFileAsync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-Command',
+          `Get-CimInstance Win32_Printer | Select-Object Name,DriverName,PortName,Default | ConvertTo-Json -Compress`,
+        ],
+        { windowsHide: true, encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
+      );
+      const parsed = JSON.parse(String(stdout || '[]').trim() || '[]');
+      winDetails = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+    } catch (e) {
+      appendAppLog('warn', 'print', 'Win32_Printer enrich failed', String(e));
+    }
+
+    const byName = new Map();
+    for (const w of winDetails) {
+      if (w && w.Name) byName.set(String(w.Name), w);
+    }
+
+    const classify = (driverName, portName) => {
+      const d = String(driverName || '');
+      const p = String(portName || '');
+      const isIppClass = /ipp|wsd|microsoft\s+ipp|class\s+driver/i.test(d) || /ipp|wsd|https?:/i.test(p);
+      const isCanonDriver = /canon|selphy/i.test(d) && !isIppClass;
+      return { isIppClass, isCanonDriver };
+    };
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      // Still return Win32 list if Electron printers unavailable
+      const printers = winDetails.map((w) => {
+        const flags = classify(w.DriverName, w.PortName);
+        return {
+          name: String(w.Name),
+          displayName: String(w.Name),
+          description: String(w.DriverName || ''),
+          isDefault: !!w.Default,
+          status: 0,
+          driverName: String(w.DriverName || ''),
+          portName: String(w.PortName || ''),
+          ...flags,
+        };
+      });
+      return { ok: true, printers };
+    }
+
+    const electronPrinters = await mainWindow.webContents.getPrintersAsync();
+    const printers = (electronPrinters || []).map((p) => {
+      const w = byName.get(p.name);
+      const driverName = w ? String(w.DriverName || '') : '';
+      const portName = w ? String(w.PortName || '') : '';
+      const flags = classify(driverName, portName);
+      return {
+        name: p.name,
+        displayName: p.displayName || p.name,
+        description: p.description || driverName || '',
+        isDefault: !!p.isDefault || !!(w && w.Default),
+        status: p.status,
+        driverName,
+        portName,
+        ...flags,
+      };
+    });
+
+    // Include any Win32 printers Electron missed
+    for (const w of winDetails) {
+      const name = String(w.Name);
+      if (printers.some((p) => p.name === name)) continue;
+      const flags = classify(w.DriverName, w.PortName);
+      printers.push({
+        name,
+        displayName: name,
+        description: String(w.DriverName || ''),
+        isDefault: !!w.Default,
+        status: 0,
+        driverName: String(w.DriverName || ''),
+        portName: String(w.PortName || ''),
+        ...flags,
+      });
+    }
+
+    return { ok: true, printers };
+  } catch (e) {
+    appendAppLog('error', 'print', 'listPrinters failed', String(e));
+    return { ok: false, printers: [], error: String(e) };
+  }
+});
+
+/**
+ * Windows photo print for kiosk / Canon SELPHY CP1500 — postcard 6″×4″ landscape.
+ * Prefer the USB (or Canon TCP/IP) queue — Microsoft IPP Wi‑Fi queues print wrong.
+ */
+async function printPhotoViaWindowsSpooler(imagePath, printerName, bleedScale = 1.06) {
+  const abs = path.resolve(imagePath);
+  if (!fs.existsSync(abs)) {
+    throw new Error('Photo file not found.');
+  }
+  const bleed = Math.min(1.12, Math.max(1.0, Number(bleedScale) || 1.06));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-spool-'));
+  const ps1 = path.join(tmpDir, 'photoprint.ps1');
+  const script = `
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+$imgPath = ${psQuote(abs)}
+$printerName = ${printerName ? psQuote(printerName) : "''"}
+$bleed = ${bleed}
+$img = [System.Drawing.Image]::FromFile($imgPath)
+try {
+  $doc = New-Object System.Drawing.Printing.PrintDocument
+  $doc.DocumentName = 'PhotoBooth SELPHY'
+  $doc.OriginAtMargins = $false
+  $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
+
+  if ($printerName -and $printerName.Trim().Length -gt 0) {
+    $doc.PrinterSettings.PrinterName = $printerName
+  }
+  if (-not $doc.PrinterSettings.IsValid) {
+    throw "Printer is not valid or not installed: $printerName"
+  }
+
+  $drv = [string]$doc.PrinterSettings.PrinterName
+  # Soft warning path — IPP class drivers ignore color/layout; still attempt print
+  $script:driverNote = ''
+
+  $doc.PrinterSettings.Copies = 1
+  $doc.DefaultPageSettings.Color = $true
+  try { $doc.PrinterSettings.DefaultPageSettings.Color = $true } catch {}
+  $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+
+  # Canon SELPHY postcard: 6" wide × 4" high (landscape)
+  $chosenPaper = $null
+  foreach ($ps in $doc.PrinterSettings.PaperSizes) {
+    $n = [string]$ps.PaperName
+    if ($n -match '(?i)postcard|card\\s*size|4\\s*[x×]\\s*6|6\\s*[x×]\\s*4|100\\s*[x×]\\s*148|hagaki|kp-?108|l\\s*size') {
+      $chosenPaper = $ps
+      break
+    }
+  }
+  if ($chosenPaper -eq $null) {
+    foreach ($ps in $doc.PrinterSettings.PaperSizes) {
+      $a = [Math]::Min($ps.Width, $ps.Height)
+      $b = [Math]::Max($ps.Width, $ps.Height)
+      if ($a -ge 390 -and $a -le 420 -and $b -ge 580 -and $b -le 620) {
+        $chosenPaper = $ps
+        break
+      }
+    }
+  }
+  if ($chosenPaper -eq $null) {
+    $chosenPaper = New-Object System.Drawing.Printing.PaperSize('PhotoBooth 6x4', 600, 400)
+    try { $doc.PrinterSettings.PaperSizes.Add($chosenPaper) } catch {}
+  }
+  $doc.DefaultPageSettings.PaperSize = $chosenPaper
+  if ($chosenPaper.Width -ge $chosenPaper.Height) {
+    $doc.DefaultPageSettings.Landscape = $false
+  } else {
+    $doc.DefaultPageSettings.Landscape = $true
+  }
+
+  $script:pbImg = $img
+  $script:paperName = $chosenPaper.PaperName
+  $script:bleed = $bleed
+  $doc.add_PrintPage({
+    param($sender, $e)
+    # Use full physical page; overscan kills thin white borders on SELPHY USB
+    $page = $e.PageBounds
+    $iw = [double]$script:pbImg.Width
+    $ih = [double]$script:pbImg.Height
+    if ($iw -le 0 -or $ih -le 0) { throw 'Image has zero size' }
+    $scale = [Math]::Max(($page.Width / $iw), ($page.Height / $ih)) * [double]$script:bleed
+    $w = [int]([Math]::Ceiling($iw * $scale))
+    $h = [int]([Math]::Ceiling($ih * $scale))
+    $x = $page.X + [int]([Math]::Floor(($page.Width - $w) / 2.0))
+    $y = $page.Y + [int]([Math]::Floor(($page.Height - $h) / 2.0))
+    $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $e.Graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $e.Graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $e.Graphics.DrawImage($script:pbImg, $x, $y, $w, $h)
+    $e.HasMorePages = $false
+  })
+
+  $doc.Print()
+  Write-Output ("OK|" + $doc.PrinterSettings.PrinterName + "|" + $script:paperName + "|" + $script:bleed)
+} finally {
+  if ($img) { $img.Dispose() }
+}
+`;
+  fs.writeFileSync(ps1, script, 'utf8');
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-STA',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-WindowStyle',
+        'Hidden',
+        '-File',
+        ps1,
+      ],
+      {
+        windowsHide: true,
+        timeout: 120000,
+        maxBuffer: 2 * 1024 * 1024,
+        encoding: 'utf8',
+      },
+    );
+    const line = String(stdout || '')
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .find((s) => s.startsWith('OK|'));
+    if (!line) {
+      const errTail = String(stderr || stdout || '').trim().slice(0, 300);
+      throw new Error(errTail || 'Print spooler returned no confirmation.');
+    }
+    const parts = line.split('|');
+    return {
+      printer: parts[1] || printerName || null,
+      paper: parts[2] || null,
+      bleed: parts[3] || String(bleed),
+    };
+  } catch (e) {
+    const detail = [e.stderr, e.stdout, e.message].filter(Boolean).join(' | ');
+    throw new Error(String(detail || e).replace(/\s+/g, ' ').trim().slice(0, 500));
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (_) {}
+  }
+}
+
+/**
+ * One-shot photo print of the original capture file (DSLR → SELPHY postcard).
+ */
+ipcMain.handle('print:photo', async (_e, payload) => {
+  try {
+    const filePath = String(payload?.filePath || '').trim();
+    const deviceName =
+      typeof payload?.deviceName === 'string' && payload.deviceName.trim()
+        ? payload.deviceName.trim()
+        : null;
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { ok: false, error: 'Photo file not found.' };
+    }
+    const cfg = loadMergedConfig();
+    const printCfg = cfg.print || {};
+    if (printCfg.enabled !== true) {
+      return { ok: false, error: 'Printing is disabled in Admin → Print.' };
+    }
+    const chosen =
+      deviceName ||
+      (typeof printCfg.printerName === 'string' && printCfg.printerName.trim()
+        ? printCfg.printerName.trim()
+        : null);
+    const bleedScale =
+      typeof printCfg.bleedScale === 'number' && Number.isFinite(printCfg.bleedScale)
+        ? printCfg.bleedScale
+        : 1.06;
+
+    const abs = path.resolve(filePath);
+    if (process.platform !== 'win32') {
+      return { ok: false, error: 'Photo printing is only supported on Windows.' };
+    }
+
+    const result = await printPhotoViaWindowsSpooler(abs, chosen, bleedScale);
+    appendAppLog('info', 'print', 'photoprint spooled', {
+      filePath: abs,
+      bytes: fs.statSync(abs).size,
+      deviceName: result.printer || chosen || 'default',
+      paper: result.paper || null,
+      bleed: result.bleed || bleedScale,
+    });
+    return {
+      ok: true,
+      deviceName: result.printer || chosen || null,
+      paper: result.paper || null,
+    };
+  } catch (e) {
+    const msg = String(e?.message || e);
+    appendAppLog('error', 'print', 'print:photo failed', msg);
+    return { ok: false, error: msg.replace(/\s+/g, ' ').trim().slice(0, 400) };
   }
 });

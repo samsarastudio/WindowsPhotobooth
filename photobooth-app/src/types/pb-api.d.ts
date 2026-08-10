@@ -128,6 +128,53 @@ export interface PbApi {
   adminDeletePhotoFrame(
     filename: string,
   ): Promise<{ ok: boolean; removed?: string; error?: string }>;
+  galleryEnsureDaySession(payload: {
+    apiBaseUrl: string;
+    uploadToken: string;
+    eventPrefix: string;
+  }): Promise<{
+    ok: boolean;
+    slug?: string;
+    galleryUrl?: string;
+    expiresAt?: string;
+    error?: string;
+  }>;
+  galleryUploadPhoto(payload: {
+    apiBaseUrl: string;
+    uploadToken: string;
+    eventPrefix: string;
+    filePath: string;
+    variant: 'original' | 'framed' | 'ai';
+  }): Promise<{
+    ok: boolean;
+    slug?: string;
+    photoId?: string;
+    shareUrl?: string;
+    url?: string;
+    variant?: string;
+    error?: string;
+  }>;
+  listPrinters(): Promise<{
+    ok: boolean;
+    printers?: {
+      name: string;
+      displayName: string;
+      description: string;
+      isDefault: boolean;
+      status: number;
+      driverName?: string;
+      portName?: string;
+      /** Microsoft IPP / WSD — often grayscale + wrong layout on SELPHY */
+      isIppClass?: boolean;
+      /** Real Canon / SELPHY driver (USB or TCP/IP with Canon software) */
+      isCanonDriver?: boolean;
+    }[];
+    error?: string;
+  }>;
+  printPhoto(payload: {
+    filePath: string;
+    deviceName?: string | null;
+  }): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;
 }
 
 declare global {

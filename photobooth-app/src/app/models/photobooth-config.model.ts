@@ -81,7 +81,64 @@ export interface PhotoboothCopyResult {
   thinkingStepBackground: string;
   thinkingStepImage: string;
   thinkingFootnote: string;
+  /** Moments remote gallery share */
+  share: string;
+  sharing: string;
+  shareQrTitle: string;
+  shareBack: string;
+  uploadFailed: string;
+  /** One-shot print on the result / final page (when printing is enabled). */
+  print: string;
+  printing: string;
+  printed: string;
+  printFailed: string;
 }
+
+export interface PhotoboothGalleryConfig {
+  /** Push captures to Moments gallery server. */
+  enabled: boolean;
+  /** Public base URL, e.g. https://moments.inmomentservices.com */
+  apiBaseUrl: string;
+  /** Shared upload token (same as MOMENTS_UPLOAD_TOKEN on the server). */
+  uploadToken: string;
+  /** Daily session slug prefix → `{prefix}-YYYY-MM-DD`. */
+  sessionPrefix: string;
+  uploadOriginal: boolean;
+  uploadFramed: boolean;
+  uploadAi: boolean;
+}
+
+export const PHOTOBOOTH_DEFAULT_GALLERY: PhotoboothGalleryConfig = {
+  enabled: false,
+  apiBaseUrl: 'https://moments.inmomentservices.com',
+  uploadToken: '',
+  sessionPrefix: 'onam',
+  uploadOriginal: true,
+  uploadFramed: true,
+  uploadAi: true,
+};
+
+export interface PhotoboothPrintConfig {
+  /** Show a one-shot Print button on the result / final gallery screen. */
+  enabled: boolean;
+  /**
+   * Windows printer name from the system printer list.
+   * Empty / null = use the OS default printer.
+   * Prefer the USB Canon SELPHY queue (real Canon driver). Wi‑Fi IPP queues often print grayscale / wrong layout.
+   */
+  printerName: string | null;
+  /**
+   * Borderless overscan for SELPHY (1.0 = exact fit, 1.06 = ~6% bleed past edges).
+   * Removes thin white borders on USB Canon driver prints.
+   */
+  bleedScale: number;
+}
+
+export const PHOTOBOOTH_DEFAULT_PRINT: PhotoboothPrintConfig = {
+  enabled: false,
+  printerName: null,
+  bleedScale: 1.06,
+};
 
 export interface PhotoboothCopyAiMode {
   title: string;
@@ -189,6 +246,8 @@ export interface PhotoboothConfig {
   branding: PhotoboothBranding;
   camera: PhotoboothCameraConfig;
   photoFrames: PhotoboothPhotoFramesConfig;
+  gallery: PhotoboothGalleryConfig;
+  print: PhotoboothPrintConfig;
   copy: PhotoboothCopy;
   /** When true, guests must pass the QR / code unlock screen. */
   requireQrUnlock: boolean;
@@ -292,6 +351,15 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     thinkingStepImage: 'Rendering with the image API',
     thinkingFootnote:
       'Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs.',
+    share: 'Share',
+    sharing: 'Uploading…',
+    shareQrTitle: 'Scan to view your photo',
+    shareBack: 'Back',
+    uploadFailed: 'Could not upload to gallery',
+    print: 'Print',
+    printing: 'Printing…',
+    printed: 'Printed',
+    printFailed: 'Print failed',
   },
   aiMode: {
     title: 'Choose a style',

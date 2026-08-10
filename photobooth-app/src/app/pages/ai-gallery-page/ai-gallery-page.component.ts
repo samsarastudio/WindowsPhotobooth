@@ -28,8 +28,19 @@ export class AiGalleryPageComponent implements OnInit {
   readonly err = signal<string | null>(null);
   readonly heroAspectRatio = signal<number | null>(null);
 
+  readonly printBusy = signal(false);
+  readonly printDone = signal(false);
+  readonly printErr = signal<string | null>(null);
+
   readonly heroSrc = computed(() =>
     this.heroKind() === 'original' ? this.originalDataUrl() : this.aiDataUrl(),
+  );
+  readonly showPrint = computed(() => this.booth.print().enabled === true);
+  readonly printPath = computed(() =>
+    this.heroKind() === 'original' ? this.session.originalPath() : this.session.aiPath(),
+  );
+  readonly canPrint = computed(
+    () => this.showPrint() && !!this.printPath() && !this.printBusy() && !this.printDone(),
   );
 
   async ngOnInit(): Promise<void> {
@@ -58,6 +69,33 @@ export class AiGalleryPageComponent implements OnInit {
   pickHero(kind: 'original' | 'ai'): void {
     this.heroKind.set(kind);
     this.heroAspectRatio.set(null);
+  }
+
+  async printOnce(): Promise<void> {
+    if (!this.canPrint()) return;
+    const pp = this.printPath();
+    if (!pp || !window.pbApi?.printPhoto) {
+      this.printErr.set('Printing requires Electron.');
+      return;
+    }
+    this.printBusy.set(true);
+    this.printErr.set(null);
+    try {
+      const deviceName = this.booth.print().printerName;
+      const r = await window.pbApi.printPhoto({
+        filePath: pp,
+        deviceName: deviceName || undefined,
+      });
+      if (!r.ok) {
+        this.printErr.set(r.error ?? 'Print failed.');
+        return;
+      }
+      this.printDone.set(true);
+    } catch (e) {
+      this.printErr.set(String(e));
+    } finally {
+      this.printBusy.set(false);
+    }
   }
 
   onHeroLoad(ev: Event): void {

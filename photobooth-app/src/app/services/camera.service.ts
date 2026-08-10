@@ -303,6 +303,8 @@ export class CameraService {
   async closeSession(): Promise<void> {
     if (!this.hasApi()) return;
     try {
+      // Stop EVF + close session. Main process then shuts down the bridge so the
+      // camera is not held warm — without racing init/open on the same turn.
       await withTimeout(window.pbApi!.cameraInvoke({ cmd: 'close' }), 3000, 'SDK close');
     } catch (e) {
       await this.log.warn('camera', 'closeSession', String(e));

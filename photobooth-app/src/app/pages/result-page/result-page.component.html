@@ -77,7 +77,57 @@
 
     <div class="pb-row pb-result-actions">
       <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ copy().result.retake }}</button>
+      @if (galleryUpload.enabled()) {
+        @if (canShare()) {
+          <button
+            type="button"
+            class="pb-btn pb-btn-primary"
+            [disabled]="shareBusy()"
+            (click)="openShare()"
+          >
+            {{ copy().result.share }}
+          </button>
+        } @else if (shareUploading()) {
+          <button type="button" class="pb-btn pb-btn-ghost" disabled>
+            {{ copy().result.sharing }}
+          </button>
+        }
+      }
+      @if (showPrint()) {
+        <button
+          type="button"
+          class="pb-btn pb-btn-primary"
+          [disabled]="!canPrint()"
+          (click)="printOnce()"
+        >
+          @if (printBusy()) {
+            {{ copy().result.printing }}
+          } @else if (printDone()) {
+            {{ copy().result.printed }}
+          } @else {
+            {{ copy().result.print }}
+          }
+        </button>
+      }
       <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
     </div>
+    @if (printErr(); as pe) {
+      <p class="pb-msg">{{ copy().result.printFailed }}: {{ pe }}</p>
+    }
   </div>
+
+  @if (shareOpen()) {
+    <div class="pb-share-overlay" role="dialog" aria-modal="true">
+      <div class="pb-share-card">
+        <h2>{{ copy().result.shareQrTitle }}</h2>
+        @if (shareQrDataUrl(); as qr) {
+          <img class="pb-share-qr" [src]="qr" alt="Share QR code" />
+        }
+        <p class="pb-hint">{{ galleryUpload.shareUrlFor(path()) }}</p>
+        <button type="button" class="pb-btn pb-btn-ghost" (click)="closeShare()">
+          {{ copy().result.shareBack }}
+        </button>
+      </div>
+    </div>
+  }
 </div>
