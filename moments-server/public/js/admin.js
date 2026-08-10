@@ -38,15 +38,33 @@ async function api(path, opts = {}) {
 }
 
 function setTab(tab) {
+  const name = String(tab || 'overview');
   document.querySelectorAll('.admin-tab').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.tab === tab);
+    btn.classList.toggle('active', btn.dataset.tab === name);
   });
   document.querySelectorAll('.admin-section').forEach((sec) => {
-    sec.hidden = sec.dataset.section !== tab;
+    const on = sec.dataset.section === name;
+    sec.classList.toggle('is-active', on);
+    sec.hidden = !on;
   });
-  if (tab === 'photos') void refreshPhotos();
-  if (tab === 'frames') void refreshFrames();
-  if (tab === 'albums') void refreshAlbums();
+  if (name === 'photos') void refreshPhotos();
+  if (name === 'frames') void refreshFrames();
+  if (name === 'albums') void refreshAlbums();
+}
+
+function unlockAdmin() {
+  document.body.classList.add('is-unlocked');
+  if (loginCard) loginCard.hidden = true;
+  if (panel) {
+    panel.hidden = false;
+    panel.removeAttribute('hidden');
+  }
+}
+
+function updateOpenAlbumLink() {
+  if (!btnOpenAlbum) return;
+  const slug = photoAlbum?.value || '';
+  btnOpenAlbum.href = slug ? `/${encodeURIComponent(slug)}` : '#';
 }
 
 document.getElementById('adminNav')?.addEventListener('click', (e) => {
@@ -81,7 +99,14 @@ async function refreshFrames() {
   }
 }
 
+function updateOpenAlbumLink() {
+  if (!btnOpenAlbum) return;
+  const slug = photoAlbum?.value || '';
+  btnOpenAlbum.href = slug ? `/${encodeURIComponent(slug)}` : '#';
+}
+
 function fillAlbumSelect() {
+  if (!photoAlbum) return;
   const prev = photoAlbum.value;
   photoAlbum.innerHTML = '';
   for (const s of albumsCache) {
@@ -94,11 +119,6 @@ function fillAlbumSelect() {
     photoAlbum.value = prev;
   }
   updateOpenAlbumLink();
-}
-
-function updateOpenAlbumLink() {
-  const slug = photoAlbum.value;
-  btnOpenAlbum.href = slug ? `/${encodeURIComponent(slug)}` : '#';
 }
 
 async function refreshAlbums() {
@@ -213,10 +233,12 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
   loginErr.hidden = true;
   try {
     await refreshAll();
-    loginCard.hidden = true;
-    panel.hidden = false;
+    unlockAdmin();
     setTab('overview');
   } catch (e) {
+    document.body.classList.remove('is-unlocked');
+    if (loginCard) loginCard.hidden = false;
+    if (panel) panel.hidden = true;
     loginErr.hidden = false;
     loginErr.textContent = String(e.message || e);
   }
