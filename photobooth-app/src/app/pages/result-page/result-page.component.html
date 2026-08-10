@@ -91,6 +91,15 @@
           <button type="button" class="pb-btn pb-btn-ghost" disabled>
             {{ copy().result.sharing }}
           </button>
+        } @else if (shareFailed()) {
+          <button
+            type="button"
+            class="pb-btn pb-btn-ghost"
+            [disabled]="shareBusy()"
+            (click)="retryShareUpload()"
+          >
+            {{ copy().result.uploadFailed }}
+          </button>
         }
       }
       @if (showPrint()) {

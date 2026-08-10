@@ -480,9 +480,9 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Moments gallery upload</h2>
           <p class="pb-hint">
-            Push every capture variant (original, framed, AI) to the Moments server. Sessions are
-            auto-created per day as <code>{{ todayGallerySlug() }}</code>. Expiry is managed in
-            gallery Admin at <code>/admin</code> on the Moments host.
+            When enabled, captures upload to Moments and the result screen shows a <strong>Share</strong>
+            button (QR to that photo) after upload succeeds. Manage albums/frames at
+            <code>{{ draftGallery.apiBaseUrl || '…' }}/admin</code>.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftGallery.enabled" />

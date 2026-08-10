@@ -6,11 +6,13 @@ import {
   getDb,
   isSessionExpired,
   loadSettings,
+  publicPhoto,
   publicSession,
   saveSettings,
 } from '../db.js';
 import { requireAdminPin } from '../auth.js';
 import { purgeExpiredSessions } from '../purge.js';
+import { seedSampleGallery } from '../seed-samples.js';
 
 export const adminRouter = Router();
 
@@ -45,6 +47,22 @@ adminRouter.get('/sessions', (_req, res) => {
     };
   });
   return res.json({ ok: true, sessions });
+});
+
+adminRouter.get('/sessions/:slug', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
+  if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const photos = getDb()
+    .prepare('SELECT * FROM photos WHERE session_id = ? ORDER BY created_at DESC')
+    .all(row.id);
+  return res.json({
+    ok: true,
+    session: {
+      ...publicSession(row, photos),
+      expired: isSessionExpired(row),
+      photoCount: photos.length,
+    },
+  });
 });
 
 adminRouter.patch('/sessions/:slug', (req, res) => {
@@ -85,7 +103,29 @@ adminRouter.delete('/sessions/:slug', (req, res) => {
   return res.json({ ok: true, removed: row.slug });
 });
 
+adminRouter.delete('/sessions/:slug/photos/:photoId', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
+  if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const photo = getDb()
+    .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
+    .get(req.params.photoId, row.id);
+  if (!photo) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  getDb().prepare('DELETE FROM photos WHERE id = ?').run(photo.id);
+  const filePath = path.join(config.photosDir, row.slug, photo.filename);
+  fs.rmSync(filePath, { force: true });
+  return res.json({ ok: true, removed: photo.id, photo: publicPhoto(row.slug, photo) });
+});
+
 adminRouter.post('/purge-expired', (_req, res) => {
   const result = purgeExpiredSessions();
   return res.json({ ok: true, ...result });
+});
+
+adminRouter.post('/seed-samples', (_req, res) => {
+  try {
+    const result = seedSampleGallery();
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+  }
 });

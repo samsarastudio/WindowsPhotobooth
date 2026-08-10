@@ -54,6 +54,11 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     const r = this.uploadRecord();
     return !r || r.status === 'pending';
   });
+  readonly shareFailed = computed(() => {
+    if (!this.galleryUpload.enabled()) return false;
+    const r = this.uploadRecord();
+    return r?.status === 'error';
+  });
   readonly showPrint = computed(() => this.booth.print().enabled === true);
   readonly canPrint = computed(
     () => this.showPrint() && !!this.path() && !this.printBusy() && !this.printDone(),
@@ -117,8 +122,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
     // Poll briefly so Share appears when a background upload finishes.
     if (this.galleryUpload.enabled()) {
+      void this.galleryUpload.ensureShareUpload(pp);
       this.sharePoll = setInterval(() => {
-        // touch computed by reading record
         void this.galleryUpload.recordFor(this.path());
         if (this.canShare() && this.sharePoll) {
           clearInterval(this.sharePoll);
@@ -196,6 +201,17 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       this.shareOpen.set(true);
     } catch (e) {
       this.aiErr.set(String(e));
+    } finally {
+      this.shareBusy.set(false);
+    }
+  }
+
+  async retryShareUpload(): Promise<void> {
+    const pp = this.path();
+    if (!pp) return;
+    this.shareBusy.set(true);
+    try {
+      await this.galleryUpload.ensureShareUpload(pp);
     } finally {
       this.shareBusy.set(false);
     }

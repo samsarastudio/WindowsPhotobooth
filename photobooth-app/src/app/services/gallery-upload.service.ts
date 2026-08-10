@@ -18,6 +18,8 @@ export class GalleryUploadService {
   private readonly booth = inject(BoothConfigService);
 
   private readonly byPath = signal<Record<string, GalleryUploadRecord>>({});
+  /** Bumps whenever upload state changes — keeps result Share UI reactive. */
+  readonly revision = signal(0);
   readonly sessionSlug = signal<string | null>(null);
   readonly galleryUrl = signal<string | null>(null);
   readonly lastError = signal<string | null>(null);
@@ -27,7 +29,12 @@ export class GalleryUploadService {
     return g.enabled && !!g.apiBaseUrl && !!g.uploadToken;
   });
 
+  private bump(): void {
+    this.revision.update((n) => n + 1);
+  }
+
   recordFor(path: string | null | undefined): GalleryUploadRecord | null {
+    void this.revision();
     if (!path) return null;
     return this.byPath()[path] ?? null;
   }
@@ -40,6 +47,7 @@ export class GalleryUploadService {
   clearGuestSession(): void {
     this.byPath.set({});
     this.lastError.set(null);
+    this.bump();
   }
 
   todaySlug(): string {
@@ -76,6 +84,7 @@ export class GalleryUploadService {
   ): Promise<GalleryUploadRecord> {
     const pending: GalleryUploadRecord = { path: filePath, variant, status: 'pending' };
     this.byPath.update((m) => ({ ...m, [filePath]: pending }));
+    this.bump();
 
     if (!this.enabled() || !window.pbApi?.galleryUploadPhoto) {
       const err: GalleryUploadRecord = {
@@ -84,6 +93,7 @@ export class GalleryUploadService {
         error: 'Gallery upload disabled',
       };
       this.byPath.update((m) => ({ ...m, [filePath]: err }));
+      this.bump();
       return err;
     }
 
@@ -101,6 +111,7 @@ export class GalleryUploadService {
       };
       this.byPath.update((m) => ({ ...m, [filePath]: err }));
       this.lastError.set(err.error ?? null);
+      this.bump();
       return err;
     }
 
@@ -129,7 +140,25 @@ export class GalleryUploadService {
         };
     this.byPath.update((m) => ({ ...m, [filePath]: next }));
     if (!r.ok) this.lastError.set(next.error ?? null);
+    this.bump();
     return next;
+  }
+
+  /** Infer variant from capture filename conventions. */
+  inferVariant(filePath: string): GalleryPhotoVariant {
+    const base = filePath.replace(/\\/g, '/').split('/').pop()?.toLowerCase() || '';
+    if (base.includes('_ai.') || base.endsWith('_ai.png')) return 'ai';
+    if (base.includes('_framed.') || base.includes('_framed_')) return 'framed';
+    return 'original';
+  }
+
+  /** Ensure the photo shown on result is uploaded so Share can enable. */
+  async ensureShareUpload(filePath: string): Promise<GalleryUploadRecord | null> {
+    if (!this.enabled() || !filePath) return null;
+    const existing = this.byPath()[filePath];
+    if (existing?.status === 'ok' && existing.shareUrl) return existing;
+    if (existing?.status === 'pending') return existing;
+    return this.uploadPath(filePath, this.inferVariant(filePath));
   }
 
   /** Fire-and-forget helper for capture/frame/AI hooks. */
@@ -145,6 +174,7 @@ export class GalleryUploadService {
       error: `Upload of ${variant} disabled`,
     };
     this.byPath.update((m) => ({ ...m, [filePath]: rec }));
+    this.bump();
     return rec;
   }
 }

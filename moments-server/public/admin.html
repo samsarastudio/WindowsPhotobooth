@@ -5,20 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Moments admin</title>
     <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Outfit:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
+    <link rel="stylesheet" href="/css/admin.css" />
   </head>
   <body class="admin-body">
-    <header class="top">
-      <div class="brand">
-        <p class="eyebrow">inmoment</p>
-        <h1>Gallery admin</h1>
-      </div>
-    </header>
-    <main class="admin-main">
-      <section class="card">
+    <div class="admin-shell">
+      <header class="admin-topbar">
+        <div class="brand">
+          <p class="eyebrow">inmoment</p>
+          <h1>Gallery admin</h1>
+        </div>
+        <div class="admin-top-actions">
+          <a class="btn ghost" href="/wall" target="_blank" rel="noopener">Open wall</a>
+          <span id="adminStatus" class="meta admin-status"></span>
+        </div>
+      </header>
+
+      <section class="card admin-login" id="loginCard">
         <h2>Sign in</h2>
         <label>Admin PIN</label>
         <input id="pin" class="input" type="password" autocomplete="current-password" />
@@ -26,38 +32,87 @@
         <p id="loginErr" class="err" hidden></p>
       </section>
 
-      <section class="card" id="panel" hidden>
-        <h2>Default expiry</h2>
-        <label>Default TTL (days) for new sessions</label>
-        <div class="row">
-          <input id="ttl" class="input" type="number" min="1" max="3650" />
-          <button type="button" class="btn primary" id="btnSaveTtl">Save</button>
+      <div class="admin-layout" id="panel" hidden>
+        <aside class="admin-sidebar">
+          <p class="admin-sidebar-title">Sections</p>
+          <nav class="admin-nav" id="adminNav">
+            <button type="button" class="admin-tab active" data-tab="overview">Overview</button>
+            <button type="button" class="admin-tab" data-tab="albums">Albums</button>
+            <button type="button" class="admin-tab" data-tab="photos">Photos</button>
+            <button type="button" class="admin-tab" data-tab="frames">Frames</button>
+            <button type="button" class="admin-tab" data-tab="wall">Mosaic wall</button>
+            <button type="button" class="admin-tab" data-tab="settings">Settings</button>
+          </nav>
+        </aside>
+
+        <div class="admin-content">
+          <section class="card admin-section" data-section="overview">
+            <h2>Overview</h2>
+            <div class="stat-grid">
+              <div class="stat"><strong id="statAlbums">0</strong><span>Albums</span></div>
+              <div class="stat"><strong id="statPhotos">0</strong><span>Photos</span></div>
+              <div class="stat"><strong id="statFrames">0</strong><span>Frames</span></div>
+            </div>
+            <p class="meta">Public URLs: <code>/wall</code> · <code>/wall/slideshow</code> · <code>/{session}</code> · <code>/{session}/wall</code></p>
+            <div class="row wrap">
+              <button type="button" class="btn primary" id="btnSeed">Add sample photos</button>
+              <button type="button" class="btn ghost" id="btnPurge">Purge expired now</button>
+            </div>
+          </section>
+
+          <section class="card admin-section" data-section="albums" hidden>
+            <h2>Albums (sessions)</h2>
+            <p class="meta">Each photobooth day creates an album. Delete removes the album and all its photos.</p>
+            <div id="sessionList" class="session-list"></div>
+          </section>
+
+          <section class="card admin-section" data-section="photos" hidden>
+            <h2>Photos</h2>
+            <label>Album</label>
+            <select id="photoAlbum" class="input"></select>
+            <div class="row wrap">
+              <button type="button" class="btn ghost" id="btnRefreshPhotos">Refresh</button>
+              <a class="btn ghost" id="btnOpenAlbum" href="#" target="_blank" rel="noopener">Open gallery</a>
+            </div>
+            <div id="photoGrid" class="photo-admin-grid"></div>
+          </section>
+
+          <section class="card admin-section" data-section="frames" hidden>
+            <h2>Photo frames</h2>
+            <p class="meta">Booth overlays currently on this server. Photobooth can sync these via Admin → Frames.</p>
+            <div class="row wrap">
+              <input id="frameFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              <button type="button" class="btn primary" id="btnUploadFrame">Upload frame</button>
+            </div>
+            <div id="frameList" class="frame-grid"></div>
+          </section>
+
+          <section class="card admin-section" data-section="wall" hidden>
+            <h2>Mosaic wall</h2>
+            <p class="meta">Shown on <code>/wall</code> and session <code>/{session}/wall</code>.</p>
+            <label>Wall title</label>
+            <input id="wallTitle" class="input" />
+            <label>Center overlay text (optional)</label>
+            <input id="wallOverlay" class="input" placeholder="e.g. UNLEASHED" />
+            <label>Columns</label>
+            <input id="wallColumns" class="input" type="number" min="6" max="24" />
+            <label>Empty cell ratio (0–0.6)</label>
+            <input id="wallEmpty" class="input" type="number" min="0" max="0.6" step="0.01" />
+            <button type="button" class="btn primary" id="btnSaveWall">Save wall settings</button>
+          </section>
+
+          <section class="card admin-section" data-section="settings" hidden>
+            <h2>Settings</h2>
+            <label>Default TTL (days) for new albums</label>
+            <div class="row">
+              <input id="ttl" class="input" type="number" min="1" max="3650" />
+              <button type="button" class="btn primary" id="btnSaveTtl">Save</button>
+            </div>
+            <p class="meta">Change <code>ADMIN_PIN</code> and <code>UPLOAD_TOKEN</code> in the server <code>.env</code>, then restart the service.</p>
+          </section>
         </div>
-        <button type="button" class="btn ghost" id="btnPurge">Purge expired now</button>
-        <p id="adminStatus" class="meta"></p>
-
-        <h2 class="mt">Mosaic wall</h2>
-        <p class="meta">Public URLs: <code>/wall</code> · <code>/wall/slideshow</code> · <code>/{session}/wall</code></p>
-        <label>Wall title</label>
-        <input id="wallTitle" class="input" />
-        <label>Center overlay text (optional)</label>
-        <input id="wallOverlay" class="input" placeholder="e.g. UNLEASHED" />
-        <label>Columns</label>
-        <input id="wallColumns" class="input" type="number" min="6" max="24" />
-        <label>Empty cell ratio (0–0.6)</label>
-        <input id="wallEmpty" class="input" type="number" min="0" max="0.6" step="0.01" />
-        <button type="button" class="btn primary" id="btnSaveWall">Save wall settings</button>
-
-        <h2 class="mt">Photo frames (booth overlays)</h2>
-        <p class="meta">Upload PNGs with transparent/black photo holes. Booths sync these from the server.</p>
-        <input id="frameFile" type="file" accept="image/png,image/jpeg,image/webp" />
-        <button type="button" class="btn primary" id="btnUploadFrame">Upload frame</button>
-        <div id="frameList" class="frame-grid"></div>
-
-        <h2 class="mt">Sessions</h2>
-        <div id="sessionList" class="session-list"></div>
-      </section>
-    </main>
+      </div>
+    </div>
     <script src="/js/admin.js" type="module"></script>
   </body>
 </html>
