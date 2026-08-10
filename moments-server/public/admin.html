@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260810-2" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260810-3" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -26,9 +26,11 @@
 
       <section class="card admin-login" id="loginCard">
         <h2>Sign in</h2>
-        <label>Admin PIN</label>
-        <input id="pin" class="input" type="password" autocomplete="current-password" />
-        <button type="button" class="btn primary" id="btnLogin">Unlock</button>
+        <form id="loginForm" autocomplete="on">
+          <label for="pin">Admin PIN</label>
+          <input id="pin" class="input" name="pin" type="password" autocomplete="current-password" />
+          <button type="submit" class="btn primary" id="btnLogin">Unlock</button>
+        </form>
         <p id="loginErr" class="err" hidden></p>
       </section>
 
@@ -113,6 +115,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260810-2" type="module"></script>
+    <script src="/js/admin.js?v=20260810-3" type="module"></script>
   </body>
 </html>

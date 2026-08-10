@@ -99,12 +99,6 @@ async function refreshFrames() {
   }
 }
 
-function updateOpenAlbumLink() {
-  if (!btnOpenAlbum) return;
-  const slug = photoAlbum?.value || '';
-  btnOpenAlbum.href = slug ? `/${encodeURIComponent(slug)}` : '#';
-}
-
 function fillAlbumSelect() {
   if (!photoAlbum) return;
   const prev = photoAlbum.value;
@@ -229,18 +223,19 @@ async function refreshAll() {
   await refreshFrames();
 }
 
-document.getElementById('btnLogin').addEventListener('click', async () => {
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
   loginErr.hidden = true;
   try {
     await refreshAll();
     unlockAdmin();
     setTab('overview');
-  } catch (e) {
+  } catch (err) {
     document.body.classList.remove('is-unlocked');
     if (loginCard) loginCard.hidden = false;
     if (panel) panel.hidden = true;
     loginErr.hidden = false;
-    loginErr.textContent = String(e.message || e);
+    loginErr.textContent = String(err.message || err);
   }
 });
 
