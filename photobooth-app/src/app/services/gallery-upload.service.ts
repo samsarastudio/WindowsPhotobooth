@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { BoothConfigService } from './booth-config.service';
 
 export type GalleryPhotoVariant = 'original' | 'framed' | 'ai';
@@ -10,11 +10,11 @@ export interface GalleryUploadRecord {
   shareUrl?: string;
   url?: string;
   error?: string;
-  status: 'pending' | 'ok' | 'error';
+  status: 'pending' | 'queued' | 'ok' | 'error';
 }
 
 @Injectable({ providedIn: 'root' })
-export class GalleryUploadService {
+export class GalleryUploadService implements OnDestroy {
   private readonly booth = inject(BoothConfigService);
 
   private readonly byPath = signal<Record<string, GalleryUploadRecord>>({});
@@ -28,6 +28,27 @@ export class GalleryUploadService {
     const g = this.booth.gallery();
     return g.enabled && !!g.apiBaseUrl && !!g.uploadToken;
   });
+
+  private onlineHandler = () => {
+    void this.flushQueue();
+  };
+  private unsubQueue?: () => void;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.onlineHandler);
+      this.unsubQueue = window.pbApi?.onGalleryUploadQueueUpdated?.((item) => {
+        this.applyQueueItem(item);
+      });
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.onlineHandler);
+    }
+    this.unsubQueue?.();
+  }
 
   private bump(): void {
     this.revision.update((n) => n + 1);
@@ -63,26 +84,71 @@ export class GalleryUploadService {
     if (!this.enabled() || !window.pbApi?.galleryEnsureDaySession) {
       return { ok: false, error: 'Gallery upload disabled' };
     }
-    const g = this.booth.gallery();
-    const r = await window.pbApi.galleryEnsureDaySession({
-      apiBaseUrl: g.apiBaseUrl,
-      uploadToken: g.uploadToken,
-      eventPrefix: g.sessionPrefix,
-    });
-    if (r.ok) {
-      this.sessionSlug.set(r.slug ?? this.todaySlug());
-      this.galleryUrl.set(r.galleryUrl ?? null);
-    } else {
-      this.lastError.set(r.error ?? 'Session ensure failed');
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return { ok: false, error: 'Offline' };
     }
-    return r;
+    const g = this.booth.gallery();
+    try {
+      const r = await window.pbApi.galleryEnsureDaySession({
+        apiBaseUrl: g.apiBaseUrl,
+        uploadToken: g.uploadToken,
+        eventPrefix: g.sessionPrefix,
+      });
+      if (r.ok) {
+        this.sessionSlug.set(r.slug ?? this.todaySlug());
+        this.galleryUrl.set(r.galleryUrl ?? null);
+      } else {
+        this.lastError.set(r.error ?? 'Session ensure failed');
+      }
+      return r;
+    } catch (e) {
+      return { ok: false, error: String(e) };
+    }
+  }
+
+  private applyQueueItem(item: {
+    filePath?: string;
+    variant?: string;
+    status?: string;
+    photoId?: string;
+    shareUrl?: string;
+    url?: string;
+    error?: string;
+  } | null): void {
+    if (!item?.filePath) return;
+    const status =
+      item.status === 'ok' || item.status === 'error' || item.status === 'pending' || item.status === 'queued'
+        ? item.status
+        : 'queued';
+    const rec: GalleryUploadRecord = {
+      path: item.filePath,
+      variant: (item.variant as GalleryPhotoVariant) || this.inferVariant(item.filePath),
+      status,
+      photoId: item.photoId,
+      shareUrl: item.shareUrl,
+      url: item.url,
+      error: item.error,
+    };
+    this.byPath.update((m) => ({ ...m, [item.filePath!]: rec }));
+    if (status === 'error') this.lastError.set(item.error ?? null);
+    this.bump();
+  }
+
+  async flushQueue(): Promise<void> {
+    if (!this.enabled() || !window.pbApi?.galleryFlushUploadQueue) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    try {
+      await window.pbApi.galleryFlushUploadQueue();
+    } catch {
+      /* offline flush is best-effort */
+    }
   }
 
   async uploadPath(
     filePath: string,
     variant: GalleryPhotoVariant,
   ): Promise<GalleryUploadRecord> {
-    const pending: GalleryUploadRecord = { path: filePath, variant, status: 'pending' };
+    const pending: GalleryUploadRecord = { path: filePath, variant, status: 'queued' };
     this.byPath.update((m) => ({ ...m, [filePath]: pending }));
     this.bump();
 
@@ -102,19 +168,6 @@ export class GalleryUploadService {
     if (variant === 'framed' && !g.uploadFramed) return this.skip(filePath, variant);
     if (variant === 'ai' && !g.uploadAi) return this.skip(filePath, variant);
 
-    const ensured = await this.ensureDaySession();
-    if (!ensured.ok) {
-      const err: GalleryUploadRecord = {
-        ...pending,
-        status: 'error',
-        error: ensured.error ?? 'No session',
-      };
-      this.byPath.update((m) => ({ ...m, [filePath]: err }));
-      this.lastError.set(err.error ?? null);
-      this.bump();
-      return err;
-    }
-
     const r = await window.pbApi.galleryUploadPhoto({
       apiBaseUrl: g.apiBaseUrl,
       uploadToken: g.uploadToken,
@@ -132,14 +185,21 @@ export class GalleryUploadService {
           shareUrl: r.shareUrl,
           url: r.url,
         }
-      : {
-          path: filePath,
-          variant,
-          status: 'error',
-          error: r.error ?? 'Upload failed',
-        };
+      : r.queued || r.status === 'queued' || r.status === 'pending'
+        ? {
+            path: filePath,
+            variant,
+            status: 'queued',
+            error: r.error,
+          }
+        : {
+            path: filePath,
+            variant,
+            status: 'error',
+            error: r.error ?? 'Upload failed',
+          };
     this.byPath.update((m) => ({ ...m, [filePath]: next }));
-    if (!r.ok) this.lastError.set(next.error ?? null);
+    if (next.status === 'error') this.lastError.set(next.error ?? null);
     this.bump();
     return next;
   }
@@ -157,7 +217,10 @@ export class GalleryUploadService {
     if (!this.enabled() || !filePath) return null;
     const existing = this.byPath()[filePath];
     if (existing?.status === 'ok' && existing.shareUrl) return existing;
-    if (existing?.status === 'pending') return existing;
+    if (existing?.status === 'pending' || existing?.status === 'queued') {
+      void this.flushQueue();
+      return existing;
+    }
     return this.uploadPath(filePath, this.inferVariant(filePath));
   }
 

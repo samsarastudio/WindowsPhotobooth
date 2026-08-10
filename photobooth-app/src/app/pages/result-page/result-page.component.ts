@@ -52,7 +52,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly shareUploading = computed(() => {
     if (!this.galleryUpload.enabled()) return false;
     const r = this.uploadRecord();
-    return !r || r.status === 'pending';
+    return !r || r.status === 'pending' || r.status === 'queued';
   });
   readonly shareFailed = computed(() => {
     if (!this.galleryUpload.enabled()) return false;

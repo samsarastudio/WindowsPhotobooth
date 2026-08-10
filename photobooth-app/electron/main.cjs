@@ -1206,6 +1206,11 @@ app.whenReady().then(() => {
     return permission === 'media' || permission === 'camera' || permission === 'microphone';
   });
   createWindow();
+  setTimeout(() => {
+    void flushUploadQueue().catch((e) =>
+      appendAppLog('warn', 'gallery', 'startup queue flush failed', String(e)),
+    );
+  }, 2500);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -2045,12 +2050,232 @@ ipcMain.handle('gallery:ensureDaySession', async (_e, payload) => {
   }
 });
 
+function getUploadQueuePath() {
+  const dir = path.join(getPortableRoot(), 'data');
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'gallery-upload-queue.json');
+}
+
+function loadUploadQueue() {
+  try {
+    const p = getUploadQueuePath();
+    if (!fs.existsSync(p)) return { items: [] };
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return { items: Array.isArray(raw?.items) ? raw.items : [] };
+  } catch (_) {
+    return { items: [] };
+  }
+}
+
+function saveUploadQueue(q) {
+  fs.writeFileSync(getUploadQueuePath(), JSON.stringify({ items: q.items || [] }, null, 2), 'utf8');
+}
+
+function notifyUploadQueueItem(item) {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('gallery:upload-queue-updated', item);
+    }
+  } catch (_) {}
+}
+
+function isLikelyOfflineError(err) {
+  const s = String(err || '');
+  return /fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|network|offline|AbortError|getaddrinfo|Failed to fetch/i.test(
+    s,
+  );
+}
+
+async function uploadPhotoOnce(payload, signal) {
+  const base = galleryBaseUrl(payload?.apiBaseUrl);
+  const token = String(payload?.uploadToken || '').trim();
+  const eventPrefix = String(payload?.eventPrefix || 'session').trim() || 'session';
+  const variant = String(payload?.variant || 'original');
+  const filePath = String(payload?.filePath || '');
+  if (!base || !token) {
+    return { ok: false, error: 'Gallery API URL and upload token are required.' };
+  }
+  if (!filePath) return { ok: false, error: 'Missing filePath' };
+  const abs = path.resolve(filePath);
+  const captureRoot = path.resolve(getCaptureDir());
+  if (!isPathUnder(abs, captureRoot)) {
+    return { ok: false, error: 'Photo path outside capture directory.' };
+  }
+  if (!fs.existsSync(abs)) return { ok: false, error: 'Photo file not found.' };
+
+  const ensure = await galleryFetchJson(
+    `${base}/api/sessions/day`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ eventPrefix }),
+      signal,
+    },
+  );
+  if (!ensure.res.ok || !ensure.data?.ok) {
+    return { ok: false, error: ensure.data?.error || `Session HTTP ${ensure.res.status}` };
+  }
+  const slug = ensure.data.session?.slug;
+  if (!slug) return { ok: false, error: 'No session slug returned' };
+
+  const FormData = require('form-data');
+  const buf = fs.readFileSync(abs);
+  const ext = path.extname(abs).toLowerCase();
+  const mime =
+    ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  const form = new FormData();
+  form.append('photo', buf, {
+    filename: path.basename(abs),
+    contentType: mime,
+    knownLength: buf.length,
+  });
+  form.append('variant', variant);
+  form.append('sourceLocalName', path.basename(abs));
+
+  const uploadUrl = `${base}/api/sessions/${encodeURIComponent(slug)}/photos`;
+  const bodyBuf = form.getBuffer();
+  const res = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...form.getHeaders(),
+      'Content-Length': String(bodyBuf.length),
+    },
+    body: bodyBuf,
+    signal,
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {}
+  if (!res.ok || !data?.ok) {
+    return { ok: false, error: data?.error || `Upload HTTP ${res.status}` };
+  }
+  return {
+    ok: true,
+    slug,
+    photoId: data.photo?.id,
+    shareUrl: data.photo?.shareUrl,
+    url: data.photo?.url,
+    variant: data.photo?.variant,
+  };
+}
+
+let uploadFlushRunning = false;
+
+async function flushUploadQueue() {
+  if (uploadFlushRunning) return { ok: true, busy: true };
+  uploadFlushRunning = true;
+  try {
+    const q = loadUploadQueue();
+    let uploaded = 0;
+    let failed = 0;
+    for (const item of q.items) {
+      if (item.status === 'ok') continue;
+      if (!item.filePath || !fs.existsSync(item.filePath)) {
+        item.status = 'error';
+        item.error = 'Photo file missing';
+        item.updatedAt = new Date().toISOString();
+        notifyUploadQueueItem(item);
+        failed++;
+        continue;
+      }
+      item.status = 'pending';
+      item.updatedAt = new Date().toISOString();
+      notifyUploadQueueItem(item);
+
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 20000);
+      let r;
+      try {
+        r = await uploadPhotoOnce(item, ac.signal);
+      } catch (e) {
+        r = { ok: false, error: String(e) };
+      } finally {
+        clearTimeout(timer);
+      }
+
+      item.attempts = (item.attempts || 0) + 1;
+      item.updatedAt = new Date().toISOString();
+      if (r.ok) {
+        item.status = 'ok';
+        item.photoId = r.photoId;
+        item.shareUrl = r.shareUrl;
+        item.url = r.url;
+        item.slug = r.slug;
+        item.error = undefined;
+        uploaded++;
+        notifyUploadQueueItem(item);
+      } else {
+        const offline = isLikelyOfflineError(r.error);
+        item.status = offline ? 'queued' : 'error';
+        item.error = r.error || 'Upload failed';
+        failed++;
+        notifyUploadQueueItem(item);
+        if (offline) break;
+      }
+    }
+    const cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    q.items = q.items.filter((it) => {
+      if (it.status !== 'ok') return true;
+      const t = Date.parse(it.updatedAt || it.createdAt || '') || 0;
+      return t >= cutoff;
+    });
+    saveUploadQueue(q);
+    return {
+      ok: true,
+      uploaded,
+      failed,
+      pending: q.items.filter((i) => i.status !== 'ok' && i.status !== 'error').length,
+    };
+  } finally {
+    uploadFlushRunning = false;
+  }
+}
+
+function enqueueGalleryUpload(payload) {
+  const abs = path.resolve(String(payload?.filePath || ''));
+  const variant = String(payload?.variant || 'original');
+  const q = loadUploadQueue();
+  let item = q.items.find(
+    (i) => i.filePath === abs && i.variant === variant && i.status !== 'ok',
+  );
+  const now = new Date().toISOString();
+  if (!item) {
+    item = {
+      id: require('crypto').randomBytes(8).toString('hex'),
+      filePath: abs,
+      variant,
+      apiBaseUrl: galleryBaseUrl(payload?.apiBaseUrl),
+      uploadToken: String(payload?.uploadToken || '').trim(),
+      eventPrefix: String(payload?.eventPrefix || 'session').trim() || 'session',
+      status: 'queued',
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    q.items.push(item);
+  } else {
+    item.apiBaseUrl = galleryBaseUrl(payload?.apiBaseUrl) || item.apiBaseUrl;
+    item.uploadToken = String(payload?.uploadToken || '').trim() || item.uploadToken;
+    item.eventPrefix =
+      String(payload?.eventPrefix || '').trim() || item.eventPrefix || 'session';
+    item.status = 'queued';
+    item.updatedAt = now;
+    item.error = undefined;
+  }
+  saveUploadQueue(q);
+  notifyUploadQueueItem(item);
+  return item;
+}
+
 ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
   try {
     const base = galleryBaseUrl(payload?.apiBaseUrl);
     const token = String(payload?.uploadToken || '').trim();
-    const eventPrefix = String(payload?.eventPrefix || 'session').trim() || 'session';
-    const variant = String(payload?.variant || 'original');
     const filePath = String(payload?.filePath || '');
     if (!base || !token) {
       return { ok: false, error: 'Gallery API URL and upload token are required.' };
@@ -2063,67 +2288,58 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
     }
     if (!fs.existsSync(abs)) return { ok: false, error: 'Photo file not found.' };
 
-    const ensure = await galleryFetchJson(`${base}/api/sessions/day`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ eventPrefix }),
-    });
-    if (!ensure.res.ok || !ensure.data?.ok) {
-      return { ok: false, error: ensure.data?.error || `Session HTTP ${ensure.res.status}` };
-    }
-    const slug = ensure.data.session?.slug;
-    if (!slug) return { ok: false, error: 'No session slug returned' };
-
-    const FormData = require('form-data');
-    const buf = fs.readFileSync(abs);
-    const ext = path.extname(abs).toLowerCase();
-    const mime =
-      ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-    const form = new FormData();
-    form.append('photo', buf, {
-      filename: path.basename(abs),
-      contentType: mime,
-      knownLength: buf.length,
-    });
-    form.append('variant', variant);
-    form.append('sourceLocalName', path.basename(abs));
-
-    const uploadUrl = `${base}/api/sessions/${encodeURIComponent(slug)}/photos`;
-    const bodyBuf = form.getBuffer();
-    const res = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...form.getHeaders(),
-        'Content-Length': String(bodyBuf.length),
-      },
-      body: bodyBuf,
-    });
-    let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {}
-    if (!res.ok || !data?.ok) {
-      return { ok: false, error: data?.error || `Upload HTTP ${res.status}` };
+    const item = enqueueGalleryUpload(payload);
+    await flushUploadQueue();
+    const fresh =
+      loadUploadQueue().items.find((i) => i.id === item.id) ||
+      loadUploadQueue().items.find((i) => i.filePath === abs && i.variant === item.variant) ||
+      item;
+    if (fresh.status === 'ok') {
+      return {
+        ok: true,
+        slug: fresh.slug,
+        photoId: fresh.photoId,
+        shareUrl: fresh.shareUrl,
+        url: fresh.url,
+        variant: fresh.variant,
+      };
     }
     return {
-      ok: true,
-      slug,
-      photoId: data.photo?.id,
-      shareUrl: data.photo?.shareUrl,
-      url: data.photo?.url,
-      variant: data.photo?.variant,
+      ok: false,
+      queued: fresh.status === 'queued' || fresh.status === 'pending',
+      status: fresh.status,
+      error: fresh.error || 'Queued for upload when online',
     };
+  } catch (e) {
+    return { ok: false, queued: true, error: String(e) };
+  }
+});
+
+ipcMain.handle('gallery:flushUploadQueue', async () => {
+  try {
+    return await flushUploadQueue();
   } catch (e) {
     return { ok: false, error: String(e) };
   }
 });
 
-async function fetchRemoteFrames(base) {
-  const res = await fetch(`${base}/api/frames`);
+ipcMain.handle('gallery:getUploadQueueItem', async (_e, filePath) => {
+  try {
+    const abs = path.resolve(String(filePath || ''));
+    const items = loadUploadQueue().items.filter((i) => i.filePath === abs);
+    const item =
+      items.find((i) => i.status === 'ok') ||
+      items.find((i) => i.status === 'pending' || i.status === 'queued') ||
+      items[items.length - 1] ||
+      null;
+    return { ok: true, item };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+async function fetchRemoteFrames(base, signal) {
+  const res = await fetch(`${base}/api/frames`, { signal });
   let data = null;
   try {
     data = await res.json();
@@ -2134,7 +2350,7 @@ async function fetchRemoteFrames(base) {
   return Array.isArray(data.frames) ? data.frames : [];
 }
 
-async function publishLocalFrameFile(base, token, filename) {
+async function publishLocalFrameFile(base, token, filename, signal) {
   const safe = path.basename(String(filename || ''));
   if (!safe || safe.includes('..')) return { ok: false, error: 'Invalid filename' };
   const full = path.join(getPhotoFramesDir(), safe);
@@ -2162,6 +2378,7 @@ async function publishLocalFrameFile(base, token, filename) {
       'Content-Length': String(bodyBuf.length),
     },
     body: bodyBuf,
+    signal,
   });
   let data = null;
   try {
@@ -2190,7 +2407,7 @@ async function deleteRemoteFrameFile(base, token, filename) {
   return { ok: true, removed: data.removed || safe };
 }
 
-async function pullRemoteFramesToLocal(base, remoteFrames) {
+async function pullRemoteFramesToLocal(base, remoteFrames, signal) {
   const dir = getPhotoFramesDir();
   const synced = [];
   const failed = [];
@@ -2199,7 +2416,7 @@ async function pullRemoteFramesToLocal(base, remoteFrames) {
     if (!filename || filename.includes('..')) continue;
     const url = frame.downloadUrl || `${base}${frame.url}`;
     try {
-      const imgRes = await fetch(url);
+      const imgRes = await fetch(url, { signal });
       if (!imgRes.ok) {
         failed.push({ filename, error: `HTTP ${imgRes.status}` });
         continue;
@@ -2219,60 +2436,82 @@ async function pullRemoteFramesToLocal(base, remoteFrames) {
  * 1) Push local frames (when token provided) so booth overlays appear on the gallery host
  * 2) Pull remote frames so Moments admin uploads show on the booth
  * 3) Optionally prune local files missing from the remote set (Moments deletes)
+ * Offline / timeout: returns { ok:false, offline:true } so callers keep local frames.
  */
 async function syncFramesWithMoments(payload) {
   const base = galleryBaseUrl(payload?.apiBaseUrl);
   if (!base) return { ok: false, error: 'Gallery API URL is required.' };
   const token = String(payload?.uploadToken || '').trim();
-  const pushLocal = payload?.pushLocal !== false;
+  const pushLocal = payload?.pushLocal === true;
   const pruneLocal = payload?.pruneLocal === true;
+  const timeoutMs =
+    Number.isFinite(Number(payload?.timeoutMs)) && Number(payload.timeoutMs) > 0
+      ? Number(payload.timeoutMs)
+      : 12000;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
 
-  let remote = await fetchRemoteFrames(base);
-  const remoteNames = new Set(
-    remote.map((f) => path.basename(String(f.filename || ''))).filter(Boolean),
-  );
+  try {
+    let remote = await fetchRemoteFrames(base, ac.signal);
+    const remoteNames = new Set(
+      remote.map((f) => path.basename(String(f.filename || ''))).filter(Boolean),
+    );
 
-  const published = [];
-  const publishFailed = [];
-  if (token && pushLocal) {
-    for (const filename of listPhotoFrameFiles()) {
-      const r = await publishLocalFrameFile(base, token, filename);
-      if (r.ok) published.push(filename);
-      else publishFailed.push({ filename, error: r.error || 'Publish failed' });
-    }
-    if (published.length) {
-      remote = await fetchRemoteFrames(base);
-      remoteNames.clear();
-      for (const f of remote) {
-        const n = path.basename(String(f.filename || ''));
-        if (n) remoteNames.add(n);
+    const published = [];
+    const publishFailed = [];
+    if (token && pushLocal) {
+      for (const filename of listPhotoFrameFiles()) {
+        if (ac.signal.aborted) break;
+        const r = await publishLocalFrameFile(base, token, filename, ac.signal);
+        if (r.ok) published.push(filename);
+        else publishFailed.push({ filename, error: r.error || 'Publish failed' });
+      }
+      if (published.length) {
+        remote = await fetchRemoteFrames(base, ac.signal);
+        remoteNames.clear();
+        for (const f of remote) {
+          const n = path.basename(String(f.filename || ''));
+          if (n) remoteNames.add(n);
+        }
       }
     }
-  }
 
-  const { synced, failed } = await pullRemoteFramesToLocal(base, remote);
+    const { synced, failed } = await pullRemoteFramesToLocal(base, remote, ac.signal);
 
-  const pruned = [];
-  if (pruneLocal) {
-    const dir = getPhotoFramesDir();
-    for (const filename of listPhotoFrameFiles()) {
-      if (remoteNames.has(filename)) continue;
-      try {
-        fs.unlinkSync(path.join(dir, filename));
-        pruned.push(filename);
-      } catch (_) {}
+    const pruned = [];
+    if (pruneLocal) {
+      const dir = getPhotoFramesDir();
+      for (const filename of listPhotoFrameFiles()) {
+        if (remoteNames.has(filename)) continue;
+        try {
+          fs.unlinkSync(path.join(dir, filename));
+          pruned.push(filename);
+        } catch (_) {}
+      }
     }
-  }
 
-  return {
-    ok: true,
-    synced,
-    published,
-    pruned,
-    failed: [...publishFailed, ...failed],
-    count: synced.length,
-    publishedCount: published.length,
-  };
+    return {
+      ok: true,
+      synced,
+      published,
+      pruned,
+      failed: [...publishFailed, ...failed],
+      count: synced.length,
+      publishedCount: published.length,
+    };
+  } catch (e) {
+    const msg = String(e?.message || e);
+    const offline =
+      e?.name === 'AbortError' ||
+      /abort|fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network|offline/i.test(msg);
+    return {
+      ok: false,
+      offline,
+      error: offline ? 'Moments unreachable — using local frames' : msg,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 ipcMain.handle('gallery:syncFrames', async (_e, payload) => {

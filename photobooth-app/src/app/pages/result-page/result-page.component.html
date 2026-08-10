@@ -62,17 +62,8 @@
           @if (!booth.openAiConfigured()) {
             <p class="pb-hint pb-result-ai-hint">OpenAI API key must be set in Admin → AI.</p>
           }
-          @if (aiModelUsed(); as model) {
-            <p class="pb-hint pb-result-ai-model">Using model path: {{ model }}</p>
-          }
         }
       </div>
-    }
-
-    @if (path(); as p) {
-      <p class="pb-path-hint" [attr.title]="copy().result.savedPrefix + ' ' + p">
-        {{ copy().result.savedPrefix }} {{ p }}
-      </p>
     }
 
     <div class="pb-row pb-result-actions">
@@ -132,7 +123,6 @@
         @if (shareQrDataUrl(); as qr) {
           <img class="pb-share-qr" [src]="qr" alt="Share QR code" />
         }
-        <p class="pb-hint">{{ galleryUpload.shareUrlFor(path()) }}</p>
         <button type="button" class="pb-btn pb-btn-ghost" (click)="closeShare()">
           {{ copy().result.shareBack }}
         </button>

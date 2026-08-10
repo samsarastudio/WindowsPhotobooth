@@ -487,6 +487,7 @@ export class AdminDashboardComponent implements OnInit {
       uploadToken: creds.uploadToken || undefined,
       pushLocal: !!creds.uploadToken,
       pruneLocal: false,
+      timeoutMs: 20000,
     });
     if (!quiet) {
       if (r.ok) {

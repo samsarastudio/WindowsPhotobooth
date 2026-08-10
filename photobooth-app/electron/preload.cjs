@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld('pbApi', {
   adminDeletePhotoFrame: (filename) => ipcRenderer.invoke('admin:deletePhotoFrame', filename),
   galleryEnsureDaySession: (payload) => ipcRenderer.invoke('gallery:ensureDaySession', payload),
   galleryUploadPhoto: (payload) => ipcRenderer.invoke('gallery:uploadPhoto', payload),
+  galleryFlushUploadQueue: () => ipcRenderer.invoke('gallery:flushUploadQueue'),
+  galleryGetUploadQueueItem: (filePath) => ipcRenderer.invoke('gallery:getUploadQueueItem', filePath),
+  onGalleryUploadQueueUpdated: (cb) => {
+    const handler = (_event, item) => cb(item);
+    ipcRenderer.on('gallery:upload-queue-updated', handler);
+    return () => ipcRenderer.removeListener('gallery:upload-queue-updated', handler);
+  },
   gallerySyncFrames: (payload) => ipcRenderer.invoke('gallery:syncFrames', payload),
   galleryPublishFrame: (payload) => ipcRenderer.invoke('gallery:publishFrame', payload),
   galleryDeleteRemoteFrame: (payload) => ipcRenderer.invoke('gallery:deleteRemoteFrame', payload),

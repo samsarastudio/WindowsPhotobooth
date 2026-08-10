@@ -54,6 +54,11 @@ function listPhotos(sessionId) {
     .all(sessionId);
 }
 
+/** Guest-facing gallery: framed + AI only (originals stay in admin). */
+function listPublicPhotos(sessionId) {
+  return listPhotos(sessionId).filter((p) => p.variant !== 'original');
+}
+
 export const sessionsRouter = Router();
 
 sessionsRouter.put('/day', requireUploadToken, (req, res) => {
@@ -103,7 +108,7 @@ sessionsRouter.get('/:slug', (req, res) => {
   if (isSessionExpired(session)) {
     return res.status(410).json({ ok: false, error: 'Session expired' });
   }
-  return res.json({ ok: true, session: publicSession(session, listPhotos(session.id)) });
+  return res.json({ ok: true, session: publicSession(session, listPublicPhotos(session.id)) });
 });
 
 sessionsRouter.get('/:slug/stream', (req, res) => {
@@ -167,12 +172,15 @@ sessionsRouter.post(
       .run(row);
 
     const photo = publicPhoto(session.slug, row);
-    broadcastPhotoAdded(session.slug, photo);
-    notifyWallPhoto({
-      ...photo,
-      sessionSlug: session.slug,
-      sessionTitle: session.title,
-    });
+    // Originals are admin-only — do not push to live public galleries / wall.
+    if (variant !== 'original') {
+      broadcastPhotoAdded(session.slug, photo);
+      notifyWallPhoto({
+        ...photo,
+        sessionSlug: session.slug,
+        sessionTitle: session.title,
+      });
+    }
     return res.status(201).json({ ok: true, photo });
   },
 );

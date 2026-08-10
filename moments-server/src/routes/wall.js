@@ -27,6 +27,7 @@ function listWallPhotos(limit = 500) {
     .map((row) => {
       const session = byId.get(row.session_id);
       if (!session) return null;
+      if (row.variant === 'original') return null;
       return {
         ...publicPhoto(session.slug, row),
         sessionSlug: session.slug,

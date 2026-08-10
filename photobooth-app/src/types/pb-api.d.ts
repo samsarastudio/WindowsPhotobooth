@@ -147,6 +147,8 @@ export interface PbApi {
     variant: 'original' | 'framed' | 'ai';
   }): Promise<{
     ok: boolean;
+    queued?: boolean;
+    status?: string;
     slug?: string;
     photoId?: string;
     shareUrl?: string;
@@ -154,13 +156,47 @@ export interface PbApi {
     variant?: string;
     error?: string;
   }>;
+  galleryFlushUploadQueue(): Promise<{
+    ok: boolean;
+    uploaded?: number;
+    failed?: number;
+    pending?: number;
+    busy?: boolean;
+    error?: string;
+  }>;
+  galleryGetUploadQueueItem(filePath: string): Promise<{
+    ok: boolean;
+    item?: {
+      filePath: string;
+      variant: string;
+      status: string;
+      photoId?: string;
+      shareUrl?: string;
+      url?: string;
+      error?: string;
+    } | null;
+    error?: string;
+  }>;
+  onGalleryUploadQueueUpdated?(
+    cb: (item: {
+      filePath: string;
+      variant?: string;
+      status?: string;
+      photoId?: string;
+      shareUrl?: string;
+      url?: string;
+      error?: string;
+    }) => void,
+  ): () => void;
   gallerySyncFrames(payload: {
     apiBaseUrl: string;
     uploadToken?: string;
     pushLocal?: boolean;
     pruneLocal?: boolean;
+    timeoutMs?: number;
   }): Promise<{
     ok: boolean;
+    offline?: boolean;
     synced?: string[];
     published?: string[];
     pruned?: string[];

@@ -92,17 +92,19 @@ export class FramePageComponent implements OnInit {
     this.selected.set(pick);
   }
 
-  /** Pull overlays from Moments so admin uploads appear on the booth. */
+  /** Pull overlays from Moments when online; otherwise keep local frames. */
   private async pullFramesFromMoments(): Promise<void> {
     const g = this.booth.gallery();
     const apiBaseUrl = (g.apiBaseUrl || '').replace(/\/$/, '');
     if (!g.enabled || !apiBaseUrl || !window.pbApi?.gallerySyncFrames) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     try {
       await window.pbApi.gallerySyncFrames({
         apiBaseUrl,
-        uploadToken: g.uploadToken || undefined,
-        pushLocal: !!g.uploadToken,
+        uploadToken: undefined,
+        pushLocal: false,
         pruneLocal: false,
+        timeoutMs: 2500,
       });
     } catch {
       /* offline Moments should not block the frame picker */
