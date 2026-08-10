@@ -13,6 +13,9 @@ const wallEmpty = document.getElementById('wallEmpty');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
 const btnOpenAlbum = document.getElementById('btnOpenAlbum');
+const uploadTokenEl = document.getElementById('uploadToken');
+const publicBaseUrlEl = document.getElementById('publicBaseUrl');
+const tokenMetaEl = document.getElementById('tokenMeta');
 
 /** @type {any[]} */
 let albumsCache = [];
@@ -211,9 +214,32 @@ async function refreshPhotos() {
   }
 }
 
+function applyTokenSettings(settings) {
+  if (uploadTokenEl) uploadTokenEl.value = settings.uploadToken || '';
+  if (publicBaseUrlEl) publicBaseUrlEl.textContent = settings.publicBaseUrl || '—';
+  if (tokenMetaEl) {
+    const src =
+      settings.uploadTokenSource === 'settings'
+        ? 'saved in admin'
+        : settings.uploadTokenSource === 'env'
+          ? 'from server .env'
+          : 'not set';
+    tokenMetaEl.textContent = settings.uploadTokenConfigured
+      ? `Token active (${src}). Paste into Photobooth Admin → Gallery.`
+      : 'No token set — booth uploads will fail until you save one.';
+  }
+}
+
+function generateUploadToken() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function refreshAll() {
   const settings = await api('/api/admin/settings');
   ttlEl.value = String(settings.settings.defaultTtlDays);
+  applyTokenSettings(settings.settings);
   const wall = await api('/api/admin/wall/settings');
   wallTitle.value = wall.wall.title || '';
   wallOverlay.value = wall.wall.overlay || '';
@@ -249,6 +275,40 @@ document.getElementById('btnSaveTtl').addEventListener('click', async () => {
   } catch (e) {
     setStatus(String(e.message || e));
   }
+});
+
+document.getElementById('btnSaveToken')?.addEventListener('click', async () => {
+  try {
+    const token = uploadTokenEl?.value?.trim() || '';
+    const r = await api('/api/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ uploadToken: token }),
+    });
+    applyTokenSettings(r.settings);
+    setStatus(token ? 'Upload token saved' : 'Upload token cleared');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnCopyToken')?.addEventListener('click', async () => {
+  const token = uploadTokenEl?.value?.trim() || '';
+  if (!token) {
+    setStatus('Nothing to copy — generate or enter a token first');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(token);
+    setStatus('Upload token copied');
+  } catch {
+    uploadTokenEl?.select();
+    setStatus('Select the token and copy manually (Ctrl+C)');
+  }
+});
+
+document.getElementById('btnGenerateToken')?.addEventListener('click', () => {
+  if (uploadTokenEl) uploadTokenEl.value = generateUploadToken();
+  setStatus('Generated a new token — click Save token, then paste it into the photobooth');
 });
 
 document.getElementById('btnSaveWall').addEventListener('click', async () => {

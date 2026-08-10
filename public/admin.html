@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260810-4" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260810-5" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -110,11 +110,25 @@
               <input id="ttl" class="input" type="number" min="1" max="3650" />
               <button type="button" class="btn primary" id="btnSaveTtl">Save</button>
             </div>
-            <p class="meta">Change <code>ADMIN_PIN</code> and <code>UPLOAD_TOKEN</code> in the server <code>.env</code>, then restart the service.</p>
+
+            <h3 class="admin-subhead">Booth upload token</h3>
+            <p class="meta">
+              Paste this into Windows Photobooth → Admin → Gallery → Upload token.
+              Public URL: <code id="publicBaseUrl">—</code>
+            </p>
+            <label for="uploadToken">Upload token</label>
+            <input id="uploadToken" class="input" type="text" autocomplete="off" spellcheck="false" />
+            <div class="row wrap">
+              <button type="button" class="btn primary" id="btnSaveToken">Save token</button>
+              <button type="button" class="btn ghost" id="btnCopyToken">Copy</button>
+              <button type="button" class="btn ghost" id="btnGenerateToken">Generate new</button>
+            </div>
+            <p id="tokenMeta" class="meta"></p>
+            <p class="meta">Admin PIN still lives in the server <code>.env</code> (<code>ADMIN_PIN</code>).</p>
           </section>
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260810-4" type="module"></script>
+    <script src="/js/admin.js?v=20260810-5" type="module"></script>
   </body>
 </html>

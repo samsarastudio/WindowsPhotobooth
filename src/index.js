@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
 import { initDb, getDb, isSessionExpired } from './db.js';
+import { getUploadToken } from './auth.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { adminRouter } from './routes/admin.js';
 import { framesRouter, adminFramesRouter, ensureFramesDir } from './routes/frames.js';
@@ -91,7 +92,7 @@ app.listen(config.port, config.host, () => {
   console.log(
     `[moments] listening on http://${config.host}:${config.port} → ${config.publicBaseUrl}`,
   );
-  if (!config.uploadToken) {
-    console.warn('[moments] WARNING: UPLOAD_TOKEN is empty — uploads will fail until set');
+  if (!getUploadToken()) {
+    console.warn('[moments] WARNING: UPLOAD_TOKEN is empty — set it in Admin → Settings or .env');
   }
 });
