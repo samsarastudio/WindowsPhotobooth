@@ -138,7 +138,7 @@ In PhotoBooth → **Admin → Gallery**:
 
 1. Enable gallery upload
 2. Set API base URL to `https://moments.inmomentservices.com`
-3. Paste the same `UPLOAD_TOKEN`
+3. Paste the **Upload token** from Moments `/admin` → **Settings** (Generate → Save → Copy), or from `UPLOAD_TOKEN` in `.env`
 4. Set session prefix (e.g. `onam` → daily `onam-YYYY-MM-DD`)
 
 Uploads: original, framed, and AI variants. Share QR on the result screen opens the photo deep link.

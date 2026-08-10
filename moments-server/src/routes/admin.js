@@ -10,7 +10,7 @@ import {
   publicSession,
   saveSettings,
 } from '../db.js';
-import { requireAdminPin } from '../auth.js';
+import { getUploadToken, requireAdminPin } from '../auth.js';
 import { purgeExpiredSessions } from '../purge.js';
 import { seedSampleGallery } from '../seed-samples.js';
 
@@ -18,17 +18,54 @@ export const adminRouter = Router();
 
 adminRouter.use(requireAdminPin);
 
+function adminSettingsPayload() {
+  const settings = loadSettings();
+  const uploadToken = getUploadToken();
+  return {
+    defaultTtlDays: settings.defaultTtlDays,
+    uploadToken,
+    uploadTokenConfigured: !!uploadToken,
+    uploadTokenSource: settings.uploadToken?.trim()
+      ? 'settings'
+      : config.uploadToken
+        ? 'env'
+        : 'none',
+    publicBaseUrl: config.publicBaseUrl,
+  };
+}
+
 adminRouter.get('/settings', (_req, res) => {
-  res.json({ ok: true, settings: loadSettings() });
+  res.json({ ok: true, settings: adminSettingsPayload() });
 });
 
 adminRouter.patch('/settings', (req, res) => {
-  const days = Number(req.body?.defaultTtlDays);
-  if (!Number.isFinite(days) || days < 1 || days > 3650) {
-    return res.status(400).json({ ok: false, error: 'defaultTtlDays must be 1–3650' });
+  const patch = {};
+
+  if (req.body?.defaultTtlDays !== undefined) {
+    const days = Number(req.body.defaultTtlDays);
+    if (!Number.isFinite(days) || days < 1 || days > 3650) {
+      return res.status(400).json({ ok: false, error: 'defaultTtlDays must be 1–3650' });
+    }
+    patch.defaultTtlDays = Math.floor(days);
   }
-  const settings = saveSettings({ defaultTtlDays: Math.floor(days) });
-  return res.json({ ok: true, settings });
+
+  if (req.body?.uploadToken !== undefined) {
+    if (typeof req.body.uploadToken !== 'string') {
+      return res.status(400).json({ ok: false, error: 'uploadToken must be a string' });
+    }
+    const token = req.body.uploadToken.trim();
+    if (token && token.length < 8) {
+      return res.status(400).json({ ok: false, error: 'uploadToken must be at least 8 characters' });
+    }
+    patch.uploadToken = token;
+  }
+
+  if (!Object.keys(patch).length) {
+    return res.status(400).json({ ok: false, error: 'No settings to update' });
+  }
+
+  saveSettings(patch);
+  return res.json({ ok: true, settings: adminSettingsPayload() });
 });
 
 adminRouter.get('/sessions', (_req, res) => {
