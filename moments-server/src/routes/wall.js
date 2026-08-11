@@ -97,6 +97,13 @@ export function wallSettings() {
     mosaicTargetUrl: hasTarget
       ? `/media/branding/${encodeURIComponent(target)}?v=${fs.statSync(targetPath).mtimeMs}`
       : '',
+    /** Faded backdrop / watermark under the photo collage (0–1). */
+    backdropOpacity:
+      typeof s.wallBackdropOpacity === 'number' &&
+      s.wallBackdropOpacity >= 0 &&
+      s.wallBackdropOpacity <= 1
+        ? s.wallBackdropOpacity
+        : 0.22,
   };
 }
 
@@ -141,6 +148,9 @@ adminWallRouter.patch('/settings', (req, res) => {
   }
   if (typeof req.body?.emptyRatio === 'number') {
     patch.wallEmptyRatio = Math.min(0.6, Math.max(0, req.body.emptyRatio));
+  }
+  if (typeof req.body?.backdropOpacity === 'number') {
+    patch.wallBackdropOpacity = Math.min(1, Math.max(0, req.body.backdropOpacity));
   }
   if (req.body?.clearBrandLogo === true) {
     const cur = loadSettings();

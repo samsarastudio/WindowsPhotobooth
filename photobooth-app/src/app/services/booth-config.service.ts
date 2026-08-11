@@ -5,6 +5,7 @@ import type {
   PhotoboothConfig,
   PhotoboothBranding,
   PhotoboothCopy,
+  PhotoboothDebugConfig,
   PhotoboothGalleryConfig,
   PhotoboothPhotoFramesConfig,
   PhotoboothPrintConfig,
@@ -15,6 +16,7 @@ import {
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
   PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
   PHOTOBOOTH_DEFAULT_PRINT,
@@ -223,6 +225,16 @@ function normalizePrintConfig(
   };
 }
 
+function normalizeDebugConfig(
+  patch?: Partial<PhotoboothDebugConfig> | null,
+): PhotoboothDebugConfig {
+  const base = PHOTOBOOTH_DEFAULT_DEBUG;
+  if (!patch) return { ...base };
+  return {
+    enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
+  };
+}
+
 function pathBasenameSafe(name: string): string {
   const base = name.replace(/\\/g, '/').split('/').pop() || name;
   if (base.includes('..')) return 'frame.png';
@@ -257,6 +269,9 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const print = normalizePrintConfig(
     (rest['print'] as Partial<PhotoboothPrintConfig> | undefined) ?? undefined,
   );
+  const debug = normalizeDebugConfig(
+    (rest['debug'] as Partial<PhotoboothDebugConfig> | undefined) ?? undefined,
+  );
   const requireQrUnlock =
     typeof rest['requireQrUnlock'] === 'boolean' ? rest['requireQrUnlock'] : false;
   const aiGenerationEnabled =
@@ -273,6 +288,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     photoFrames,
     gallery,
     print,
+    debug,
     copy,
     requireQrUnlock,
     aiGenerationEnabled,
@@ -283,7 +299,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 }
 
 export type BoothAdminSavePartial = Partial<
-  Omit<PhotoboothConfig, 'branding' | 'camera' | 'photoFrames' | 'gallery' | 'print'>
+  Omit<PhotoboothConfig, 'branding' | 'camera' | 'photoFrames' | 'gallery' | 'print' | 'debug'>
 > & {
   openAiApiKey?: string;
   branding?: Partial<PhotoboothBranding>;
@@ -291,6 +307,7 @@ export type BoothAdminSavePartial = Partial<
   photoFrames?: Partial<PhotoboothPhotoFramesConfig>;
   gallery?: Partial<PhotoboothGalleryConfig>;
   print?: Partial<PhotoboothPrintConfig>;
+  debug?: Partial<PhotoboothDebugConfig>;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -306,6 +323,8 @@ export class BoothConfigService {
   );
   readonly gallery = computed(() => this.state()?.gallery ?? PHOTOBOOTH_DEFAULT_GALLERY);
   readonly print = computed(() => this.state()?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
+  readonly debug = computed(() => this.state()?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
+  readonly debugEnabled = computed(() => this.debug().enabled === true);
   readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'inmoment');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
@@ -341,6 +360,7 @@ export class BoothConfigService {
         photoFrames: { ...PHOTOBOOTH_DEFAULT_PHOTO_FRAMES },
         gallery: { ...PHOTOBOOTH_DEFAULT_GALLERY },
         print: { ...PHOTOBOOTH_DEFAULT_PRINT },
+        debug: { ...PHOTOBOOTH_DEFAULT_DEBUG },
         copy: PHOTOBOOTH_DEFAULT_COPY,
         requireQrUnlock: false,
         aiGenerationEnabled: false,

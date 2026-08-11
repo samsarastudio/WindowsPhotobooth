@@ -37,6 +37,9 @@
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'ai'" (click)="setTab('ai')">
             AI
           </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'debug'" (click)="setTab('debug')">
+            Debug
+          </button>
         </nav>
       </aside>
 
@@ -820,6 +823,57 @@
               file if support needs to see camera errors.
             </p>
           }
+        </section>
+      </div>
+    }
+
+    @if (tab === 'debug') {
+      <div class="pb-admin-debug">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Debug log panel</h2>
+          <p class="pb-hint">
+            Turn this on to show a live log dock on every screen (camera, upload, gallery, errors).
+            Logs also keep writing to <code>logs/photobooth.log</code> beside the app.
+          </p>
+          <label class="pb-check">
+            <input type="checkbox" [(ngModel)]="draftDebug.enabled" />
+            Enable live debug logging
+          </label>
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveDebug()">
+              Save debug setting
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="refreshDebugPanel()">
+              Reload from disk
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="clearDebugPanel()">
+              Clear panel
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="pingDebugLog()">
+              Write test line
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="openLogsFolder()">
+              Open logs folder
+            </button>
+          </div>
+          @if (logFilePath(); as logPath) {
+            <p class="pb-hint pb-hint-tight">Log file: <code>{{ logPath }}</code></p>
+          }
+          <div class="pb-admin-log-panel" aria-live="polite">
+            @for (e of boothLog.entries(); track e.id) {
+              <div class="pb-admin-log-line" [attr.data-level]="e.level">
+                <span class="pb-admin-log-meta"
+                  >{{ e.ts.slice(11, 19) }} · {{ e.level }} · {{ e.scope }}</span
+                >
+                <span class="pb-admin-log-msg">{{ e.message }}</span>
+                @if (e.detail) {
+                  <span class="pb-admin-log-detail">{{ e.detail }}</span>
+                }
+              </div>
+            } @empty {
+              <p class="pb-hint">No log lines yet. Enable debug, save, then use the booth or tap “Write test line”.</p>
+            }
+          </div>
         </section>
       </div>
     }

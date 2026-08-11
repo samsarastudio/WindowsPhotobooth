@@ -153,6 +153,28 @@ adminRouter.delete('/sessions/:slug/photos/:photoId', (req, res) => {
   return res.json({ ok: true, removed: photo.id, photo: publicPhoto(row.slug, photo) });
 });
 
+adminRouter.post('/sessions/:slug/photos/bulk-delete', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
+  if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const ids = Array.isArray(req.body?.ids)
+    ? [...new Set(req.body.ids.map((id) => String(id || '').trim()).filter(Boolean))]
+    : [];
+  if (!ids.length) {
+    return res.status(400).json({ ok: false, error: 'ids array required' });
+  }
+  const removed = [];
+  const del = getDb().prepare('DELETE FROM photos WHERE id = ? AND session_id = ?');
+  const get = getDb().prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?');
+  for (const id of ids) {
+    const photo = get.get(id, row.id);
+    if (!photo) continue;
+    del.run(id, row.id);
+    fs.rmSync(path.join(config.photosDir, row.slug, photo.filename), { force: true });
+    removed.push(id);
+  }
+  return res.json({ ok: true, removed, count: removed.length });
+});
+
 adminRouter.post('/purge-expired', (_req, res) => {
   const result = purgeExpiredSessions();
   return res.json({ ok: true, ...result });

@@ -348,3 +348,49 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.pb-admin-log-panel {
+  margin-top: 0.85rem;
+  max-height: min(48vh, 420px);
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(28, 26, 23, 0.12);
+  background: #1c1a17;
+  color: #f4f0ea;
+  padding: 0.65rem 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.pb-admin-log-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pb-admin-log-meta {
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.pb-admin-log-line[data-level='error'] .pb-admin-log-meta {
+  color: #ff8f8f;
+}
+
+.pb-admin-log-line[data-level='warn'] .pb-admin-log-meta {
+  color: #ffd27a;
+}
+
+.pb-admin-log-msg {
+  word-break: break-word;
+}
+
+.pb-admin-log-detail {
+  opacity: 0.75;
+  word-break: break-word;
+  white-space: pre-wrap;
+}

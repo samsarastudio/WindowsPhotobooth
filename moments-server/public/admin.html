@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260810-5" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260811-4" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -75,7 +75,11 @@
             <div class="row wrap">
               <button type="button" class="btn ghost" id="btnRefreshPhotos">Refresh</button>
               <a class="btn ghost" id="btnOpenAlbum" href="#" target="_blank" rel="noopener">Open gallery</a>
+              <button type="button" class="btn ghost" id="btnSelectAllPhotos">Select all</button>
+              <button type="button" class="btn ghost" id="btnClearPhotoSelection">Clear selection</button>
+              <button type="button" class="btn danger" id="btnBulkDeletePhotos" disabled>Delete selected</button>
             </div>
+            <p id="photoSelectionMeta" class="meta">Select photos with the checkboxes to delete several at once.</p>
             <div id="photoGrid" class="photo-admin-grid"></div>
           </section>
 
@@ -92,7 +96,7 @@
           <section class="card admin-section" data-section="wall" hidden>
             <h2>Mosaic wall</h2>
             <p class="meta">
-              Guest photos fill a grid and reveal a larger target image (logo / artwork), like a digital mosaic wall.
+              Guest photos collage on a filled wall with motion. A faded backdrop sits under the photos for watermark or brand artwork.
               Cards stay 6×4. Open <code>/wall</code>.
             </p>
             <label>Wall title</label>
@@ -101,13 +105,15 @@
             <input id="wallOverlay" class="input" placeholder="e.g. UNLEASHED" />
             <label>Mosaic density (columns)</label>
             <input id="wallColumns" class="input" type="number" min="8" max="28" step="1" />
-            <label>Mosaic target image (logo / artwork to reveal)</label>
+            <label>Backdrop / watermark image (under photos)</label>
             <div class="row wrap">
               <input id="wallMosaicTarget" type="file" accept="image/png,image/jpeg,image/webp" />
-              <button type="button" class="btn ghost" id="btnUploadMosaicTarget">Upload target</button>
-              <button type="button" class="btn ghost" id="btnClearMosaicTarget">Clear target</button>
+              <button type="button" class="btn ghost" id="btnUploadMosaicTarget">Upload backdrop</button>
+              <button type="button" class="btn ghost" id="btnClearMosaicTarget">Clear backdrop</button>
             </div>
             <p id="wallMosaicTargetPreview" class="meta"></p>
+            <label>Backdrop opacity <span id="wallBackdropOpacityLabel">22%</span></label>
+            <input id="wallBackdropOpacity" class="input" type="range" min="0" max="100" step="1" value="22" />
             <label>Partner brand text (shown with inmoment)</label>
             <input id="wallBrandText" class="input" placeholder="e.g. Event partner name" />
             <label>Partner brand logo (optional)</label>
@@ -146,6 +152,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260810-7" type="module"></script>
+    <script src="/js/admin.js?v=20260811-4" type="module"></script>
   </body>
 </html>

@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/gallery.css?v=20260811-3" />
+    <link rel="stylesheet" href="/css/gallery.css?v=20260811-4" />
   </head>
   <body>
     <div class="leaf leaf-tr" aria-hidden="true"></div>
@@ -52,7 +52,11 @@
             <span id="mosaicPartnerText" class="mosaic-brand-text" hidden></span>
           </div>
         </header>
-        <div id="mosaicStage" class="mosaic-stage"></div>
+        <div id="mosaicStage" class="mosaic-stage">
+          <div id="mosaicBackdrop" class="mosaic-backdrop" hidden aria-hidden="true">
+            <img id="mosaicBackdropImg" class="mosaic-backdrop-img" alt="" />
+          </div>
+        </div>
         <p id="wallOverlay" class="mosaic-watermark" hidden></p>
       </div>
     </main>
@@ -80,6 +84,6 @@
       </div>
     </div>
 
-    <script src="/js/gallery.js?v=20260811-3" type="module"></script>
+    <script src="/js/gallery.js?v=20260811-4" type="module"></script>
   </body>
 </html>

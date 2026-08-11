@@ -41,8 +41,21 @@ export interface PbApi {
     scope?: string;
     message: string;
     detail?: unknown;
+    skipBroadcast?: boolean;
   }): Promise<{ ok: boolean; logFile?: string; error?: string }>;
+  readLogTail(payload?: {
+    maxLines?: number;
+  }): Promise<{ ok: boolean; lines?: string[]; logFile?: string; error?: string }>;
   openLogsFolder(): Promise<{ ok: boolean; path?: string; error?: string }>;
+  onAppLogEntry?(
+    cb: (entry: {
+      ts?: string;
+      level?: string;
+      scope?: string;
+      message?: string;
+      detail?: string;
+    }) => void,
+  ): () => void;
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
   readFileBase64(filePath: string): Promise<string>;
   saveJpeg(fullPath: string, base64Body: string): Promise<{ ok: boolean; path?: string }>;

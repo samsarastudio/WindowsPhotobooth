@@ -55,6 +55,7 @@ export function loadSettings() {
     wallBrandText: '',
     wallBrandLogo: '',
     wallMosaicTarget: '',
+    wallBackdropOpacity: 0.22,
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {

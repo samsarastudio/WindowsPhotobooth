@@ -501,6 +501,32 @@ body.is-mosaic main {
   border-radius: 16px;
 }
 
+.mosaic-backdrop {
+  --backdrop-opacity: 0.22;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.mosaic-backdrop[hidden] {
+  display: none !important;
+}
+
+.mosaic-backdrop-img {
+  width: min(78%, 920px);
+  height: min(72%, 620px);
+  object-fit: contain;
+  object-position: center;
+  opacity: var(--backdrop-opacity);
+  filter: saturate(0.85);
+  user-select: none;
+}
+
 .mosaic-scan {
   position: absolute;
   inset: 0;
@@ -571,6 +597,25 @@ body.is-mosaic main {
 .mosaic-slot.is-filled {
   cursor: pointer;
   z-index: 3;
+}
+
+.mosaic-slot.is-focus {
+  z-index: 5;
+}
+
+.mosaic-slot.is-focus .mosaic-slot-card {
+  box-shadow:
+    0 18px 42px rgba(40, 35, 28, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.9);
+}
+
+.mosaic-slot.is-vanish {
+  pointer-events: none;
+  animation: mosaicVanish 0.28s ease-in forwards;
+}
+
+.mosaic-slot.is-swoosh .mosaic-slot-card {
+  animation: mosaicSwoosh 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .mosaic-slot-card {
@@ -734,18 +779,53 @@ body.is-mosaic main {
   }
 }
 
+@keyframes mosaicVanish {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(var(--mx, 0px), var(--my, 0px), 0) rotate(var(--rot)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translate3d(var(--mx, 0px), var(--my, 0px), 0) rotate(var(--rot)) scale(0.82);
+  }
+}
+
+@keyframes mosaicSwoosh {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.86) rotate(-2deg);
+    filter: blur(5px);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+    filter: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mosaic-scan::before,
   .mosaic-slot.is-empty .mosaic-slot-card,
   .mosaic-slot.is-empty .mosaic-slot-card::before,
   .mosaic-slot.is-filled .mosaic-slot-card,
   .mosaic-slot.is-filled .mosaic-slot-photo,
-  .mosaic-slot.is-shine .mosaic-slot-shine {
+  .mosaic-slot.is-shine .mosaic-slot-shine,
+  .mosaic-slot.is-vanish,
+  .mosaic-slot.is-swoosh .mosaic-slot-card {
     animation: none !important;
   }
   .mosaic-slot.is-filled .mosaic-slot-photo {
     display: block;
     opacity: 1;
+  }
+  .mosaic-slot.is-vanish {
+    opacity: 0;
   }
 }
 

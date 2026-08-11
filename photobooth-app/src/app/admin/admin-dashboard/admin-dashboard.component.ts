@@ -6,6 +6,7 @@ import type {
   PhotoboothBranding,
   PhotoboothCameraConfig,
   PhotoboothCopy,
+  PhotoboothDebugConfig,
   PhotoboothGalleryConfig,
   PhotoboothPrintConfig,
 } from '../../models/photobooth-config.model';
@@ -17,6 +18,7 @@ import {
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
   PHOTOBOOTH_DEFAULT_COPY,
+  PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
   PHOTOBOOTH_DEFAULT_PRINT,
   PLAIN_PHOTO_MODE_ID,
@@ -72,12 +74,14 @@ interface AdminFrameItem {
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
-  tab: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai' = 'copy';
+  tab: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai' | 'debug' =
+    'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
   draftBranding: PhotoboothBranding = structuredClone(PHOTOBOOTH_DEFAULT_BRANDING);
   draftCamera: PhotoboothCameraConfig = structuredClone(PHOTOBOOTH_DEFAULT_CAMERA);
   draftGallery: PhotoboothGalleryConfig = structuredClone(PHOTOBOOTH_DEFAULT_GALLERY);
   draftPrint: PhotoboothPrintConfig = structuredClone(PHOTOBOOTH_DEFAULT_PRINT);
+  draftDebug: PhotoboothDebugConfig = structuredClone(PHOTOBOOTH_DEFAULT_DEBUG);
   activeThemeId = 'default';
   draftAiEnabled = false;
   draftRequireQrUnlock = false;
@@ -106,7 +110,7 @@ export class AdminDashboardComponent implements OnInit {
     readonly booth: BoothConfigService,
     readonly branding: BrandingLogoService,
     private readonly camera: CameraService,
-    private readonly boothLog: BoothLogService,
+    readonly boothLog: BoothLogService,
     private readonly theme: ThemeService,
     private readonly router: Router,
   ) {}
@@ -132,11 +136,12 @@ export class AdminDashboardComponent implements OnInit {
     this.draftCamera = structuredClone(cfg?.camera ?? PHOTOBOOTH_DEFAULT_CAMERA);
     this.draftGallery = structuredClone(cfg?.gallery ?? PHOTOBOOTH_DEFAULT_GALLERY);
     this.draftPrint = structuredClone(cfg?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
+    this.draftDebug = structuredClone(cfg?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
     this.openAiKeyDraft = '';
   }
 
   setTab(
-    t: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai',
+    t: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai' | 'debug',
   ): void {
     this.tab = t;
     if (t === 'themes') {
@@ -156,6 +161,9 @@ export class AdminDashboardComponent implements OnInit {
     }
     if (t === 'ai') {
       void this.refreshAllAiBackgrounds();
+    }
+    if (t === 'debug') {
+      void this.refreshDebugPanel();
     }
   }
 
@@ -642,6 +650,51 @@ export class AdminDashboardComponent implements OnInit {
         `Could not open folder. Check logs\\photobooth.log next to the app. (${r.error ?? ''})`,
       );
     }
+  }
+
+  async saveDebug(): Promise<void> {
+    this.status.set(null);
+    this.busy.set(true);
+    try {
+      const ok = await this.booth.save({
+        debug: { ...this.draftDebug },
+      });
+      if (ok) {
+        this.syncFromService();
+        this.status.set(
+          this.draftDebug.enabled
+            ? 'Debug logging enabled — live panel is on.'
+            : 'Debug logging disabled.',
+        );
+        if (this.draftDebug.enabled) {
+          await this.refreshDebugPanel();
+          await this.boothLog.info('admin', 'debug panel enabled');
+        }
+      } else {
+        this.status.set('Save failed (run in Electron).');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async refreshDebugPanel(): Promise<void> {
+    const p = await this.boothLog.refreshLogPath();
+    this.logFilePath.set(p);
+    await this.boothLog.loadTailFromDisk(300);
+  }
+
+  clearDebugPanel(): void {
+    this.boothLog.clear();
+    this.status.set('Cleared on-screen log buffer (file on disk kept).');
+  }
+
+  async pingDebugLog(): Promise<void> {
+    await this.boothLog.info('admin', 'debug ping', {
+      at: new Date().toISOString(),
+      galleryEnabled: this.draftGallery.enabled,
+    });
+    this.status.set('Wrote a test log line.');
   }
 
   async saveCamera(): Promise<void> {

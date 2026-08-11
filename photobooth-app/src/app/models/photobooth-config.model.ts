@@ -109,13 +109,22 @@ export interface PhotoboothGalleryConfig {
 }
 
 export const PHOTOBOOTH_DEFAULT_GALLERY: PhotoboothGalleryConfig = {
-  enabled: false,
+  enabled: true,
   apiBaseUrl: 'https://moments.inmomentservices.com',
-  uploadToken: '',
+  uploadToken: 'd242f34d06615494f68726947dcf3e416a0faa5a1711792723af1860dffdc008',
   sessionPrefix: 'onam',
   uploadOriginal: true,
   uploadFramed: true,
   uploadAi: true,
+};
+
+export interface PhotoboothDebugConfig {
+  /** When true, Admin → Debug shows a live log panel (and a floating dock on guest screens). */
+  enabled: boolean;
+}
+
+export const PHOTOBOOTH_DEFAULT_DEBUG: PhotoboothDebugConfig = {
+  enabled: false,
 };
 
 export interface PhotoboothPrintConfig {
@@ -248,6 +257,7 @@ export interface PhotoboothConfig {
   photoFrames: PhotoboothPhotoFramesConfig;
   gallery: PhotoboothGalleryConfig;
   print: PhotoboothPrintConfig;
+  debug: PhotoboothDebugConfig;
   copy: PhotoboothCopy;
   /** When true, guests must pass the QR / code unlock screen. */
   requireQrUnlock: boolean;

@@ -3,7 +3,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('pbApi', {
   getPaths: () => ipcRenderer.invoke('app:getPaths'),
   log: (payload) => ipcRenderer.invoke('app:log', payload),
+  readLogTail: (payload) => ipcRenderer.invoke('app:readLogTail', payload || {}),
   openLogsFolder: () => ipcRenderer.invoke('app:openLogsFolder'),
+  onAppLogEntry: (cb) => {
+    const handler = (_event, entry) => cb(entry);
+    ipcRenderer.on('app:log-entry', handler);
+    return () => ipcRenderer.removeListener('app:log-entry', handler);
+  },
   cameraInvoke: (cmd) => ipcRenderer.invoke('camera:invoke', cmd),
   readFileBase64: (filePath) => ipcRenderer.invoke('file:readBase64', filePath),
   saveJpeg: (fullPath, base64Body) => ipcRenderer.invoke('file:saveJpeg', fullPath, base64Body),

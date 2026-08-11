@@ -11,13 +11,16 @@
     "guestFrameFiles": []
   },
   "gallery": {
-    "enabled": false,
+    "enabled": true,
     "apiBaseUrl": "https://moments.inmomentservices.com",
-    "uploadToken": "",
+    "uploadToken": "d242f34d06615494f68726947dcf3e416a0faa5a1711792723af1860dffdc008",
     "sessionPrefix": "onam",
     "uploadOriginal": true,
     "uploadFramed": true,
     "uploadAi": true
+  },
+  "debug": {
+    "enabled": false
   },
   "print": {
     "enabled": false,

@@ -120,14 +120,31 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       this.err.set(String(e));
     }
 
-    // Poll briefly so Share appears when a background upload finishes.
+    // Keep Share state live while background upload finishes; recover if stuck.
     if (this.galleryUpload.enabled()) {
       void this.galleryUpload.ensureShareUpload(pp);
+      let ticks = 0;
       this.sharePoll = setInterval(() => {
+        ticks += 1;
         void this.galleryUpload.recordFor(this.path());
         if (this.canShare() && this.sharePoll) {
           clearInterval(this.sharePoll);
           this.sharePoll = undefined;
+          return;
+        }
+        // Re-kick every ~4s; after ~25s surface retry instead of infinite Uploading…
+        if (ticks % 10 === 0) {
+          void this.galleryUpload.ensureShareUpload(this.path() || pp);
+        }
+        if (ticks >= 60 && this.shareUploading()) {
+          const cur = this.galleryUpload.recordFor(this.path());
+          if (!cur || cur.status === 'pending' || cur.status === 'queued') {
+            this.galleryUpload.markUploadTimedOut(this.path() || pp);
+          }
+          if (this.sharePoll) {
+            clearInterval(this.sharePoll);
+            this.sharePoll = undefined;
+          }
         }
       }, 400);
     }
