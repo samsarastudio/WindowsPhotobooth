@@ -501,6 +501,76 @@ body.is-mosaic main {
   border-radius: 16px;
 }
 
+.mosaic-stage.is-completed {
+  --completed-cols: 8;
+  --completed-rows: 4;
+  display: grid;
+  grid-template-columns: repeat(var(--completed-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--completed-rows), minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  align-content: stretch;
+  justify-content: stretch;
+}
+
+.mosaic-stage.is-completed .mosaic-backdrop {
+  inset: 3px;
+  border-radius: 10px;
+  z-index: 0;
+}
+
+.mosaic-stage.is-completed .mosaic-slot {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: auto;
+  transform: none;
+  transition: none;
+  z-index: 1;
+  animation: mosaicCompletedArrive 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--arrive-delay, 0ms);
+}
+
+.mosaic-stage.is-completed .mosaic-slot-card {
+  border-radius: 4px;
+  box-shadow: none;
+  border: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none !important;
+  background: #111;
+}
+
+.mosaic-stage.is-completed .mosaic-slot.is-filled .mosaic-slot-photo {
+  animation: none;
+  display: block;
+}
+
+.mosaic-stage.is-completed .mosaic-slot-shine,
+.mosaic-stage.is-completed .mosaic-scan {
+  display: none !important;
+}
+
+body.is-mosaic-completed .mosaic-watermark {
+  color: rgba(47, 93, 58, 0.1);
+  z-index: 3;
+}
+
+@keyframes mosaicCompletedArrive {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .mosaic-backdrop {
   --backdrop-opacity: 0.22;
   position: absolute;
@@ -817,7 +887,8 @@ body.is-mosaic main {
   .mosaic-slot.is-filled .mosaic-slot-photo,
   .mosaic-slot.is-shine .mosaic-slot-shine,
   .mosaic-slot.is-vanish,
-  .mosaic-slot.is-swoosh .mosaic-slot-card {
+  .mosaic-slot.is-swoosh .mosaic-slot-card,
+  .mosaic-stage.is-completed .mosaic-slot {
     animation: none !important;
   }
   .mosaic-slot.is-filled .mosaic-slot-photo {

@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260811-4" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260811-5" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -96,9 +96,18 @@
           <section class="card admin-section" data-section="wall" hidden>
             <h2>Mosaic wall</h2>
             <p class="meta">
-              Guest photos collage on a filled wall with motion. A faded backdrop sits under the photos for watermark or brand artwork.
+              Guest photos collage on a filled wall with motion. At the end of the show, switch to a completed
+              filled grid. A faded backdrop sits under the photos for watermark or brand artwork.
               Cards stay 6×4. Open <code>/wall</code>.
             </p>
+            <div class="wall-mode-box">
+              <label>Wall display mode</label>
+              <p id="wallModeStatus" class="meta">Live collage — photos float and swap during the event.</p>
+              <div class="row wrap">
+                <button type="button" class="btn primary" id="btnShowCompletedView">Show completed grid</button>
+                <button type="button" class="btn ghost" id="btnShowLiveCollage">Back to live collage</button>
+              </div>
+            </div>
             <label>Wall title</label>
             <input id="wallTitle" class="input" />
             <label>Center overlay text (optional)</label>
@@ -152,6 +161,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260811-4" type="module"></script>
+    <script src="/js/admin.js?v=20260811-5" type="module"></script>
   </body>
 </html>

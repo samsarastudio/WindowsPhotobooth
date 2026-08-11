@@ -4,7 +4,7 @@ import multer from 'multer';
 import { Router } from 'express';
 import { config } from '../config.js';
 import { getDb, isSessionExpired, publicPhoto, loadSettings, saveSettings } from '../db.js';
-import { subscribeSession, broadcastPhotoAdded } from '../sse.js';
+import { subscribeSession, broadcastPhotoAdded, broadcastEvent } from '../sse.js';
 import { requireAdminPin } from '../auth.js';
 
 const WALL_CHANNEL = '__wall__';
@@ -104,6 +104,8 @@ export function wallSettings() {
       s.wallBackdropOpacity <= 1
         ? s.wallBackdropOpacity
         : 0.22,
+    /** End-of-show: dense filled CSS grid instead of live collage motion. */
+    completedView: s.wallCompletedView === true,
   };
 }
 
@@ -152,6 +154,9 @@ adminWallRouter.patch('/settings', (req, res) => {
   if (typeof req.body?.backdropOpacity === 'number') {
     patch.wallBackdropOpacity = Math.min(1, Math.max(0, req.body.backdropOpacity));
   }
+  if (typeof req.body?.completedView === 'boolean') {
+    patch.wallCompletedView = req.body.completedView;
+  }
   if (req.body?.clearBrandLogo === true) {
     const cur = loadSettings();
     if (cur.wallBrandLogo) {
@@ -173,7 +178,9 @@ adminWallRouter.patch('/settings', (req, res) => {
     patch.wallMosaicTarget = '';
   }
   saveSettings(patch);
-  res.json({ ok: true, wall: wallSettings() });
+  const wall = wallSettings();
+  broadcastEvent(WALL_CHANNEL, 'wall.settings', wall);
+  res.json({ ok: true, wall });
 });
 
 adminWallRouter.post('/brand-logo', upload.single('logo'), (req, res) => {

@@ -56,6 +56,8 @@ export function loadSettings() {
     wallBrandLogo: '',
     wallMosaicTarget: '',
     wallBackdropOpacity: 0.22,
+    /** End-of-show dense filled grid instead of live collage. */
+    wallCompletedView: false,
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {
