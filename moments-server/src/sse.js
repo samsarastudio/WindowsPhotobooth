@@ -35,9 +35,14 @@ export function subscribeSession(slug, res) {
 }
 
 export function broadcastPhotoAdded(slug, photo) {
+  broadcastEvent(slug, 'photo.added', photo);
+}
+
+/** @param {string} slug @param {string} event @param {unknown} data */
+export function broadcastEvent(slug, event, data) {
   const set = clientsBySlug.get(slug);
   if (!set || set.size === 0) return;
-  const payload = `event: photo.added\ndata: ${JSON.stringify(photo)}\n\n`;
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const client of [...set]) {
     try {
       client.write(payload);

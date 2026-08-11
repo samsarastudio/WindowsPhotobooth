@@ -14,6 +14,7 @@ const wallBrandPreview = document.getElementById('wallBrandPreview');
 const wallMosaicTargetPreview = document.getElementById('wallMosaicTargetPreview');
 const wallBackdropOpacity = document.getElementById('wallBackdropOpacity');
 const wallBackdropOpacityLabel = document.getElementById('wallBackdropOpacityLabel');
+const wallModeStatus = document.getElementById('wallModeStatus');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
 const photoSelectionMeta = document.getElementById('photoSelectionMeta');
@@ -48,6 +49,31 @@ function mosaicBackdropPreviewText(url) {
   return url
     ? 'Backdrop image on file — shown faded under the photo collage.'
     : 'No backdrop yet — upload a watermark or brand image.';
+}
+
+function syncWallModeStatus(completed) {
+  if (!wallModeStatus) return;
+  wallModeStatus.textContent = completed
+    ? 'Completed filled grid — dense end-of-show layout on /wall.'
+    : 'Live collage — photos float and swap during the event.';
+  const btnCompleted = document.getElementById('btnShowCompletedView');
+  const btnLive = document.getElementById('btnShowLiveCollage');
+  if (btnCompleted) btnCompleted.disabled = !!completed;
+  if (btnLive) btnLive.disabled = !completed;
+}
+
+async function setWallCompletedView(completed) {
+  const r = await api('/api/admin/wall/settings', {
+    method: 'PATCH',
+    body: JSON.stringify({ completedView: !!completed }),
+  });
+  syncWallModeStatus(!!r.wall?.completedView);
+  setStatus(
+    r.wall?.completedView
+      ? 'Wall switched to completed filled grid'
+      : 'Wall switched back to live collage',
+  );
+  return r;
 }
 
 function pin() {
@@ -307,6 +333,7 @@ async function refreshAll() {
   if (wallMosaicTargetPreview) {
     wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.wall.mosaicTargetUrl);
   }
+  syncWallModeStatus(!!wall.wall.completedView);
   await refreshAlbums();
   await refreshFrames();
 }
@@ -393,6 +420,7 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
       wallBackdropOpacity.value = String(pct);
       syncBackdropOpacityLabel(pct);
     }
+    syncWallModeStatus(!!wall.wall.completedView);
     if (wallBrandPreview) {
       wallBrandPreview.textContent = wall.wall.brandLogoUrl
         ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
@@ -403,6 +431,22 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
     if (wallMosaicTargetPreview) {
       wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.wall.mosaicTargetUrl);
     }
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnShowCompletedView')?.addEventListener('click', async () => {
+  try {
+    await setWallCompletedView(true);
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnShowLiveCollage')?.addEventListener('click', async () => {
+  try {
+    await setWallCompletedView(false);
   } catch (e) {
     setStatus(String(e.message || e));
   }

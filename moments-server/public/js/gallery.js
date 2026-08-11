@@ -68,6 +68,8 @@ const mosaicPhotoSlot = new Map();
 let mosaicRotateCursor = 0;
 let index = 0;
 let es = null;
+/** Secondary SSE for wall.settings when viewing a session mosaic. */
+let wallSettingsEs = null;
 let ssTimer = null;
 let ssPlaying = false;
 let viewMode = 'grid';
@@ -80,6 +82,7 @@ let wallCfg = {
   brandLogoUrl: '',
   mosaicTargetUrl: '',
   backdropOpacity: 0.22,
+  completedView: false,
 };
 let route = parseRoute();
 let mosaicShineTimer = null;
@@ -125,10 +128,11 @@ function setMode(mode, push = true) {
   }
   if (mode === 'mosaic') {
     els.empty.hidden = true;
-    void renderMosaic(true);
-    startMosaicLoops();
+    applyMosaicLayoutMode(true);
   } else {
     stopMosaicLoops();
+    els.mosaicStage?.classList.remove('is-completed');
+    document.body.classList.remove('is-mosaic-completed');
   }
   if (mode === 'slideshow') {
     if (photos.length) openSlideshow();
@@ -184,6 +188,112 @@ function seededRandom(seed) {
     s = (s * 16807) % 2147483647;
     return (s - 1) / 2147483646;
   };
+}
+
+function isCompletedView() {
+  return !!wallCfg.completedView;
+}
+
+function ensureMosaicBackdrop() {
+  if (!els.mosaicStage) return;
+  if (!els.mosaicBackdrop || !els.mosaicStage.contains(els.mosaicBackdrop)) {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'mosaicBackdrop';
+    backdrop.className = 'mosaic-backdrop';
+    backdrop.hidden = true;
+    backdrop.setAttribute('aria-hidden', 'true');
+    backdrop.innerHTML = '<img id="mosaicBackdropImg" class="mosaic-backdrop-img" alt="" />';
+    els.mosaicStage.prepend(backdrop);
+    els.mosaicBackdrop = backdrop;
+    els.mosaicBackdropImg = backdrop.querySelector('.mosaic-backdrop-img');
+  }
+}
+
+function completedGridDims(count) {
+  const n = Math.max(1, count);
+  const stageW = Math.max(320, els.mosaicStage?.clientWidth || 1200);
+  const stageH = Math.max(240, els.mosaicStage?.clientHeight || 800);
+  const preferred = Math.min(28, Math.max(4, Number(wallCfg.columns) || 12));
+  let best = { cols: 1, rows: n, score: Infinity };
+  const maxCols = Math.min(n, Math.max(preferred + 4, 24));
+  for (let cols = 1; cols <= maxCols; cols++) {
+    const rows = Math.ceil(n / cols);
+    const cellW = stageW / cols;
+    const cellH = stageH / rows;
+    const aspect = cellW / Math.max(1, cellH);
+    const empty = cols * rows - n;
+    // Prefer ~6×4 cells, denser last rows, and columns near admin density
+    const score =
+      Math.abs(aspect - MOSAIC_CELL_ASPECT) * 2.2 +
+      empty * 0.35 +
+      Math.abs(cols - preferred) * 0.08;
+    if (score < best.score) best = { cols, rows, score };
+  }
+  return best;
+}
+
+function applyMosaicLayoutMode(fullRebuild = true) {
+  if (!els.mosaicStage || viewMode !== 'mosaic') return;
+  const completed = isCompletedView();
+  els.mosaicStage.classList.toggle('is-completed', completed);
+  document.body.classList.toggle('is-mosaic-completed', completed);
+  if (completed) {
+    stopMosaicLoops();
+    buildMosaicCompleted();
+  } else {
+    renderMosaic(fullRebuild);
+    startMosaicLoops();
+  }
+}
+
+function buildMosaicCompleted() {
+  if (!els.mosaicStage) return;
+  els.mosaicStage.querySelectorAll('.mosaic-slot, .mosaic-scan').forEach((el) => el.remove());
+  ensureMosaicBackdrop();
+  mosaicSlots = [];
+  mosaicPhotoSlot.clear();
+  mosaicRotateCursor = 0;
+  updateMosaicBranding();
+
+  const list = photos.filter((p) => p?.id);
+  if (!list.length) return;
+
+  const { cols, rows } = completedGridDims(list.length);
+  els.mosaicStage.style.setProperty('--completed-cols', String(cols));
+  els.mosaicStage.style.setProperty('--completed-rows', String(rows));
+
+  list.forEach((photo, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mosaic-slot is-filled is-completed-cell';
+    btn.dataset.slot = String(i);
+    btn.style.setProperty('--arrive-delay', `${Math.min(i * 28, 1200)}ms`);
+    btn.innerHTML =
+      '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
+    const img = btn.querySelector('.mosaic-slot-photo');
+    if (img) {
+      img.src = photo.url;
+      img.alt = '';
+    }
+    btn.onclick = () => {
+      const idx = photos.findIndex((p) => p.id === photo.id);
+      if (idx >= 0) openLightbox(idx);
+    };
+    els.mosaicStage.appendChild(btn);
+    mosaicSlots.push({
+      el: btn,
+      photoId: photo.id,
+      size: 0,
+      x: 0,
+      y: 0,
+      rot: 0,
+      floatDur: 8,
+      floatDelay: 0,
+      scanDelay: 0,
+      focus: false,
+    });
+    mosaicPhotoSlot.set(photo.id, i);
+  });
 }
 
 function mosaicSlotCount() {
@@ -398,7 +508,7 @@ function pickEmptySlot() {
 }
 
 function placePhotoInMosaic(photo, opts = {}) {
-  if (!photo?.id || viewMode !== 'mosaic') return;
+  if (!photo?.id || viewMode !== 'mosaic' || isCompletedView()) return;
   if (mosaicPhotoSlot.has(photo.id) && !opts.force) {
     const idx = mosaicPhotoSlot.get(photo.id);
     const img = mosaicSlots[idx]?.el?.querySelector('.mosaic-slot-photo');
@@ -435,17 +545,11 @@ function buildMosaicCollage() {
 
   // Keep backdrop node; only wipe slots/scan
   els.mosaicStage.querySelectorAll('.mosaic-slot, .mosaic-scan').forEach((el) => el.remove());
-  if (!els.mosaicBackdrop || !els.mosaicStage.contains(els.mosaicBackdrop)) {
-    const backdrop = document.createElement('div');
-    backdrop.id = 'mosaicBackdrop';
-    backdrop.className = 'mosaic-backdrop';
-    backdrop.hidden = true;
-    backdrop.setAttribute('aria-hidden', 'true');
-    backdrop.innerHTML = '<img id="mosaicBackdropImg" class="mosaic-backdrop-img" alt="" />';
-    els.mosaicStage.prepend(backdrop);
-    els.mosaicBackdrop = backdrop;
-    els.mosaicBackdropImg = backdrop.querySelector('.mosaic-backdrop-img');
-  }
+  ensureMosaicBackdrop();
+  els.mosaicStage.classList.remove('is-completed');
+  document.body.classList.remove('is-mosaic-completed');
+  els.mosaicStage.style.removeProperty('--completed-cols');
+  els.mosaicStage.style.removeProperty('--completed-rows');
 
   mosaicSlots = [];
   mosaicPhotoSlot.clear();
@@ -485,6 +589,10 @@ function buildMosaicCollage() {
 
 function renderMosaic(fullRebuild = false) {
   if (!els.mosaicStage) return;
+  if (isCompletedView()) {
+    buildMosaicCompleted();
+    return;
+  }
   if (fullRebuild || !mosaicSlots.length) {
     buildMosaicCollage();
     const order = [...photos];
@@ -496,7 +604,7 @@ function renderMosaic(fullRebuild = false) {
     // Fill up to cap; extras wait for rotation so guests still see theirs
     order.slice(0, mosaicFillCap()).forEach((photo, i) => {
       setTimeout(() => {
-        if (viewMode !== 'mosaic') return;
+        if (viewMode !== 'mosaic' || isCompletedView()) return;
         placePhotoInMosaic(photo, { shine: true });
       }, Math.min(i * 70, 2000));
     });
@@ -509,7 +617,7 @@ function renderMosaic(fullRebuild = false) {
 }
 
 function shineRandomMosaicTile() {
-  if (viewMode !== 'mosaic') return;
+  if (viewMode !== 'mosaic' || isCompletedView()) return;
   const filled = mosaicSlots.filter((s) => s.photoId);
   if (!filled.length) return;
   const slot = filled[Math.floor(Math.random() * filled.length)];
@@ -520,7 +628,7 @@ function shineRandomMosaicTile() {
 }
 
 function rotateMosaicPhotos() {
-  if (viewMode !== 'mosaic' || !mosaicSlots.length || photos.length < 1) return;
+  if (viewMode !== 'mosaic' || isCompletedView() || !mosaicSlots.length || photos.length < 1) return;
 
   // 1) Fill empty slots first
   const visible = new Set([...mosaicPhotoSlot.keys()]);
@@ -585,7 +693,7 @@ function rotateMosaicPhotos() {
 }
 
 function driftMosaicSlots() {
-  if (viewMode !== 'mosaic' || mosaicSlots.length < 2) return;
+  if (viewMode !== 'mosaic' || isCompletedView() || mosaicSlots.length < 2) return;
   const stageW = els.mosaicStage?.clientWidth || 1200;
   const stageH = els.mosaicStage?.clientHeight || 800;
   const pad = 18;
@@ -621,6 +729,7 @@ function driftMosaicSlots() {
 
 function startMosaicLoops() {
   stopMosaicLoops();
+  if (isCompletedView()) return;
   mosaicShineTimer = setInterval(shineRandomMosaicTile, 3200);
   mosaicRotateTimer = setInterval(rotateMosaicPhotos, 6500);
   mosaicDriftTimer = setInterval(driftMosaicSlots, 11000);
@@ -651,8 +760,17 @@ function upsertPhoto(photo) {
   photos.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   if (viewMode === 'grid') renderGrid();
   else if (viewMode === 'mosaic') {
-    // Never force-replace on arrival — fill empty glass slots first.
-    placePhotoInMosaic(photo, { shine: isNew, force: false });
+    if (isCompletedView()) {
+      if (isNew) buildMosaicCompleted();
+      else {
+        const idx = mosaicPhotoSlot.get(photo.id);
+        const img = mosaicSlots[idx]?.el?.querySelector?.('.mosaic-slot-photo');
+        if (img && photo.url) img.src = photo.url;
+      }
+    } else {
+      // Never force-replace on arrival — fill empty glass slots first.
+      placePhotoInMosaic(photo, { shine: isNew, force: false });
+    }
   }
   if (els.meta) els.meta.textContent = photos.length + ' photos';
 }
@@ -707,6 +825,20 @@ function stopSs() {
   ssTimer = null;
 }
 
+function onWallSettingsEvent(ev) {
+  try {
+    const wall = JSON.parse(ev.data);
+    const prevCompleted = !!wallCfg.completedView;
+    wallCfg = { ...wallCfg, ...wall };
+    updateMosaicBranding();
+    if (viewMode === 'mosaic' && prevCompleted !== !!wallCfg.completedView) {
+      applyMosaicLayoutMode(true);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 function connectStream(url) {
   if (es) es.close();
   es = new EventSource(url);
@@ -717,6 +849,17 @@ function connectStream(url) {
       /* ignore */
     }
   });
+  es.addEventListener('wall.settings', onWallSettingsEvent);
+
+  if (wallSettingsEs) {
+    wallSettingsEs.close();
+    wallSettingsEs = null;
+  }
+  // Session galleries need wall settings stream for completed-view toggles.
+  if (!String(url).includes('/api/wall/stream')) {
+    wallSettingsEs = new EventSource('/api/wall/stream');
+    wallSettingsEs.addEventListener('wall.settings', onWallSettingsEvent);
+  }
 }
 
 async function loadSession(slug) {
@@ -818,7 +961,7 @@ let mosaicResizeTimer = null;
 window.addEventListener('resize', () => {
   if (viewMode !== 'mosaic') return;
   clearTimeout(mosaicResizeTimer);
-  mosaicResizeTimer = setTimeout(() => renderMosaic(true), 280);
+  mosaicResizeTimer = setTimeout(() => applyMosaicLayoutMode(true), 280);
 });
 
 if (route.kind === 'home') {
