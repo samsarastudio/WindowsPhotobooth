@@ -1,9 +1,24 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import multer from 'multer';
 import { Router } from 'express';
+import { config } from '../config.js';
 import { getDb, isSessionExpired, publicPhoto, loadSettings, saveSettings } from '../db.js';
 import { subscribeSession, broadcastPhotoAdded } from '../sse.js';
 import { requireAdminPin } from '../auth.js';
 
 const WALL_CHANNEL = '__wall__';
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg']);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+});
+
+function ensureBrandingDir() {
+  fs.mkdirSync(config.brandingDir, { recursive: true });
+  return config.brandingDir;
+}
 
 function listActiveSessions(now = new Date()) {
   return getDb()
@@ -49,6 +64,12 @@ function listWallPhotos(limit = 500) {
 
 export function wallSettings() {
   const s = loadSettings();
+  const logo =
+    typeof s.wallBrandLogo === 'string' && s.wallBrandLogo.trim()
+      ? path.basename(s.wallBrandLogo.trim())
+      : '';
+  const logoPath = logo ? path.join(config.brandingDir, logo) : '';
+  const hasLogo = !!(logo && fs.existsSync(logoPath));
   return {
     title: typeof s.wallTitle === 'string' && s.wallTitle.trim() ? s.wallTitle.trim() : 'Wall of moments',
     overlay: typeof s.wallOverlay === 'string' ? s.wallOverlay : '',
@@ -59,6 +80,11 @@ export function wallSettings() {
       typeof s.wallEmptyRatio === 'number' && s.wallEmptyRatio >= 0 && s.wallEmptyRatio <= 0.6
         ? s.wallEmptyRatio
         : 0.22,
+    brandText: typeof s.wallBrandText === 'string' ? s.wallBrandText.trim().slice(0, 80) : '',
+    brandLogo: hasLogo ? logo : '',
+    brandLogoUrl: hasLogo
+      ? `/media/branding/${encodeURIComponent(logo)}?v=${fs.statSync(logoPath).mtimeMs}`
+      : '',
   };
 }
 
@@ -95,12 +121,59 @@ adminWallRouter.patch('/settings', (req, res) => {
   const patch = {};
   if (typeof req.body?.title === 'string') patch.wallTitle = req.body.title.trim().slice(0, 80);
   if (typeof req.body?.overlay === 'string') patch.wallOverlay = req.body.overlay.trim().slice(0, 80);
+  if (typeof req.body?.brandText === 'string') {
+    patch.wallBrandText = req.body.brandText.trim().slice(0, 80);
+  }
   if (typeof req.body?.columns === 'number') {
     patch.wallColumns = Math.min(24, Math.max(6, Math.floor(req.body.columns)));
   }
   if (typeof req.body?.emptyRatio === 'number') {
     patch.wallEmptyRatio = Math.min(0.6, Math.max(0, req.body.emptyRatio));
   }
+  if (req.body?.clearBrandLogo === true) {
+    const cur = loadSettings();
+    if (cur.wallBrandLogo) {
+      const full = path.join(config.brandingDir, path.basename(String(cur.wallBrandLogo)));
+      try {
+        fs.unlinkSync(full);
+      } catch (_) {}
+    }
+    patch.wallBrandLogo = '';
+  }
   saveSettings(patch);
   res.json({ ok: true, wall: wallSettings() });
 });
+
+adminWallRouter.post('/brand-logo', upload.single('logo'), (req, res) => {
+  if (!req.file?.buffer?.length) {
+    return res.status(400).json({ ok: false, error: 'Missing logo file (field: logo)' });
+  }
+  ensureBrandingDir();
+  const suggested = req.file.originalname || `partner-${Date.now()}.png`;
+  let ext = path.extname(suggested).toLowerCase();
+  if (!IMAGE_EXT.has(ext)) {
+    const mime = req.file.mimetype || '';
+    ext = mime.includes('svg')
+      ? '.svg'
+      : mime.includes('png')
+        ? '.png'
+        : mime.includes('webp')
+          ? '.webp'
+          : '.jpg';
+  }
+  const filename = `wall-partner${ext}`;
+  const dest = path.join(config.brandingDir, filename);
+  // Remove previous partner logos with other extensions
+  for (const ent of fs.readdirSync(config.brandingDir)) {
+    if (ent.startsWith('wall-partner.')) {
+      try {
+        fs.unlinkSync(path.join(config.brandingDir, ent));
+      } catch (_) {}
+    }
+  }
+  fs.writeFileSync(dest, req.file.buffer);
+  saveSettings({ wallBrandLogo: filename });
+  return res.status(201).json({ ok: true, wall: wallSettings() });
+});
+
+export { ensureBrandingDir };

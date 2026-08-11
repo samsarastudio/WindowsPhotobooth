@@ -91,15 +91,20 @@
 
           <section class="card admin-section" data-section="wall" hidden>
             <h2>Mosaic wall</h2>
-            <p class="meta">Shown on <code>/wall</code> and session <code>/{session}/wall</code>.</p>
+            <p class="meta">Full-screen floating wall on <code>/wall</code> and <code>/{session}/wall</code>. Photos stay 6×4.</p>
             <label>Wall title</label>
             <input id="wallTitle" class="input" />
             <label>Center overlay text (optional)</label>
             <input id="wallOverlay" class="input" placeholder="e.g. UNLEASHED" />
-            <label>Columns</label>
-            <input id="wallColumns" class="input" type="number" min="6" max="24" />
-            <label>Empty cell ratio (0–0.6)</label>
-            <input id="wallEmpty" class="input" type="number" min="0" max="0.6" step="0.01" />
+            <label>Partner brand text (shown with inmoment)</label>
+            <input id="wallBrandText" class="input" placeholder="e.g. Event partner name" />
+            <label>Partner brand logo (optional)</label>
+            <div class="row wrap">
+              <input id="wallBrandLogo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
+              <button type="button" class="btn ghost" id="btnUploadWallBrand">Upload logo</button>
+              <button type="button" class="btn ghost" id="btnClearWallBrand">Clear logo</button>
+            </div>
+            <p id="wallBrandPreview" class="meta"></p>
             <button type="button" class="btn primary" id="btnSaveWall">Save wall settings</button>
           </section>
 
@@ -129,6 +134,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260810-5" type="module"></script>
+    <script src="/js/admin.js?v=20260810-6" type="module"></script>
   </body>
 </html>

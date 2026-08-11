@@ -52,6 +52,8 @@ export function loadSettings() {
     wallOverlay: '',
     wallColumns: 14,
     wallEmptyRatio: 0.22,
+    wallBrandText: '',
+    wallBrandLogo: '',
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {
