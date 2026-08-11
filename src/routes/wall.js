@@ -70,12 +70,20 @@ export function wallSettings() {
       : '';
   const logoPath = logo ? path.join(config.brandingDir, logo) : '';
   const hasLogo = !!(logo && fs.existsSync(logoPath));
+
+  const target =
+    typeof s.wallMosaicTarget === 'string' && s.wallMosaicTarget.trim()
+      ? path.basename(s.wallMosaicTarget.trim())
+      : '';
+  const targetPath = target ? path.join(config.brandingDir, target) : '';
+  const hasTarget = !!(target && fs.existsSync(targetPath));
+
   return {
     title: typeof s.wallTitle === 'string' && s.wallTitle.trim() ? s.wallTitle.trim() : 'Wall of moments',
     overlay: typeof s.wallOverlay === 'string' ? s.wallOverlay : '',
-    columns: typeof s.wallColumns === 'number' && s.wallColumns >= 6 && s.wallColumns <= 24
+    columns: typeof s.wallColumns === 'number' && s.wallColumns >= 8 && s.wallColumns <= 28
       ? s.wallColumns
-      : 14,
+      : 16,
     emptyRatio:
       typeof s.wallEmptyRatio === 'number' && s.wallEmptyRatio >= 0 && s.wallEmptyRatio <= 0.6
         ? s.wallEmptyRatio
@@ -84,6 +92,10 @@ export function wallSettings() {
     brandLogo: hasLogo ? logo : '',
     brandLogoUrl: hasLogo
       ? `/media/branding/${encodeURIComponent(logo)}?v=${fs.statSync(logoPath).mtimeMs}`
+      : '',
+    mosaicTarget: hasTarget ? target : '',
+    mosaicTargetUrl: hasTarget
+      ? `/media/branding/${encodeURIComponent(target)}?v=${fs.statSync(targetPath).mtimeMs}`
       : '',
   };
 }
@@ -140,6 +152,16 @@ adminWallRouter.patch('/settings', (req, res) => {
     }
     patch.wallBrandLogo = '';
   }
+  if (req.body?.clearMosaicTarget === true) {
+    const cur = loadSettings();
+    if (cur.wallMosaicTarget) {
+      const full = path.join(config.brandingDir, path.basename(String(cur.wallMosaicTarget)));
+      try {
+        fs.unlinkSync(full);
+      } catch (_) {}
+    }
+    patch.wallMosaicTarget = '';
+  }
   saveSettings(patch);
   res.json({ ok: true, wall: wallSettings() });
 });
@@ -173,6 +195,30 @@ adminWallRouter.post('/brand-logo', upload.single('logo'), (req, res) => {
   }
   fs.writeFileSync(dest, req.file.buffer);
   saveSettings({ wallBrandLogo: filename });
+  return res.status(201).json({ ok: true, wall: wallSettings() });
+});
+
+adminWallRouter.post('/mosaic-target', upload.single('target'), (req, res) => {
+  if (!req.file?.buffer?.length) {
+    return res.status(400).json({ ok: false, error: 'Missing target image (field: target)' });
+  }
+  ensureBrandingDir();
+  const suggested = req.file.originalname || `mosaic-${Date.now()}.png`;
+  let ext = path.extname(suggested).toLowerCase();
+  if (!IMAGE_EXT.has(ext)) {
+    const mime = req.file.mimetype || '';
+    ext = mime.includes('png') ? '.png' : mime.includes('webp') ? '.webp' : '.jpg';
+  }
+  const filename = `wall-mosaic-target${ext}`;
+  for (const ent of fs.readdirSync(config.brandingDir)) {
+    if (ent.startsWith('wall-mosaic-target.')) {
+      try {
+        fs.unlinkSync(path.join(config.brandingDir, ent));
+      } catch (_) {}
+    }
+  }
+  fs.writeFileSync(path.join(config.brandingDir, filename), req.file.buffer);
+  saveSettings({ wallMosaicTarget: filename });
   return res.status(201).json({ ok: true, wall: wallSettings() });
 });
 

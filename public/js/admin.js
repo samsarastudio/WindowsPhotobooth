@@ -8,8 +8,10 @@ const ttlEl = document.getElementById('ttl');
 const frameList = document.getElementById('frameList');
 const wallTitle = document.getElementById('wallTitle');
 const wallOverlay = document.getElementById('wallOverlay');
+const wallColumns = document.getElementById('wallColumns');
 const wallBrandText = document.getElementById('wallBrandText');
 const wallBrandPreview = document.getElementById('wallBrandPreview');
+const wallMosaicTargetPreview = document.getElementById('wallMosaicTargetPreview');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
 const btnOpenAlbum = document.getElementById('btnOpenAlbum');
@@ -243,6 +245,7 @@ async function refreshAll() {
   const wall = await api('/api/admin/wall/settings');
   wallTitle.value = wall.wall.title || '';
   wallOverlay.value = wall.wall.overlay || '';
+  if (wallColumns) wallColumns.value = String(wall.wall.columns ?? 16);
   if (wallBrandText) wallBrandText.value = wall.wall.brandText || '';
   if (wallBrandPreview) {
     wallBrandPreview.textContent = wall.wall.brandLogoUrl
@@ -250,6 +253,11 @@ async function refreshAll() {
       : wall.wall.brandText
         ? `Partner text: ${wall.wall.brandText}`
         : 'No partner brand set — inmoment shows alone.';
+  }
+  if (wallMosaicTargetPreview) {
+    wallMosaicTargetPreview.textContent = wall.wall.mosaicTargetUrl
+      ? 'Mosaic target image on file — photos will reveal it.'
+      : 'No mosaic target yet — upload a logo/artwork for the reveal effect.';
   }
   await refreshAlbums();
   await refreshFrames();
@@ -325,6 +333,7 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
         title: wallTitle.value,
         overlay: wallOverlay.value,
         brandText: wallBrandText?.value || '',
+        columns: Number(wallColumns?.value || 16),
       }),
     });
     setStatus('Wall settings saved');
@@ -335,6 +344,11 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
         : wall.wall.brandText
           ? `Partner text: ${wall.wall.brandText}`
           : 'No partner brand set — inmoment shows alone.';
+    }
+    if (wallMosaicTargetPreview) {
+      wallMosaicTargetPreview.textContent = wall.wall.mosaicTargetUrl
+        ? 'Mosaic target image on file — photos will reveal it.'
+        : 'No mosaic target yet — upload a logo/artwork for the reveal effect.';
     }
   } catch (e) {
     setStatus(String(e.message || e));
@@ -378,6 +392,43 @@ document.getElementById('btnClearWallBrand')?.addEventListener('click', async ()
           : 'No partner brand set — inmoment shows alone.';
     }
     setStatus('Partner logo cleared');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnUploadMosaicTarget')?.addEventListener('click', async () => {
+  const input = document.getElementById('wallMosaicTarget');
+  const file = input?.files?.[0];
+  if (!file) {
+    setStatus('Choose a mosaic target image first');
+    return;
+  }
+  try {
+    const fd = new FormData();
+    fd.append('target', file, file.name);
+    await api('/api/admin/wall/mosaic-target', { method: 'POST', body: fd });
+    if (input) input.value = '';
+    if (wallMosaicTargetPreview) {
+      wallMosaicTargetPreview.textContent = 'Mosaic target image on file — photos will reveal it.';
+    }
+    setStatus('Mosaic target uploaded');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnClearMosaicTarget')?.addEventListener('click', async () => {
+  try {
+    await api('/api/admin/wall/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ clearMosaicTarget: true }),
+    });
+    if (wallMosaicTargetPreview) {
+      wallMosaicTargetPreview.textContent =
+        'No mosaic target yet — upload a logo/artwork for the reveal effect.';
+    }
+    setStatus('Mosaic target cleared');
   } catch (e) {
     setStatus(String(e.message || e));
   }

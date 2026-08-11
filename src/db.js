@@ -54,6 +54,7 @@ export function loadSettings() {
     wallEmptyRatio: 0.22,
     wallBrandText: '',
     wallBrandLogo: '',
+    wallMosaicTarget: '',
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {
