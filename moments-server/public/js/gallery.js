@@ -39,7 +39,6 @@ const els = {
   grid: document.getElementById('grid'),
   mosaic: document.getElementById('mosaic'),
   mosaicStage: document.getElementById('mosaicStage'),
-  mosaicGrid: null,
   wallOverlay: document.getElementById('wallOverlay'),
   mosaicPartner: document.getElementById('mosaicPartner'),
   mosaicPartnerLogo: document.getElementById('mosaicPartnerLogo'),
@@ -56,10 +55,12 @@ const els = {
 
 /** @type {any[]} */
 let photos = [];
-/** @type {{ el: HTMLElement, photoId: string | null, color: string, weight: number }[]} */
-let mosaicCells = [];
-/** @type {Map<string, number>} photoId -> cell index */
-const mosaicPhotoCell = new Map();
+/** @type {{ el: HTMLElement, photoId: string | null, size: number, x: number, y: number }[]} */
+let mosaicSlots = [];
+/** @type {Map<string, number>} photoId -> slot index */
+const mosaicPhotoSlot = new Map();
+/** Round-robin index for rotating unseen photos into view */
+let mosaicRotateCursor = 0;
 let index = 0;
 let es = null;
 let ssTimer = null;
@@ -76,8 +77,9 @@ let wallCfg = {
 };
 let route = parseRoute();
 let mosaicShineTimer = null;
-let mosaicReshuffleTimer = null;
-/** 6×4 postcard cell aspect (width/height) */
+let mosaicRotateTimer = null;
+let mosaicDriftTimer = null;
+/** 6×4 postcard — width/height */
 const MOSAIC_CELL_ASPECT = 6 / 4;
 
 function setStatus(msg, show = true) {
@@ -149,75 +151,61 @@ function seededRandom(seed) {
   };
 }
 
-function mosaicGridSize() {
-  const stageW = Math.max(320, els.mosaicStage?.clientWidth || window.innerWidth || 1200);
-  const stageH = Math.max(240, els.mosaicStage?.clientHeight || window.innerHeight || 800);
-  let cols = Math.min(28, Math.max(8, Number(wallCfg.columns) || 16));
-  let cellW = stageW / cols;
-  let cellH = cellW / MOSAIC_CELL_ASPECT; // 6:4 → height = width * 4/6
-  let rows = Math.max(3, Math.floor(stageH / cellH));
-  // Recenter fit if vertical leftover is huge
-  if (rows * cellH < stageH * 0.72) {
-    cols = Math.max(8, cols - 2);
-    cellW = stageW / cols;
-    cellH = cellW / MOSAIC_CELL_ASPECT;
-    rows = Math.max(3, Math.floor(stageH / cellH));
-  }
-  const gridW = stageW;
-  const gridH = rows * cellH;
-  return { cols, rows, gridW, gridH };
+function mosaicSlotCount() {
+  const stageW = els.mosaicStage?.clientWidth || window.innerWidth || 1200;
+  const stageH = els.mosaicStage?.clientHeight || window.innerHeight || 800;
+  const area = stageW * stageH;
+  // Soft collage density — not a packed grid
+  return Math.min(18, Math.max(8, Math.round(area / 90000)));
 }
 
-function defaultCellColors(cols, rows) {
-  const cells = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const t = (r / Math.max(1, rows - 1) + c / Math.max(1, cols - 1)) / 2;
-      const g = Math.round(55 + t * 40);
-      const color = `rgb(${40 + Math.round(t * 20)}, ${g}, ${50 + Math.round(t * 25)})`;
-      cells.push({ color, weight: 0.35 + t * 0.4 });
+function mosaicSizeScale(rand) {
+  const roll = rand();
+  if (roll < 0.18) return 1.45; // larger hero cards
+  if (roll < 0.55) return 1.1;
+  if (roll < 0.85) return 0.9;
+  return 0.72;
+}
+
+function layoutMosaicSlots(count) {
+  const stageW = Math.max(320, els.mosaicStage?.clientWidth || 1200);
+  const stageH = Math.max(240, els.mosaicStage?.clientHeight || 800);
+  const base = Math.min(stageW * 0.2, stageH * 0.28, 220);
+  const rand = seededRandom(count * 97 + Math.round(stageW + stageH));
+  const slots = [];
+  const pad = 16;
+
+  for (let i = 0; i < count; i++) {
+    const scale = mosaicSizeScale(rand);
+    const size = Math.max(110, base * scale);
+    const h = size / MOSAIC_CELL_ASPECT;
+    let x = pad + rand() * Math.max(1, stageW - size - pad * 2);
+    let y = pad + rand() * Math.max(1, stageH - h - pad * 2);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      let crowded = false;
+      for (const s of slots) {
+        const dx = x + size / 2 - (s.x + s.size / 2);
+        const dy = y + h / 2 - (s.y + s.size / MOSAIC_CELL_ASPECT / 2);
+        if (Math.hypot(dx, dy) < Math.min(size, s.size) * 0.62) {
+          crowded = true;
+          break;
+        }
+      }
+      if (!crowded) break;
+      x = pad + rand() * Math.max(1, stageW - size - pad * 2);
+      y = pad + rand() * Math.max(1, stageH - h - pad * 2);
     }
-  }
-  return cells;
-}
-
-async function sampleMosaicTarget(url, cols, rows) {
-  if (!url) return defaultCellColors(cols, rows);
-  try {
-    const img = new Image();
-    img.decoding = 'async';
-    img.crossOrigin = 'anonymous';
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = url;
+    slots.push({
+      x,
+      y,
+      size,
+      rot: (rand() - 0.5) * 5,
+      floatDur: 7 + rand() * 6,
+      floatDelay: -rand() * 5,
+      scanDelay: rand() * 3,
     });
-    const canvas = document.createElement('canvas');
-    canvas.width = cols;
-    canvas.height = rows;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return defaultCellColors(cols, rows);
-    ctx.drawImage(img, 0, 0, cols, rows);
-    const data = ctx.getImageData(0, 0, cols, rows).data;
-    const cells = [];
-    for (let i = 0; i < cols * rows; i++) {
-      const o = i * 4;
-      const r = data[o];
-      const g = data[o + 1];
-      const b = data[o + 2];
-      const a = data[o + 3] / 255;
-      const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-      // Prefer filling higher-contrast / more opaque regions first
-      const weight = a * (0.25 + Math.abs(luma - 0.5) * 1.2);
-      cells.push({
-        color: `rgb(${r}, ${g}, ${b})`,
-        weight: Math.max(0.08, weight),
-      });
-    }
-    return cells;
-  } catch {
-    return defaultCellColors(cols, rows);
   }
+  return slots;
 }
 
 function updateMosaicBranding() {
@@ -258,184 +246,230 @@ function updateMosaicBranding() {
   }
 }
 
-function clearMosaicCell(cell) {
-  if (!cell?.el) return;
-  cell.photoId = null;
-  cell.el.classList.remove('is-filled', 'is-shine', 'is-float');
-  cell.el.classList.add('is-empty');
-  const img = cell.el.querySelector('.mosaic-cell-photo');
+function applySlotTransform(slot, animatePos = true) {
+  if (!slot?.el) return;
+  if (!animatePos) slot.el.style.transition = 'none';
+  slot.el.style.setProperty('--sz', slot.size + 'px');
+  slot.el.style.setProperty('--rot', slot.rot + 'deg');
+  slot.el.style.setProperty('--mx', slot.x + 'px');
+  slot.el.style.setProperty('--my', slot.y + 'px');
+  slot.el.style.setProperty('--float-dur', slot.floatDur + 's');
+  slot.el.style.setProperty('--float-delay', slot.floatDelay + 's');
+  slot.el.style.setProperty('--scan-delay', slot.scanDelay + 's');
+  if (!animatePos) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        slot.el.style.transition = '';
+      });
+    });
+  }
+}
+
+function clearMosaicSlot(slot) {
+  if (!slot?.el) return;
+  if (slot.photoId) mosaicPhotoSlot.delete(slot.photoId);
+  slot.photoId = null;
+  slot.el.classList.remove('is-filled', 'is-shine');
+  slot.el.classList.add('is-empty');
+  const img = slot.el.querySelector('.mosaic-slot-photo');
   if (img) {
     img.removeAttribute('src');
     img.alt = '';
   }
+  slot.el.onclick = null;
 }
 
-function fillMosaicCell(cellIndex, photo, opts = {}) {
-  const cell = mosaicCells[cellIndex];
-  if (!cell || !photo?.id) return;
-  if (cell.photoId && mosaicPhotoCell.get(cell.photoId) === cellIndex) {
-    mosaicPhotoCell.delete(cell.photoId);
+function fillMosaicSlot(slotIndex, photo, opts = {}) {
+  const slot = mosaicSlots[slotIndex];
+  if (!slot || !photo?.id) return;
+  if (slot.photoId && mosaicPhotoSlot.get(slot.photoId) === slotIndex) {
+    mosaicPhotoSlot.delete(slot.photoId);
   }
-  const prevIdx = mosaicPhotoCell.get(photo.id);
-  if (prevIdx != null && prevIdx !== cellIndex && mosaicCells[prevIdx]) {
-    clearMosaicCell(mosaicCells[prevIdx]);
+  const prev = mosaicPhotoSlot.get(photo.id);
+  if (prev != null && prev !== slotIndex && mosaicSlots[prev]) {
+    clearMosaicSlot(mosaicSlots[prev]);
   }
-  cell.photoId = photo.id;
-  mosaicPhotoCell.set(photo.id, cellIndex);
-  cell.el.classList.remove('is-empty');
-  cell.el.classList.add('is-filled', 'is-float');
-  const img = cell.el.querySelector('.mosaic-cell-photo');
+  slot.photoId = photo.id;
+  mosaicPhotoSlot.set(photo.id, slotIndex);
+  slot.el.classList.remove('is-empty');
+  slot.el.classList.add('is-filled');
+  const img = slot.el.querySelector('.mosaic-slot-photo');
   if (img) {
     img.src = photo.url;
     img.alt = '';
   }
   if (opts.shine !== false) {
-    cell.el.classList.remove('is-shine');
-    void cell.el.offsetWidth;
-    cell.el.classList.add('is-shine');
-    setTimeout(() => cell.el.classList.remove('is-shine'), 1200);
+    slot.el.classList.remove('is-shine');
+    void slot.el.offsetWidth;
+    slot.el.classList.add('is-shine');
+    setTimeout(() => slot.el.classList.remove('is-shine'), 1100);
   }
-  cell.el.onclick = () => {
+  slot.el.onclick = () => {
     const i = photos.findIndex((p) => p.id === photo.id);
     if (i >= 0) openLightbox(i);
   };
 }
 
-function pickMosaicCellForPhoto(preferEmpty = true) {
-  if (!mosaicCells.length) return -1;
-  if (preferEmpty) {
-    const empty = mosaicCells
-      .map((c, i) => ({ i, w: c.weight, empty: !c.photoId }))
-      .filter((x) => x.empty)
-      .sort((a, b) => b.w - a.w);
-    if (empty.length) {
-      // Weighted random among top candidates
-      const top = empty.slice(0, Math.max(3, Math.ceil(empty.length * 0.35)));
-      const sum = top.reduce((a, x) => a + x.w, 0) || 1;
-      let r = Math.random() * sum;
-      for (const x of top) {
-        r -= x.w;
-        if (r <= 0) return x.i;
-      }
-      return top[0].i;
-    }
-  }
-  // Replace a lower-weight filled cell
-  const filled = mosaicCells
-    .map((c, i) => ({ i, w: c.weight, empty: !c.photoId }))
-    .filter((x) => !x.empty)
-    .sort((a, b) => a.w - b.w);
-  if (!filled.length) return 0;
-  return filled[Math.floor(Math.random() * Math.min(filled.length, 6))].i;
+function mosaicFillCap() {
+  // Keep some glass placeholders so the wall feels “expecting” photos
+  const reserve = Math.max(2, Math.round(mosaicSlots.length * 0.22));
+  return Math.max(1, mosaicSlots.length - reserve);
+}
+
+function pickEmptySlot() {
+  const empty = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => !x.s.photoId);
+  if (!empty.length) return -1;
+  return empty[Math.floor(Math.random() * empty.length)].i;
 }
 
 function placePhotoInMosaic(photo, opts = {}) {
   if (!photo?.id || viewMode !== 'mosaic') return;
-  if (mosaicPhotoCell.has(photo.id) && !opts.force) {
-    const idx = mosaicPhotoCell.get(photo.id);
-    const cell = mosaicCells[idx];
-    const img = cell?.el?.querySelector('.mosaic-cell-photo');
+  if (mosaicPhotoSlot.has(photo.id) && !opts.force) {
+    const idx = mosaicPhotoSlot.get(photo.id);
+    const img = mosaicSlots[idx]?.el?.querySelector('.mosaic-slot-photo');
     if (img && photo.url) img.src = photo.url;
     return;
   }
-  const idx = pickMosaicCellForPhoto(true);
+  const cap = mosaicFillCap();
+  let idx = pickEmptySlot();
+  if (opts.force || mosaicPhotoSlot.size >= cap || idx < 0) {
+    if (!opts.force && mosaicPhotoSlot.size >= cap && idx >= 0) {
+      // Soft fill: leave glass placeholders alone
+      return;
+    }
+    const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
+    if (filled.length && (opts.force || idx < 0 || mosaicPhotoSlot.size >= cap)) {
+      idx = filled[Math.floor(Math.random() * filled.length)].i;
+    }
+  }
   if (idx < 0) return;
-  fillMosaicCell(idx, photo, opts);
+  fillMosaicSlot(idx, photo, opts);
 }
 
-async function buildMosaicGrid() {
+function buildMosaicCollage() {
   if (!els.mosaicStage) return;
   updateMosaicBranding();
-  const { cols, rows, gridW, gridH } = mosaicGridSize();
-  const samples = await sampleMosaicTarget(wallCfg.mosaicTargetUrl || '', cols, rows);
+  const count = mosaicSlotCount();
+  const layouts = layoutMosaicSlots(count);
 
   els.mosaicStage.innerHTML = '';
-  mosaicCells = [];
-  mosaicPhotoCell.clear();
+  mosaicSlots = [];
+  mosaicPhotoSlot.clear();
+  mosaicRotateCursor = 0;
 
-  const grid = document.createElement('div');
-  grid.className = 'mosaic-grid';
-  grid.style.setProperty('--mosaic-cols', String(cols));
-  grid.style.setProperty('--mosaic-rows', String(rows));
-  grid.style.width = `${gridW}px`;
-  grid.style.height = `${gridH}px`;
-  els.mosaicGrid = grid;
+  const scan = document.createElement('div');
+  scan.className = 'mosaic-scan';
+  scan.setAttribute('aria-hidden', 'true');
+  els.mosaicStage.appendChild(scan);
 
-  for (let i = 0; i < cols * rows; i++) {
-    const sample = samples[i] || { color: '#2a332e', weight: 0.3 };
-    const cell = document.createElement('button');
-    cell.type = 'button';
-    cell.className = 'mosaic-cell is-empty';
-    cell.style.setProperty('--cell-color', sample.color);
-    cell.innerHTML =
-      '<img class="mosaic-cell-photo" alt="" decoding="async" /><span class="mosaic-cell-tint" aria-hidden="true"></span><span class="mosaic-cell-shine" aria-hidden="true"></span>';
-    grid.appendChild(cell);
-    mosaicCells.push({
-      el: cell,
+  layouts.forEach((layout, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mosaic-slot is-empty';
+    btn.dataset.slot = String(i);
+    btn.innerHTML =
+      '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
+    const slot = {
+      el: btn,
       photoId: null,
-      color: sample.color,
-      weight: sample.weight,
-    });
-  }
-  els.mosaicStage.appendChild(grid);
+      size: layout.size,
+      x: layout.x,
+      y: layout.y,
+      rot: layout.rot,
+      floatDur: layout.floatDur,
+      floatDelay: layout.floatDelay,
+      scanDelay: layout.scanDelay,
+    };
+    applySlotTransform(slot, false);
+    els.mosaicStage.appendChild(btn);
+    mosaicSlots.push(slot);
+  });
 }
 
-async function renderMosaic(fullRebuild = false) {
+function renderMosaic(fullRebuild = false) {
   if (!els.mosaicStage) return;
-  if (fullRebuild || !mosaicCells.length) {
-    await buildMosaicGrid();
+  if (fullRebuild || !mosaicSlots.length) {
+    buildMosaicCollage();
     const order = [...photos];
-    const rand = seededRandom(order.length * 97 + (wallCfg.columns || 16) * 13);
+    const rand = seededRandom(order.length * 97 + mosaicSlots.length * 13);
     for (let i = order.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
     }
-    order.forEach((photo, i) => {
+    // Fill up to cap; extras wait for rotation so guests still see theirs
+    order.slice(0, mosaicFillCap()).forEach((photo, i) => {
       setTimeout(() => {
         if (viewMode !== 'mosaic') return;
         placePhotoInMosaic(photo, { shine: true });
-      }, Math.min(i * 55, 2400));
+      }, Math.min(i * 70, 2000));
     });
     return;
   }
   for (const photo of photos) {
-    if (!mosaicPhotoCell.has(photo.id)) placePhotoInMosaic(photo, { shine: true });
+    if (mosaicPhotoSlot.size >= mosaicFillCap()) break;
+    if (!mosaicPhotoSlot.has(photo.id)) placePhotoInMosaic(photo, { shine: true });
   }
 }
 
 function shineRandomMosaicTile() {
   if (viewMode !== 'mosaic') return;
-  const filled = mosaicCells.filter((c) => c.photoId);
+  const filled = mosaicSlots.filter((s) => s.photoId);
   if (!filled.length) return;
-  const cell = filled[Math.floor(Math.random() * filled.length)];
-  cell.el.classList.remove('is-shine');
-  void cell.el.offsetWidth;
-  cell.el.classList.add('is-shine');
-  setTimeout(() => cell.el.classList.remove('is-shine'), 1100);
+  const slot = filled[Math.floor(Math.random() * filled.length)];
+  slot.el.classList.remove('is-shine');
+  void slot.el.offsetWidth;
+  slot.el.classList.add('is-shine');
+  setTimeout(() => slot.el.classList.remove('is-shine'), 1100);
 }
 
-function reshuffleMosaicPhotos() {
-  if (viewMode !== 'mosaic' || photos.length < 2 || mosaicCells.length < 2) return;
-  // Move a few photos into empty/high-weight cells — keeps mosaic alive without breaking composition
-  const empties = mosaicCells.map((c, i) => ({ c, i })).filter((x) => !x.c.photoId);
-  if (!empties.length) return;
-  const movers = [...photos].sort(() => Math.random() - 0.5).slice(0, Math.min(3, empties.length));
-  movers.forEach((photo, n) => {
-    setTimeout(() => placePhotoInMosaic(photo, { force: true, shine: true }), n * 180);
+function rotateMosaicPhotos() {
+  if (viewMode !== 'mosaic' || !mosaicSlots.length || photos.length <= mosaicFillCap()) return;
+  // Bring next unseen photos onto the wall so guests can find theirs
+  const visible = new Set([...mosaicPhotoSlot.keys()]);
+  const unseen = photos.filter((p) => !visible.has(p.id));
+  const pool = unseen.length ? unseen : photos;
+  const take = Math.min(2, pool.length, mosaicSlots.length);
+  for (let n = 0; n < take; n++) {
+    const photo = pool[(mosaicRotateCursor + n) % pool.length];
+    setTimeout(() => placePhotoInMosaic(photo, { force: true, shine: true }), n * 220);
+  }
+  mosaicRotateCursor = (mosaicRotateCursor + take) % pool.length;
+}
+
+function driftMosaicSlots() {
+  if (viewMode !== 'mosaic' || mosaicSlots.length < 2) return;
+  const stageW = els.mosaicStage?.clientWidth || 1200;
+  const stageH = els.mosaicStage?.clientHeight || 800;
+  const pad = 14;
+  // Nudge a few slots for living collage motion
+  const idxs = mosaicSlots
+    .map((_, i) => i)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.ceil(mosaicSlots.length * 0.3));
+  idxs.forEach((i) => {
+    const slot = mosaicSlots[i];
+    const h = slot.size / MOSAIC_CELL_ASPECT;
+    slot.x = Math.min(stageW - slot.size - pad, Math.max(pad, slot.x + (Math.random() - 0.5) * 36));
+    slot.y = Math.min(stageH - h - pad, Math.max(pad, slot.y + (Math.random() - 0.5) * 28));
+    slot.rot = Math.max(-4, Math.min(4, slot.rot + (Math.random() - 0.5) * 1.5));
+    applySlotTransform(slot, true);
   });
 }
 
 function startMosaicLoops() {
   stopMosaicLoops();
-  mosaicShineTimer = setInterval(shineRandomMosaicTile, 3600);
-  mosaicReshuffleTimer = setInterval(reshuffleMosaicPhotos, 16000);
+  mosaicShineTimer = setInterval(shineRandomMosaicTile, 3800);
+  mosaicRotateTimer = setInterval(rotateMosaicPhotos, 12000);
+  mosaicDriftTimer = setInterval(driftMosaicSlots, 9000);
 }
 
 function stopMosaicLoops() {
   if (mosaicShineTimer) clearInterval(mosaicShineTimer);
-  if (mosaicReshuffleTimer) clearInterval(mosaicReshuffleTimer);
+  if (mosaicRotateTimer) clearInterval(mosaicRotateTimer);
+  if (mosaicDriftTimer) clearInterval(mosaicDriftTimer);
   mosaicShineTimer = null;
-  mosaicReshuffleTimer = null;
+  mosaicRotateTimer = null;
+  mosaicDriftTimer = null;
 }
 
 function upsertPhoto(photo) {
@@ -447,9 +481,9 @@ function upsertPhoto(photo) {
   photos.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   if (viewMode === 'grid') renderGrid();
   else if (viewMode === 'mosaic') {
-    placePhotoInMosaic(photo, { shine: isNew, force: false });
+    placePhotoInMosaic(photo, { shine: isNew, force: isNew });
   }
-  if (els.meta) els.meta.textContent = `${photos.length} photos`;
+  if (els.meta) els.meta.textContent = photos.length + " photos";
 }
 
 function openLightbox(i) {
@@ -603,6 +637,13 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft') showSs(index - 1);
     if (e.key === 'ArrowRight') showSs(index + 1);
   }
+});
+
+let mosaicResizeTimer = null;
+window.addEventListener('resize', () => {
+  if (viewMode !== 'mosaic') return;
+  clearTimeout(mosaicResizeTimer);
+  mosaicResizeTimer = setTimeout(() => renderMosaic(true), 280);
 });
 
 if (route.kind === 'home') {
