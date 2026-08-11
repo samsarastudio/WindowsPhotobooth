@@ -138,6 +138,25 @@ sessionsRouter.post(
       return res.status(400).json({ ok: false, error: 'variant must be original|framed|ai' });
     }
 
+    const width = req.body?.width ? Number(req.body.width) : null;
+    const height = req.body?.height ? Number(req.body.height) : null;
+    const sourceLocalName = String(req.body?.sourceLocalName || req.file.originalname || '').trim() || null;
+
+    // Dedupe: same local capture filename + variant in this session → return existing.
+    if (sourceLocalName) {
+      const existing = getDb()
+        .prepare(
+          `SELECT * FROM photos
+           WHERE session_id = ? AND variant = ? AND source_local_name = ?
+           ORDER BY created_at DESC LIMIT 1`,
+        )
+        .get(session.id, variant, sourceLocalName);
+      if (existing) {
+        const photo = publicPhoto(session.slug, existing);
+        return res.json({ ok: true, photo, deduped: true });
+      }
+    }
+
     const id = nanoid(14);
     const mime = req.file.mimetype || 'image/jpeg';
     const ext =
@@ -148,8 +167,6 @@ sessionsRouter.post(
     const dest = path.join(sessionDir, filename);
     fs.writeFileSync(dest, req.file.buffer);
 
-    const width = req.body?.width ? Number(req.body.width) : null;
-    const height = req.body?.height ? Number(req.body.height) : null;
     const row = {
       id,
       session_id: session.id,
@@ -157,7 +174,7 @@ sessionsRouter.post(
       filename,
       mime,
       bytes: req.file.buffer.length,
-      source_local_name: req.body?.sourceLocalName || req.file.originalname || null,
+      source_local_name: sourceLocalName,
       width: Number.isFinite(width) ? width : null,
       height: Number.isFinite(height) ? height : null,
       created_at: new Date().toISOString(),
