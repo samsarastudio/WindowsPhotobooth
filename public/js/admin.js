@@ -12,8 +12,12 @@ const wallColumns = document.getElementById('wallColumns');
 const wallBrandText = document.getElementById('wallBrandText');
 const wallBrandPreview = document.getElementById('wallBrandPreview');
 const wallMosaicTargetPreview = document.getElementById('wallMosaicTargetPreview');
+const wallBackdropOpacity = document.getElementById('wallBackdropOpacity');
+const wallBackdropOpacityLabel = document.getElementById('wallBackdropOpacityLabel');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
+const photoSelectionMeta = document.getElementById('photoSelectionMeta');
+const btnBulkDeletePhotos = document.getElementById('btnBulkDeletePhotos');
 const btnOpenAlbum = document.getElementById('btnOpenAlbum');
 const uploadTokenEl = document.getElementById('uploadToken');
 const publicBaseUrlEl = document.getElementById('publicBaseUrl');
@@ -21,6 +25,30 @@ const tokenMetaEl = document.getElementById('tokenMeta');
 
 /** @type {any[]} */
 let albumsCache = [];
+/** @type {Set<string>} */
+const selectedPhotoIds = new Set();
+
+function syncBackdropOpacityLabel(value) {
+  const pct = Math.round(Number(value) || 0);
+  if (wallBackdropOpacityLabel) wallBackdropOpacityLabel.textContent = `${pct}%`;
+}
+
+function updatePhotoSelectionUi() {
+  const n = selectedPhotoIds.size;
+  if (btnBulkDeletePhotos) btnBulkDeletePhotos.disabled = n === 0;
+  if (photoSelectionMeta) {
+    photoSelectionMeta.textContent =
+      n === 0
+        ? 'Select photos with the checkboxes to delete several at once.'
+        : `${n} photo${n === 1 ? '' : 's'} selected.`;
+  }
+}
+
+function mosaicBackdropPreviewText(url) {
+  return url
+    ? 'Backdrop image on file — shown faded under the photo collage.'
+    : 'No backdrop yet — upload a watermark or brand image.';
+}
 
 function pin() {
   return pinEl.value.trim();
@@ -180,6 +208,8 @@ async function refreshPhotos() {
   }
   updateOpenAlbumLink();
   const slug = photoAlbum.value;
+  selectedPhotoIds.clear();
+  updatePhotoSelectionUi();
   photoGrid.innerHTML = '';
   if (!slug) {
     photoGrid.innerHTML = '<p class="meta">No album selected.</p>';
@@ -195,6 +225,10 @@ async function refreshPhotos() {
     const card = document.createElement('article');
     card.className = 'photo-admin-card';
     card.innerHTML = `
+      <label class="photo-select">
+        <input type="checkbox" class="photo-check" data-id="${p.id}" />
+        <span class="sr-only">Select photo</span>
+      </label>
       <img src="${p.url}" alt="" loading="lazy" />
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
@@ -203,6 +237,17 @@ async function refreshPhotos() {
         <button type="button" class="btn ghost delete">Delete photo</button>
       </div>
     `;
+    const check = card.querySelector('.photo-check');
+    check?.addEventListener('change', () => {
+      if (check.checked) {
+        selectedPhotoIds.add(p.id);
+        card.classList.add('is-selected');
+      } else {
+        selectedPhotoIds.delete(p.id);
+        card.classList.remove('is-selected');
+      }
+      updatePhotoSelectionUi();
+    });
     card.querySelector('.delete').addEventListener('click', async () => {
       if (!confirm('Delete this photo from the album?')) return;
       await api(`/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(p.id)}`, {
@@ -247,6 +292,11 @@ async function refreshAll() {
   wallOverlay.value = wall.wall.overlay || '';
   if (wallColumns) wallColumns.value = String(wall.wall.columns ?? 16);
   if (wallBrandText) wallBrandText.value = wall.wall.brandText || '';
+  if (wallBackdropOpacity) {
+    const pct = Math.round((wall.wall.backdropOpacity ?? 0.22) * 100);
+    wallBackdropOpacity.value = String(pct);
+    syncBackdropOpacityLabel(pct);
+  }
   if (wallBrandPreview) {
     wallBrandPreview.textContent = wall.wall.brandLogoUrl
       ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
@@ -255,9 +305,7 @@ async function refreshAll() {
         : 'No partner brand set — inmoment shows alone.';
   }
   if (wallMosaicTargetPreview) {
-    wallMosaicTargetPreview.textContent = wall.wall.mosaicTargetUrl
-      ? 'Mosaic target image on file — photos will reveal it.'
-      : 'No mosaic target yet — upload a logo/artwork for the reveal effect.';
+    wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.wall.mosaicTargetUrl);
   }
   await refreshAlbums();
   await refreshFrames();
@@ -327,6 +375,7 @@ document.getElementById('btnGenerateToken')?.addEventListener('click', () => {
 
 document.getElementById('btnSaveWall').addEventListener('click', async () => {
   try {
+    const opacityPct = Number(wallBackdropOpacity?.value ?? 22);
     await api('/api/admin/wall/settings', {
       method: 'PATCH',
       body: JSON.stringify({
@@ -334,10 +383,16 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
         overlay: wallOverlay.value,
         brandText: wallBrandText?.value || '',
         columns: Number(wallColumns?.value || 16),
+        backdropOpacity: Math.min(1, Math.max(0, opacityPct / 100)),
       }),
     });
     setStatus('Wall settings saved');
     const wall = await api('/api/admin/wall/settings');
+    if (wallBackdropOpacity) {
+      const pct = Math.round((wall.wall.backdropOpacity ?? 0.22) * 100);
+      wallBackdropOpacity.value = String(pct);
+      syncBackdropOpacityLabel(pct);
+    }
     if (wallBrandPreview) {
       wallBrandPreview.textContent = wall.wall.brandLogoUrl
         ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
@@ -346,9 +401,7 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
           : 'No partner brand set — inmoment shows alone.';
     }
     if (wallMosaicTargetPreview) {
-      wallMosaicTargetPreview.textContent = wall.wall.mosaicTargetUrl
-        ? 'Mosaic target image on file — photos will reveal it.'
-        : 'No mosaic target yet — upload a logo/artwork for the reveal effect.';
+      wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.wall.mosaicTargetUrl);
     }
   } catch (e) {
     setStatus(String(e.message || e));
@@ -401,7 +454,7 @@ document.getElementById('btnUploadMosaicTarget')?.addEventListener('click', asyn
   const input = document.getElementById('wallMosaicTarget');
   const file = input?.files?.[0];
   if (!file) {
-    setStatus('Choose a mosaic target image first');
+    setStatus('Choose a backdrop image first');
     return;
   }
   try {
@@ -410,9 +463,9 @@ document.getElementById('btnUploadMosaicTarget')?.addEventListener('click', asyn
     await api('/api/admin/wall/mosaic-target', { method: 'POST', body: fd });
     if (input) input.value = '';
     if (wallMosaicTargetPreview) {
-      wallMosaicTargetPreview.textContent = 'Mosaic target image on file — photos will reveal it.';
+      wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(true);
     }
-    setStatus('Mosaic target uploaded');
+    setStatus('Backdrop image uploaded');
   } catch (e) {
     setStatus(String(e.message || e));
   }
@@ -425,10 +478,9 @@ document.getElementById('btnClearMosaicTarget')?.addEventListener('click', async
       body: JSON.stringify({ clearMosaicTarget: true }),
     });
     if (wallMosaicTargetPreview) {
-      wallMosaicTargetPreview.textContent =
-        'No mosaic target yet — upload a logo/artwork for the reveal effect.';
+      wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText('');
     }
-    setStatus('Mosaic target cleared');
+    setStatus('Backdrop cleared');
   } catch (e) {
     setStatus(String(e.message || e));
   }
@@ -483,4 +535,47 @@ document.getElementById('btnRefreshPhotos')?.addEventListener('click', () => voi
 photoAlbum?.addEventListener('change', () => {
   updateOpenAlbumLink();
   void refreshPhotos();
+});
+
+wallBackdropOpacity?.addEventListener('input', () => {
+  syncBackdropOpacityLabel(wallBackdropOpacity.value);
+});
+
+document.getElementById('btnSelectAllPhotos')?.addEventListener('click', () => {
+  photoGrid?.querySelectorAll('.photo-check').forEach((el) => {
+    const input = /** @type {HTMLInputElement} */ (el);
+    input.checked = true;
+    const id = input.dataset.id;
+    if (id) selectedPhotoIds.add(id);
+    input.closest('.photo-admin-card')?.classList.add('is-selected');
+  });
+  updatePhotoSelectionUi();
+});
+
+document.getElementById('btnClearPhotoSelection')?.addEventListener('click', () => {
+  selectedPhotoIds.clear();
+  photoGrid?.querySelectorAll('.photo-check').forEach((el) => {
+    /** @type {HTMLInputElement} */ (el).checked = false;
+    el.closest('.photo-admin-card')?.classList.remove('is-selected');
+  });
+  updatePhotoSelectionUi();
+});
+
+document.getElementById('btnBulkDeletePhotos')?.addEventListener('click', async () => {
+  const slug = photoAlbum?.value;
+  const ids = [...selectedPhotoIds];
+  if (!slug || !ids.length) return;
+  if (!confirm(`Delete ${ids.length} selected photo${ids.length === 1 ? '' : 's'}?`)) return;
+  try {
+    const r = await api(`/api/admin/sessions/${encodeURIComponent(slug)}/photos/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+    setStatus(`Deleted ${r.count || ids.length} photo${(r.count || ids.length) === 1 ? '' : 's'}`);
+    selectedPhotoIds.clear();
+    await refreshAll();
+    await refreshPhotos();
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
 });
