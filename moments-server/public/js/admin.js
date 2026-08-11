@@ -8,8 +8,8 @@ const ttlEl = document.getElementById('ttl');
 const frameList = document.getElementById('frameList');
 const wallTitle = document.getElementById('wallTitle');
 const wallOverlay = document.getElementById('wallOverlay');
-const wallColumns = document.getElementById('wallColumns');
-const wallEmpty = document.getElementById('wallEmpty');
+const wallBrandText = document.getElementById('wallBrandText');
+const wallBrandPreview = document.getElementById('wallBrandPreview');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
 const btnOpenAlbum = document.getElementById('btnOpenAlbum');
@@ -243,8 +243,14 @@ async function refreshAll() {
   const wall = await api('/api/admin/wall/settings');
   wallTitle.value = wall.wall.title || '';
   wallOverlay.value = wall.wall.overlay || '';
-  wallColumns.value = String(wall.wall.columns ?? 14);
-  wallEmpty.value = String(wall.wall.emptyRatio ?? 0.22);
+  if (wallBrandText) wallBrandText.value = wall.wall.brandText || '';
+  if (wallBrandPreview) {
+    wallBrandPreview.textContent = wall.wall.brandLogoUrl
+      ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
+      : wall.wall.brandText
+        ? `Partner text: ${wall.wall.brandText}`
+        : 'No partner brand set — inmoment shows alone.';
+  }
   await refreshAlbums();
   await refreshFrames();
 }
@@ -318,11 +324,60 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
       body: JSON.stringify({
         title: wallTitle.value,
         overlay: wallOverlay.value,
-        columns: Number(wallColumns.value),
-        emptyRatio: Number(wallEmpty.value),
+        brandText: wallBrandText?.value || '',
       }),
     });
     setStatus('Wall settings saved');
+    const wall = await api('/api/admin/wall/settings');
+    if (wallBrandPreview) {
+      wallBrandPreview.textContent = wall.wall.brandLogoUrl
+        ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
+        : wall.wall.brandText
+          ? `Partner text: ${wall.wall.brandText}`
+          : 'No partner brand set — inmoment shows alone.';
+    }
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnUploadWallBrand')?.addEventListener('click', async () => {
+  const input = document.getElementById('wallBrandLogo');
+  const file = input?.files?.[0];
+  if (!file) {
+    setStatus('Choose a partner logo image first');
+    return;
+  }
+  try {
+    const fd = new FormData();
+    fd.append('logo', file, file.name);
+    const r = await api('/api/admin/wall/brand-logo', { method: 'POST', body: fd });
+    if (input) input.value = '';
+    if (wallBrandPreview) {
+      wallBrandPreview.textContent = r.wall?.brandLogoUrl
+        ? `Partner logo uploaded${r.wall.brandText ? ` · ${r.wall.brandText}` : ''}`
+        : 'Partner logo uploaded';
+    }
+    setStatus('Partner brand logo uploaded');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnClearWallBrand')?.addEventListener('click', async () => {
+  try {
+    const r = await api('/api/admin/wall/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ clearBrandLogo: true }),
+    });
+    if (wallBrandPreview && r.wall) {
+      wallBrandPreview.textContent = r.wall.brandLogoUrl
+        ? `Partner logo on file${r.wall.brandText ? ` · ${r.wall.brandText}` : ''}`
+        : r.wall.brandText
+          ? `Partner text: ${r.wall.brandText}`
+          : 'No partner brand set — inmoment shows alone.';
+    }
+    setStatus('Partner logo cleared');
   } catch (e) {
     setStatus(String(e.message || e));
   }

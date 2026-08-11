@@ -8,11 +8,12 @@ import { getUploadToken } from './auth.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { adminRouter } from './routes/admin.js';
 import { framesRouter, adminFramesRouter, ensureFramesDir } from './routes/frames.js';
-import { wallRouter, adminWallRouter } from './routes/wall.js';
+import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js';
 import { purgeExpiredSessions } from './purge.js';
 
 initDb();
 ensureFramesDir();
+ensureBrandingDir();
 
 const app = express();
 app.disable('x-powered-by');
@@ -39,6 +40,15 @@ app.get('/media/frames/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   if (filename.includes('..')) return res.status(400).end();
   const filePath = path.join(config.framesDir, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.sendFile(filePath);
+});
+
+app.get('/media/branding/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (filename.includes('..')) return res.status(400).end();
+  const filePath = path.join(config.brandingDir, filename);
   if (!fs.existsSync(filePath)) return res.status(404).end();
   res.setHeader('Cache-Control', 'public, max-age=3600');
   return res.sendFile(filePath);

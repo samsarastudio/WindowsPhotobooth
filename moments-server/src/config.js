@@ -32,6 +32,9 @@ export const config = {
   get framesDir() {
     return path.join(this.dataDir, 'frames');
   },
+  get brandingDir() {
+    return path.join(this.dataDir, 'branding');
+  },
   get settingsPath() {
     return path.join(this.dataDir, 'settings.json');
   },

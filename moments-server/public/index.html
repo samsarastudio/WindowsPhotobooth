@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/gallery.css?v=20260810-7" />
+    <link rel="stylesheet" href="/css/gallery.css?v=20260810-8" />
   </head>
   <body>
     <div class="leaf leaf-tr" aria-hidden="true"></div>
@@ -34,6 +34,15 @@
       <p id="empty" class="empty" hidden>Photos will appear here as they’re taken…</p>
       <div id="grid" class="grid" aria-live="polite"></div>
       <div id="mosaic" class="mosaic" hidden aria-live="polite">
+        <header class="mosaic-brand" aria-label="Branding">
+          <div class="mosaic-brand-inmoment">
+            <span class="mosaic-brand-eyebrow">inmoment</span>
+          </div>
+          <div class="mosaic-brand-partner" id="mosaicPartner" hidden>
+            <img id="mosaicPartnerLogo" class="mosaic-brand-logo" alt="" hidden />
+            <span id="mosaicPartnerText" class="mosaic-brand-text" hidden></span>
+          </div>
+        </header>
         <div id="mosaicStage" class="mosaic-stage"></div>
         <p id="wallOverlay" class="mosaic-watermark" hidden></p>
       </div>
@@ -62,6 +71,6 @@
       </div>
     </div>
 
-    <script src="/js/gallery.js?v=20260810-7" type="module"></script>
+    <script src="/js/gallery.js?v=20260810-8" type="module"></script>
   </body>
 </html>
