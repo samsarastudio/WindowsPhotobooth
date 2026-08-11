@@ -128,8 +128,13 @@ export class FramePageComponent implements OnInit {
         photoScale: this.booth.photoFrames().photoScale,
       });
       if (r.ok && r.path) {
-        this.galleryUpload.queueUpload(photo, 'original');
-        this.galleryUpload.queueUpload(r.path, 'framed');
+        // Await uploads before result so Share does not start a second framed POST.
+        try {
+          await this.galleryUpload.uploadPath(photo, 'original');
+          await this.galleryUpload.uploadPath(r.path, 'framed');
+        } catch {
+          /* result page can retry share upload */
+        }
         await this.router.navigate(['/result'], { state: { path: r.path } });
       } else {
         this.err.set(r.error ?? 'Could not apply frame.');

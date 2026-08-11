@@ -62,11 +62,15 @@ const LOG_MAX_BYTES = 2 * 1024 * 1024;
  * Local file logger — works fully offline. Writes next to the portable exe:
  *   <exe folder>/logs/photobooth.log
  */
-function appendAppLog(level, scope, message, detail) {
+function appendAppLog(level, scope, message, detail, opts = {}) {
+  const ts = new Date().toISOString();
+  const lvl = String(level || 'info').toLowerCase();
+  const sc = scope || 'app';
+  const msg = message || '';
+  let detailStr = '';
   try {
     const logPath = getLogFilePath();
-    const ts = new Date().toISOString();
-    let line = `[${ts}] [${String(level || 'info').toUpperCase()}] [${scope || 'app'}] ${message || ''}`;
+    let line = `[${ts}] [${lvl.toUpperCase()}] [${sc}] ${msg}`;
     if (detail !== undefined && detail !== null && detail !== '') {
       let extra = detail;
       if (typeof detail === 'object') {
@@ -76,7 +80,8 @@ function appendAppLog(level, scope, message, detail) {
           extra = String(detail);
         }
       }
-      line += ` | ${extra}`;
+      detailStr = String(extra);
+      line += ` | ${detailStr}`;
     }
     line += '\n';
     try {
@@ -93,6 +98,19 @@ function appendAppLog(level, scope, message, detail) {
   } catch (e) {
     try {
       console.error('[log-write-failed]', e);
+    } catch (_) {}
+  }
+  if (!opts.skipBroadcast) {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('app:log-entry', {
+          ts,
+          level: lvl,
+          scope: sc,
+          message: msg,
+          detail: detailStr || undefined,
+        });
+      }
     } catch (_) {}
   }
 }
@@ -1242,10 +1260,27 @@ ipcMain.handle('app:log', async (_e, payload) => {
     const scope = payload?.scope || 'renderer';
     const message = payload?.message || '';
     const detail = payload?.detail;
-    appendAppLog(level, scope, message, detail);
+    appendAppLog(level, scope, message, detail, {
+      skipBroadcast: payload?.skipBroadcast === true,
+    });
     return { ok: true, logFile: getLogFilePath() };
   } catch (e) {
     return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('app:readLogTail', async (_e, payload) => {
+  try {
+    const maxLines = Math.min(1000, Math.max(20, Number(payload?.maxLines) || 250));
+    const logPath = getLogFilePath();
+    if (!fs.existsSync(logPath)) {
+      return { ok: true, lines: [], logFile: logPath };
+    }
+    const text = fs.readFileSync(logPath, 'utf8');
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    return { ok: true, lines: lines.slice(-maxLines), logFile: logPath };
+  } catch (e) {
+    return { ok: false, error: String(e), lines: [] };
   }
 });
 
@@ -2067,8 +2102,32 @@ function loadUploadQueue() {
   }
 }
 
+/** Merge by id so a flush in progress cannot wipe items enqueued concurrently. */
 function saveUploadQueue(q) {
-  fs.writeFileSync(getUploadQueuePath(), JSON.stringify({ items: q.items || [] }, null, 2), 'utf8');
+  const disk = loadUploadQueue();
+  const map = new Map();
+  for (const it of disk.items || []) {
+    if (it?.id) map.set(it.id, it);
+  }
+  for (const it of q.items || []) {
+    if (!it?.id) continue;
+    const prev = map.get(it.id);
+    if (!prev) {
+      map.set(it.id, it);
+      continue;
+    }
+    const prevT = Date.parse(prev.updatedAt || prev.createdAt || '') || 0;
+    const nextT = Date.parse(it.updatedAt || it.createdAt || '') || 0;
+    // Prefer the caller’s copy when timestamps are equal/newer (in-memory flush updates).
+    map.set(it.id, nextT >= prevT ? { ...prev, ...it } : { ...it, ...prev });
+  }
+  const cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000;
+  const items = [...map.values()].filter((it) => {
+    if (it.status !== 'ok') return true;
+    const t = Date.parse(it.updatedAt || it.createdAt || '') || 0;
+    return t >= cutoff;
+  });
+  fs.writeFileSync(getUploadQueuePath(), JSON.stringify({ items }, null, 2), 'utf8');
 }
 
 function notifyUploadQueueItem(item) {
@@ -2165,31 +2224,34 @@ async function uploadPhotoOnce(payload, signal) {
 }
 
 let uploadFlushRunning = false;
+/** Set when enqueue happens while a flush is in progress — run another pass. */
+let uploadFlushAgain = false;
 
-async function flushUploadQueue() {
-  if (uploadFlushRunning) return { ok: true, busy: true };
-  uploadFlushRunning = true;
-  try {
-    const q = loadUploadQueue();
-    let uploaded = 0;
-    let failed = 0;
-    for (const item of q.items) {
-      if (item.status === 'ok') continue;
-      if (!item.filePath || !fs.existsSync(item.filePath)) {
-        item.status = 'error';
-        item.error = 'Photo file missing';
-        item.updatedAt = new Date().toISOString();
-        notifyUploadQueueItem(item);
-        failed++;
-        continue;
-      }
-      item.status = 'pending';
+async function flushUploadQueuePass() {
+  // Always reload so items enqueued during a prior pass are included.
+  const q = loadUploadQueue();
+  let uploaded = 0;
+  let failed = 0;
+  let stoppedOffline = false;
+  for (const item of q.items) {
+    if (item.status === 'ok' || item.status === 'error') continue;
+    if (!item.filePath || !fs.existsSync(item.filePath)) {
+      item.status = 'error';
+      item.error = 'Photo file missing';
       item.updatedAt = new Date().toISOString();
       notifyUploadQueueItem(item);
+      failed++;
+      continue;
+    }
+    item.status = 'pending';
+    item.updatedAt = new Date().toISOString();
+    notifyUploadQueueItem(item);
+    // Persist pending ASAP so a concurrent enqueue merge cannot lose this row.
+    saveUploadQueue(q);
 
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 20000);
-      let r;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 20000);
+    let r;
       try {
         r = await uploadPhotoOnce(item, ac.signal);
       } catch (e) {
@@ -2208,42 +2270,89 @@ async function flushUploadQueue() {
         item.slug = r.slug;
         item.error = undefined;
         uploaded++;
+        appendAppLog('info', 'gallery', 'upload ok', {
+          variant: item.variant,
+          file: path.basename(item.filePath),
+          photoId: r.photoId,
+        });
         notifyUploadQueueItem(item);
       } else {
         const offline = isLikelyOfflineError(r.error);
         item.status = offline ? 'queued' : 'error';
         item.error = r.error || 'Upload failed';
         failed++;
+        appendAppLog(offline ? 'warn' : 'error', 'gallery', 'upload failed', {
+          variant: item.variant,
+          file: path.basename(item.filePath),
+          offline,
+          error: item.error,
+        });
         notifyUploadQueueItem(item);
-        if (offline) break;
+        if (offline) {
+          stoppedOffline = true;
+          break;
+        }
       }
-    }
-    const cutoff = Date.now() - 2 * 24 * 60 * 60 * 1000;
-    q.items = q.items.filter((it) => {
-      if (it.status !== 'ok') return true;
-      const t = Date.parse(it.updatedAt || it.createdAt || '') || 0;
-      return t >= cutoff;
-    });
     saveUploadQueue(q);
-    return {
-      ok: true,
-      uploaded,
-      failed,
-      pending: q.items.filter((i) => i.status !== 'ok' && i.status !== 'error').length,
-    };
+  }
+  saveUploadQueue(q);
+  const fresh = loadUploadQueue();
+  return {
+    ok: true,
+    uploaded,
+    failed,
+    stoppedOffline,
+    pending: fresh.items.filter((i) => i.status !== 'ok' && i.status !== 'error').length,
+  };
+}
+
+async function flushUploadQueue() {
+  if (uploadFlushRunning) {
+    uploadFlushAgain = true;
+    return { ok: true, busy: true };
+  }
+  uploadFlushRunning = true;
+  let uploaded = 0;
+  let failed = 0;
+  let pending = 0;
+  try {
+    // Bound passes so a pathological enqueue loop cannot hang forever.
+    for (let pass = 0; pass < 8; pass++) {
+      uploadFlushAgain = false;
+      const r = await flushUploadQueuePass();
+      uploaded += r.uploaded || 0;
+      failed += r.failed || 0;
+      pending = r.pending || 0;
+      if (r.stoppedOffline) break;
+      if (!uploadFlushAgain) break;
+    }
   } finally {
     uploadFlushRunning = false;
   }
+  // Enqueue may have landed in the finally window — kick one more flush.
+  if (uploadFlushAgain) {
+    const again = await flushUploadQueue();
+    return {
+      ok: true,
+      uploaded: uploaded + (again.uploaded || 0),
+      failed: failed + (again.failed || 0),
+      pending: again.pending ?? pending,
+    };
+  }
+  return { ok: true, uploaded, failed, pending };
 }
 
 function enqueueGalleryUpload(payload) {
   const abs = path.resolve(String(payload?.filePath || ''));
   const variant = String(payload?.variant || 'original');
   const q = loadUploadQueue();
-  let item = q.items.find(
-    (i) => i.filePath === abs && i.variant === variant && i.status !== 'ok',
-  );
+  // Prefer an existing row for this file+variant — including already-ok (avoid re-upload duplicates).
+  let item = q.items.find((i) => i.filePath === abs && i.variant === variant);
   const now = new Date().toISOString();
+  if (item?.status === 'ok' && item.shareUrl) {
+    notifyUploadQueueItem(item);
+    return item;
+  }
   if (!item) {
     item = {
       id: require('crypto').randomBytes(8).toString('hex'),
@@ -2263,12 +2372,15 @@ function enqueueGalleryUpload(payload) {
     item.uploadToken = String(payload?.uploadToken || '').trim() || item.uploadToken;
     item.eventPrefix =
       String(payload?.eventPrefix || '').trim() || item.eventPrefix || 'session';
-    item.status = 'queued';
+    if (item.status !== 'ok') {
+      item.status = 'queued';
+      item.error = undefined;
+    }
     item.updatedAt = now;
-    item.error = undefined;
   }
   saveUploadQueue(q);
   notifyUploadQueueItem(item);
+  if (uploadFlushRunning) uploadFlushAgain = true;
   return item;
 }
 
@@ -2289,6 +2401,18 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
     if (!fs.existsSync(abs)) return { ok: false, error: 'Photo file not found.' };
 
     const item = enqueueGalleryUpload(payload);
+    // Already uploaded successfully — do not POST again.
+    if (item.status === 'ok' && item.shareUrl) {
+      return {
+        ok: true,
+        slug: item.slug,
+        photoId: item.photoId,
+        shareUrl: item.shareUrl,
+        url: item.url,
+        variant: item.variant,
+        deduped: true,
+      };
+    }
     await flushUploadQueue();
     const fresh =
       loadUploadQueue().items.find((i) => i.id === item.id) ||

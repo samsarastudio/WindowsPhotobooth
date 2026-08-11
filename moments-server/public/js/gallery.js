@@ -343,8 +343,8 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
 }
 
 function mosaicFillCap() {
-  // Keep some glass placeholders so the wall feels “expecting” photos
-  const reserve = Math.max(2, Math.round(mosaicSlots.length * 0.22));
+  // Keep at most a couple of glass placeholders for “expecting photo” feel
+  const reserve = mosaicSlots.length >= 10 ? 2 : mosaicSlots.length >= 6 ? 1 : 0;
   return Math.max(1, mosaicSlots.length - reserve);
 }
 
@@ -362,19 +362,31 @@ function placePhotoInMosaic(photo, opts = {}) {
     if (img && photo.url) img.src = photo.url;
     return;
   }
-  const cap = mosaicFillCap();
-  let idx = pickEmptySlot();
-  if (opts.force || mosaicPhotoSlot.size >= cap || idx < 0) {
-    if (!opts.force && mosaicPhotoSlot.size >= cap && idx >= 0) {
-      // Soft fill: leave glass placeholders alone
-      return;
-    }
-    const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
-    if (filled.length && (opts.force || idx < 0 || mosaicPhotoSlot.size >= cap)) {
-      idx = filled[Math.floor(Math.random() * filled.length)].i;
-    }
+  // Always fill an empty glass slot first — never replace when empties remain.
+  const empty = pickEmptySlot();
+  if (empty >= 0 && !opts.force) {
+    fillMosaicSlot(empty, photo, opts);
+    return;
   }
-  if (idx < 0) return;
+  if (empty >= 0 && opts.force && mosaicPhotoSlot.size < mosaicSlots.length) {
+    fillMosaicSlot(empty, photo, opts);
+    return;
+  }
+  if (!opts.force) {
+    // Soft place with no empties left (at visual cap) — wait for rotation.
+    if (mosaicPhotoSlot.size >= mosaicFillCap()) return;
+    if (empty >= 0) {
+      fillMosaicSlot(empty, photo, opts);
+    }
+    return;
+  }
+  // Forced swap: replace a random filled slot so unseen photos can appear.
+  const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
+  if (!filled.length) {
+    if (empty >= 0) fillMosaicSlot(empty, photo, opts);
+    return;
+  }
+  const idx = filled[Math.floor(Math.random() * filled.length)].i;
   fillMosaicSlot(idx, photo, opts);
 }
 
@@ -455,12 +467,25 @@ function shineRandomMosaicTile() {
 }
 
 function rotateMosaicPhotos() {
-  if (viewMode !== 'mosaic' || !mosaicSlots.length || photos.length <= mosaicFillCap()) return;
-  // Bring next unseen photos onto the wall so guests can find theirs
+  if (viewMode !== 'mosaic' || !mosaicSlots.length || photos.length < 2) return;
+
+  // 1) Fill any empty slots with photos not yet on the wall
   const visible = new Set([...mosaicPhotoSlot.keys()]);
   const unseen = photos.filter((p) => !visible.has(p.id));
-  const pool = unseen.length ? unseen : photos;
-  const take = Math.min(2, pool.length, mosaicSlots.length);
+  const emptyIdxs = mosaicSlots.map((s, i) => (!s.photoId ? i : -1)).filter((i) => i >= 0);
+  let filledEmpties = 0;
+  for (const photo of unseen) {
+    if (filledEmpties >= emptyIdxs.length) break;
+    if (mosaicPhotoSlot.size >= mosaicFillCap() && emptyIdxs.length - filledEmpties <= 0) break;
+    placePhotoInMosaic(photo, { shine: true, force: false });
+    filledEmpties++;
+  }
+
+  // 2) Occasionally swap so guests keep seeing different photos
+  if (photos.length <= mosaicPhotoSlot.size) return;
+  const stillUnseen = photos.filter((p) => !mosaicPhotoSlot.has(p.id));
+  const pool = stillUnseen.length ? stillUnseen : photos;
+  const take = Math.min(2, pool.length, Math.max(1, mosaicPhotoSlot.size));
   for (let n = 0; n < take; n++) {
     const photo = pool[(mosaicRotateCursor + n) % pool.length];
     setTimeout(() => placePhotoInMosaic(photo, { force: true, shine: true }), n * 220);
@@ -520,7 +545,8 @@ function upsertPhoto(photo) {
   photos.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   if (viewMode === 'grid') renderGrid();
   else if (viewMode === 'mosaic') {
-    placePhotoInMosaic(photo, { shine: isNew, force: isNew });
+    // Never force-replace on arrival — fill empty glass slots first.
+    placePhotoInMosaic(photo, { shine: isNew, force: false });
   }
   if (els.meta) els.meta.textContent = photos.length + ' photos';
 }

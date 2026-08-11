@@ -1,5 +1,6 @@
 import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { BoothConfigService } from './booth-config.service';
+import { BoothLogService } from './booth-log.service';
 
 export type GalleryPhotoVariant = 'original' | 'framed' | 'ai';
 
@@ -16,6 +17,7 @@ export interface GalleryUploadRecord {
 @Injectable({ providedIn: 'root' })
 export class GalleryUploadService implements OnDestroy {
   private readonly booth = inject(BoothConfigService);
+  private readonly log = inject(BoothLogService);
 
   private readonly byPath = signal<Record<string, GalleryUploadRecord>>({});
   /** Bumps whenever upload state changes — keeps result Share UI reactive. */
@@ -164,6 +166,7 @@ export class GalleryUploadService implements OnDestroy {
     }
 
     const g = this.booth.gallery();
+    void this.log.info('gallery', `upload start (${variant})`, { filePath });
     if (variant === 'original' && !g.uploadOriginal) return this.skip(filePath, variant);
     if (variant === 'framed' && !g.uploadFramed) return this.skip(filePath, variant);
     if (variant === 'ai' && !g.uploadAi) return this.skip(filePath, variant);
@@ -200,6 +203,16 @@ export class GalleryUploadService implements OnDestroy {
           };
     this.byPath.update((m) => ({ ...m, [filePath]: next }));
     if (next.status === 'error') this.lastError.set(next.error ?? null);
+    if (next.status === 'ok') {
+      void this.log.info('gallery', `upload ok (${variant})`, {
+        photoId: next.photoId,
+        shareUrl: next.shareUrl,
+      });
+    } else if (next.status === 'queued') {
+      void this.log.warn('gallery', `upload queued (${variant})`, { error: next.error });
+    } else {
+      void this.log.error('gallery', `upload error (${variant})`, { error: next.error });
+    }
     this.bump();
     return next;
   }
@@ -215,13 +228,40 @@ export class GalleryUploadService implements OnDestroy {
   /** Ensure the photo shown on result is uploaded so Share can enable. */
   async ensureShareUpload(filePath: string): Promise<GalleryUploadRecord | null> {
     if (!this.enabled() || !filePath) return null;
-    const existing = this.byPath()[filePath];
+
+    await this.syncFromDisk(filePath);
+    let existing = this.byPath()[filePath];
     if (existing?.status === 'ok' && existing.shareUrl) return existing;
+
     if (existing?.status === 'pending' || existing?.status === 'queued') {
-      void this.flushQueue();
-      return existing;
+      await this.flushQueue();
+      await this.syncFromDisk(filePath);
+      existing = this.byPath()[filePath];
+      if (existing?.status === 'ok' && existing.shareUrl) return existing;
+      if (existing?.status === 'error') return existing;
+      // Still in flight / queued offline — do not POST a duplicate.
+      return existing ?? null;
     }
+
+    if (existing?.status === 'error') {
+      return this.uploadPath(filePath, this.inferVariant(filePath));
+    }
+
+    // No local record yet — first upload for this path.
     return this.uploadPath(filePath, this.inferVariant(filePath));
+  }
+
+  private async syncFromDisk(filePath: string): Promise<void> {
+    if (!window.pbApi?.galleryGetUploadQueueItem) return;
+    try {
+      const r = await window.pbApi.galleryGetUploadQueueItem(filePath);
+      if (r?.ok && r.item) {
+        // Alias under the UI path so Share state matches the result screen key.
+        this.applyQueueItem({ ...r.item, filePath });
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   /** Fire-and-forget helper for capture/frame/AI hooks. */
@@ -239,5 +279,24 @@ export class GalleryUploadService implements OnDestroy {
     this.byPath.update((m) => ({ ...m, [filePath]: rec }));
     this.bump();
     return rec;
+  }
+
+  /** Surface a retryable error when upload never leaves pending/queued. */
+  markUploadTimedOut(filePath: string | null | undefined): void {
+    if (!filePath) return;
+    const cur = this.byPath()[filePath];
+    if (cur?.status === 'ok') return;
+    const rec: GalleryUploadRecord = {
+      path: filePath,
+      variant: cur?.variant || this.inferVariant(filePath),
+      status: 'error',
+      error: cur?.error || 'Upload timed out — tap to retry',
+      photoId: cur?.photoId,
+      shareUrl: cur?.shareUrl,
+      url: cur?.url,
+    };
+    this.byPath.update((m) => ({ ...m, [filePath]: rec }));
+    this.lastError.set(rec.error ?? null);
+    this.bump();
   }
 }
