@@ -91,11 +91,23 @@
 
           <section class="card admin-section" data-section="wall" hidden>
             <h2>Mosaic wall</h2>
-            <p class="meta">Full-screen floating wall on <code>/wall</code> and <code>/{session}/wall</code>. Photos stay 6×4.</p>
+            <p class="meta">
+              Guest photos fill a grid and reveal a larger target image (logo / artwork), like a digital mosaic wall.
+              Cards stay 6×4. Open <code>/wall</code>.
+            </p>
             <label>Wall title</label>
             <input id="wallTitle" class="input" />
             <label>Center overlay text (optional)</label>
             <input id="wallOverlay" class="input" placeholder="e.g. UNLEASHED" />
+            <label>Mosaic density (columns)</label>
+            <input id="wallColumns" class="input" type="number" min="8" max="28" step="1" />
+            <label>Mosaic target image (logo / artwork to reveal)</label>
+            <div class="row wrap">
+              <input id="wallMosaicTarget" type="file" accept="image/png,image/jpeg,image/webp" />
+              <button type="button" class="btn ghost" id="btnUploadMosaicTarget">Upload target</button>
+              <button type="button" class="btn ghost" id="btnClearMosaicTarget">Clear target</button>
+            </div>
+            <p id="wallMosaicTargetPreview" class="meta"></p>
             <label>Partner brand text (shown with inmoment)</label>
             <input id="wallBrandText" class="input" placeholder="e.g. Event partner name" />
             <label>Partner brand logo (optional)</label>
@@ -134,6 +146,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260810-6" type="module"></script>
+    <script src="/js/admin.js?v=20260810-7" type="module"></script>
   </body>
 </html>
