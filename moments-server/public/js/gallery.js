@@ -37,6 +37,9 @@ const els = {
   status: document.getElementById('status'),
   empty: document.getElementById('empty'),
   grid: document.getElementById('grid'),
+  guestPhoto: document.getElementById('guestPhoto'),
+  guestPhotoImg: document.getElementById('guestPhotoImg'),
+  guestPhotoDownload: document.getElementById('guestPhotoDownload'),
   mosaic: document.getElementById('mosaic'),
   mosaicStage: document.getElementById('mosaicStage'),
   wallOverlay: document.getElementById('wallOverlay'),
@@ -101,14 +104,21 @@ function pathForMode(mode) {
 function setMode(mode, push = true) {
   viewMode = mode;
   const immersive = mode === 'mosaic';
+  const guestOnly = mode === 'photo';
   document.body.classList.toggle('is-mosaic', immersive);
+  document.body.classList.toggle('is-guest-photo', guestOnly);
   document.body.classList.toggle('is-slideshow-route', mode === 'slideshow');
   if (els.topBar) els.topBar.hidden = immersive;
   els.grid.hidden = mode !== 'grid';
+  if (els.guestPhoto) els.guestPhoto.hidden = mode !== 'photo';
   els.mosaic.hidden = mode !== 'mosaic';
   if (mode === 'grid') {
     els.empty.hidden = photos.length > 0;
     renderGrid();
+  }
+  if (mode === 'photo') {
+    els.empty.hidden = true;
+    renderGuestPhoto();
   }
   if (mode === 'mosaic') {
     els.empty.hidden = true;
@@ -123,7 +133,7 @@ function setMode(mode, push = true) {
     stopSs();
     els.slideshow.hidden = true;
   }
-  if (push && route.kind !== 'home') {
+  if (push && route.kind !== 'home' && route.kind !== 'photo') {
     history.replaceState(null, '', pathForMode(mode));
   }
 }
@@ -139,6 +149,28 @@ function renderGrid() {
     btn.innerHTML = `<img src="${photo.url}" alt="" loading="lazy" /><span class="badge">${photo.variant}</span>`;
     btn.addEventListener('click', () => openLightbox(photos.findIndex((p) => p.id === photo.id)));
     els.grid.appendChild(btn);
+  }
+}
+
+/** QR share link — only the guest’s photo, no album grid. */
+function renderGuestPhoto() {
+  if (!els.guestPhotoImg) return;
+  const photo = photos[0] || null;
+  if (!photo) {
+    els.guestPhotoImg.removeAttribute('src');
+    if (els.guestPhotoDownload) {
+      els.guestPhotoDownload.removeAttribute('href');
+    }
+    setStatus('Photo not found or no longer available.');
+    return;
+  }
+  setStatus('', false);
+  els.guestPhotoImg.src = photo.url;
+  els.title.textContent = 'Your photo';
+  els.meta.textContent = photo.variant || '';
+  if (els.guestPhotoDownload) {
+    els.guestPhotoDownload.href = photo.url;
+    els.guestPhotoDownload.download = `${photo.id}-${photo.variant || 'photo'}.jpg`;
   }
 }
 
@@ -474,6 +506,13 @@ function stopMosaicLoops() {
 
 function upsertPhoto(photo) {
   if (!photo?.id || photo.variant === 'original') return;
+  // Guest QR view stays locked to that one photo.
+  if (route.kind === 'photo') {
+    if (photo.id !== route.photoId) return;
+    photos = [photo];
+    if (viewMode === 'photo') renderGuestPhoto();
+    return;
+  }
   const i = photos.findIndex((p) => p.id === photo.id);
   const isNew = i < 0;
   if (i >= 0) photos[i] = photo;
@@ -483,7 +522,7 @@ function upsertPhoto(photo) {
   else if (viewMode === 'mosaic') {
     placePhotoInMosaic(photo, { shine: isNew, force: isNew });
   }
-  if (els.meta) els.meta.textContent = photos.length + " photos";
+  if (els.meta) els.meta.textContent = photos.length + ' photos';
 }
 
 function openLightbox(i) {
@@ -575,16 +614,20 @@ async function loadSession(slug) {
     /* optional */
   }
   photos = (data.session.photos || []).filter((p) => p.variant !== 'original');
-  els.meta.textContent = `Expires ${new Date(data.session.expiresAt).toLocaleString()} · ${photos.length} photos`;
-  connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
 
   if (route.kind === 'photo' && route.photoId) {
-    setMode('grid', false);
-    const i = photos.findIndex((p) => p.id === route.photoId);
-    if (i >= 0) openLightbox(i);
-  } else {
-    setMode(route.mode || 'grid', false);
+    // QR / share link: only this guest’s photo — never the full session grid.
+    const mine = photos.find((p) => p.id === route.photoId);
+    photos = mine ? [mine] : [];
+    els.meta.textContent = photos.length ? '' : 'Photo unavailable';
+    connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
+    setMode('photo', false);
+    return;
   }
+
+  els.meta.textContent = `Expires ${new Date(data.session.expiresAt).toLocaleString()} · ${photos.length} photos`;
+  connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
+  setMode(route.mode || 'grid', false);
 }
 
 async function loadWall() {
