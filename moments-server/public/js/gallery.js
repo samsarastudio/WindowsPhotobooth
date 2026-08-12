@@ -318,13 +318,28 @@ function mosaicGridMetrics() {
   return { stageW, stageH, pad, gap, cols, rows, cellW, cellH };
 }
 
-/** Pick a span in grid cells: 1×1 (1), 2×1 (2), or 2×2 (4). */
+/** Fit a 6×4 card centered inside a reserved rect (never stretch the frame). */
+function fitLandscapeCard(reserveX, reserveY, reserveW, reserveH) {
+  let w = reserveW;
+  let h = w / MOSAIC_CELL_ASPECT;
+  if (h > reserveH + 0.5) {
+    h = reserveH;
+    w = h * MOSAIC_CELL_ASPECT;
+  }
+  return {
+    x: reserveX + (reserveW - w) / 2,
+    y: reserveY + (reserveH - h) / 2,
+    size: w,
+    height: h,
+  };
+}
+
+/** Pick a span in grid cells: 1×1 (1), medium ~2-area, or 2×2 (4). */
 function pickMosaicSpan(rand, freeCells, colsLeft, rowsLeft) {
   const can4 = freeCells >= 4 && colsLeft >= 2 && rowsLeft >= 2;
-  const can2 = freeCells >= 2 && colsLeft >= 2;
   const roll = rand();
   if (can4 && roll < 0.22) return { spanC: 2, spanR: 2, grids: 4 };
-  if (can2 && roll < 0.52) return { spanC: 2, spanR: 1, grids: 2 };
+  if (can4 && roll < 0.5) return { spanC: 2, spanR: 2, grids: 2, medium: true };
   return { spanC: 1, spanR: 1, grids: 1 };
 }
 
@@ -355,46 +370,68 @@ function layoutMosaicSlots() {
     }
     return n;
   };
+  const pushSlot = (r, c, spanC, spanR, grids, medium) => {
+    mark(r, c, spanC, spanR);
+    const reserveW = cellW * spanC + gap * (spanC - 1);
+    const reserveH = cellH * spanR + gap * (spanR - 1);
+    const reserveX = pad + c * (cellW + gap);
+    const reserveY = pad + r * (cellH + gap);
+    let card;
+    if (medium && spanC === 2 && spanR === 2) {
+      // ~2-grid area, still 6×4 — larger than 1×1, smaller than full 2×2
+      const targetW = cellW * 1.42;
+      card = fitLandscapeCard(
+        reserveX + (reserveW - targetW) / 2,
+        reserveY + (reserveH - targetW / MOSAIC_CELL_ASPECT) / 2,
+        targetW,
+        targetW / MOSAIC_CELL_ASPECT,
+      );
+    } else {
+      card = fitLandscapeCard(reserveX, reserveY, reserveW, reserveH);
+    }
+    const rot = (rand() - 0.5) * (grids >= 4 ? 0.7 : 1.1);
+    slots.push({
+      x: card.x,
+      y: card.y,
+      homeX: card.x,
+      homeY: card.y,
+      size: card.size,
+      height: card.height,
+      homeSize: card.size,
+      homeHeight: card.height,
+      rot,
+      homeRot: rot,
+      floatDur: 8 + rand() * 6,
+      floatDelay: -rand() * 5,
+      scanDelay: rand() * 3,
+      focus: grids >= 4,
+      spanC,
+      spanR,
+      grids,
+      col: c,
+      row: r,
+    });
+  };
 
   // Seed 1–2 hero 4-grid tiles first for hierarchy
   let heroes = 0;
   const heroTarget = rows * cols >= 20 ? 2 : 1;
-  for (let r = 0; r < rows && heroes < heroTarget; r++) {
-    for (let c = 0; c < cols && heroes < heroTarget; c++) {
-      if (!canPlace(r, c, 2, 2)) continue;
-      if (rand() > 0.55 && heroes > 0) continue;
-      mark(r, c, 2, 2);
-      const w = cellW * 2 + gap;
-      const h = cellH * 2 + gap;
-      const x = pad + c * (cellW + gap);
-      const y = pad + r * (cellH + gap);
-      const rot = (rand() - 0.5) * 0.9;
-      slots.push({
-        x,
-        y,
-        homeX: x,
-        homeY: y,
-        size: w,
-        height: h,
-        homeSize: w,
-        homeHeight: h,
-        rot,
-        homeRot: rot,
-        floatDur: 10 + rand() * 4,
-        floatDelay: -rand() * 4,
-        scanDelay: rand() * 3,
-        focus: true,
-        spanC: 2,
-        spanR: 2,
-        grids: 4,
-        col: c,
-        row: r,
-      });
-      heroes++;
-    }
+  const heroStarts = [];
+  for (let r = 0; r <= rows - 2; r++) {
+    for (let c = 0; c <= cols - 2; c++) heroStarts.push({ r, c });
+  }
+  for (let i = heroStarts.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [heroStarts[i], heroStarts[j]] = [heroStarts[j], heroStarts[i]];
+  }
+  for (const { r, c } of heroStarts) {
+    if (heroes >= heroTarget) break;
+    if (!canPlace(r, c, 2, 2)) continue;
+    pushSlot(r, c, 2, 2, 4, false);
+    heroes++;
   }
 
-  // Pack remaining cells with first-fit: 2-grid and 1-grid mix
+  // Pack remaining: medium (2) and small (1), always 6×4 cards
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (occupied[r][c]) continue;
@@ -404,37 +441,10 @@ function layoutMosaicSlots() {
         span = { spanC: 1, spanR: 1, grids: 1 };
         if (!canPlace(r, c, 1, 1)) continue;
       }
-      mark(r, c, span.spanC, span.spanR);
-      const w = cellW * span.spanC + gap * (span.spanC - 1);
-      const h = cellH * span.spanR + gap * (span.spanR - 1);
-      const x = pad + c * (cellW + gap);
-      const y = pad + r * (cellH + gap);
-      const rot = (rand() - 0.5) * (span.grids >= 4 ? 0.8 : 1.2);
-      slots.push({
-        x,
-        y,
-        homeX: x,
-        homeY: y,
-        size: w,
-        height: h,
-        homeSize: w,
-        homeHeight: h,
-        rot,
-        homeRot: rot,
-        floatDur: 8 + rand() * 6,
-        floatDelay: -rand() * 5,
-        scanDelay: rand() * 3,
-        focus: span.grids >= 4,
-        spanC: span.spanC,
-        spanR: span.spanR,
-        grids: span.grids,
-        col: c,
-        row: r,
-      });
+      pushSlot(r, c, span.spanC, span.spanR, span.grids, !!span.medium);
     }
   }
 
-  // Prefer a filled wall: if the last row is mostly empty 1-cells, that's fine
   return slots;
 }
 
@@ -492,8 +502,12 @@ function updateMosaicBranding() {
 function applySlotTransform(slot, animatePos = true) {
   if (!slot?.el) return;
   if (!animatePos) slot.el.style.transition = 'none';
-  slot.el.style.setProperty('--sz', slot.size + 'px');
-  slot.el.style.setProperty('--sz-h', (slot.height || slot.size / MOSAIC_CELL_ASPECT) + 'px');
+  // Always keep 6×4 — height derived from width
+  const w = slot.size;
+  const h = w / MOSAIC_CELL_ASPECT;
+  slot.height = h;
+  slot.el.style.setProperty('--sz', w + 'px');
+  slot.el.style.setProperty('--sz-h', h + 'px');
   slot.el.style.setProperty('--rot', slot.rot + 'deg');
   slot.el.style.setProperty('--mx', slot.x + 'px');
   slot.el.style.setProperty('--my', slot.y + 'px');
@@ -503,6 +517,7 @@ function applySlotTransform(slot, animatePos = true) {
   slot.el.dataset.grids = String(slot.grids || 1);
   slot.el.classList.toggle('is-span-2', slot.grids === 2);
   slot.el.classList.toggle('is-span-4', slot.grids === 4);
+  slot.el.classList.toggle('is-focus', !!slot.focus || slot.grids >= 4);
   if (!animatePos) {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -510,6 +525,37 @@ function applySlotTransform(slot, animatePos = true) {
       });
     });
   }
+}
+
+function snapshotSlotGeometry(slot) {
+  return {
+    x: slot.x,
+    y: slot.y,
+    homeX: slot.homeX,
+    homeY: slot.homeY,
+    size: slot.size,
+    height: slot.height,
+    homeSize: slot.homeSize,
+    homeHeight: slot.homeHeight,
+    rot: slot.rot,
+    homeRot: slot.homeRot,
+    grids: slot.grids,
+    spanC: slot.spanC,
+    spanR: slot.spanR,
+    focus: slot.focus,
+    col: slot.col,
+    row: slot.row,
+  };
+}
+
+function applySlotGeometry(slot, geom) {
+  Object.assign(slot, geom);
+  slot.homeX = geom.homeX ?? geom.x;
+  slot.homeY = geom.homeY ?? geom.y;
+  slot.homeSize = geom.homeSize ?? geom.size;
+  slot.homeHeight = geom.homeHeight ?? geom.height;
+  slot.homeRot = geom.homeRot ?? geom.rot;
+  applySlotTransform(slot, true);
 }
 
 function clearMosaicSlot(slot) {
@@ -725,29 +771,34 @@ function rotateMosaicPhotos() {
     filledEmpties++;
   }
 
-  // 2) Swap photo content between fixed grid homes (slots stay put)
+  // 2) Move photos into different slot geometries (size + place), not just swap src
   const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
-  if (filled.length >= 2 && Math.random() < 0.7) {
+  if (filled.length >= 2 && Math.random() < 0.85) {
     const a = filled[Math.floor(Math.random() * filled.length)];
-    let b = filled[Math.floor(Math.random() * filled.length)];
-    if (b.i === a.i) b = filled[(filled.indexOf(a) + 1) % filled.length];
-    const photoA = photos.find((p) => p.id === a.s.photoId);
-    const photoB = photos.find((p) => p.id === b.s.photoId);
-    if (photoA && photoB) {
+    const mixed = filled.filter((x) => x.i !== a.i && x.s.grids !== a.s.grids);
+    const poolB = mixed.length ? mixed : filled.filter((x) => x.i !== a.i);
+    if (poolB.length) {
+      const b = poolB[Math.floor(Math.random() * poolB.length)];
+      const geomA = snapshotSlotGeometry(a.s);
+      const geomB = snapshotSlotGeometry(b.s);
       a.s.el.classList.add('is-vanish');
       b.s.el.classList.add('is-vanish');
       setTimeout(() => {
-        mosaicPhotoSlot.delete(photoA.id);
-        mosaicPhotoSlot.delete(photoB.id);
-        a.s.photoId = null;
-        b.s.photoId = null;
-        fillMosaicSlot(a.i, photoB, { animate: false, shine: true, focus: a.s.focus });
-        fillMosaicSlot(b.i, photoA, { animate: false, shine: true, focus: b.s.focus });
+        applySlotGeometry(a.s, geomB);
+        applySlotGeometry(b.s, geomA);
+        a.s.el.classList.remove('is-vanish');
+        b.s.el.classList.remove('is-vanish');
+        a.s.el.classList.add('is-swoosh');
+        b.s.el.classList.add('is-swoosh');
+        setTimeout(() => {
+          a.s.el.classList.remove('is-swoosh');
+          b.s.el.classList.remove('is-swoosh');
+        }, 700);
       }, 280);
     }
   }
 
-  // 3) Bring unseen photos into fixed slots
+  // 3) Bring unseen photos into slots (may replace content of a random filled slot)
   if (photos.length <= mosaicPhotoSlot.size) return;
   const stillUnseen = photos.filter((p) => !mosaicPhotoSlot.has(p.id));
   const pool = stillUnseen.length ? stillUnseen : photos;

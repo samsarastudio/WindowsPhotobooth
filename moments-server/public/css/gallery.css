@@ -643,7 +643,7 @@ body.is-mosaic-completed .mosaic-watermark {
 /* Soft glass collage slots — virtual grid spans (1 / 2 / 4); display-only */
 .mosaic-slot {
   --sz: 160px;
-  --sz-h: 107px;
+  --sz-h: calc(var(--sz) * 4 / 6);
   --rot: 0deg;
   --float-dur: 8s;
   --float-delay: 0s;
@@ -652,7 +652,7 @@ body.is-mosaic-completed .mosaic-watermark {
   top: 0;
   width: var(--sz);
   height: var(--sz-h);
-  aspect-ratio: auto;
+  aspect-ratio: 6 / 4;
   margin: 0;
   padding: 0;
   border: 0;
