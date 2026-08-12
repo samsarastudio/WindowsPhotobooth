@@ -209,25 +209,27 @@ function ensureMosaicBackdrop() {
   }
 }
 
-function completedGridDims(count) {
-  const n = Math.max(1, count);
+function completedGridDims(photoCount) {
   const stageW = Math.max(320, els.mosaicStage?.clientWidth || 1200);
   const stageH = Math.max(240, els.mosaicStage?.clientHeight || 800);
   const preferred = Math.min(28, Math.max(4, Number(wallCfg.columns) || 12));
-  let best = { cols: 1, rows: n, score: Infinity };
-  const maxCols = Math.min(n, Math.max(preferred + 4, 24));
-  for (let cols = 1; cols <= maxCols; cols++) {
-    const rows = Math.ceil(n / cols);
+  // Cap cell count so huge albums stay dense without thousands of DOM nodes
+  const minCellW = 88;
+  const maxCols = Math.max(2, Math.min(preferred, Math.floor(stageW / minCellW)));
+  let best = { cols: maxCols, rows: 1, capacity: maxCols, score: Infinity };
+  for (let cols = 2; cols <= maxCols; cols++) {
     const cellW = stageW / cols;
-    const cellH = stageH / rows;
+    const cellH = cellW / MOSAIC_CELL_ASPECT;
+    const rows = Math.max(1, Math.floor(stageH / cellH));
+    const capacity = cols * rows;
+    if (capacity < 1) continue;
     const aspect = cellW / Math.max(1, cellH);
-    const empty = cols * rows - n;
-    // Prefer ~6×4 cells, denser last rows, and columns near admin density
+    const unused = photoCount > 0 ? Math.max(0, capacity - Math.min(photoCount, capacity)) : 0;
     const score =
-      Math.abs(aspect - MOSAIC_CELL_ASPECT) * 2.2 +
-      empty * 0.35 +
-      Math.abs(cols - preferred) * 0.08;
-    if (score < best.score) best = { cols, rows, score };
+      Math.abs(aspect - MOSAIC_CELL_ASPECT) * 2 +
+      Math.abs(cols - preferred) * 0.1 +
+      unused * 0.02;
+    if (score < best.score) best = { cols, rows, capacity, score };
   }
   return best;
 }
@@ -240,6 +242,7 @@ function applyMosaicLayoutMode(fullRebuild = true) {
   if (completed) {
     stopMosaicLoops();
     buildMosaicCompleted();
+    startMosaicLoops();
   } else {
     renderMosaic(fullRebuild);
     startMosaicLoops();
@@ -252,40 +255,46 @@ function buildMosaicCompleted() {
   ensureMosaicBackdrop();
   mosaicSlots = [];
   mosaicPhotoSlot.clear();
-  mosaicRotateCursor = 0;
   updateMosaicBranding();
 
   const list = photos.filter((p) => p?.id);
   if (!list.length) return;
 
-  const { cols, rows } = completedGridDims(list.length);
+  const { cols, rows, capacity } = completedGridDims(list.length);
+  const cap = Math.max(1, capacity || cols * rows);
   els.mosaicStage.style.setProperty('--completed-cols', String(cols));
   els.mosaicStage.style.setProperty('--completed-rows', String(rows));
 
-  list.forEach((photo, i) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'mosaic-slot is-filled is-completed-cell';
-    btn.dataset.slot = String(i);
-    btn.style.setProperty('--arrive-delay', `${Math.min(i * 28, 1200)}ms`);
-    btn.innerHTML =
-      '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
-    const img = btn.querySelector('.mosaic-slot-photo');
+  // Virtual window: only as many cells as fill the stage
+  const start = list.length <= cap ? 0 : mosaicRotateCursor % list.length;
+  const windowPhotos = [];
+  for (let i = 0; i < Math.min(cap, list.length); i++) {
+    windowPhotos.push(list[(start + i) % list.length]);
+  }
+
+  windowPhotos.forEach((photo, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'mosaic-slot is-filled is-completed-cell';
+    cell.dataset.slot = String(i);
+    cell.setAttribute('aria-hidden', 'true');
+    cell.style.setProperty('--arrive-delay', `${Math.min(i * 18, 900)}ms`);
+    cell.innerHTML =
+      '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" loading="lazy" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
+    const img = cell.querySelector('.mosaic-slot-photo');
     if (img) {
       img.src = photo.url;
       img.alt = '';
+      img.draggable = false;
     }
-    btn.onclick = () => {
-      const idx = photos.findIndex((p) => p.id === photo.id);
-      if (idx >= 0) openLightbox(idx);
-    };
-    els.mosaicStage.appendChild(btn);
+    els.mosaicStage.appendChild(cell);
     mosaicSlots.push({
-      el: btn,
+      el: cell,
       photoId: photo.id,
       size: 0,
       x: 0,
       y: 0,
+      homeX: 0,
+      homeY: 0,
       rot: 0,
       floatDur: 8,
       floatDelay: 0,
@@ -296,73 +305,136 @@ function buildMosaicCompleted() {
   });
 }
 
-function mosaicSlotCount() {
-  const stageW = els.mosaicStage?.clientWidth || window.innerWidth || 1200;
-  const stageH = els.mosaicStage?.clientHeight || window.innerHeight || 800;
-  const area = stageW * stageH;
-  // Fewer, larger cards so the wall feels filled
-  return Math.min(11, Math.max(5, Math.round(area / 145000)));
-}
-
-function mosaicSizeScale(rand) {
-  const roll = rand();
-  if (roll < 0.28) return 1.38; // hero focus
-  if (roll < 0.72) return 1.18;
-  return 1.0; // no tiny cards
-}
-
-function layoutMosaicSlots(count) {
+function mosaicGridMetrics() {
   const stageW = Math.max(320, els.mosaicStage?.clientWidth || 1200);
   const stageH = Math.max(240, els.mosaicStage?.clientHeight || 800);
-  const base = Math.min(stageW * 0.32, stageH * 0.42, 340);
-  const rand = seededRandom(count * 97 + Math.round(stageW + stageH));
+  const pad = 14;
+  const gap = 8;
+  // Virtual unit grid — tiles span 1, 2, or 4 cells
+  const cols = stageW >= 1500 ? 8 : stageW >= 1100 ? 6 : stageW >= 720 ? 5 : 4;
+  const cellW = (stageW - pad * 2 - gap * (cols - 1)) / cols;
+  const cellH = cellW / MOSAIC_CELL_ASPECT;
+  const rows = Math.max(3, Math.floor((stageH - pad * 2 + gap) / (cellH + gap)));
+  return { stageW, stageH, pad, gap, cols, rows, cellW, cellH };
+}
+
+/** Pick a span in grid cells: 1×1 (1), 2×1 (2), or 2×2 (4). */
+function pickMosaicSpan(rand, freeCells, colsLeft, rowsLeft) {
+  const can4 = freeCells >= 4 && colsLeft >= 2 && rowsLeft >= 2;
+  const can2 = freeCells >= 2 && colsLeft >= 2;
+  const roll = rand();
+  if (can4 && roll < 0.22) return { spanC: 2, spanR: 2, grids: 4 };
+  if (can2 && roll < 0.52) return { spanC: 2, spanR: 1, grids: 2 };
+  return { spanC: 1, spanR: 1, grids: 1 };
+}
+
+function layoutMosaicSlots() {
+  const { pad, gap, cols, rows, cellW, cellH } = mosaicGridMetrics();
+  const rand = seededRandom(cols * 131 + rows * 97 + Math.round(cellW * 10));
+  const occupied = Array.from({ length: rows }, () => Array(cols).fill(false));
   const slots = [];
-  const pad = 18;
-  // Soft grid anchors reduce random pile-ups
-  const cols = Math.max(2, Math.ceil(Math.sqrt(count * (stageW / Math.max(1, stageH)))));
-  const rows = Math.max(2, Math.ceil(count / cols));
-  const cellW = (stageW - pad * 2) / cols;
-  const cellH = (stageH - pad * 2) / rows;
 
-  for (let i = 0; i < count; i++) {
-    const scale = mosaicSizeScale(rand);
-    const size = Math.max(170, Math.min(base * scale, cellW * 1.15, stageW * 0.42));
-    const h = size / MOSAIC_CELL_ASPECT;
-    const col = i % cols;
-    const row = Math.floor(i / cols) % rows;
-    const jitterX = (rand() - 0.5) * cellW * 0.28;
-    const jitterY = (rand() - 0.5) * cellH * 0.28;
-    let x = pad + col * cellW + (cellW - size) / 2 + jitterX;
-    let y = pad + row * cellH + (cellH - h) / 2 + jitterY;
-    x = Math.min(stageW - size - pad, Math.max(pad, x));
-    y = Math.min(stageH - h - pad, Math.max(pad, y));
-
-    for (let attempt = 0; attempt < 18; attempt++) {
-      let crowded = false;
-      for (const s of slots) {
-        const dx = x + size / 2 - (s.x + s.size / 2);
-        const dy = y + h / 2 - (s.y + s.size / MOSAIC_CELL_ASPECT / 2);
-        // Stronger separation — avoid heavy overlaps
-        if (Math.hypot(dx, dy) < Math.min(size, s.size) * 1.05) {
-          crowded = true;
-          break;
-        }
-      }
-      if (!crowded) break;
-      x = pad + rand() * Math.max(1, stageW - size - pad * 2);
-      y = pad + rand() * Math.max(1, stageH - h - pad * 2);
+  const mark = (r, c, spanC, spanR) => {
+    for (let y = r; y < r + spanR; y++) {
+      for (let x = c; x < c + spanC; x++) occupied[y][x] = true;
     }
-    slots.push({
-      x,
-      y,
-      size,
-      rot: (rand() - 0.5) * 3.5,
-      floatDur: 7 + rand() * 6,
-      floatDelay: -rand() * 5,
-      scanDelay: rand() * 3,
-      focus: scale >= 1.3,
-    });
+  };
+  const canPlace = (r, c, spanC, spanR) => {
+    if (c + spanC > cols || r + spanR > rows) return false;
+    for (let y = r; y < r + spanR; y++) {
+      for (let x = c; x < c + spanC; x++) {
+        if (occupied[y][x]) return false;
+      }
+    }
+    return true;
+  };
+  const freeCount = () => {
+    let n = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) if (!occupied[r][c]) n++;
+    }
+    return n;
+  };
+
+  // Seed 1–2 hero 4-grid tiles first for hierarchy
+  let heroes = 0;
+  const heroTarget = rows * cols >= 20 ? 2 : 1;
+  for (let r = 0; r < rows && heroes < heroTarget; r++) {
+    for (let c = 0; c < cols && heroes < heroTarget; c++) {
+      if (!canPlace(r, c, 2, 2)) continue;
+      if (rand() > 0.55 && heroes > 0) continue;
+      mark(r, c, 2, 2);
+      const w = cellW * 2 + gap;
+      const h = cellH * 2 + gap;
+      const x = pad + c * (cellW + gap);
+      const y = pad + r * (cellH + gap);
+      const rot = (rand() - 0.5) * 0.9;
+      slots.push({
+        x,
+        y,
+        homeX: x,
+        homeY: y,
+        size: w,
+        height: h,
+        homeSize: w,
+        homeHeight: h,
+        rot,
+        homeRot: rot,
+        floatDur: 10 + rand() * 4,
+        floatDelay: -rand() * 4,
+        scanDelay: rand() * 3,
+        focus: true,
+        spanC: 2,
+        spanR: 2,
+        grids: 4,
+        col: c,
+        row: r,
+      });
+      heroes++;
+    }
   }
+
+  // Pack remaining cells with first-fit: 2-grid and 1-grid mix
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (occupied[r][c]) continue;
+      const free = freeCount();
+      let span = pickMosaicSpan(rand, free, cols - c, rows - r);
+      if (!canPlace(r, c, span.spanC, span.spanR)) {
+        span = { spanC: 1, spanR: 1, grids: 1 };
+        if (!canPlace(r, c, 1, 1)) continue;
+      }
+      mark(r, c, span.spanC, span.spanR);
+      const w = cellW * span.spanC + gap * (span.spanC - 1);
+      const h = cellH * span.spanR + gap * (span.spanR - 1);
+      const x = pad + c * (cellW + gap);
+      const y = pad + r * (cellH + gap);
+      const rot = (rand() - 0.5) * (span.grids >= 4 ? 0.8 : 1.2);
+      slots.push({
+        x,
+        y,
+        homeX: x,
+        homeY: y,
+        size: w,
+        height: h,
+        homeSize: w,
+        homeHeight: h,
+        rot,
+        homeRot: rot,
+        floatDur: 8 + rand() * 6,
+        floatDelay: -rand() * 5,
+        scanDelay: rand() * 3,
+        focus: span.grids >= 4,
+        spanC: span.spanC,
+        spanR: span.spanR,
+        grids: span.grids,
+        col: c,
+        row: r,
+      });
+    }
+  }
+
+  // Prefer a filled wall: if the last row is mostly empty 1-cells, that's fine
   return slots;
 }
 
@@ -421,12 +493,16 @@ function applySlotTransform(slot, animatePos = true) {
   if (!slot?.el) return;
   if (!animatePos) slot.el.style.transition = 'none';
   slot.el.style.setProperty('--sz', slot.size + 'px');
+  slot.el.style.setProperty('--sz-h', (slot.height || slot.size / MOSAIC_CELL_ASPECT) + 'px');
   slot.el.style.setProperty('--rot', slot.rot + 'deg');
   slot.el.style.setProperty('--mx', slot.x + 'px');
   slot.el.style.setProperty('--my', slot.y + 'px');
   slot.el.style.setProperty('--float-dur', slot.floatDur + 's');
   slot.el.style.setProperty('--float-delay', slot.floatDelay + 's');
   slot.el.style.setProperty('--scan-delay', slot.scanDelay + 's');
+  slot.el.dataset.grids = String(slot.grids || 1);
+  slot.el.classList.toggle('is-span-2', slot.grids === 2);
+  slot.el.classList.toggle('is-span-4', slot.grids === 4);
   if (!animatePos) {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -447,7 +523,6 @@ function clearMosaicSlot(slot) {
     img.removeAttribute('src');
     img.alt = '';
   }
-  slot.el.onclick = null;
 }
 
 function fillMosaicSlot(slotIndex, photo, opts = {}) {
@@ -481,10 +556,6 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
       slot.el.classList.remove('is-swoosh');
       slot.el.classList.remove('is-shine');
     }, 900);
-    slot.el.onclick = () => {
-      const i = photos.findIndex((p) => p.id === photo.id);
-      if (i >= 0) openLightbox(i);
-    };
   };
 
   if (opts.animate && slot.photoId) {
@@ -540,8 +611,7 @@ function placePhotoInMosaic(photo, opts = {}) {
 
 function buildMosaicCollage() {
   if (!els.mosaicStage) return;
-  const count = mosaicSlotCount();
-  const layouts = layoutMosaicSlots(count);
+  const layouts = layoutMosaicSlots();
 
   // Keep backdrop node; only wipe slots/scan
   els.mosaicStage.querySelectorAll('.mosaic-slot, .mosaic-scan').forEach((el) => el.remove());
@@ -562,27 +632,41 @@ function buildMosaicCollage() {
   els.mosaicStage.appendChild(scan);
 
   layouts.forEach((layout, i) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'mosaic-slot is-empty';
-    if (layout.focus) btn.classList.add('is-focus');
-    btn.dataset.slot = String(i);
-    btn.innerHTML =
-      '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
+    const cell = document.createElement('div');
+    cell.className = 'mosaic-slot is-empty';
+    if (layout.focus) cell.classList.add('is-focus');
+    if (layout.grids === 2) cell.classList.add('is-span-2');
+    if (layout.grids === 4) cell.classList.add('is-span-4');
+    cell.dataset.slot = String(i);
+    cell.dataset.grids = String(layout.grids || 1);
+    cell.setAttribute('aria-hidden', 'true');
+    cell.innerHTML =
+      '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" draggable="false" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
     const slot = {
-      el: btn,
+      el: cell,
       photoId: null,
       size: layout.size,
+      height: layout.height,
+      homeSize: layout.homeSize ?? layout.size,
+      homeHeight: layout.homeHeight ?? layout.height,
       x: layout.x,
       y: layout.y,
+      homeX: layout.homeX ?? layout.x,
+      homeY: layout.homeY ?? layout.y,
       rot: layout.rot,
+      homeRot: layout.homeRot ?? layout.rot,
       floatDur: layout.floatDur,
       floatDelay: layout.floatDelay,
       scanDelay: layout.scanDelay,
       focus: !!layout.focus,
+      spanC: layout.spanC,
+      spanR: layout.spanR,
+      grids: layout.grids || 1,
+      col: layout.col,
+      row: layout.row,
     };
     applySlotTransform(slot, false);
-    els.mosaicStage.appendChild(btn);
+    els.mosaicStage.appendChild(cell);
     mosaicSlots.push(slot);
   });
 }
@@ -641,43 +725,29 @@ function rotateMosaicPhotos() {
     filledEmpties++;
   }
 
-  // 2) Swap places between filled cards (vanish → swoosh) so sizes/focus feel alive
+  // 2) Swap photo content between fixed grid homes (slots stay put)
   const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
-  if (filled.length >= 2 && Math.random() < 0.75) {
+  if (filled.length >= 2 && Math.random() < 0.7) {
     const a = filled[Math.floor(Math.random() * filled.length)];
     let b = filled[Math.floor(Math.random() * filled.length)];
     if (b.i === a.i) b = filled[(filled.indexOf(a) + 1) % filled.length];
-    const posA = { x: a.s.x, y: a.s.y, size: a.s.size, rot: a.s.rot, focus: a.s.focus };
-    const posB = { x: b.s.x, y: b.s.y, size: b.s.size, rot: b.s.rot, focus: b.s.focus };
-    a.s.el.classList.add('is-vanish');
-    b.s.el.classList.add('is-vanish');
-    setTimeout(() => {
-      a.s.x = posB.x;
-      a.s.y = posB.y;
-      a.s.size = posB.size;
-      a.s.rot = posB.rot;
-      a.s.focus = Math.random() < 0.4;
-      b.s.x = posA.x;
-      b.s.y = posA.y;
-      b.s.size = posA.size;
-      b.s.rot = posA.rot;
-      b.s.focus = !a.s.focus && Math.random() < 0.35;
-      a.s.el.classList.toggle('is-focus', !!a.s.focus);
-      b.s.el.classList.toggle('is-focus', !!b.s.focus);
-      applySlotTransform(a.s, true);
-      applySlotTransform(b.s, true);
-      a.s.el.classList.remove('is-vanish');
-      b.s.el.classList.remove('is-vanish');
-      a.s.el.classList.add('is-swoosh');
-      b.s.el.classList.add('is-swoosh');
+    const photoA = photos.find((p) => p.id === a.s.photoId);
+    const photoB = photos.find((p) => p.id === b.s.photoId);
+    if (photoA && photoB) {
+      a.s.el.classList.add('is-vanish');
+      b.s.el.classList.add('is-vanish');
       setTimeout(() => {
-        a.s.el.classList.remove('is-swoosh');
-        b.s.el.classList.remove('is-swoosh');
-      }, 700);
-    }, 300);
+        mosaicPhotoSlot.delete(photoA.id);
+        mosaicPhotoSlot.delete(photoB.id);
+        a.s.photoId = null;
+        b.s.photoId = null;
+        fillMosaicSlot(a.i, photoB, { animate: false, shine: true, focus: a.s.focus });
+        fillMosaicSlot(b.i, photoA, { animate: false, shine: true, focus: b.s.focus });
+      }, 280);
+    }
   }
 
-  // 3) Occasionally bring unseen photos onto the wall
+  // 3) Bring unseen photos into fixed slots
   if (photos.length <= mosaicPhotoSlot.size) return;
   const stillUnseen = photos.filter((p) => !mosaicPhotoSlot.has(p.id));
   const pool = stillUnseen.length ? stillUnseen : photos;
@@ -685,7 +755,7 @@ function rotateMosaicPhotos() {
   for (let n = 0; n < take; n++) {
     const photo = pool[(mosaicRotateCursor + n) % pool.length];
     setTimeout(
-      () => placePhotoInMosaic(photo, { force: true, shine: true, animate: true, focus: true }),
+      () => placePhotoInMosaic(photo, { force: true, shine: true, animate: true, focus: false }),
       400 + n * 240,
     );
   }
@@ -694,45 +764,40 @@ function rotateMosaicPhotos() {
 
 function driftMosaicSlots() {
   if (viewMode !== 'mosaic' || isCompletedView() || mosaicSlots.length < 2) return;
-  const stageW = els.mosaicStage?.clientWidth || 1200;
-  const stageH = els.mosaicStage?.clientHeight || 800;
-  const pad = 18;
-  // Gentle nudge only — keep separation so the wall stays readable
+  // Ease slots back toward their virtual-grid homes — never wander far
   const idxs = mosaicSlots
     .map((_, i) => i)
     .sort(() => Math.random() - 0.5)
-    .slice(0, Math.max(1, Math.ceil(mosaicSlots.length * 0.22)));
+    .slice(0, Math.max(1, Math.ceil(mosaicSlots.length * 0.35)));
   idxs.forEach((i) => {
     const slot = mosaicSlots[i];
-    const h = slot.size / MOSAIC_CELL_ASPECT;
-    let nx = Math.min(stageW - slot.size - pad, Math.max(pad, slot.x + (Math.random() - 0.5) * 18));
-    let ny = Math.min(stageH - h - pad, Math.max(pad, slot.y + (Math.random() - 0.5) * 14));
-    let crowded = false;
-    for (let j = 0; j < mosaicSlots.length; j++) {
-      if (j === i) continue;
-      const o = mosaicSlots[j];
-      const oh = o.size / MOSAIC_CELL_ASPECT;
-      const dx = nx + slot.size / 2 - (o.x + o.size / 2);
-      const dy = ny + h / 2 - (o.y + oh / 2);
-      if (Math.hypot(dx, dy) < Math.min(slot.size, o.size) * 0.88) {
-        crowded = true;
-        break;
-      }
-    }
-    if (crowded) return;
-    slot.x = nx;
-    slot.y = ny;
-    slot.rot = Math.max(-3.5, Math.min(3.5, slot.rot + (Math.random() - 0.5) * 0.8));
+    const homeX = slot.homeX ?? slot.x;
+    const homeY = slot.homeY ?? slot.y;
+    const homeRot = slot.homeRot ?? slot.rot;
+    slot.x = homeX + (Math.random() - 0.5) * 4;
+    slot.y = homeY + (Math.random() - 0.5) * 3;
+    slot.rot = homeRot + (Math.random() - 0.5) * 0.4;
     applySlotTransform(slot, true);
   });
 }
 
+function rotateCompletedWindow() {
+  if (viewMode !== 'mosaic' || !isCompletedView()) return;
+  if (photos.length <= mosaicSlots.length) return;
+  mosaicRotateCursor =
+    (mosaicRotateCursor + Math.max(1, Math.floor(mosaicSlots.length * 0.2))) % photos.length;
+  buildMosaicCompleted();
+}
+
 function startMosaicLoops() {
   stopMosaicLoops();
-  if (isCompletedView()) return;
-  mosaicShineTimer = setInterval(shineRandomMosaicTile, 3200);
-  mosaicRotateTimer = setInterval(rotateMosaicPhotos, 6500);
-  mosaicDriftTimer = setInterval(driftMosaicSlots, 11000);
+  if (isCompletedView()) {
+    mosaicRotateTimer = setInterval(rotateCompletedWindow, 14000);
+    return;
+  }
+  mosaicShineTimer = setInterval(shineRandomMosaicTile, 4200);
+  mosaicRotateTimer = setInterval(rotateMosaicPhotos, 7000);
+  mosaicDriftTimer = setInterval(driftMosaicSlots, 14000);
 }
 
 function stopMosaicLoops() {
