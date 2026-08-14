@@ -517,7 +517,9 @@ function applySlotTransform(slot, animatePos = true) {
   slot.el.dataset.grids = String(slot.grids || 1);
   slot.el.classList.toggle('is-span-2', slot.grids === 2);
   slot.el.classList.toggle('is-span-4', slot.grids === 4);
-  slot.el.classList.toggle('is-focus', !!slot.focus || slot.grids >= 4);
+  const filled = !!slot.photoId || slot.el.classList.contains('is-filled');
+  slot.el.classList.toggle('is-focus', filled && (!!slot.focus || slot.grids >= 4));
+  slot.el.style.zIndex = filled ? (slot.grids >= 4 ? '10' : slot.grids === 2 ? '9' : '8') : '1';
   if (!animatePos) {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -564,6 +566,7 @@ function clearMosaicSlot(slot) {
   slot.photoId = null;
   slot.el.classList.remove('is-filled', 'is-shine', 'is-swoosh', 'is-vanish', 'is-focus');
   slot.el.classList.add('is-empty');
+  slot.el.style.zIndex = '1';
   const img = slot.el.querySelector('.mosaic-slot-photo');
   if (img) {
     img.removeAttribute('src');
@@ -589,6 +592,7 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
     slot.el.classList.add('is-filled');
     if (slot.focus || opts.focus) slot.el.classList.add('is-focus');
     else slot.el.classList.remove('is-focus');
+    slot.el.style.zIndex = slot.grids >= 4 || opts.focus ? '10' : slot.grids === 2 ? '9' : '8';
     const img = slot.el.querySelector('.mosaic-slot-photo');
     if (img) {
       img.src = photo.url;

@@ -27,7 +27,7 @@ function listActiveSessions(now = new Date()) {
     .filter((s) => !isSessionExpired(s, now));
 }
 
-function listWallPhotos(limit = 500) {
+function listWallPhotos(limit = 4000) {
   const sessions = listActiveSessions();
   const byId = new Map(sessions.map((s) => [s.id, s]));
   if (!sessions.length) return { photos: [], sessions: [] };
