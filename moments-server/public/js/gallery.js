@@ -757,6 +757,96 @@ function shineRandomMosaicTile() {
   setTimeout(() => slot.el.classList.remove('is-shine'), 1100);
 }
 
+function slotSizeKey(slot) {
+  return slot?.grids || 1;
+}
+
+function slotsDifferInSize(a, b) {
+  if (!a || !b) return false;
+  if (slotSizeKey(a) !== slotSizeKey(b)) return true;
+  // Same span class but different card width (e.g. medium vs hero packing quirks)
+  const avg = (a.size + b.size) / 2;
+  return avg > 0 && Math.abs(a.size - b.size) / avg > 0.18;
+}
+
+function animateSlotGeometrySwap(slotA, slotB, delay = 0) {
+  if (!slotA?.el || !slotB?.el) return;
+  const geomA = snapshotSlotGeometry(slotA);
+  const geomB = snapshotSlotGeometry(slotB);
+  setTimeout(() => {
+    slotA.el.classList.add('is-vanish');
+    slotB.el.classList.add('is-vanish');
+    setTimeout(() => {
+      applySlotGeometry(slotA, geomB);
+      applySlotGeometry(slotB, geomA);
+      slotA.el.classList.remove('is-vanish');
+      slotB.el.classList.remove('is-vanish');
+      slotA.el.classList.add('is-swoosh');
+      slotB.el.classList.add('is-swoosh');
+      setTimeout(() => {
+        slotA.el.classList.remove('is-swoosh');
+        slotB.el.classList.remove('is-swoosh');
+      }, 700);
+    }, 280);
+  }, delay);
+}
+
+/**
+ * Prefer moving a photo into an empty slot of a different size.
+ * Falls back to swapping two filled photos that differ in size.
+ * Never does same-size place-swaps — those look like a plain A↔B swap.
+ */
+function pickMosaicSizeMoves(maxMoves = 2) {
+  const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
+  const empty = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => !x.s.photoId);
+  const scored = [];
+
+  for (const f of filled) {
+    for (const e of empty) {
+      if (!slotsDifferInSize(f.s, e.s)) continue;
+      const score =
+        Math.abs(slotSizeKey(f.s) - slotSizeKey(e.s)) * 100 +
+        Math.abs(f.s.size - e.s.size) +
+        Math.random() * 12;
+      scored.push({ a: f, b: e, score });
+    }
+  }
+
+  for (let i = 0; i < filled.length; i++) {
+    for (let j = i + 1; j < filled.length; j++) {
+      if (!slotsDifferInSize(filled[i].s, filled[j].s)) continue;
+      const score =
+        Math.abs(slotSizeKey(filled[i].s) - slotSizeKey(filled[j].s)) * 40 +
+        Math.abs(filled[i].s.size - filled[j].s.size) +
+        Math.random() * 8;
+      scored.push({ a: filled[i], b: filled[j], score });
+    }
+  }
+
+  scored.sort((x, y) => y.score - x.score);
+  const used = new Set();
+  const picked = [];
+  for (const m of scored) {
+    if (used.has(m.a.i) || used.has(m.b.i)) continue;
+    used.add(m.a.i);
+    used.add(m.b.i);
+    picked.push(m);
+    if (picked.length >= maxMoves) break;
+  }
+
+  // Last resort: if every filled tile is the same size, still move into any empty
+  // so photos leave their current place (size change happens on the empty target).
+  if (!picked.length && filled.length && empty.length) {
+    const f = filled[Math.floor(Math.random() * filled.length)];
+    const different = empty.filter((e) => slotsDifferInSize(f.s, e.s));
+    const pool = different.length ? different : empty;
+    const e = pool[Math.floor(Math.random() * pool.length)];
+    picked.push({ a: f, b: e, score: 1 });
+  }
+
+  return picked;
+}
+
 function rotateMosaicPhotos() {
   if (viewMode !== 'mosaic' || isCompletedView() || !mosaicSlots.length || photos.length < 1) return;
 
@@ -771,46 +861,32 @@ function rotateMosaicPhotos() {
     filledEmpties++;
   }
 
-  // 2) Move photos into different slot geometries (size + place), not just swap src
-  const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
-  if (filled.length >= 2 && Math.random() < 0.85) {
-    const a = filled[Math.floor(Math.random() * filled.length)];
-    const mixed = filled.filter((x) => x.i !== a.i && x.s.grids !== a.s.grids);
-    const poolB = mixed.length ? mixed : filled.filter((x) => x.i !== a.i);
-    if (poolB.length) {
-      const b = poolB[Math.floor(Math.random() * poolB.length)];
-      const geomA = snapshotSlotGeometry(a.s);
-      const geomB = snapshotSlotGeometry(b.s);
-      a.s.el.classList.add('is-vanish');
-      b.s.el.classList.add('is-vanish');
-      setTimeout(() => {
-        applySlotGeometry(a.s, geomB);
-        applySlotGeometry(b.s, geomA);
-        a.s.el.classList.remove('is-vanish');
-        b.s.el.classList.remove('is-vanish');
-        a.s.el.classList.add('is-swoosh');
-        b.s.el.classList.add('is-swoosh');
-        setTimeout(() => {
-          a.s.el.classList.remove('is-swoosh');
-          b.s.el.classList.remove('is-swoosh');
-        }, 700);
-      }, 280);
-    }
+  // 2) Move photos into different slot sizes/places (geometry), not same-size A↔B swaps
+  if (Math.random() < 0.92) {
+    const moves = pickMosaicSizeMoves(Math.min(3, Math.max(1, Math.floor(mosaicPhotoSlot.size / 2) || 1)));
+    moves.forEach((m, n) => animateSlotGeometrySwap(m.a.s, m.b.s, n * 140));
   }
 
-  // 3) Bring unseen photos into slots (may replace content of a random filled slot)
+  // 3) Bring unseen photos into empty slots when possible; only force-replace if full
   if (photos.length <= mosaicPhotoSlot.size) return;
   const stillUnseen = photos.filter((p) => !mosaicPhotoSlot.has(p.id));
-  const pool = stillUnseen.length ? stillUnseen : photos;
-  const take = Math.min(2, pool.length, Math.max(1, mosaicPhotoSlot.size));
+  if (!stillUnseen.length) return;
+  const emptiesLeft = mosaicSlots.filter((s) => !s.photoId).length;
+  const take = Math.min(2, stillUnseen.length, Math.max(1, emptiesLeft || mosaicPhotoSlot.size));
   for (let n = 0; n < take; n++) {
-    const photo = pool[(mosaicRotateCursor + n) % pool.length];
+    const photo = stillUnseen[(mosaicRotateCursor + n) % stillUnseen.length];
     setTimeout(
-      () => placePhotoInMosaic(photo, { force: true, shine: true, animate: true, focus: false }),
-      400 + n * 240,
+      () =>
+        placePhotoInMosaic(photo, {
+          force: emptiesLeft === 0,
+          shine: true,
+          animate: true,
+          focus: false,
+        }),
+      450 + n * 240,
     );
   }
-  mosaicRotateCursor = (mosaicRotateCursor + take) % pool.length;
+  mosaicRotateCursor = (mosaicRotateCursor + take) % stillUnseen.length;
 }
 
 function driftMosaicSlots() {
