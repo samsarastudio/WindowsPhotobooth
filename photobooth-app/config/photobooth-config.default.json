@@ -12,7 +12,15 @@
     "guestTextEnabled": false,
     "guestTextOptional": true,
     "guestTextMaxLength": 36,
-    "guestTextCreditLine": "by inmoment photography"
+    "guestTextCreditLine": "by inmoment photography",
+    "guestTextXPercent": 50,
+    "guestTextYPercent": 78,
+    "guestTextSizePercent": 3.4,
+    "guestTextColor": "#c9a36a",
+    "guestTextCreditColor": "#d8c4a0",
+    "guestTextAlign": "center",
+    "guestTextBrush": false,
+    "guestTextBrushOpacity": 0.22
   },
   "gallery": {
     "enabled": true,

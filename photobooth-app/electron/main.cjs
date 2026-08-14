@@ -509,10 +509,13 @@ async function compositePhotoIntoFrame(
   const caption = typeof guestText === 'string' ? guestText.trim().slice(0, 80) : '';
   const credit = typeof creditLine === 'string' ? creditLine.trim().slice(0, 60) : '';
   if (caption || credit) {
+    const style = getCaptionStyleFromConfig();
     const overlays = [];
-    const brush = await buildCaptionBrushOverlay(sharpMod, fw, fh, hole, caption, credit);
-    if (brush) overlays.push(brush);
-    const textSvg = buildFrameCaptionSvg(fw, fh, hole, caption, credit);
+    if (style.brush) {
+      const brush = await buildCaptionBrushOverlay(sharpMod, fw, fh, caption, credit, style);
+      if (brush) overlays.push(brush);
+    }
+    const textSvg = buildFrameCaptionSvg(fw, fh, caption, credit, style);
     overlays.push({ input: Buffer.from(textSvg), left: 0, top: 0 });
     composed = await sharpMod(composed).composite(overlays).png().toBuffer();
   }
@@ -550,69 +553,107 @@ function getCaptionBrushstrokePath() {
   return null;
 }
 
-/** Layout for caption on the photo (lower third of the hole). */
-function getCaptionLayout(fw, fh, hole, guestText, creditLine) {
-  const hx = hole?.left ?? Math.round(fw * 0.08);
-  const hy = hole?.top ?? Math.round(fh * 0.08);
-  const hw = hole?.width ?? Math.round(fw * 0.84);
-  const hh = hole?.height ?? Math.round(fh * 0.72);
-  const cx = hx + hw / 2;
-  const cy = hy + hh * 0.78;
-  const fontSize = Math.max(22, Math.min(Math.round(Math.min(hw, hh) * 0.085), Math.round(fh * 0.07)));
-  const creditSize = Math.max(12, Math.round(fontSize * 0.34));
+function clampRange(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function parseHexColor(value, fallback) {
+  const s = String(value || '').trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+    return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+  }
+  return fallback;
+}
+
+function hexLuminance(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+function getCaptionStyleFromConfig() {
+  const pf = (loadMergedConfig().photoFrames || {});
+  const align =
+    pf.guestTextAlign === 'left' || pf.guestTextAlign === 'right' ? pf.guestTextAlign : 'center';
+  return {
+    xPct: clampRange(pf.guestTextXPercent, 0, 100, 50),
+    yPct: clampRange(pf.guestTextYPercent, 0, 100, 78),
+    sizePct: clampRange(pf.guestTextSizePercent, 1.2, 12, 3.4),
+    color: parseHexColor(pf.guestTextColor, '#c9a36a'),
+    creditColor: parseHexColor(pf.guestTextCreditColor, '#d8c4a0'),
+    align,
+    brush: pf.guestTextBrush === true,
+    brushOpacity: clampRange(pf.guestTextBrushOpacity, 0, 1, 0.22),
+  };
+}
+
+function getCaptionLayout(fw, fh, guestText, creditLine, style) {
+  const cx = fw * (style.xPct / 100);
+  const cy = fh * (style.yPct / 100);
+  const fontSize = Math.max(14, Math.round(fh * (style.sizePct / 100)));
+  const creditSize = Math.max(9, Math.round(fontSize * 0.34));
+  const guestY = creditLine ? cy - fontSize * 0.08 : cy + fontSize * 0.28;
+  const creditY = guestY + fontSize * 0.52;
   const strokeW = Math.min(
-    hw * 0.92,
-    Math.max(hw * 0.52, fontSize * (3.2 + Math.min(28, (guestText || '').length) * 0.55)),
+    fw * 0.72,
+    Math.max(fw * 0.18, fontSize * (1.8 + Math.min(28, (guestText || '').length) * 0.38)),
   );
-  const strokeH = fontSize * (creditLine ? 2.6 : 2.1);
-  const guestY = creditLine ? cy - fontSize * 0.08 : cy + fontSize * 0.32;
-  const creditY = guestY + fontSize * 0.58;
-  return { cx, cy, fontSize, creditSize, strokeW, strokeH, guestY, creditY };
+  const strokeH = fontSize * (creditLine ? 1.85 : 1.45);
+  const anchor = style.align === 'left' ? 'start' : style.align === 'right' ? 'end' : 'middle';
+  return { cx, cy, fontSize, creditSize, guestY, creditY, strokeW, strokeH, anchor };
 }
 
 /**
- * AI watercolor brushstroke PNG under the caption (transparent paint swipe).
+ * Optional watercolor swipe — kept small and translucent when admin enables it.
  */
-async function buildCaptionBrushOverlay(sharpMod, fw, fh, hole, guestText, creditLine) {
+async function buildCaptionBrushOverlay(sharpMod, fw, fh, guestText, creditLine, style) {
   const brushPath = getCaptionBrushstrokePath();
   if (!brushPath) return null;
-  const { cx, cy, strokeW, strokeH } = getCaptionLayout(fw, fh, hole, guestText, creditLine);
+  const { cx, cy, strokeW } = getCaptionLayout(fw, fh, guestText, creditLine, style);
   const meta = await sharpMod(brushPath).metadata();
   const aspect = (meta.width || 1400) / Math.max(1, meta.height || 400);
-  const targetW = Math.max(80, Math.round(strokeW * 1.08));
-  const targetH = Math.max(40, Math.round(targetW / aspect));
-  // Soften opacity so the photo still peeks through the paint
+  const targetW = Math.max(64, Math.round(strokeW));
+  const targetH = Math.max(28, Math.round(targetW / aspect));
   const raw = await sharpMod(brushPath)
     .resize(targetW, targetH, { fit: 'fill' })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   const pixels = raw.data;
+  const mul = style.brushOpacity;
   for (let i = 0; i < pixels.length; i += 4) {
-    pixels[i + 3] = Math.round(pixels[i + 3] * 0.9);
+    pixels[i + 3] = Math.round(pixels[i + 3] * mul);
   }
   const brushBuf = await sharpMod(pixels, {
     raw: { width: raw.info.width, height: raw.info.height, channels: 4 },
   })
     .png()
     .toBuffer();
+  let left = Math.round(cx - targetW / 2);
+  if (style.align === 'left') left = Math.round(cx - targetW * 0.12);
+  if (style.align === 'right') left = Math.round(cx - targetW * 0.88);
   return {
     input: brushBuf,
-    left: Math.max(0, Math.round(cx - targetW / 2)),
+    left: Math.max(0, Math.min(fw - targetW, left)),
     top: Math.max(0, Math.round(cy - targetH / 2)),
   };
 }
 
 /**
- * Caption text ON the guest photo. Uses embedded Windows fonts for Sharp/librsvg.
+ * Caption on the print. Thin contrasting outline instead of a large paint splash.
  */
-function buildFrameCaptionSvg(fw, fh, hole, guestText, creditLine) {
-  const { cx, fontSize, creditSize, guestY, creditY } = getCaptionLayout(
+function buildFrameCaptionSvg(fw, fh, guestText, creditLine, style) {
+  const { cx, fontSize, creditSize, guestY, creditY, anchor } = getCaptionLayout(
     fw,
     fh,
-    hole,
     guestText,
     creditLine,
+    style,
   );
 
   const scriptUrl =
@@ -633,6 +674,10 @@ function buildFrameCaptionSvg(fw, fh, hole, guestText, creditLine) {
     .filter(Boolean)
     .join('');
 
+  const fill = style.color;
+  const creditFill = style.creditColor;
+  const outline = hexLuminance(fill) > 0.55 ? 'rgba(28,22,16,0.55)' : 'rgba(255,248,238,0.55)';
+  const strokeW = Math.max(1.2, fontSize * 0.045);
   const guest = escapeXmlText(guestText);
   const credit = escapeXmlText(creditLine);
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -640,18 +685,18 @@ function buildFrameCaptionSvg(fw, fh, hole, guestText, creditLine) {
   <defs>
     <style type="text/css"><![CDATA[
       ${fontFaces}
-      .guest-caption{font-family:'PbCaptionScript','Segoe Script','Segoe Print',Georgia,serif;font-size:${fontSize}px;fill:#241f1b;}
-      .guest-credit{font-family:'PbCaptionSerif',Georgia,'Times New Roman',serif;font-size:${creditSize}px;fill:#4a4540;}
+      .guest-caption{font-family:'PbCaptionScript','Segoe Script','Segoe Print',Georgia,serif;font-size:${fontSize}px;fill:${fill};stroke:${outline};stroke-width:${strokeW}px;paint-order:stroke fill;}
+      .guest-credit{font-family:'PbCaptionSerif',Georgia,'Times New Roman',serif;font-size:${creditSize}px;fill:${creditFill};opacity:0.92;}
     ]]></style>
   </defs>
   ${
     guest
-      ? `<text x="${cx}" y="${guestY}" text-anchor="middle" class="guest-caption">${guest}</text>`
+      ? `<text x="${cx}" y="${guestY}" text-anchor="${anchor}" class="guest-caption">${guest}</text>`
       : ''
   }
   ${
     credit
-      ? `<text x="${cx}" y="${creditY}" text-anchor="middle" class="guest-credit">${credit}</text>`
+      ? `<text x="${cx}" y="${creditY}" text-anchor="${anchor}" class="guest-credit">${credit}</text>`
       : ''
   }
 </svg>`;

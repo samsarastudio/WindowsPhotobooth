@@ -187,7 +187,56 @@ function normalizePhotoFramesConfig(
       typeof patch.guestTextCreditLine === 'string'
         ? patch.guestTextCreditLine.trim().slice(0, 60)
         : base.guestTextCreditLine,
+    guestTextXPercent: clampPercent(
+      patch.guestTextXPercent,
+      base.guestTextXPercent,
+    ),
+    guestTextYPercent: clampPercent(
+      patch.guestTextYPercent,
+      base.guestTextYPercent,
+    ),
+    guestTextSizePercent: clampRange(
+      patch.guestTextSizePercent,
+      1.2,
+      12,
+      base.guestTextSizePercent,
+    ),
+    guestTextColor: parseHexColor(patch.guestTextColor, base.guestTextColor),
+    guestTextCreditColor: parseHexColor(patch.guestTextCreditColor, base.guestTextCreditColor),
+    guestTextAlign:
+      patch.guestTextAlign === 'left' ||
+      patch.guestTextAlign === 'center' ||
+      patch.guestTextAlign === 'right'
+        ? patch.guestTextAlign
+        : base.guestTextAlign,
+    guestTextBrush:
+      typeof patch.guestTextBrush === 'boolean' ? patch.guestTextBrush : base.guestTextBrush,
+    guestTextBrushOpacity: clampRange(
+      patch.guestTextBrushOpacity,
+      0,
+      1,
+      base.guestTextBrushOpacity,
+    ),
   };
+}
+
+function clampPercent(value: unknown, fallback: number): number {
+  return clampRange(value, 0, 100, fallback);
+}
+
+function clampRange(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseHexColor(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') return fallback;
+  const s = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
+    return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+  }
+  return fallback;
 }
 
 function normalizeGalleryConfig(

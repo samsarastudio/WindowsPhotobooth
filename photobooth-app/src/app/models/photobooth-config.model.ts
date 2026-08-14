@@ -252,7 +252,7 @@ export interface PhotoboothPhotoFramesConfig {
   guestFrameFiles: string[];
   /**
    * After frame pick, prompt for custom text (names / message) with an in-app keyboard.
-   * Text is drawn in the frame footer band so the overlay artwork stays intact.
+   * Placement, color, and size are set in Admin → Frames.
    */
   guestTextEnabled: boolean;
   /** Allow skipping the text step. */
@@ -261,6 +261,21 @@ export interface PhotoboothPhotoFramesConfig {
   guestTextMaxLength: number;
   /** Optional static credit under the guest line (e.g. "by inmoment photography"). */
   guestTextCreditLine: string;
+  /** Horizontal position on the print, 0–100 (0 = left, 50 = center). */
+  guestTextXPercent: number;
+  /** Vertical position on the print, 0–100 (0 = top). */
+  guestTextYPercent: number;
+  /** Guest line size as a percent of print height. */
+  guestTextSizePercent: number;
+  /** Guest line color (#rrggbb). */
+  guestTextColor: string;
+  /** Credit line color (#rrggbb). */
+  guestTextCreditColor: string;
+  guestTextAlign: 'left' | 'center' | 'right';
+  /** Soft paint swipe behind text. Off by default — outline keeps type readable. */
+  guestTextBrush: boolean;
+  /** 0–1 opacity of the brushstroke when enabled. */
+  guestTextBrushOpacity: number;
 }
 
 export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
@@ -272,6 +287,14 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   guestTextOptional: true,
   guestTextMaxLength: 36,
   guestTextCreditLine: 'by inmoment photography',
+  guestTextXPercent: 50,
+  guestTextYPercent: 78,
+  guestTextSizePercent: 3.4,
+  guestTextColor: '#c9a36a',
+  guestTextCreditColor: '#d8c4a0',
+  guestTextAlign: 'center',
+  guestTextBrush: false,
+  guestTextBrushOpacity: 0.22,
 };
 
 /** Fields returned to the renderer (admin PIN and OpenAI API key are never included). */

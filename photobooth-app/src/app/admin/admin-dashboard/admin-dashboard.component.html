@@ -658,9 +658,81 @@
               placeholder="by inmoment photography"
               [(ngModel)]="draftGuestTextCreditLine"
             />
+            <div class="pb-caption-grid">
+              <label>
+                Horizontal position
+                <span class="pb-caption-val">{{ draftGuestTextXPercent }}%</span>
+              </label>
+              <input
+                class="pb-range"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                [(ngModel)]="draftGuestTextXPercent"
+              />
+              <label>
+                Vertical position
+                <span class="pb-caption-val">{{ draftGuestTextYPercent }}%</span>
+              </label>
+              <input
+                class="pb-range"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                [(ngModel)]="draftGuestTextYPercent"
+              />
+              <label>
+                Text size
+                <span class="pb-caption-val">{{ draftGuestTextSizePercent }}% of print height</span>
+              </label>
+              <input
+                class="pb-range"
+                type="range"
+                min="1.5"
+                max="8"
+                step="0.1"
+                [(ngModel)]="draftGuestTextSizePercent"
+              />
+              <label>Alignment</label>
+              <select class="pb-input" [(ngModel)]="draftGuestTextAlign">
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+              <label>Guest text color</label>
+              <div class="pb-color-row">
+                <input type="color" [(ngModel)]="draftGuestTextColor" />
+                <input class="pb-input" type="text" maxlength="7" [(ngModel)]="draftGuestTextColor" />
+              </div>
+              <label>Credit color</label>
+              <div class="pb-color-row">
+                <input type="color" [(ngModel)]="draftGuestTextCreditColor" />
+                <input class="pb-input" type="text" maxlength="7" [(ngModel)]="draftGuestTextCreditColor" />
+              </div>
+            </div>
+            <label class="pb-admin-check">
+              <input type="checkbox" [(ngModel)]="draftGuestTextBrush" />
+              Soft brushstroke behind text (off is cleaner)
+            </label>
+            @if (draftGuestTextBrush) {
+              <label>
+                Brush opacity
+                <span class="pb-caption-val">{{ draftGuestTextBrushOpacity }}</span>
+              </label>
+              <input
+                class="pb-range"
+                type="range"
+                min="0.05"
+                max="0.55"
+                step="0.01"
+                [(ngModel)]="draftGuestTextBrushOpacity"
+              />
+            }
             <p class="pb-hint pb-hint-tight">
-              Guest text is drawn on the photo (lower area) over a soft translucent brushstroke so it stays
-              readable on busy frames. Frame artwork still composites around the photo hole.
+              Position is on the full print (50 / 78 = lower photo, 50 / 92 = Polaroid footer). Default is
+              gold script with a thin outline — no paint splash. Save, then take a new photo to preview.
             </p>
           }
           <label>Default frame (pre-selected for guests)</label>

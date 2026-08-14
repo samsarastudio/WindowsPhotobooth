@@ -90,6 +90,14 @@ export class AdminDashboardComponent implements OnInit {
   draftGuestTextOptional = true;
   draftGuestTextMaxLength = 36;
   draftGuestTextCreditLine = 'by inmoment photography';
+  draftGuestTextXPercent = 50;
+  draftGuestTextYPercent = 78;
+  draftGuestTextSizePercent = 3.4;
+  draftGuestTextColor = '#c9a36a';
+  draftGuestTextCreditColor = '#d8c4a0';
+  draftGuestTextAlign: 'left' | 'center' | 'right' = 'center';
+  draftGuestTextBrush = false;
+  draftGuestTextBrushOpacity = 0.22;
   draftPhotoScale = 1;
   draftDefaultFrameFile: string | null = 'onam-grma-2026.png';
   /** Empty = all frames on disk are offered to guests. */
@@ -135,6 +143,14 @@ export class AdminDashboardComponent implements OnInit {
     this.draftGuestTextOptional = cfg?.photoFrames?.guestTextOptional ?? true;
     this.draftGuestTextMaxLength = cfg?.photoFrames?.guestTextMaxLength ?? 36;
     this.draftGuestTextCreditLine = cfg?.photoFrames?.guestTextCreditLine ?? 'by inmoment photography';
+    this.draftGuestTextXPercent = cfg?.photoFrames?.guestTextXPercent ?? 50;
+    this.draftGuestTextYPercent = cfg?.photoFrames?.guestTextYPercent ?? 78;
+    this.draftGuestTextSizePercent = cfg?.photoFrames?.guestTextSizePercent ?? 3.4;
+    this.draftGuestTextColor = cfg?.photoFrames?.guestTextColor ?? '#c9a36a';
+    this.draftGuestTextCreditColor = cfg?.photoFrames?.guestTextCreditColor ?? '#d8c4a0';
+    this.draftGuestTextAlign = cfg?.photoFrames?.guestTextAlign ?? 'center';
+    this.draftGuestTextBrush = cfg?.photoFrames?.guestTextBrush ?? false;
+    this.draftGuestTextBrushOpacity = cfg?.photoFrames?.guestTextBrushOpacity ?? 0.22;
     this.draftPhotoScale = cfg?.photoFrames?.photoScale ?? 1;
     this.draftDefaultFrameFile = cfg?.photoFrames?.defaultFrameFile ?? null;
     this.draftGuestFrameFiles = [...(cfg?.photoFrames?.guestFrameFiles ?? [])];
@@ -259,6 +275,14 @@ export class AdminDashboardComponent implements OnInit {
           guestTextOptional: this.draftGuestTextOptional,
           guestTextMaxLength: this.draftGuestTextMaxLength,
           guestTextCreditLine: this.draftGuestTextCreditLine,
+          guestTextXPercent: Number(this.draftGuestTextXPercent),
+          guestTextYPercent: Number(this.draftGuestTextYPercent),
+          guestTextSizePercent: Number(this.draftGuestTextSizePercent),
+          guestTextColor: this.draftGuestTextColor,
+          guestTextCreditColor: this.draftGuestTextCreditColor,
+          guestTextAlign: this.draftGuestTextAlign,
+          guestTextBrush: this.draftGuestTextBrush,
+          guestTextBrushOpacity: Number(this.draftGuestTextBrushOpacity),
         },
       });
       if (ok) {
