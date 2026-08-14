@@ -673,16 +673,20 @@ body.is-mosaic-completed .mosaic-watermark {
 
 .mosaic-slot.is-filled {
   cursor: default;
-  z-index: 3;
+  z-index: 8;
 }
 
-.mosaic-slot.is-span-2 {
-  z-index: 3;
+.mosaic-slot.is-empty {
+  z-index: 1;
 }
 
-.mosaic-slot.is-span-4,
-.mosaic-slot.is-focus {
-  z-index: 5;
+.mosaic-slot.is-filled.is-span-2 {
+  z-index: 9;
+}
+
+.mosaic-slot.is-filled.is-span-4,
+.mosaic-slot.is-filled.is-focus {
+  z-index: 10;
 }
 
 .mosaic-slot.is-span-4 .mosaic-slot-card,
