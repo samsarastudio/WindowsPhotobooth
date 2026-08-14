@@ -8,7 +8,11 @@
     "enabled": true,
     "photoScale": 1,
     "defaultFrameFile": "onam-grma-2026.png",
-    "guestFrameFiles": []
+    "guestFrameFiles": [],
+    "guestTextEnabled": false,
+    "guestTextOptional": true,
+    "guestTextMaxLength": 36,
+    "guestTextCreditLine": "by inmoment photography"
   },
   "gallery": {
     "enabled": true,

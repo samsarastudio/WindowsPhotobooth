@@ -174,6 +174,15 @@ export interface PhotoboothCopyFrame {
   applying: string;
 }
 
+export interface PhotoboothCopyCaption {
+  title: string;
+  subtitle: string;
+  placeholder: string;
+  continueLabel: string;
+  skipLabel: string;
+  applying: string;
+}
+
 export interface PhotoboothCopy {
   attract: PhotoboothCopyAttract;
   qr: PhotoboothCopyQr;
@@ -181,6 +190,7 @@ export interface PhotoboothCopy {
   result: PhotoboothCopyResult;
   aiMode: PhotoboothCopyAiMode;
   frame: PhotoboothCopyFrame;
+  caption: PhotoboothCopyCaption;
 }
 
 export interface PhotoboothAiMode {
@@ -240,6 +250,17 @@ export interface PhotoboothPhotoFramesConfig {
    * Empty array = all frames in `config/photo-frames/`.
    */
   guestFrameFiles: string[];
+  /**
+   * After frame pick, prompt for custom text (names / message) with an in-app keyboard.
+   * Text is drawn in the frame footer band so the overlay artwork stays intact.
+   */
+  guestTextEnabled: boolean;
+  /** Allow skipping the text step. */
+  guestTextOptional: boolean;
+  /** Max characters for the guest line. */
+  guestTextMaxLength: number;
+  /** Optional static credit under the guest line (e.g. "by inmoment photography"). */
+  guestTextCreditLine: string;
 }
 
 export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
@@ -247,6 +268,10 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   photoScale: 1,
   defaultFrameFile: 'onam-grma-2026.png',
   guestFrameFiles: [],
+  guestTextEnabled: false,
+  guestTextOptional: true,
+  guestTextMaxLength: 36,
+  guestTextCreditLine: 'by inmoment photography',
 };
 
 /** Fields returned to the renderer (admin PIN and OpenAI API key are never included). */
@@ -383,5 +408,13 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     continueLabel: 'Use this frame',
     skipLabel: 'Skip frame',
     applying: 'Applying frame…',
+  },
+  caption: {
+    title: 'Add your text',
+    subtitle: 'Type a name or short message for the frame',
+    placeholder: 'Your names or message',
+    continueLabel: 'Continue',
+    skipLabel: 'Skip text',
+    applying: 'Creating keepsake…',
   },
 };

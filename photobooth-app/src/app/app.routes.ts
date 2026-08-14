@@ -9,6 +9,7 @@ import { ResultPageComponent } from './pages/result-page/result-page.component';
 import { AiModePageComponent } from './pages/ai-mode-page/ai-mode-page.component';
 import { AiGalleryPageComponent } from './pages/ai-gallery-page/ai-gallery-page.component';
 import { FramePageComponent } from './pages/frame-page/frame-page.component';
+import { CaptionPageComponent } from './pages/caption-page/caption-page.component';
 
 export const routes: Routes = [
   { path: '', component: AttractPageComponent },
@@ -16,6 +17,7 @@ export const routes: Routes = [
   { path: 'ai-mode', component: AiModePageComponent },
   { path: 'capture', component: CapturePageComponent },
   { path: 'frame', component: FramePageComponent },
+  { path: 'caption', component: CaptionPageComponent },
   { path: 'result', component: ResultPageComponent },
   { path: 'ai-gallery', component: AiGalleryPageComponent },
   { path: 'admin/login', component: AdminLoginComponent },

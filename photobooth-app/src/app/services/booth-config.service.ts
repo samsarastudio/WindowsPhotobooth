@@ -31,6 +31,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     result: { ...base.result, ...patch.result },
     aiMode: { ...base.aiMode, ...patch.aiMode },
     frame: { ...base.frame, ...patch.frame },
+    caption: { ...base.caption, ...patch.caption },
   };
 }
 
@@ -169,6 +170,23 @@ function normalizePhotoFramesConfig(
     photoScale,
     defaultFrameFile,
     guestFrameFiles,
+    guestTextEnabled:
+      typeof patch.guestTextEnabled === 'boolean' ? patch.guestTextEnabled : base.guestTextEnabled,
+    guestTextOptional:
+      typeof patch.guestTextOptional === 'boolean' ? patch.guestTextOptional : base.guestTextOptional,
+    guestTextMaxLength: Math.min(
+      80,
+      Math.max(
+        8,
+        typeof patch.guestTextMaxLength === 'number' && !Number.isNaN(patch.guestTextMaxLength)
+          ? Math.floor(patch.guestTextMaxLength)
+          : base.guestTextMaxLength,
+      ),
+    ),
+    guestTextCreditLine:
+      typeof patch.guestTextCreditLine === 'string'
+        ? patch.guestTextCreditLine.trim().slice(0, 60)
+        : base.guestTextCreditLine,
   };
 }
 

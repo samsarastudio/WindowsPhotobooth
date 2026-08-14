@@ -119,6 +119,13 @@ export class FramePageComponent implements OnInit {
     const photo = this.photoPath();
     const frame = this.selected();
     if (!photo || !frame || !window.pbApi?.applyPhotoFrame) return;
+
+    // Collect custom text before compositing when admin enabled the caption step.
+    if (this.booth.photoFrames().guestTextEnabled) {
+      await this.router.navigate(['/caption'], { state: { path: photo, frameFile: frame } });
+      return;
+    }
+
     this.busy.set(true);
     this.err.set(null);
     try {

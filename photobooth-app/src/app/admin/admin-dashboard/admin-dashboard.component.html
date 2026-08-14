@@ -632,6 +632,37 @@
             <input type="checkbox" [(ngModel)]="draftFramesEnabled" />
             Show frame picker on the guest booth after capture
           </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGuestTextEnabled" [disabled]="!draftFramesEnabled" />
+            Prompt guests for custom frame text (in-app keyboard)
+          </label>
+          @if (draftGuestTextEnabled) {
+            <label class="pb-admin-check">
+              <input type="checkbox" [(ngModel)]="draftGuestTextOptional" />
+              Allow guests to skip the text step
+            </label>
+            <label>Max characters</label>
+            <input
+              class="pb-input"
+              type="number"
+              min="8"
+              max="80"
+              step="1"
+              [(ngModel)]="draftGuestTextMaxLength"
+            />
+            <label>Credit line under guest text (optional)</label>
+            <input
+              class="pb-input"
+              type="text"
+              maxlength="60"
+              placeholder="by inmoment photography"
+              [(ngModel)]="draftGuestTextCreditLine"
+            />
+            <p class="pb-hint pb-hint-tight">
+              Guest text is drawn on the photo (lower area) over a soft translucent brushstroke so it stays
+              readable on busy frames. Frame artwork still composites around the photo hole.
+            </p>
+          }
           <label>Default frame (pre-selected for guests)</label>
           <select class="pb-input" [(ngModel)]="draftDefaultFrameFile">
             <option [ngValue]="null">First enabled frame</option>

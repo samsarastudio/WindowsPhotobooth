@@ -459,9 +459,17 @@ async function makeFrameOverlay(sharpMod, framePath, blackThreshold = 48) {
 
 /**
  * Guest photo UNDER the frame overlay (frame artwork sits on top).
- * Photo fills the detected hole (photoScale defaults to 1 — no inset / black gap).
+ * Caption sits ON the photo (lower third of the hole) with a soft brushstroke
+ * behind it for contrast — drawn last so busy frame art cannot hide it.
  */
-async function compositePhotoIntoFrame(sharpMod, framePath, photoPath, photoScale = 1) {
+async function compositePhotoIntoFrame(
+  sharpMod,
+  framePath,
+  photoPath,
+  photoScale = 1,
+  guestText = '',
+  creditLine = '',
+) {
   const scale = Math.min(1, Math.max(0.5, Number(photoScale) || 1));
   const meta = await sharpMod(framePath).metadata();
   const fw = meta.width || 1;
@@ -493,10 +501,160 @@ async function compositePhotoIntoFrame(sharpMod, framePath, photoPath, photoScal
     .toBuffer();
 
   const frameOverlay = await makeFrameOverlay(sharpMod, framePath);
-  return sharpMod(base)
+  let composed = await sharpMod(base)
     .composite([{ input: frameOverlay, left: 0, top: 0 }])
     .png()
     .toBuffer();
+
+  const caption = typeof guestText === 'string' ? guestText.trim().slice(0, 80) : '';
+  const credit = typeof creditLine === 'string' ? creditLine.trim().slice(0, 60) : '';
+  if (caption || credit) {
+    const overlays = [];
+    const brush = await buildCaptionBrushOverlay(sharpMod, fw, fh, hole, caption, credit);
+    if (brush) overlays.push(brush);
+    const textSvg = buildFrameCaptionSvg(fw, fh, hole, caption, credit);
+    overlays.push({ input: Buffer.from(textSvg), left: 0, top: 0 });
+    composed = await sharpMod(composed).composite(overlays).png().toBuffer();
+  }
+
+  return composed;
+}
+
+function escapeXmlText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function windowsFontFileUrl(fileName) {
+  const full = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts', fileName);
+  if (!fs.existsSync(full)) return null;
+  return `file:///${full.replace(/\\/g, '/')}`;
+}
+
+function getCaptionBrushstrokePath() {
+  const candidates = [
+    path.join(getPortableRoot(), 'config', 'branding', 'caption-brushstroke.png'),
+    path.join(getBundleRoot(), 'config', 'branding', 'caption-brushstroke.png'),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+/** Layout for caption on the photo (lower third of the hole). */
+function getCaptionLayout(fw, fh, hole, guestText, creditLine) {
+  const hx = hole?.left ?? Math.round(fw * 0.08);
+  const hy = hole?.top ?? Math.round(fh * 0.08);
+  const hw = hole?.width ?? Math.round(fw * 0.84);
+  const hh = hole?.height ?? Math.round(fh * 0.72);
+  const cx = hx + hw / 2;
+  const cy = hy + hh * 0.78;
+  const fontSize = Math.max(22, Math.min(Math.round(Math.min(hw, hh) * 0.085), Math.round(fh * 0.07)));
+  const creditSize = Math.max(12, Math.round(fontSize * 0.34));
+  const strokeW = Math.min(
+    hw * 0.92,
+    Math.max(hw * 0.52, fontSize * (3.2 + Math.min(28, (guestText || '').length) * 0.55)),
+  );
+  const strokeH = fontSize * (creditLine ? 2.6 : 2.1);
+  const guestY = creditLine ? cy - fontSize * 0.08 : cy + fontSize * 0.32;
+  const creditY = guestY + fontSize * 0.58;
+  return { cx, cy, fontSize, creditSize, strokeW, strokeH, guestY, creditY };
+}
+
+/**
+ * AI watercolor brushstroke PNG under the caption (transparent paint swipe).
+ */
+async function buildCaptionBrushOverlay(sharpMod, fw, fh, hole, guestText, creditLine) {
+  const brushPath = getCaptionBrushstrokePath();
+  if (!brushPath) return null;
+  const { cx, cy, strokeW, strokeH } = getCaptionLayout(fw, fh, hole, guestText, creditLine);
+  const meta = await sharpMod(brushPath).metadata();
+  const aspect = (meta.width || 1400) / Math.max(1, meta.height || 400);
+  const targetW = Math.max(80, Math.round(strokeW * 1.08));
+  const targetH = Math.max(40, Math.round(targetW / aspect));
+  // Soften opacity so the photo still peeks through the paint
+  const raw = await sharpMod(brushPath)
+    .resize(targetW, targetH, { fit: 'fill' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const pixels = raw.data;
+  for (let i = 0; i < pixels.length; i += 4) {
+    pixels[i + 3] = Math.round(pixels[i + 3] * 0.9);
+  }
+  const brushBuf = await sharpMod(pixels, {
+    raw: { width: raw.info.width, height: raw.info.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+  return {
+    input: brushBuf,
+    left: Math.max(0, Math.round(cx - targetW / 2)),
+    top: Math.max(0, Math.round(cy - targetH / 2)),
+  };
+}
+
+/**
+ * Caption text ON the guest photo. Uses embedded Windows fonts for Sharp/librsvg.
+ */
+function buildFrameCaptionSvg(fw, fh, hole, guestText, creditLine) {
+  const { cx, fontSize, creditSize, guestY, creditY } = getCaptionLayout(
+    fw,
+    fh,
+    hole,
+    guestText,
+    creditLine,
+  );
+
+  const scriptUrl =
+    windowsFontFileUrl('segoesc.ttf') ||
+    windowsFontFileUrl('FRSCRIPT.TTF') ||
+    windowsFontFileUrl('SCRIPTBL.TTF') ||
+    windowsFontFileUrl('segoepr.ttf');
+  const serifUrl = windowsFontFileUrl('georgia.ttf') || windowsFontFileUrl('times.ttf');
+
+  const fontFaces = [
+    scriptUrl
+      ? `@font-face{font-family:'PbCaptionScript';src:url('${scriptUrl}') format('truetype');}`
+      : '',
+    serifUrl
+      ? `@font-face{font-family:'PbCaptionSerif';src:url('${serifUrl}') format('truetype');}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  const guest = escapeXmlText(guestText);
+  const credit = escapeXmlText(creditLine);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${fw}" height="${fh}" viewBox="0 0 ${fw} ${fh}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style type="text/css"><![CDATA[
+      ${fontFaces}
+      .guest-caption{font-family:'PbCaptionScript','Segoe Script','Segoe Print',Georgia,serif;font-size:${fontSize}px;fill:#241f1b;}
+      .guest-credit{font-family:'PbCaptionSerif',Georgia,'Times New Roman',serif;font-size:${creditSize}px;fill:#4a4540;}
+    ]]></style>
+  </defs>
+  ${
+    guest
+      ? `<text x="${cx}" y="${guestY}" text-anchor="middle" class="guest-caption">${guest}</text>`
+      : ''
+  }
+  ${
+    credit
+      ? `<text x="${cx}" y="${creditY}" text-anchor="middle" class="guest-credit">${credit}</text>`
+      : ''
+  }
+</svg>`;
 }
 
 function getAiBackgroundsDir(modeId) {
@@ -1882,6 +2040,10 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
       payload && typeof payload.frameFile === 'string' ? path.basename(payload.frameFile.trim()) : '';
     const photoScale =
       payload && typeof payload.photoScale === 'number' ? payload.photoScale : 1;
+    const guestText =
+      payload && typeof payload.guestText === 'string' ? payload.guestText : '';
+    const creditLine =
+      payload && typeof payload.creditLine === 'string' ? payload.creditLine : '';
     if (!imagePath || !frameFile) {
       return { ok: false, error: 'Missing image or frame.' };
     }
@@ -1892,8 +2054,20 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
     if (!fs.existsSync(framePath)) {
       return { ok: false, error: `Frame not found: ${frameFile}` };
     }
-    appendAppLog('info', 'frames', 'apply start', { imagePath, frameFile, photoScale });
-    const outBuf = await compositePhotoIntoFrame(sharpMod, framePath, imagePath, photoScale);
+    appendAppLog('info', 'frames', 'apply start', {
+      imagePath,
+      frameFile,
+      photoScale,
+      hasGuestText: !!guestText.trim(),
+    });
+    const outBuf = await compositePhotoIntoFrame(
+      sharpMod,
+      framePath,
+      imagePath,
+      photoScale,
+      guestText,
+      creditLine,
+    );
     const dir = path.dirname(imagePath);
     const base = path.basename(imagePath, path.extname(imagePath));
     const outPath = path.join(dir, `${base}_framed.png`);

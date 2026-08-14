@@ -86,6 +86,10 @@ export class AdminDashboardComponent implements OnInit {
   draftAiEnabled = false;
   draftRequireQrUnlock = false;
   draftFramesEnabled = true;
+  draftGuestTextEnabled = false;
+  draftGuestTextOptional = true;
+  draftGuestTextMaxLength = 36;
+  draftGuestTextCreditLine = 'by inmoment photography';
   draftPhotoScale = 1;
   draftDefaultFrameFile: string | null = 'onam-grma-2026.png';
   /** Empty = all frames on disk are offered to guests. */
@@ -127,6 +131,10 @@ export class AdminDashboardComponent implements OnInit {
     this.draftAiEnabled = cfg?.aiGenerationEnabled ?? false;
     this.draftRequireQrUnlock = cfg?.requireQrUnlock ?? false;
     this.draftFramesEnabled = cfg?.photoFrames?.enabled ?? true;
+    this.draftGuestTextEnabled = cfg?.photoFrames?.guestTextEnabled ?? false;
+    this.draftGuestTextOptional = cfg?.photoFrames?.guestTextOptional ?? true;
+    this.draftGuestTextMaxLength = cfg?.photoFrames?.guestTextMaxLength ?? 36;
+    this.draftGuestTextCreditLine = cfg?.photoFrames?.guestTextCreditLine ?? 'by inmoment photography';
     this.draftPhotoScale = cfg?.photoFrames?.photoScale ?? 1;
     this.draftDefaultFrameFile = cfg?.photoFrames?.defaultFrameFile ?? null;
     this.draftGuestFrameFiles = [...(cfg?.photoFrames?.guestFrameFiles ?? [])];
@@ -247,6 +255,10 @@ export class AdminDashboardComponent implements OnInit {
           photoScale: this.draftPhotoScale,
           defaultFrameFile: defaultFrameFile || null,
           guestFrameFiles,
+          guestTextEnabled: this.draftFramesEnabled && this.draftGuestTextEnabled,
+          guestTextOptional: this.draftGuestTextOptional,
+          guestTextMaxLength: this.draftGuestTextMaxLength,
+          guestTextCreditLine: this.draftGuestTextCreditLine,
         },
       });
       if (ok) {

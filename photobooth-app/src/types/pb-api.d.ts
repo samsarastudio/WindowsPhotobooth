@@ -133,6 +133,10 @@ export interface PbApi {
     imagePath: string;
     frameFile: string;
     photoScale?: number;
+    /** Guest caption drawn in the frame footer (after overlay). */
+    guestText?: string;
+    /** Optional credit under guest text. */
+    creditLine?: string;
   }): Promise<{ ok: boolean; path?: string; frameFile?: string; error?: string }>;
   adminPickPhotoFrameImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
   adminInstallPhotoFrame(
