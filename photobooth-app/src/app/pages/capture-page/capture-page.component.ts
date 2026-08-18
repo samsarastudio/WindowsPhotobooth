@@ -441,12 +441,75 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async navigateResult(filePath: string): Promise<void> {
-    if (this.booth.photoFrames().enabled) {
+    const framesCfg = this.booth.photoFrames();
+    if (framesCfg.enabled) {
+      if (framesCfg.autoApplyFrame) {
+        await this.autoApplyFrameAndNavigate(filePath);
+        return;
+      }
       await this.router.navigate(['/frame'], { state: { path: filePath } });
       return;
     }
     this.galleryUpload.queueUpload(filePath, 'original');
     await this.router.navigate(['/result'], { state: { path: filePath } });
+  }
+
+  /**
+   * Silently pick and composite a frame without showing the frame-selection screen.
+   * Chooses `defaultFrameFile` when set; otherwise picks randomly from the allowed set.
+   */
+  private async autoApplyFrameAndNavigate(filePath: string): Promise<void> {
+    if (!window.pbApi?.listPhotoFrames || !window.pbApi?.applyPhotoFrame) {
+      // Electron APIs unavailable — fall back to the normal frame picker.
+      await this.router.navigate(['/frame'], { state: { path: filePath } });
+      return;
+    }
+
+    const framesCfg = this.booth.photoFrames();
+
+    const listResult = await window.pbApi.listPhotoFrames();
+    if (!listResult.ok || !listResult.frames?.length) {
+      // No frames available — show picker so the user at least sees an error.
+      await this.router.navigate(['/frame'], { state: { path: filePath } });
+      return;
+    }
+
+    const allow = framesCfg.guestFrameFiles ?? [];
+    let pool = listResult.frames;
+    if (!allow.includes('__none__') && allow.length > 0) {
+      pool = listResult.frames.filter((f) => allow.includes(f.filename));
+    }
+    if (!pool.length) {
+      await this.router.navigate(['/frame'], { state: { path: filePath } });
+      return;
+    }
+
+    // Pick frame: prefer explicit default, otherwise random from pool.
+    const def = framesCfg.defaultFrameFile;
+    const frameFile =
+      (def && pool.some((f) => f.filename === def) ? def : null) ??
+      pool[Math.floor(Math.random() * pool.length)].filename;
+
+    if (framesCfg.guestTextEnabled) {
+      // Caption step is enabled — navigate there so the guest can type their text.
+      await this.router.navigate(['/caption'], { state: { path: filePath, frameFile } });
+      return;
+    }
+
+    const applyResult = await window.pbApi.applyPhotoFrame({
+      imagePath: filePath,
+      frameFile,
+      photoScale: framesCfg.photoScale,
+    });
+
+    if (applyResult.ok && applyResult.path) {
+      this.galleryUpload.queueUpload(filePath, 'original');
+      this.galleryUpload.queueUpload(applyResult.path, 'framed');
+      await this.router.navigate(['/result'], { state: { path: applyResult.path } });
+    } else {
+      // Compositing failed — fall back to picker so the guest knows something went wrong.
+      await this.router.navigate(['/frame'], { state: { path: filePath } });
+    }
   }
 
   /** After decode: reveal buffered layer, then refresh aspect from the visible layer. */

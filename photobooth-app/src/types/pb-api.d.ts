@@ -215,11 +215,14 @@ export interface PbApi {
     ok: boolean;
     offline?: boolean;
     synced?: string[];
+    skipped?: string[];
     published?: string[];
     pruned?: string[];
     failed?: { filename: string; error: string }[];
     count?: number;
+    skippedCount?: number;
     publishedCount?: number;
+    prunedCount?: number;
     error?: string;
   }>;
   galleryPublishFrame(payload: {

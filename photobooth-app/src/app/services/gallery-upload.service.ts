@@ -33,8 +33,10 @@ export class GalleryUploadService implements OnDestroy {
 
   private onlineHandler = () => {
     void this.flushQueue();
+    void this.syncFramesFromMoments();
   };
   private unsubQueue?: () => void;
+  private framesSyncInFlight: Promise<void> | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -50,6 +52,52 @@ export class GalleryUploadService implements OnDestroy {
       window.removeEventListener('online', this.onlineHandler);
     }
     this.unsubQueue?.();
+  }
+
+  /**
+   * Non-blocking: pull latest Moments frames (and drop local copies removed on the server),
+   * then drain any queued photo uploads. Safe to call while offline — no-ops.
+   */
+  startBackgroundSync(): void {
+    void this.syncFramesFromMoments();
+    void this.flushQueue();
+  }
+
+  /** Server is source of truth. Offline keeps whatever is already on disk. */
+  async syncFramesFromMoments(): Promise<void> {
+    if (!window.pbApi?.gallerySyncFrames) return;
+    const g = this.booth.gallery();
+    const apiBaseUrl = (g.apiBaseUrl || '').replace(/\/$/, '');
+    if (!apiBaseUrl) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (this.framesSyncInFlight) return this.framesSyncInFlight;
+    this.framesSyncInFlight = (async () => {
+      try {
+        const r = await window.pbApi!.gallerySyncFrames!({
+          apiBaseUrl,
+          uploadToken: undefined,
+          pushLocal: false,
+          pruneLocal: true,
+          timeoutMs: 20000,
+        });
+        if (r.ok) {
+          void this.log.info('frames', 'moments sync ok', {
+            pulled: r.count ?? 0,
+            skipped: r.skippedCount ?? 0,
+            pruned: r.prunedCount ?? r.pruned?.length ?? 0,
+          });
+        } else if (r.offline) {
+          void this.log.warn('frames', 'moments unreachable — using local frames');
+        } else if (r.error) {
+          void this.log.warn('frames', 'moments sync failed', { error: r.error });
+        }
+      } catch (e) {
+        void this.log.warn('frames', 'moments sync error', { error: String(e) });
+      } finally {
+        this.framesSyncInFlight = null;
+      }
+    })();
+    return this.framesSyncInFlight;
   }
 
   private bump(): void {

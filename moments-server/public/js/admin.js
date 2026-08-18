@@ -14,6 +14,9 @@ const wallBrandPreview = document.getElementById('wallBrandPreview');
 const wallMosaicTargetPreview = document.getElementById('wallMosaicTargetPreview');
 const wallBackdropOpacity = document.getElementById('wallBackdropOpacity');
 const wallBackdropOpacityLabel = document.getElementById('wallBackdropOpacityLabel');
+const wallBrandRevealEnabled = document.getElementById('wallBrandRevealEnabled');
+const wallBrandRevealSeconds = document.getElementById('wallBrandRevealSeconds');
+const wallBrandRevealHoldSeconds = document.getElementById('wallBrandRevealHoldSeconds');
 const wallModeStatus = document.getElementById('wallModeStatus');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
@@ -47,8 +50,8 @@ function updatePhotoSelectionUi() {
 
 function mosaicBackdropPreviewText(url) {
   return url
-    ? 'Backdrop image on file — shown faded under the photo collage.'
-    : 'No backdrop yet — upload a watermark or brand image.';
+    ? 'Backdrop on file — centered behind the wall, glimpsed when photos swap.'
+    : 'No backdrop yet — choose a file, then click Upload backdrop.';
 }
 
 function syncWallModeStatus(completed) {
@@ -309,36 +312,44 @@ function generateUploadToken() {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function applyWallForm(wall) {
+  if (!wall) return;
+  if (wallTitle) wallTitle.value = wall.title || '';
+  if (wallOverlay) wallOverlay.value = wall.overlay || '';
+  if (wallColumns) wallColumns.value = String(wall.columns ?? 16);
+  if (wallBrandText) wallBrandText.value = wall.brandText || '';
+  if (wallBackdropOpacity) {
+    const pct = Math.round((wall.backdropOpacity ?? 0.55) * 100);
+    wallBackdropOpacity.value = String(pct);
+    syncBackdropOpacityLabel(pct);
+  }
+  if (wallBrandRevealEnabled) wallBrandRevealEnabled.checked = wall.brandRevealEnabled === true;
+  if (wallBrandRevealSeconds) wallBrandRevealSeconds.value = String(wall.brandRevealSeconds ?? 45);
+  if (wallBrandRevealHoldSeconds) wallBrandRevealHoldSeconds.value = String(wall.brandRevealHoldSeconds ?? 6);
+  if (wallBrandPreview) {
+    wallBrandPreview.textContent = wall.brandLogoUrl
+      ? `Partner logo on file${wall.brandText ? ` · ${wall.brandText}` : ''}${
+          wall.brandRevealEnabled ? ' · reveal on' : ' · reveal off'
+        }`
+      : wall.brandText
+        ? `Partner text: ${wall.brandText}`
+        : 'No partner brand set — upload a logo to use reveal.';
+  }
+  if (wallMosaicTargetPreview) {
+    wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.mosaicTargetUrl);
+  }
+  syncWallModeStatus(!!wall.completedView);
+}
+
 async function refreshAll() {
   const settings = await api('/api/admin/settings');
   ttlEl.value = String(settings.settings.defaultTtlDays);
   applyTokenSettings(settings.settings);
   const wall = await api('/api/admin/wall/settings');
-  wallTitle.value = wall.wall.title || '';
-  wallOverlay.value = wall.wall.overlay || '';
-  if (wallColumns) wallColumns.value = String(wall.wall.columns ?? 16);
-  if (wallBrandText) wallBrandText.value = wall.wall.brandText || '';
-  if (wallBackdropOpacity) {
-    const pct = Math.round((wall.wall.backdropOpacity ?? 0.22) * 100);
-    wallBackdropOpacity.value = String(pct);
-    syncBackdropOpacityLabel(pct);
-  }
-  if (wallBrandPreview) {
-    wallBrandPreview.textContent = wall.wall.brandLogoUrl
-      ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
-      : wall.wall.brandText
-        ? `Partner text: ${wall.wall.brandText}`
-        : 'No partner brand set — inmoment shows alone.';
-  }
-  if (wallMosaicTargetPreview) {
-    wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.wall.mosaicTargetUrl);
-  }
-  syncWallModeStatus(!!wall.wall.completedView);
+  applyWallForm(wall.wall);
   await refreshAlbums();
   await refreshFrames();
 }
-
-document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   loginErr.hidden = true;
   try {
@@ -402,7 +413,7 @@ document.getElementById('btnGenerateToken')?.addEventListener('click', () => {
 
 document.getElementById('btnSaveWall').addEventListener('click', async () => {
   try {
-    const opacityPct = Number(wallBackdropOpacity?.value ?? 22);
+    const opacityPct = Number(wallBackdropOpacity?.value ?? 55);
     await api('/api/admin/wall/settings', {
       method: 'PATCH',
       body: JSON.stringify({
@@ -411,26 +422,14 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
         brandText: wallBrandText?.value || '',
         columns: Number(wallColumns?.value || 16),
         backdropOpacity: Math.min(1, Math.max(0, opacityPct / 100)),
+        brandRevealEnabled: !!wallBrandRevealEnabled?.checked,
+        brandRevealSeconds: Number(wallBrandRevealSeconds?.value || 45),
+        brandRevealHoldSeconds: Number(wallBrandRevealHoldSeconds?.value || 6),
       }),
     });
     setStatus('Wall settings saved');
     const wall = await api('/api/admin/wall/settings');
-    if (wallBackdropOpacity) {
-      const pct = Math.round((wall.wall.backdropOpacity ?? 0.22) * 100);
-      wallBackdropOpacity.value = String(pct);
-      syncBackdropOpacityLabel(pct);
-    }
-    syncWallModeStatus(!!wall.wall.completedView);
-    if (wallBrandPreview) {
-      wallBrandPreview.textContent = wall.wall.brandLogoUrl
-        ? `Partner logo on file${wall.wall.brandText ? ` · ${wall.wall.brandText}` : ''}`
-        : wall.wall.brandText
-          ? `Partner text: ${wall.wall.brandText}`
-          : 'No partner brand set — inmoment shows alone.';
-    }
-    if (wallMosaicTargetPreview) {
-      wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.wall.mosaicTargetUrl);
-    }
+    applyWallForm(wall.wall);
   } catch (e) {
     setStatus(String(e.message || e));
   }
@@ -464,11 +463,7 @@ document.getElementById('btnUploadWallBrand')?.addEventListener('click', async (
     fd.append('logo', file, file.name);
     const r = await api('/api/admin/wall/brand-logo', { method: 'POST', body: fd });
     if (input) input.value = '';
-    if (wallBrandPreview) {
-      wallBrandPreview.textContent = r.wall?.brandLogoUrl
-        ? `Partner logo uploaded${r.wall.brandText ? ` · ${r.wall.brandText}` : ''}`
-        : 'Partner logo uploaded';
-    }
+    applyWallForm(r.wall);
     setStatus('Partner brand logo uploaded');
   } catch (e) {
     setStatus(String(e.message || e));
@@ -481,13 +476,7 @@ document.getElementById('btnClearWallBrand')?.addEventListener('click', async ()
       method: 'PATCH',
       body: JSON.stringify({ clearBrandLogo: true }),
     });
-    if (wallBrandPreview && r.wall) {
-      wallBrandPreview.textContent = r.wall.brandLogoUrl
-        ? `Partner logo on file${r.wall.brandText ? ` · ${r.wall.brandText}` : ''}`
-        : r.wall.brandText
-          ? `Partner text: ${r.wall.brandText}`
-          : 'No partner brand set — inmoment shows alone.';
-    }
+    applyWallForm(r.wall);
     setStatus('Partner logo cleared');
   } catch (e) {
     setStatus(String(e.message || e));
@@ -504,11 +493,9 @@ document.getElementById('btnUploadMosaicTarget')?.addEventListener('click', asyn
   try {
     const fd = new FormData();
     fd.append('target', file, file.name);
-    await api('/api/admin/wall/mosaic-target', { method: 'POST', body: fd });
+    const r = await api('/api/admin/wall/mosaic-target', { method: 'POST', body: fd });
     if (input) input.value = '';
-    if (wallMosaicTargetPreview) {
-      wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(true);
-    }
+    applyWallForm(r.wall);
     setStatus('Backdrop image uploaded');
   } catch (e) {
     setStatus(String(e.message || e));
@@ -517,13 +504,11 @@ document.getElementById('btnUploadMosaicTarget')?.addEventListener('click', asyn
 
 document.getElementById('btnClearMosaicTarget')?.addEventListener('click', async () => {
   try {
-    await api('/api/admin/wall/settings', {
+    const r = await api('/api/admin/wall/settings', {
       method: 'PATCH',
       body: JSON.stringify({ clearMosaicTarget: true }),
     });
-    if (wallMosaicTargetPreview) {
-      wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText('');
-    }
+    applyWallForm(r.wall);
     setStatus('Backdrop cleared');
   } catch (e) {
     setStatus(String(e.message || e));

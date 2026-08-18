@@ -624,13 +624,20 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Photo frame overlays</h2>
           <p class="pb-hint">
-            Choose which decorative frames guests see after capture. Manage the master library on
-            Moments Admin (<code>/admin</code>), then sync here — or upload locally and publish to the
-            server.
+            Choose which decorative frames guests see after capture. Moments Admin is the master
+            library — this booth pulls it on load and drops overlays that were deleted on the server.
+            Offline, the last local copies keep working.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftFramesEnabled" />
-            Show frame picker on the guest booth after capture
+            Apply a frame to every photo after capture
+          </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftAutoApplyFrame" [disabled]="!draftFramesEnabled" />
+            Auto-apply frame silently (skip the frame-selection screen for guests)
+            <span class="pb-hint pb-hint-inline">
+              Uses the default frame when set, otherwise picks randomly from the enabled frames.
+            </span>
           </label>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftGuestTextEnabled" [disabled]="!draftFramesEnabled" />
@@ -719,20 +726,61 @@
             @if (draftGuestTextBrush) {
               <label>
                 Brush opacity
-                <span class="pb-caption-val">{{ draftGuestTextBrushOpacity }}</span>
+                <span class="pb-caption-val">{{ captionBrushOpacityPct }}%</span>
               </label>
               <input
                 class="pb-range"
                 type="range"
                 min="0.05"
-                max="0.55"
+                max="1"
                 step="0.01"
                 [(ngModel)]="draftGuestTextBrushOpacity"
               />
             }
+            <div
+              class="pb-caption-preview"
+              role="application"
+              aria-label="Click or drag to place guest text on the 6 by 4 print"
+              (pointerdown)="startCaptionPreviewDrag($event)"
+              (pointermove)="moveCaptionPreviewDrag($event)"
+              (pointerup)="endCaptionPreviewDrag()"
+              (pointercancel)="endCaptionPreviewDrag()"
+            >
+              @if (captionPreviewFrameUrl) {
+                <img class="pb-caption-preview-frame" [src]="captionPreviewFrameUrl" alt="" />
+              } @else {
+                <div class="pb-caption-preview-photo" aria-hidden="true"></div>
+              }
+              <div
+                class="pb-caption-preview-mark"
+                [class.is-left]="draftGuestTextAlign === 'left'"
+                [class.is-right]="draftGuestTextAlign === 'right'"
+                [style.left.%]="draftGuestTextXPercent"
+                [style.top.%]="draftGuestTextYPercent"
+              >
+                @if (draftGuestTextBrush) {
+                  <span
+                    class="pb-caption-preview-brush"
+                    [style.opacity]="draftGuestTextBrushOpacity"
+                    aria-hidden="true"
+                  ></span>
+                }
+                <span
+                  class="pb-caption-preview-guest"
+                  [style.color]="draftGuestTextColor"
+                  [style.font-size.em]="captionPreviewSizeEm"
+                  >Happy Onam</span
+                >
+                @if (draftGuestTextCreditLine.trim()) {
+                  <span class="pb-caption-preview-credit" [style.color]="draftGuestTextCreditColor">{{
+                    draftGuestTextCreditLine
+                  }}</span>
+                }
+              </div>
+            </div>
             <p class="pb-hint pb-hint-tight">
-              Position is on the full print (50 / 78 = lower photo, 50 / 92 = Polaroid footer). Default is
-              gold script with a thin outline — no paint splash. Save, then take a new photo to preview.
+              Click or drag on the 6×4 print to place the text. Brush opacity goes to 100%. Save, then take a
+              new photo to apply on real prints.
             </p>
           }
           <label>Default frame (pre-selected for guests)</label>
@@ -778,9 +826,10 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Frames on this machine</h2>
           <p class="pb-hint pb-hint-tight">
-            Stored in <code>config/photo-frames/</code>. Uploads and Sync push overlays to Moments
-            automatically (Gallery API URL + upload token required). Sync also pulls frames added in
-            Moments admin.
+            Stored in <code>config/photo-frames/</code>. The booth pulls the Moments library on
+            startup (and when the network returns). Frames deleted on the server are removed here.
+            Uploading a frame still publishes it to Moments when a gallery token is set. Offline, the
+            last local copies stay in use and photo uploads wait in the queue.
           </p>
           @if (photoFramesList().length === 0) {
             <p class="pb-hint">No frames found. Sync from Moments or upload a PNG with a black or transparent photo hole.</p>

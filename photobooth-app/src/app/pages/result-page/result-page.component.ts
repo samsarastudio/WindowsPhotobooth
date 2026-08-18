@@ -137,6 +137,12 @@ export class ResultPageComponent implements OnInit, OnDestroy {
           void this.galleryUpload.ensureShareUpload(this.path() || pp);
         }
         if (ticks >= 60 && this.shareUploading()) {
+          const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+          if (offline) {
+            ticks = 0;
+            void this.galleryUpload.flushQueue();
+            return;
+          }
           const cur = this.galleryUpload.recordFor(this.path());
           if (!cur || cur.status === 'pending' || cur.status === 'queued') {
             this.galleryUpload.markUploadTimedOut(this.path() || pp);

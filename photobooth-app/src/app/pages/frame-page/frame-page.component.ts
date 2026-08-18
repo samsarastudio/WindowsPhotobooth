@@ -46,8 +46,17 @@ export class FramePageComponent implements OnInit {
       this.err.set('No photo — go back and capture again.');
       return;
     }
-    if (!this.booth.photoFrames().enabled) {
+    const framesCfg = this.booth.photoFrames();
+    if (!framesCfg.enabled) {
       await this.router.navigate(['/result'], { state: { path: this.photoPath() } });
+      return;
+    }
+    // Auto-apply mode: load frames, pick one silently, and proceed without showing UI.
+    if (framesCfg.autoApplyFrame) {
+      await this.loadFrames();
+      if (this.frames().length > 0) {
+        await this.applySelected();
+      }
       return;
     }
     await this.loadFrames();
@@ -58,7 +67,7 @@ export class FramePageComponent implements OnInit {
       this.err.set('Frames require Electron.');
       return;
     }
-    await this.pullFramesFromMoments();
+    this.galleryUpload.startBackgroundSync();
     const r = await window.pbApi.listPhotoFrames();
     if (!r.ok || !r.frames?.length) {
       this.err.set(r.error ?? 'No frames found. Add PNGs under config/photo-frames/.');
@@ -92,25 +101,6 @@ export class FramePageComponent implements OnInit {
     this.selected.set(pick);
   }
 
-  /** Pull overlays from Moments when online; otherwise keep local frames. */
-  private async pullFramesFromMoments(): Promise<void> {
-    const g = this.booth.gallery();
-    const apiBaseUrl = (g.apiBaseUrl || '').replace(/\/$/, '');
-    if (!g.enabled || !apiBaseUrl || !window.pbApi?.gallerySyncFrames) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    try {
-      await window.pbApi.gallerySyncFrames({
-        apiBaseUrl,
-        uploadToken: undefined,
-        pushLocal: false,
-        pruneLocal: false,
-        timeoutMs: 2500,
-      });
-    } catch {
-      /* offline Moments should not block the frame picker */
-    }
-  }
-
   selectFrame(filename: string): void {
     this.selected.set(filename);
   }
@@ -135,13 +125,8 @@ export class FramePageComponent implements OnInit {
         photoScale: this.booth.photoFrames().photoScale,
       });
       if (r.ok && r.path) {
-        // Await uploads before result so Share does not start a second framed POST.
-        try {
-          await this.galleryUpload.uploadPath(photo, 'original');
-          await this.galleryUpload.uploadPath(r.path, 'framed');
-        } catch {
-          /* result page can retry share upload */
-        }
+        this.galleryUpload.queueUpload(photo, 'original');
+        this.galleryUpload.queueUpload(r.path, 'framed');
         await this.router.navigate(['/result'], { state: { path: r.path } });
       } else {
         this.err.set(r.error ?? 'Could not apply frame.');

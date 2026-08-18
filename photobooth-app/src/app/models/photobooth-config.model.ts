@@ -251,6 +251,12 @@ export interface PhotoboothPhotoFramesConfig {
    */
   guestFrameFiles: string[];
   /**
+   * When true, skip the frame-selection screen and automatically apply a frame.
+   * Uses `defaultFrameFile` if set, otherwise picks randomly from `guestFrameFiles`
+   * (or all available frames when `guestFrameFiles` is empty).
+   */
+  autoApplyFrame: boolean;
+  /**
    * After frame pick, prompt for custom text (names / message) with an in-app keyboard.
    * Placement, color, and size are set in Admin → Frames.
    */
@@ -283,6 +289,7 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   photoScale: 1,
   defaultFrameFile: 'onam-grma-2026.png',
   guestFrameFiles: [],
+  autoApplyFrame: false,
   guestTextEnabled: false,
   guestTextOptional: true,
   guestTextMaxLength: 36,

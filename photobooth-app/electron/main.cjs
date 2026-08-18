@@ -376,85 +376,147 @@ function listPhotoFrameFiles() {
   return files;
 }
 
-/**
- * Find the largest near-black rectangle (photo hole) in a frame PNG.
- * Falls back to a centered content box if detection is weak.
- */
-async function detectPhotoHole(sharpMod, framePath) {
-  const img = sharpMod(framePath);
-  const meta = await img.metadata();
-  const width = meta.width || 1;
-  const height = meta.height || 1;
-  const { data, info } = await img
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const w = info.width;
-  const h = info.height;
-  const channels = info.channels || 4;
-  const threshold = 40;
-  let minX = w;
-  let minY = h;
+/** Pure-black (or JPEG-near-black) photo-hole key. Decorative navy/hair is darker than this but not all-channel-low. */
+const FRAME_HOLE_BLACK_MAX = 18;
+
+function isChromaHolePixel(r, g, b, a, threshold) {
+  if (a < 16) return true;
+  return r <= threshold && g <= threshold && b <= threshold;
+}
+
+function floodFillHoleMask(data, width, height, channels, seedX, seedY, threshold) {
+  const mask = new Uint8Array(width * height);
+  const seedI = (seedY * width + seedX) * channels;
+  if (!isChromaHolePixel(data[seedI], data[seedI + 1], data[seedI + 2], data[seedI + 3], threshold)) {
+    return { mask, count: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  }
+  const stack = [seedY * width + seedX];
+  mask[stack[0]] = 1;
+  let count = 0;
+  let minX = width;
+  let minY = height;
   let maxX = 0;
   let maxY = 0;
-  let darkCount = 0;
-  // Sample every 2nd pixel for speed
-  for (let y = 0; y < h; y += 2) {
-    for (let x = 0; x < w; x += 2) {
-      const i = (y * w + x) * channels;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      if (r <= threshold && g <= threshold && b <= threshold) {
-        darkCount += 1;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-      }
+  while (stack.length) {
+    const p = stack.pop();
+    const x = p % width;
+    const y = (p - x) / width;
+    count += 1;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    const neighbors = [p - 1, p + 1, p - width, p + width];
+    const valid = [x > 0, x < width - 1, y > 0, y < height - 1];
+    for (let n = 0; n < 4; n++) {
+      if (!valid[n]) continue;
+      const np = neighbors[n];
+      if (mask[np]) continue;
+      const i = np * channels;
+      if (!isChromaHolePixel(data[i], data[i + 1], data[i + 2], data[i + 3], threshold)) continue;
+      mask[np] = 1;
+      stack.push(np);
     }
   }
-  const area = Math.max(0, maxX - minX) * Math.max(0, maxY - minY);
-  const coverage = area / (w * h);
-  if (darkCount < 80 || coverage < 0.12) {
-    // Fallback: left-centered window typical of banner frames
-    return {
-      left: Math.round(w * 0.06),
-      top: Math.round(h * 0.08),
-      width: Math.round(w * 0.62),
-      height: Math.round(h * 0.72),
-    };
-  }
-  // Inset slightly so we sit inside the gold border
-  const padX = Math.round((maxX - minX) * 0.015);
-  const padY = Math.round((maxY - minY) * 0.015);
+  return { mask, count, minX, minY, maxX, maxY };
+}
+
+function fallbackHoleRect(w, h) {
+  return {
+    left: Math.round(w * 0.06),
+    top: Math.round(h * 0.08),
+    width: Math.round(w * 0.62),
+    height: Math.round(h * 0.72),
+  };
+}
+
+function holeRectFromBounds(minX, minY, maxX, maxY, w, h) {
+  const padX = Math.round((maxX - minX) * 0.01);
+  const padY = Math.round((maxY - minY) * 0.01);
   return {
     left: Math.max(0, minX + padX),
     top: Math.max(0, minY + padY),
-    width: Math.max(32, maxX - minX - padX * 2),
-    height: Math.max(32, maxY - minY - padY * 2),
+    width: Math.max(32, Math.min(w - minX, maxX - minX - padX * 2)),
+    height: Math.max(32, Math.min(h - minY, maxY - minY - padY * 2)),
   };
 }
 
 /**
- * Convert near-black pixels in a frame to transparent so the guest photo shows through
- * and frame artwork can sit on top of the photo.
+ * Build the overlay that sits on top of the guest photo.
+ * Prefer the file's own alpha channel (real PNGs). Only chroma-key a painted
+ * black rectangle when the file has no usable transparency (JPEG / opaque PNG).
  */
-async function makeFrameOverlay(sharpMod, framePath, blackThreshold = 48) {
-  const { data, info } = await sharpMod(framePath)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  const { width, height, channels } = info;
-  for (let i = 0; i < data.length; i += channels) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    if (r <= blackThreshold && g <= blackThreshold && b <= blackThreshold) {
-      data[i + 3] = 0;
+async function prepareFrameOverlay(sharpMod, framePath) {
+  const meta = await sharpMod(framePath).metadata();
+  const w = meta.width || 1;
+  const h = meta.height || 1;
+  const { data, info } = await sharpMod(framePath).ensureAlpha().raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const channels = info.channels || 4;
+  const total = w * h;
+
+  let alphaHoles = 0;
+  let minX = w;
+  let minY = h;
+  let maxX = 0;
+  let maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * channels + 3];
+      if (a >= 16) continue;
+      alphaHoles += 1;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
     }
   }
-  return sharpMod(data, { raw: { width, height, channels } }).png().toBuffer();
+
+  const hasUsableAlpha = meta.hasAlpha === true && alphaHoles > total * 0.05;
+  if (hasUsableAlpha) {
+    const hole = holeRectFromBounds(minX, minY, maxX, maxY, w, h);
+    // Composite the original PNG — do not re-encode pixels or punch extra holes.
+    const overlay = await sharpMod(framePath).ensureAlpha().png().toBuffer();
+    return { hole, overlay, keyed: false };
+  }
+
+  const seeds = [[Math.floor(w / 2), Math.floor(h / 2)]];
+  for (let y = Math.floor(h * 0.2); y < h * 0.8; y += Math.max(8, Math.floor(h / 20))) {
+    for (let x = Math.floor(w * 0.2); x < w * 0.8; x += Math.max(8, Math.floor(w / 20))) {
+      seeds.push([x, y]);
+    }
+  }
+  let best = { mask: new Uint8Array(total), count: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  const tried = new Uint8Array(total);
+  for (const [sx, sy] of seeds) {
+    const sp = sy * w + sx;
+    if (tried[sp]) continue;
+    const fill = floodFillHoleMask(data, w, h, channels, sx, sy, FRAME_HOLE_BLACK_MAX);
+    if (fill.count > 0) {
+      for (let p = 0; p < total; p++) {
+        if (fill.mask[p]) tried[p] = 1;
+      }
+    }
+    if (fill.count > best.count) best = fill;
+  }
+
+  const coverage = best.count / total;
+  const hole =
+    best.count < 80 || coverage < 0.08
+      ? fallbackHoleRect(w, h)
+      : holeRectFromBounds(best.minX, best.minY, best.maxX, best.maxY, w, h);
+
+  if (best.count >= 80 && coverage >= 0.08) {
+    for (let p = 0; p < total; p++) {
+      if (best.mask[p]) data[p * channels + 3] = 0;
+    }
+  }
+
+  const overlay = await sharpMod(data, { raw: { width: w, height: h, channels } })
+    .png()
+    .toBuffer();
+  return { hole, overlay, keyed: true };
 }
 
 /**
@@ -474,7 +536,7 @@ async function compositePhotoIntoFrame(
   const meta = await sharpMod(framePath).metadata();
   const fw = meta.width || 1;
   const fh = meta.height || 1;
-  const hole = await detectPhotoHole(sharpMod, framePath);
+  const { hole, overlay: frameOverlay } = await prepareFrameOverlay(sharpMod, framePath);
   // Fill the full hole; only shrink if an admin explicitly sets photoScale < 1
   const targetW = Math.max(8, Math.round(hole.width * scale));
   const targetH = Math.max(8, Math.round(hole.height * scale));
@@ -500,7 +562,6 @@ async function compositePhotoIntoFrame(
     .png()
     .toBuffer();
 
-  const frameOverlay = await makeFrameOverlay(sharpMod, framePath);
   let composed = await sharpMod(base)
     .composite([{ input: frameOverlay, left: 0, top: 0 }])
     .png()
@@ -1427,11 +1488,20 @@ app.whenReady().then(() => {
     return permission === 'media' || permission === 'camera' || permission === 'microphone';
   });
   createWindow();
+  // Frames + photo queue: never block window creation. Retry periodically so a
+  // later network restore still drains the queue without guest interaction.
+  void syncFramesOnStartup();
   setTimeout(() => {
     void flushUploadQueue().catch((e) =>
       appendAppLog('warn', 'gallery', 'startup queue flush failed', String(e)),
     );
   }, 2500);
+  setInterval(() => {
+    void flushUploadQueue().catch(() => {});
+  }, 60 * 1000);
+  setInterval(() => {
+    void syncFramesOnStartup();
+  }, 5 * 60 * 1000);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -2364,6 +2434,21 @@ function isLikelyOfflineError(err) {
   );
 }
 
+/** Fast probe so a downed Moments host does not burn 20s per queued photo. */
+async function galleryReachable(base, timeoutMs = 2500) {
+  if (!base) return false;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${base}/api/frames`, { signal: ac.signal });
+    return !!res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function uploadPhotoOnce(payload, signal) {
   const base = galleryBaseUrl(payload?.apiBaseUrl);
   const token = String(payload?.uploadToken || '').trim();
@@ -2452,6 +2537,22 @@ async function flushUploadQueuePass() {
   let uploaded = 0;
   let failed = 0;
   let stoppedOffline = false;
+  const pendingItems = (q.items || []).filter((i) => i.status !== 'ok' && i.status !== 'error');
+  if (pendingItems.length) {
+    const base = galleryBaseUrl(pendingItems[0].apiBaseUrl);
+    if (base && !(await galleryReachable(base, 2500))) {
+      appendAppLog('warn', 'gallery', 'queue flush skipped — Moments unreachable', {
+        pending: pendingItems.length,
+      });
+      return {
+        ok: true,
+        uploaded: 0,
+        failed: 0,
+        stoppedOffline: true,
+        pending: pendingItems.length,
+      };
+    }
+  }
   for (const item of q.items) {
     if (item.status === 'ok' || item.status === 'error') continue;
     if (!item.filePath || !fs.existsSync(item.filePath)) {
@@ -2632,26 +2733,15 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
         deduped: true,
       };
     }
-    await flushUploadQueue();
-    const fresh =
-      loadUploadQueue().items.find((i) => i.id === item.id) ||
-      loadUploadQueue().items.find((i) => i.filePath === abs && i.variant === item.variant) ||
-      item;
-    if (fresh.status === 'ok') {
-      return {
-        ok: true,
-        slug: fresh.slug,
-        photoId: fresh.photoId,
-        shareUrl: fresh.shareUrl,
-        url: fresh.url,
-        variant: fresh.variant,
-      };
-    }
+    // Enqueue and drain in the background so a downed gallery cannot stall capture.
+    void flushUploadQueue().catch((e) =>
+      appendAppLog('warn', 'gallery', 'background queue flush failed', String(e)),
+    );
     return {
       ok: false,
-      queued: fresh.status === 'queued' || fresh.status === 'pending',
-      status: fresh.status,
-      error: fresh.error || 'Queued for upload when online',
+      queued: true,
+      status: item.status || 'queued',
+      error: item.error || 'Queued for upload when online',
     };
   } catch (e) {
     return { ok: false, queued: true, error: String(e) };
@@ -2753,10 +2843,21 @@ async function deleteRemoteFrameFile(base, token, filename) {
 async function pullRemoteFramesToLocal(base, remoteFrames, signal) {
   const dir = getPhotoFramesDir();
   const synced = [];
+  const skipped = [];
   const failed = [];
   for (const frame of remoteFrames || []) {
     const filename = path.basename(String(frame.filename || ''));
     if (!filename || filename.includes('..')) continue;
+    const dest = path.join(dir, filename);
+    const remoteBytes = Number(frame.bytes);
+    if (Number.isFinite(remoteBytes) && remoteBytes > 0 && fs.existsSync(dest)) {
+      try {
+        if (fs.statSync(dest).size === remoteBytes) {
+          skipped.push(filename);
+          continue;
+        }
+      } catch (_) {}
+    }
     const url = frame.downloadUrl || `${base}${frame.url}`;
     try {
       const imgRes = await fetch(url, { signal });
@@ -2765,13 +2866,13 @@ async function pullRemoteFramesToLocal(base, remoteFrames, signal) {
         continue;
       }
       const buf = Buffer.from(await imgRes.arrayBuffer());
-      fs.writeFileSync(path.join(dir, filename), buf);
+      fs.writeFileSync(dest, buf);
       synced.push(filename);
     } catch (e) {
       failed.push({ filename, error: String(e) });
     }
   }
-  return { synced, failed };
+  return { synced, skipped, failed };
 }
 
 /**
@@ -2780,8 +2881,23 @@ async function pullRemoteFramesToLocal(base, remoteFrames, signal) {
  * 2) Pull remote frames so Moments admin uploads show on the booth
  * 3) Optionally prune local files missing from the remote set (Moments deletes)
  * Offline / timeout: returns { ok:false, offline:true } so callers keep local frames.
+ * Never throws to the caller — booth UI must stay usable without a network.
  */
+let framesSyncChain = Promise.resolve();
+
 async function syncFramesWithMoments(payload) {
+  const run = framesSyncChain.then(
+    () => syncFramesWithMomentsOnce(payload),
+    () => syncFramesWithMomentsOnce(payload),
+  );
+  framesSyncChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function syncFramesWithMomentsOnce(payload) {
   const base = galleryBaseUrl(payload?.apiBaseUrl);
   if (!base) return { ok: false, error: 'Gallery API URL is required.' };
   const token = String(payload?.uploadToken || '').trim();
@@ -2795,31 +2911,12 @@ async function syncFramesWithMoments(payload) {
   const timer = setTimeout(() => ac.abort(), timeoutMs);
 
   try {
-    let remote = await fetchRemoteFrames(base, ac.signal);
+    const remote = await fetchRemoteFrames(base, ac.signal);
     const remoteNames = new Set(
       remote.map((f) => path.basename(String(f.filename || ''))).filter(Boolean),
     );
 
-    const published = [];
-    const publishFailed = [];
-    if (token && pushLocal) {
-      for (const filename of listPhotoFrameFiles()) {
-        if (ac.signal.aborted) break;
-        const r = await publishLocalFrameFile(base, token, filename, ac.signal);
-        if (r.ok) published.push(filename);
-        else publishFailed.push({ filename, error: r.error || 'Publish failed' });
-      }
-      if (published.length) {
-        remote = await fetchRemoteFrames(base, ac.signal);
-        remoteNames.clear();
-        for (const f of remote) {
-          const n = path.basename(String(f.filename || ''));
-          if (n) remoteNames.add(n);
-        }
-      }
-    }
-
-    const { synced, failed } = await pullRemoteFramesToLocal(base, remote, ac.signal);
+    const { synced, skipped, failed } = await pullRemoteFramesToLocal(base, remote, ac.signal);
 
     const pruned = [];
     if (pruneLocal) {
@@ -2833,14 +2930,30 @@ async function syncFramesWithMoments(payload) {
       }
     }
 
+    // Push only leftover local-only files (after prune, this is typically empty).
+    const published = [];
+    const publishFailed = [];
+    if (token && pushLocal) {
+      for (const filename of listPhotoFrameFiles()) {
+        if (ac.signal.aborted) break;
+        if (remoteNames.has(filename)) continue;
+        const r = await publishLocalFrameFile(base, token, filename, ac.signal);
+        if (r.ok) published.push(filename);
+        else publishFailed.push({ filename, error: r.error || 'Publish failed' });
+      }
+    }
+
     return {
       ok: true,
       synced,
+      skipped,
       published,
       pruned,
       failed: [...publishFailed, ...failed],
       count: synced.length,
+      skippedCount: skipped.length,
       publishedCount: published.length,
+      prunedCount: pruned.length,
     };
   } catch (e) {
     const msg = String(e?.message || e);
@@ -2854,6 +2967,41 @@ async function syncFramesWithMoments(payload) {
     };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function gallerySettingsFromConfig() {
+  const g = loadMergedConfig().gallery || {};
+  return {
+    apiBaseUrl: galleryBaseUrl(g.apiBaseUrl),
+  };
+}
+
+async function syncFramesOnStartup() {
+  const g = gallerySettingsFromConfig();
+  if (!g.apiBaseUrl) return;
+  if (!(await galleryReachable(g.apiBaseUrl, 2500))) {
+    appendAppLog('info', 'frames', 'startup sync skipped — Moments unreachable (keeping local frames)');
+    return;
+  }
+  const r = await syncFramesWithMoments({
+    apiBaseUrl: g.apiBaseUrl,
+    uploadToken: undefined,
+    pushLocal: false,
+    pruneLocal: true,
+    timeoutMs: 20000,
+  });
+  if (r.ok) {
+    appendAppLog('info', 'frames', 'startup sync ok', {
+      pulled: r.count || 0,
+      skipped: r.skippedCount || 0,
+      pruned: r.prunedCount || (r.pruned || []).length,
+    });
+  } else {
+    appendAppLog(r.offline ? 'warn' : 'error', 'frames', 'startup sync failed', {
+      offline: !!r.offline,
+      error: r.error,
+    });
   }
 }
 

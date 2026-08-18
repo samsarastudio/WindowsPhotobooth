@@ -170,6 +170,7 @@ function normalizePhotoFramesConfig(
     photoScale,
     defaultFrameFile,
     guestFrameFiles,
+    autoApplyFrame: typeof patch.autoApplyFrame === 'boolean' ? patch.autoApplyFrame : base.autoApplyFrame,
     guestTextEnabled:
       typeof patch.guestTextEnabled === 'boolean' ? patch.guestTextEnabled : base.guestTextEnabled,
     guestTextOptional:

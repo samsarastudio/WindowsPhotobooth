@@ -86,6 +86,7 @@ export class AdminDashboardComponent implements OnInit {
   draftAiEnabled = false;
   draftRequireQrUnlock = false;
   draftFramesEnabled = true;
+  draftAutoApplyFrame = false;
   draftGuestTextEnabled = false;
   draftGuestTextOptional = true;
   draftGuestTextMaxLength = 36;
@@ -139,6 +140,7 @@ export class AdminDashboardComponent implements OnInit {
     this.draftAiEnabled = cfg?.aiGenerationEnabled ?? false;
     this.draftRequireQrUnlock = cfg?.requireQrUnlock ?? false;
     this.draftFramesEnabled = cfg?.photoFrames?.enabled ?? true;
+    this.draftAutoApplyFrame = cfg?.photoFrames?.autoApplyFrame ?? false;
     this.draftGuestTextEnabled = cfg?.photoFrames?.guestTextEnabled ?? false;
     this.draftGuestTextOptional = cfg?.photoFrames?.guestTextOptional ?? true;
     this.draftGuestTextMaxLength = cfg?.photoFrames?.guestTextMaxLength ?? 36;
@@ -248,6 +250,48 @@ export class AdminDashboardComponent implements OnInit {
     this.draftGuestFrameFiles = ['__none__'];
   }
 
+  captionDragActive = false;
+
+  get captionPreviewFrameUrl(): string | null {
+    const file = this.draftDefaultFrameFile;
+    const list = this.photoFramesList();
+    const hit = file ? list.find((f) => f.filename === file) : list.find((f) => f.guestEnabled) || list[0];
+    return hit?.url ?? null;
+  }
+
+  get captionPreviewSizeEm(): number {
+    return Math.max(0.7, Number(this.draftGuestTextSizePercent) / 3.4);
+  }
+
+  get captionBrushOpacityPct(): number {
+    return Math.round(Number(this.draftGuestTextBrushOpacity) * 100);
+  }
+
+  startCaptionPreviewDrag(ev: PointerEvent): void {
+    const el = ev.currentTarget as HTMLElement;
+    el.setPointerCapture?.(ev.pointerId);
+    this.captionDragActive = true;
+    this.applyCaptionPreviewPoint(ev, el);
+  }
+
+  moveCaptionPreviewDrag(ev: PointerEvent): void {
+    if (!this.captionDragActive) return;
+    this.applyCaptionPreviewPoint(ev, ev.currentTarget as HTMLElement);
+  }
+
+  endCaptionPreviewDrag(): void {
+    this.captionDragActive = false;
+  }
+
+  private applyCaptionPreviewPoint(ev: PointerEvent, el: HTMLElement): void {
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return;
+    const x = ((ev.clientX - r.left) / r.width) * 100;
+    const y = ((ev.clientY - r.top) / r.height) * 100;
+    this.draftGuestTextXPercent = Math.round(Math.min(100, Math.max(0, x)));
+    this.draftGuestTextYPercent = Math.round(Math.min(100, Math.max(0, y)));
+  }
+
   async saveFrames(): Promise<void> {
     this.status.set(null);
     const enabled = this.photoFramesList().filter((f) => f.guestEnabled).map((f) => f.filename);
@@ -268,6 +312,7 @@ export class AdminDashboardComponent implements OnInit {
       const ok = await this.booth.save({
         photoFrames: {
           enabled: this.draftFramesEnabled,
+          autoApplyFrame: this.draftFramesEnabled && this.draftAutoApplyFrame,
           photoScale: this.draftPhotoScale,
           defaultFrameFile: defaultFrameFile || null,
           guestFrameFiles,
@@ -522,25 +567,27 @@ export class AdminDashboardComponent implements OnInit {
     return !!r.ok;
   }
 
-  /** Pull Moments frames and push local overlays so both sides match. */
+  /** Pull Moments frames; drop local overlays that were removed on the server. */
   private async mirrorFramesWithMoments(quiet = false): Promise<boolean> {
     const creds = this.momentsGalleryCreds();
     if (!creds || !window.pbApi?.gallerySyncFrames) return false;
     const r = await window.pbApi.gallerySyncFrames({
       apiBaseUrl: creds.apiBaseUrl,
       uploadToken: creds.uploadToken || undefined,
-      pushLocal: !!creds.uploadToken,
-      pruneLocal: false,
+      pushLocal: false,
+      pruneLocal: true,
       timeoutMs: 20000,
     });
     if (!quiet) {
       if (r.ok) {
-        const pub = r.publishedCount ?? r.published?.length ?? 0;
+        const pruned = r.prunedCount ?? r.pruned?.length ?? 0;
         this.status.set(
-          `Synced with Moments: pulled ${r.count ?? 0}, published ${pub}` +
+          `Synced with Moments: pulled ${r.count ?? 0}, already current ${r.skippedCount ?? 0}, removed ${pruned} local` +
             (r.failed?.length ? ` (${r.failed.length} failed)` : '') +
             '.',
         );
+      } else if (r.offline) {
+        this.status.set('Moments unreachable — keeping local frames. Booth stays online.');
       } else {
         this.status.set(r.error ?? 'Sync failed.');
       }

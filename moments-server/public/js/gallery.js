@@ -48,6 +48,9 @@ const els = {
   mosaicPartner: document.getElementById('mosaicPartner'),
   mosaicPartnerLogo: document.getElementById('mosaicPartnerLogo'),
   mosaicPartnerText: document.getElementById('mosaicPartnerText'),
+  mosaicBrandReveal: document.getElementById('mosaicBrandReveal'),
+  mosaicBrandRevealLogo: document.getElementById('mosaicBrandRevealLogo'),
+  mosaicBrandRevealText: document.getElementById('mosaicBrandRevealText'),
   lightbox: document.getElementById('lightbox'),
   lbImg: document.getElementById('lbImg'),
   lbVariant: document.getElementById('lbVariant'),
@@ -81,13 +84,18 @@ let wallCfg = {
   brandText: '',
   brandLogoUrl: '',
   mosaicTargetUrl: '',
-  backdropOpacity: 0.22,
+  backdropOpacity: 0.55,
   completedView: false,
+  brandRevealEnabled: false,
+  brandRevealSeconds: 45,
+  brandRevealHoldSeconds: 6,
 };
 let route = parseRoute();
 let mosaicShineTimer = null;
 let mosaicRotateTimer = null;
 let mosaicDriftTimer = null;
+let mosaicRevealTimer = null;
+let mosaicRevealHideTimer = null;
 /** 6×4 postcard — width/height */
 const MOSAIC_CELL_ASPECT = 6 / 4;
 
@@ -207,6 +215,23 @@ function ensureMosaicBackdrop() {
     els.mosaicBackdrop = backdrop;
     els.mosaicBackdropImg = backdrop.querySelector('.mosaic-backdrop-img');
   }
+  ensureMosaicBrandReveal();
+}
+
+function ensureMosaicBrandReveal() {
+  if (!els.mosaicStage) return;
+  if (els.mosaicBrandReveal && els.mosaicStage.contains(els.mosaicBrandReveal)) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'mosaicBrandReveal';
+  overlay.className = 'mosaic-brand-reveal';
+  overlay.hidden = true;
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.innerHTML =
+    '<div class="mosaic-brand-reveal-inner"><img id="mosaicBrandRevealLogo" class="mosaic-brand-reveal-logo" alt="" hidden /><p id="mosaicBrandRevealText" class="mosaic-brand-reveal-text" hidden></p></div>';
+  els.mosaicStage.appendChild(overlay);
+  els.mosaicBrandReveal = overlay;
+  els.mosaicBrandRevealLogo = overlay.querySelector('#mosaicBrandRevealLogo');
+  els.mosaicBrandRevealText = overlay.querySelector('#mosaicBrandRevealText');
 }
 
 function completedGridDims(photoCount) {
@@ -308,14 +333,24 @@ function buildMosaicCompleted() {
 function mosaicGridMetrics() {
   const stageW = Math.max(320, els.mosaicStage?.clientWidth || 1200);
   const stageH = Math.max(240, els.mosaicStage?.clientHeight || 800);
-  const pad = 14;
-  const gap = 8;
-  // Virtual unit grid — tiles span 1, 2, or 4 cells
-  const cols = stageW >= 1500 ? 8 : stageW >= 1100 ? 6 : stageW >= 720 ? 5 : 4;
-  const cellW = (stageW - pad * 2 - gap * (cols - 1)) / cols;
-  const cellH = cellW / MOSAIC_CELL_ASPECT;
-  const rows = Math.max(3, Math.floor((stageH - pad * 2 + gap) / (cellH + gap)));
-  return { stageW, stageH, pad, gap, cols, rows, cellW, cellH };
+  const pad = stageW < 1100 ? 8 : 12;
+  const gap = stageW < 1100 ? 5 : 7;
+  const cols = stageW >= 1500 ? 8 : stageW >= 1280 ? 6 : stageW >= 900 ? 5 : 4;
+  let cellW = (stageW - pad * 2 - gap * (cols - 1)) / cols;
+  let cellH = cellW / MOSAIC_CELL_ASPECT;
+  let rows = Math.max(3, Math.floor((stageH - pad * 2 + gap) / (cellH + gap)));
+  // If leftover height can fit another row, shrink cells so the collage fills the stage.
+  const maxCellW = cellW;
+  while (true) {
+    const nextRows = rows + 1;
+    const nextCellH = (stageH - pad * 2 - gap * (nextRows - 1)) / nextRows;
+    const nextCellW = nextCellH * MOSAIC_CELL_ASPECT;
+    if (nextCellW > maxCellW - 0.5 || nextCellH < 72) break;
+    cellW = nextCellW;
+    cellH = nextCellH;
+    rows = nextRows;
+  }
+  return { stageW, stageH, pad, gap, cols, rows, cellW, cellH, small: stageW < 1280 };
 }
 
 /** Fit a 6×4 card centered inside a reserved rect (never stretch the frame). */
@@ -334,17 +369,15 @@ function fitLandscapeCard(reserveX, reserveY, reserveW, reserveH) {
   };
 }
 
-/** Pick a span in grid cells: 1×1 (1), medium ~2-area, or 2×2 (4). */
-function pickMosaicSpan(rand, freeCells, colsLeft, rowsLeft) {
+/** Pick a span in grid cells: 1×1 or full 2×2. Never reserve 2×2 for a smaller card (leaves holes). */
+function pickMosaicSpan(rand, freeCells, colsLeft, rowsLeft, smallScreen) {
   const can4 = freeCells >= 4 && colsLeft >= 2 && rowsLeft >= 2;
-  const roll = rand();
-  if (can4 && roll < 0.22) return { spanC: 2, spanR: 2, grids: 4 };
-  if (can4 && roll < 0.5) return { spanC: 2, spanR: 2, grids: 2, medium: true };
+  if (can4 && rand() < (smallScreen ? 0.1 : 0.2)) return { spanC: 2, spanR: 2, grids: 4 };
   return { spanC: 1, spanR: 1, grids: 1 };
 }
 
 function layoutMosaicSlots() {
-  const { pad, gap, cols, rows, cellW, cellH } = mosaicGridMetrics();
+  const { pad, gap, cols, rows, cellW, cellH, small } = mosaicGridMetrics();
   const rand = seededRandom(cols * 131 + rows * 97 + Math.round(cellW * 10));
   const occupied = Array.from({ length: rows }, () => Array(cols).fill(false));
   const slots = [];
@@ -370,25 +403,13 @@ function layoutMosaicSlots() {
     }
     return n;
   };
-  const pushSlot = (r, c, spanC, spanR, grids, medium) => {
+  const pushSlot = (r, c, spanC, spanR, grids) => {
     mark(r, c, spanC, spanR);
     const reserveW = cellW * spanC + gap * (spanC - 1);
     const reserveH = cellH * spanR + gap * (spanR - 1);
     const reserveX = pad + c * (cellW + gap);
     const reserveY = pad + r * (cellH + gap);
-    let card;
-    if (medium && spanC === 2 && spanR === 2) {
-      // ~2-grid area, still 6×4 — larger than 1×1, smaller than full 2×2
-      const targetW = cellW * 1.42;
-      card = fitLandscapeCard(
-        reserveX + (reserveW - targetW) / 2,
-        reserveY + (reserveH - targetW / MOSAIC_CELL_ASPECT) / 2,
-        targetW,
-        targetW / MOSAIC_CELL_ASPECT,
-      );
-    } else {
-      card = fitLandscapeCard(reserveX, reserveY, reserveW, reserveH);
-    }
+    const card = fitLandscapeCard(reserveX, reserveY, reserveW, reserveH);
     const rot = (rand() - 0.5) * (grids >= 4 ? 0.7 : 1.1);
     slots.push({
       x: card.x,
@@ -413,9 +434,9 @@ function layoutMosaicSlots() {
     });
   };
 
-  // Seed 1–2 hero 4-grid tiles first for hierarchy
+  // Seed 1–2 hero 4-grid tiles first for hierarchy (one on small laptop screens)
   let heroes = 0;
-  const heroTarget = rows * cols >= 20 ? 2 : 1;
+  const heroTarget = small || rows * cols < 20 ? 1 : 2;
   const heroStarts = [];
   for (let r = 0; r <= rows - 2; r++) {
     for (let c = 0; c <= cols - 2; c++) heroStarts.push({ r, c });
@@ -427,21 +448,21 @@ function layoutMosaicSlots() {
   for (const { r, c } of heroStarts) {
     if (heroes >= heroTarget) break;
     if (!canPlace(r, c, 2, 2)) continue;
-    pushSlot(r, c, 2, 2, 4, false);
+    pushSlot(r, c, 2, 2, 4);
     heroes++;
   }
 
-  // Pack remaining: medium (2) and small (1), always 6×4 cards
+  // Pack remaining as 1×1, with occasional full 2×2 heroes already seeded above
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (occupied[r][c]) continue;
       const free = freeCount();
-      let span = pickMosaicSpan(rand, free, cols - c, rows - r);
+      let span = pickMosaicSpan(rand, free, cols - c, rows - r, small);
       if (!canPlace(r, c, span.spanC, span.spanR)) {
         span = { spanC: 1, spanR: 1, grids: 1 };
         if (!canPlace(r, c, 1, 1)) continue;
       }
-      pushSlot(r, c, span.spanC, span.spanR, span.grids, !!span.medium);
+      pushSlot(r, c, span.spanC, span.spanR, span.grids);
     }
   }
 
@@ -497,6 +518,7 @@ function updateMosaicBranding() {
       textEl.textContent = '';
     }
   }
+  syncBrandRevealContent();
 }
 
 function applySlotTransform(slot, animatePos = true) {
@@ -617,8 +639,9 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
 }
 
 function mosaicFillCap() {
-  // Keep at most one glass placeholder when we have room
-  const reserve = mosaicSlots.length >= 8 ? 1 : 0;
+  // On laptop-sized walls, fill every slot so leftover glass does not look like a hole.
+  const small = (els.mosaicStage?.clientWidth || 1200) < 1280 || mosaicSlots.length < 14;
+  const reserve = small ? 0 : mosaicSlots.length >= 12 ? 1 : 0;
   return Math.max(1, mosaicSlots.length - reserve);
 }
 
@@ -851,46 +874,77 @@ function pickMosaicSizeMoves(maxMoves = 2) {
   return picked;
 }
 
+function swapMosaicSlotPhotos(i, j) {
+  const a = mosaicSlots[i];
+  const b = mosaicSlots[j];
+  if (!a?.photoId || !b?.photoId || a.photoId === b.photoId) return;
+  const photoA = photos.find((p) => p.id === a.photoId);
+  const photoB = photos.find((p) => p.id === b.photoId);
+  if (!photoA || !photoB) return;
+  mosaicPhotoSlot.delete(a.photoId);
+  mosaicPhotoSlot.delete(b.photoId);
+  a.photoId = null;
+  b.photoId = null;
+  fillMosaicSlot(i, photoB, { animate: true, shine: true });
+  fillMosaicSlot(j, photoA, { animate: true, shine: true });
+}
+
+function peekMosaicBackdrop(slot) {
+  if (!slot?.el) return;
+  slot.el.classList.add('is-vanish');
+  setTimeout(() => slot.el.classList.remove('is-vanish'), 480);
+}
+
 function rotateMosaicPhotos() {
   if (viewMode !== 'mosaic' || isCompletedView() || !mosaicSlots.length || photos.length < 1) return;
 
-  // 1) Fill empty slots first
   const visible = new Set([...mosaicPhotoSlot.keys()]);
   const unseen = photos.filter((p) => !visible.has(p.id));
-  const emptyIdxs = mosaicSlots.map((s, i) => (!s.photoId ? i : -1)).filter((i) => i >= 0);
-  let filledEmpties = 0;
   for (const photo of unseen) {
-    if (filledEmpties >= emptyIdxs.length) break;
+    if (!mosaicSlots.some((s) => !s.photoId)) break;
     placePhotoInMosaic(photo, { shine: true, force: false });
-    filledEmpties++;
   }
 
-  // 2) Move photos into different slot sizes/places (geometry), not same-size A↔B swaps
-  if (Math.random() < 0.92) {
+  if (Math.random() < 0.7) {
     const moves = pickMosaicSizeMoves(Math.min(3, Math.max(1, Math.floor(mosaicPhotoSlot.size / 2) || 1)));
     moves.forEach((m, n) => animateSlotGeometrySwap(m.a.s, m.b.s, n * 140));
   }
 
-  // 3) Bring unseen photos into empty slots when possible; only force-replace if full
-  if (photos.length <= mosaicPhotoSlot.size) return;
   const stillUnseen = photos.filter((p) => !mosaicPhotoSlot.has(p.id));
-  if (!stillUnseen.length) return;
-  const emptiesLeft = mosaicSlots.filter((s) => !s.photoId).length;
-  const take = Math.min(2, stillUnseen.length, Math.max(1, emptiesLeft || mosaicPhotoSlot.size));
-  for (let n = 0; n < take; n++) {
-    const photo = stillUnseen[(mosaicRotateCursor + n) % stillUnseen.length];
-    setTimeout(
-      () =>
-        placePhotoInMosaic(photo, {
-          force: emptiesLeft === 0,
-          shine: true,
-          animate: true,
-          focus: false,
-        }),
-      450 + n * 240,
-    );
+  const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
+  const take = Math.min(2, Math.max(1, Math.ceil(mosaicSlots.length * 0.12)));
+
+  if (stillUnseen.length) {
+    const emptiesLeft = mosaicSlots.filter((s) => !s.photoId).length;
+    for (let n = 0; n < Math.min(take, stillUnseen.length); n++) {
+      const photo = stillUnseen[(mosaicRotateCursor + n) % stillUnseen.length];
+      setTimeout(
+        () =>
+          placePhotoInMosaic(photo, {
+            force: emptiesLeft === 0 || n === 0,
+            shine: true,
+            animate: true,
+            focus: false,
+          }),
+        400 + n * 240,
+      );
+    }
+    mosaicRotateCursor = (mosaicRotateCursor + take) % stillUnseen.length;
+    return;
   }
-  mosaicRotateCursor = (mosaicRotateCursor + take) % stillUnseen.length;
+
+  if (photos.length >= 2 && filled.length >= 2) {
+    const shuffled = [...filled].sort(() => Math.random() - 0.5);
+    swapMosaicSlotPhotos(shuffled[0].i, shuffled[1].i);
+    if (take > 1 && shuffled.length >= 4) {
+      setTimeout(() => swapMosaicSlotPhotos(shuffled[2].i, shuffled[3].i), 280);
+    }
+    return;
+  }
+
+  if (filled.length) {
+    peekMosaicBackdrop(filled[Math.floor(Math.random() * filled.length)].s);
+  }
 }
 
 function driftMosaicSlots() {
@@ -920,15 +974,91 @@ function rotateCompletedWindow() {
   buildMosaicCompleted();
 }
 
+function clampBrandRevealSeconds(value, fallback, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+function brandRevealHasAsset() {
+  return !!(wallCfg.brandLogoUrl || (wallCfg.brandText || '').trim());
+}
+
+function syncBrandRevealContent() {
+  const overlay = els.mosaicBrandReveal;
+  const logoEl = els.mosaicBrandRevealLogo;
+  const textEl = els.mosaicBrandRevealText;
+  if (!overlay) return;
+  const logoUrl = (wallCfg.brandLogoUrl || '').trim();
+  const text = (wallCfg.brandText || '').trim();
+  if (logoEl) {
+    if (logoUrl) {
+      logoEl.hidden = false;
+      logoEl.src = logoUrl;
+      logoEl.alt = text || 'Partner brand';
+    } else {
+      logoEl.hidden = true;
+      logoEl.removeAttribute('src');
+    }
+  }
+  if (textEl) {
+    if (text) {
+      textEl.hidden = false;
+      textEl.textContent = text;
+    } else {
+      textEl.hidden = true;
+      textEl.textContent = '';
+    }
+  }
+}
+
+function hideBrandReveal() {
+  if (mosaicRevealHideTimer) {
+    clearTimeout(mosaicRevealHideTimer);
+    mosaicRevealHideTimer = null;
+  }
+  const overlay = els.mosaicBrandReveal;
+  if (!overlay) return;
+  overlay.classList.remove('is-on');
+  overlay.hidden = true;
+}
+
+function showBrandReveal(holdMs) {
+  const overlay = els.mosaicBrandReveal;
+  if (!overlay || !brandRevealHasAsset() || !wallCfg.brandRevealEnabled) return;
+  syncBrandRevealContent();
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add('is-on'));
+  if (mosaicRevealHideTimer) clearTimeout(mosaicRevealHideTimer);
+  mosaicRevealHideTimer = setTimeout(hideBrandReveal, holdMs);
+}
+
+function startBrandRevealLoop() {
+  stopBrandRevealLoop();
+  if (viewMode !== 'mosaic') return;
+  if (!wallCfg.brandRevealEnabled || !brandRevealHasAsset()) return;
+  const interval = clampBrandRevealSeconds(wallCfg.brandRevealSeconds, 45, 10, 600) * 1000;
+  const hold = clampBrandRevealSeconds(wallCfg.brandRevealHoldSeconds, 6, 3, 30) * 1000;
+  mosaicRevealTimer = setInterval(() => showBrandReveal(hold), interval);
+}
+
+function stopBrandRevealLoop() {
+  if (mosaicRevealTimer) clearInterval(mosaicRevealTimer);
+  mosaicRevealTimer = null;
+  hideBrandReveal();
+}
+
 function startMosaicLoops() {
   stopMosaicLoops();
   if (isCompletedView()) {
     mosaicRotateTimer = setInterval(rotateCompletedWindow, 14000);
+    startBrandRevealLoop();
     return;
   }
   mosaicShineTimer = setInterval(shineRandomMosaicTile, 4200);
   mosaicRotateTimer = setInterval(rotateMosaicPhotos, 7000);
   mosaicDriftTimer = setInterval(driftMosaicSlots, 14000);
+  startBrandRevealLoop();
 }
 
 function stopMosaicLoops() {
@@ -938,6 +1068,7 @@ function stopMosaicLoops() {
   mosaicShineTimer = null;
   mosaicRotateTimer = null;
   mosaicDriftTimer = null;
+  stopBrandRevealLoop();
 }
 
 function upsertPhoto(photo) {
@@ -1027,8 +1158,11 @@ function onWallSettingsEvent(ev) {
     const prevCompleted = !!wallCfg.completedView;
     wallCfg = { ...wallCfg, ...wall };
     updateMosaicBranding();
-    if (viewMode === 'mosaic' && prevCompleted !== !!wallCfg.completedView) {
-      applyMosaicLayoutMode(true);
+    if (viewMode === 'mosaic') {
+      startBrandRevealLoop();
+      if (prevCompleted !== !!wallCfg.completedView) {
+        applyMosaicLayoutMode(true);
+      }
     }
   } catch {
     /* ignore */

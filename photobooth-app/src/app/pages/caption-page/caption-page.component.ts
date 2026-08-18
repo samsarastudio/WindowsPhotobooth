@@ -78,12 +78,8 @@ export class CaptionPageComponent implements OnInit {
         creditLine: guestText ? this.credit() || undefined : undefined,
       });
       if (r.ok && r.path) {
-        try {
-          await this.galleryUpload.uploadPath(photo, 'original');
-          await this.galleryUpload.uploadPath(r.path, 'framed');
-        } catch {
-          /* result can retry */
-        }
+        this.galleryUpload.queueUpload(photo, 'original');
+        this.galleryUpload.queueUpload(r.path, 'framed');
         await this.router.navigate(['/result'], { state: { path: r.path } });
       } else {
         this.err.set(r.error ?? 'Could not apply frame text.');

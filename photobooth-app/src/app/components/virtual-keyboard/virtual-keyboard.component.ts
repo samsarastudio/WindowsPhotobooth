@@ -22,12 +22,11 @@ export class VirtualKeyboardComponent {
   press(ch: string): void {
     const cur = this.value();
     if (cur.length >= this.maxLength()) return;
-    const out = this.shift ? ch : ch.toLowerCase();
+    const isLetter = /^[A-Z]$/i.test(ch);
+    const out = isLetter && !this.shift ? ch.toLowerCase() : ch;
     this.valueChange.emit(cur + out);
-    if (this.shift && cur.length === 0) {
-      // After first letter of a fresh phrase, drop to lowercase
-      this.shift = false;
-    }
+    // Sentence case: one capital (start or after space), then lowercase
+    if (isLetter && this.shift) this.shift = false;
   }
 
   space(): void {

@@ -45,6 +45,13 @@
   font-weight: 600;
 }
 
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
 .admin-body.is-unlocked .admin-login {
   display: none !important;
 }
