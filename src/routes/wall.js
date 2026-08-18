@@ -97,15 +97,24 @@ export function wallSettings() {
     mosaicTargetUrl: hasTarget
       ? `/media/branding/${encodeURIComponent(target)}?v=${fs.statSync(targetPath).mtimeMs}`
       : '',
-    /** Faded backdrop / watermark under the photo collage (0–1). */
+    /** Centered brand artwork under the collage — glimpsed when tiles swap. */
     backdropOpacity:
       typeof s.wallBackdropOpacity === 'number' &&
       s.wallBackdropOpacity >= 0 &&
       s.wallBackdropOpacity <= 1
         ? s.wallBackdropOpacity
-        : 0.22,
+        : 0.55,
     /** End-of-show: dense filled CSS grid instead of live collage motion. */
     completedView: s.wallCompletedView === true,
+    brandRevealEnabled: s.wallBrandRevealEnabled === true,
+    brandRevealSeconds:
+      typeof s.wallBrandRevealSeconds === 'number'
+        ? Math.min(600, Math.max(10, Math.round(s.wallBrandRevealSeconds)))
+        : 45,
+    brandRevealHoldSeconds:
+      typeof s.wallBrandRevealHoldSeconds === 'number'
+        ? Math.min(30, Math.max(3, Math.round(s.wallBrandRevealHoldSeconds)))
+        : 6,
   };
 }
 
@@ -156,6 +165,15 @@ adminWallRouter.patch('/settings', (req, res) => {
   }
   if (typeof req.body?.completedView === 'boolean') {
     patch.wallCompletedView = req.body.completedView;
+  }
+  if (typeof req.body?.brandRevealEnabled === 'boolean') {
+    patch.wallBrandRevealEnabled = req.body.brandRevealEnabled;
+  }
+  if (typeof req.body?.brandRevealSeconds === 'number') {
+    patch.wallBrandRevealSeconds = Math.min(600, Math.max(10, Math.round(req.body.brandRevealSeconds)));
+  }
+  if (typeof req.body?.brandRevealHoldSeconds === 'number') {
+    patch.wallBrandRevealHoldSeconds = Math.min(30, Math.max(3, Math.round(req.body.brandRevealHoldSeconds)));
   }
   if (req.body?.clearBrandLogo === true) {
     const cur = loadSettings();
@@ -212,7 +230,9 @@ adminWallRouter.post('/brand-logo', upload.single('logo'), (req, res) => {
   }
   fs.writeFileSync(dest, req.file.buffer);
   saveSettings({ wallBrandLogo: filename });
-  return res.status(201).json({ ok: true, wall: wallSettings() });
+  const wall = wallSettings();
+  broadcastEvent(WALL_CHANNEL, 'wall.settings', wall);
+  return res.status(201).json({ ok: true, wall });
 });
 
 adminWallRouter.post('/mosaic-target', upload.single('target'), (req, res) => {
@@ -236,7 +256,9 @@ adminWallRouter.post('/mosaic-target', upload.single('target'), (req, res) => {
   }
   fs.writeFileSync(path.join(config.brandingDir, filename), req.file.buffer);
   saveSettings({ wallMosaicTarget: filename });
-  return res.status(201).json({ ok: true, wall: wallSettings() });
+  const wall = wallSettings();
+  broadcastEvent(WALL_CHANNEL, 'wall.settings', wall);
+  return res.status(201).json({ ok: true, wall });
 });
 
 export { ensureBrandingDir };

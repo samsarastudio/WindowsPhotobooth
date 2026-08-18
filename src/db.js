@@ -55,9 +55,12 @@ export function loadSettings() {
     wallBrandText: '',
     wallBrandLogo: '',
     wallMosaicTarget: '',
-    wallBackdropOpacity: 0.22,
+    wallBackdropOpacity: 0.55,
     /** End-of-show dense filled grid instead of live collage. */
     wallCompletedView: false,
+    wallBrandRevealEnabled: false,
+    wallBrandRevealSeconds: 45,
+    wallBrandRevealHoldSeconds: 6,
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {

@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260811-5" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260818-1" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -97,8 +97,9 @@
             <h2>Mosaic wall</h2>
             <p class="meta">
               Guest photos collage on a filled wall with motion. At the end of the show, switch to a completed
-              filled grid. A faded backdrop sits under the photos for watermark or brand artwork.
-              Cards stay 6×4. Open <code>/wall</code>.
+              filled grid. Backdrop artwork sits in the middle of the wall and peeks through when photos swap.
+              Brand partner reveal can blur the wall and overlay a logo on a timer. Cards stay 6×4.
+              Open <code>/wall</code>.
             </p>
             <div class="wall-mode-box">
               <label>Wall display mode</label>
@@ -114,18 +115,38 @@
             <input id="wallOverlay" class="input" placeholder="e.g. UNLEASHED" />
             <label>Mosaic density (columns)</label>
             <input id="wallColumns" class="input" type="number" min="8" max="28" step="1" />
-            <label>Backdrop / watermark image (under photos)</label>
+
+            <h3 class="admin-subhead">Backdrop (behind the wall)</h3>
+            <p class="meta">
+              Sits in the <strong>middle of the wall</strong> under the photos. Guests glimpse the brand
+              when tiles swap or lift. Click Upload after choosing a file.
+            </p>
+            <label>Backdrop / brand image</label>
             <div class="row wrap">
               <input id="wallMosaicTarget" type="file" accept="image/png,image/jpeg,image/webp" />
               <button type="button" class="btn ghost" id="btnUploadMosaicTarget">Upload backdrop</button>
               <button type="button" class="btn ghost" id="btnClearMosaicTarget">Clear backdrop</button>
             </div>
             <p id="wallMosaicTargetPreview" class="meta"></p>
-            <label>Backdrop opacity <span id="wallBackdropOpacityLabel">22%</span></label>
-            <input id="wallBackdropOpacity" class="input" type="range" min="0" max="100" step="1" value="22" />
-            <label>Partner brand text (shown with inmoment)</label>
+            <label>Backdrop opacity <span id="wallBackdropOpacityLabel">55%</span></label>
+            <input id="wallBackdropOpacity" class="input" type="range" min="0" max="100" step="1" value="55" />
+
+            <h3 class="admin-subhead">Brand partner reveal</h3>
+            <p class="meta">
+              Periodically blurs the live wall and shows the partner logo on top. Turn this off to
+              disable the overlay entirely. The small header chip next to inmoment still uses the same logo.
+            </p>
+            <label class="check-row">
+              <input id="wallBrandRevealEnabled" type="checkbox" />
+              Enable brand partner reveal
+            </label>
+            <label>Show every (seconds)</label>
+            <input id="wallBrandRevealSeconds" class="input" type="number" min="10" max="600" step="5" value="45" />
+            <label>Hold on screen (seconds)</label>
+            <input id="wallBrandRevealHoldSeconds" class="input" type="number" min="3" max="30" step="1" value="6" />
+            <label>Partner brand text</label>
             <input id="wallBrandText" class="input" placeholder="e.g. Event partner name" />
-            <label>Partner brand logo (optional)</label>
+            <label>Partner brand logo</label>
             <div class="row wrap">
               <input id="wallBrandLogo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
               <button type="button" class="btn ghost" id="btnUploadWallBrand">Upload logo</button>
@@ -161,6 +182,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260811-5" type="module"></script>
+    <script src="/js/admin.js?v=20260818-1" type="module"></script>
   </body>
 </html>
