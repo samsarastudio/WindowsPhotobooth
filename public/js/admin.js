@@ -350,6 +350,8 @@ async function refreshAll() {
   await refreshAlbums();
   await refreshFrames();
 }
+
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   loginErr.hidden = true;
   try {
