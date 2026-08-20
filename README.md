@@ -17,11 +17,12 @@ Cloudflare Tunnel should map **`moments.inmomentservices.com` → `http://127.0.
 
 Open `/admin`, unlock with `ADMIN_PIN`.
 
-Sections: **Overview** · **Albums** · **Photos** · **Frames** · **Mosaic wall** · **Settings**
+Sections: **Overview** · **Albums** · **Photos** · **QR events** · **Frames** · **Mosaic wall** · **Settings**
 
 - **Add sample photos** seeds a demo album + placeholder frame for testing
 - Delete whole albums or individual photos
 - Frames list shows overlays currently on the server (booth syncs these)
+- **QR events** — print A3/A4 card batches, activate, reset sessions, attendant page
 
 ## Gallery URLs
 
@@ -32,7 +33,23 @@ Sections: **Overview** · **Albums** · **Photos** · **Frames** · **Mosaic wal
 | `/{session}/slideshow` | Auto slideshow for that session |
 | `/wall` | Mosaic of **all** photos from active (non-expired) sessions |
 | `/wall/slideshow` | Slideshow of all active-session photos |
-| `/{session}/p/{photoId}` | Deep link / lightbox to one photo |
+| `/{session}/p/{photoId}` | Deep link / lightbox to one photo (+ optional **Link my card**) |
+| `/q/{code}` | Event card preview (linked photo or “get your photo taken”) |
+| `/qr-scan` | Attendant iPad/phone scanner (event name + live counts) |
+
+## QR event cards
+
+1. Admin → **QR events** → create batch (50/100/200/custom) → choose **A3 or A4** → Generate.
+2. Download PDF, print, cut cards.
+3. **Activate** the batch.
+4. Attendants bookmark `/qr-scan` on an iPad/phone (camera in the page).
+5. Guests keep cards; phone camera opens `/q/{code}` (inmoment branded preview + Instagram).
+6. After a photo, guests can **Link my card** on the share page (optional).
+7. **Reset session** reuses the same printed codes without reprinting.
+
+Printed QR payload: `{PUBLIC_BASE_URL}/q/{code}`.
+
+After deploy on the Pi: `npm install --omit=dev` (adds `qrcode` + `pdfkit`) then restart `moments-gallery`.
 
 ## Photo frames (booth overlays)
 

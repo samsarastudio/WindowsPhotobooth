@@ -40,6 +40,13 @@ const els = {
   guestPhoto: document.getElementById('guestPhoto'),
   guestPhotoImg: document.getElementById('guestPhotoImg'),
   guestPhotoDownload: document.getElementById('guestPhotoDownload'),
+  btnAttachCard: document.getElementById('btnAttachCard'),
+  attachPanel: document.getElementById('attachPanel'),
+  attachVideo: document.getElementById('attachVideo'),
+  attachCodeInput: document.getElementById('attachCodeInput'),
+  attachStatus: document.getElementById('attachStatus'),
+  btnAttachSubmit: document.getElementById('btnAttachSubmit'),
+  btnAttachCancel: document.getElementById('btnAttachCancel'),
   mosaic: document.getElementById('mosaic'),
   mosaicStage: document.getElementById('mosaicStage'),
   mosaicBackdrop: document.getElementById('mosaicBackdrop'),
@@ -194,7 +201,136 @@ function renderGuestPhoto() {
     els.guestPhotoDownload.href = photo.url;
     els.guestPhotoDownload.download = `${photo.id}-${photo.variant || 'photo'}.jpg`;
   }
+  if (els.attachStatus) {
+    els.attachStatus.hidden = true;
+    els.attachStatus.textContent = '';
+  }
+  if (els.attachPanel) els.attachPanel.hidden = true;
 }
+
+let attachStream = null;
+let attachRaf = 0;
+
+function extractEventCode(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const m = s.match(/\/q\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  try {
+    const u = new URL(s);
+    const parts = u.pathname.split('/').filter(Boolean);
+    const i = parts.indexOf('q');
+    if (i >= 0 && parts[i + 1]) return decodeURIComponent(parts[i + 1]);
+  } catch {
+    /* plain */
+  }
+  return s.replace(/[^A-Za-z0-9_-]/g, '');
+}
+
+function stopAttachCamera() {
+  if (attachRaf) cancelAnimationFrame(attachRaf);
+  attachRaf = 0;
+  if (attachStream) {
+    attachStream.getTracks().forEach((t) => t.stop());
+    attachStream = null;
+  }
+  if (els.attachVideo) els.attachVideo.srcObject = null;
+}
+
+async function startAttachCamera() {
+  if (!els.attachVideo || !navigator.mediaDevices?.getUserMedia) return;
+  try {
+    attachStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: { ideal: 'environment' } },
+    });
+    els.attachVideo.srcObject = attachStream;
+    await els.attachVideo.play();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const tick = () => {
+      if (!els.attachVideo || els.attachVideo.readyState < 2) {
+        attachRaf = requestAnimationFrame(tick);
+        return;
+      }
+      canvas.width = els.attachVideo.videoWidth;
+      canvas.height = els.attachVideo.videoHeight;
+      ctx.drawImage(els.attachVideo, 0, 0);
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (typeof jsQR === 'function') {
+        const found = jsQR(image.data, image.width, image.height, {
+          inversionAttempts: 'dontInvert',
+        });
+        if (found?.data) {
+          const code = extractEventCode(found.data);
+          if (code && els.attachCodeInput) {
+            els.attachCodeInput.value = code;
+            void submitAttach(false);
+            return;
+          }
+        }
+      }
+      attachRaf = requestAnimationFrame(tick);
+    };
+    attachRaf = requestAnimationFrame(tick);
+  } catch {
+    /* camera optional — paste still works */
+  }
+}
+
+async function submitAttach(replace) {
+  const photo = photos[0];
+  if (!photo?.id) return;
+  const code = extractEventCode(els.attachCodeInput?.value);
+  if (!code) {
+    if (els.attachStatus) {
+      els.attachStatus.hidden = false;
+      els.attachStatus.textContent = 'Enter or scan a card code.';
+    }
+    return;
+  }
+  try {
+    const res = await fetch('/api/qr/attach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, photoId: photo.id, replace: !!replace }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && data.needsConfirm) {
+      if (confirm('This card is linked to another photo. Replace with this one?')) {
+        return submitAttach(true);
+      }
+      return;
+    }
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    stopAttachCamera();
+    if (els.attachPanel) els.attachPanel.hidden = true;
+    if (els.attachStatus) {
+      els.attachStatus.hidden = false;
+      els.attachStatus.textContent =
+        'Card linked — scan your card anytime to see this photo.';
+    }
+  } catch (e) {
+    if (els.attachStatus) {
+      els.attachStatus.hidden = false;
+      els.attachStatus.textContent = String(e.message || e);
+    }
+  }
+}
+
+els.btnAttachCard?.addEventListener('click', () => {
+  if (!els.attachPanel) return;
+  els.attachPanel.hidden = false;
+  if (els.attachCodeInput) els.attachCodeInput.value = '';
+  void startAttachCamera();
+});
+
+els.btnAttachCancel?.addEventListener('click', () => {
+  stopAttachCamera();
+  if (els.attachPanel) els.attachPanel.hidden = true;
+});
+
+els.btnAttachSubmit?.addEventListener('click', () => void submitAttach(false));
 
 function seededRandom(seed) {
   let s = seed % 2147483647;

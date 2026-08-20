@@ -50,15 +50,15 @@ function updatePhotoSelectionUi() {
 
 function mosaicBackdropPreviewText(url) {
   return url
-    ? 'Backdrop on file — centered behind the wall, glimpsed when photos swap.'
-    : 'No backdrop yet — choose a file, then click Upload backdrop.';
+    ? 'Backdrop on file ? centered behind the wall, glimpsed when photos swap.'
+    : 'No backdrop yet ? choose a file, then click Upload backdrop.';
 }
 
 function syncWallModeStatus(completed) {
   if (!wallModeStatus) return;
   wallModeStatus.textContent = completed
-    ? 'Completed filled grid — dense end-of-show layout on /wall.'
-    : 'Live collage — photos float and swap during the event.';
+    ? 'Completed filled grid ? dense end-of-show layout on /wall.'
+    : 'Live collage ? photos float and swap during the event.';
   const btnCompleted = document.getElementById('btnShowCompletedView');
   const btnLive = document.getElementById('btnShowLiveCollage');
   if (btnCompleted) btnCompleted.disabled = !!completed;
@@ -112,6 +112,8 @@ function setTab(tab) {
   if (name === 'photos') void refreshPhotos();
   if (name === 'frames') void refreshFrames();
   if (name === 'albums') void refreshAlbums();
+  if (name === 'qr') void refreshQrSection();
+  if (name === 'overview') void refreshQrOverviewStats();
 }
 
 function unlockAdmin() {
@@ -157,7 +159,7 @@ async function refreshFrames() {
     frameList.appendChild(div);
   }
   if (!(list.frames || []).length) {
-    frameList.innerHTML = '<p class="meta">No frames on the server yet — upload a PNG overlay.</p>';
+    frameList.innerHTML = '<p class="meta">No frames on the server yet ? upload a PNG overlay.</p>';
   }
 }
 
@@ -188,7 +190,7 @@ async function refreshAlbums() {
 
   sessionList.innerHTML = '';
   if (!albumsCache.length) {
-    sessionList.innerHTML = '<p class="meta">No albums yet. Use “Add sample photos” or capture from a booth.</p>';
+    sessionList.innerHTML = '<p class="meta">No albums yet. Use ?Add sample photos? or capture from a booth.</p>';
     return;
   }
   for (const s of albumsCache) {
@@ -196,7 +198,7 @@ async function refreshAlbums() {
     div.className = `session-item${s.expired ? ' expired' : ''}`;
     div.innerHTML = `
       <strong>${s.slug}</strong>
-      <span class="meta">${s.title} · ${s.photoCount} photos · expires ${new Date(s.expiresAt).toLocaleString()}${s.expired ? ' · EXPIRED' : ''}</span>
+      <span class="meta">${s.title} ? ${s.photoCount} photos ? expires ${new Date(s.expiresAt).toLocaleString()}${s.expired ? ' ? EXPIRED' : ''}</span>
       <div class="row wrap">
         <input class="input ttl-days" type="number" min="1" max="3650" placeholder="Extend days" style="max-width:8rem" />
         <button type="button" class="btn ghost extend">Set TTL days</button>
@@ -292,7 +294,7 @@ async function refreshPhotos() {
 
 function applyTokenSettings(settings) {
   if (uploadTokenEl) uploadTokenEl.value = settings.uploadToken || '';
-  if (publicBaseUrlEl) publicBaseUrlEl.textContent = settings.publicBaseUrl || '—';
+  if (publicBaseUrlEl) publicBaseUrlEl.textContent = settings.publicBaseUrl || '?';
   if (tokenMetaEl) {
     const src =
       settings.uploadTokenSource === 'settings'
@@ -301,8 +303,8 @@ function applyTokenSettings(settings) {
           ? 'from server .env'
           : 'not set';
     tokenMetaEl.textContent = settings.uploadTokenConfigured
-      ? `Token active (${src}). Paste into Photobooth Admin → Gallery.`
-      : 'No token set — booth uploads will fail until you save one.';
+      ? `Token active (${src}). Paste into Photobooth Admin ? Gallery.`
+      : 'No token set ? booth uploads will fail until you save one.';
   }
 }
 
@@ -328,12 +330,12 @@ function applyWallForm(wall) {
   if (wallBrandRevealHoldSeconds) wallBrandRevealHoldSeconds.value = String(wall.brandRevealHoldSeconds ?? 6);
   if (wallBrandPreview) {
     wallBrandPreview.textContent = wall.brandLogoUrl
-      ? `Partner logo on file${wall.brandText ? ` · ${wall.brandText}` : ''}${
-          wall.brandRevealEnabled ? ' · reveal on' : ' · reveal off'
+      ? `Partner logo on file${wall.brandText ? ` ? ${wall.brandText}` : ''}${
+          wall.brandRevealEnabled ? ' ? reveal on' : ' ? reveal off'
         }`
       : wall.brandText
         ? `Partner text: ${wall.brandText}`
-        : 'No partner brand set — upload a logo to use reveal.';
+        : 'No partner brand set ? upload a logo to use reveal.';
   }
   if (wallMosaicTargetPreview) {
     wallMosaicTargetPreview.textContent = mosaicBackdropPreviewText(wall.mosaicTargetUrl);
@@ -349,6 +351,7 @@ async function refreshAll() {
   applyWallForm(wall.wall);
   await refreshAlbums();
   await refreshFrames();
+  await refreshQrOverviewStats();
 }
 
 document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
@@ -396,7 +399,7 @@ document.getElementById('btnSaveToken')?.addEventListener('click', async () => {
 document.getElementById('btnCopyToken')?.addEventListener('click', async () => {
   const token = uploadTokenEl?.value?.trim() || '';
   if (!token) {
-    setStatus('Nothing to copy — generate or enter a token first');
+    setStatus('Nothing to copy ? generate or enter a token first');
     return;
   }
   try {
@@ -410,7 +413,7 @@ document.getElementById('btnCopyToken')?.addEventListener('click', async () => {
 
 document.getElementById('btnGenerateToken')?.addEventListener('click', () => {
   if (uploadTokenEl) uploadTokenEl.value = generateUploadToken();
-  setStatus('Generated a new token — click Save token, then paste it into the photobooth');
+  setStatus('Generated a new token ? click Save token, then paste it into the photobooth');
 });
 
 document.getElementById('btnSaveWall').addEventListener('click', async () => {
@@ -606,6 +609,407 @@ document.getElementById('btnBulkDeletePhotos')?.addEventListener('click', async 
     selectedPhotoIds.clear();
     await refreshAll();
     await refreshPhotos();
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+/** ??? QR events ??? */
+let qrSelectedBatchId = '';
+
+async function refreshQrOverviewStats() {
+  try {
+    const s = await api('/api/admin/qr/stats/today');
+    const scans = String(s.totalScans ?? 0);
+    const rem = String(s.remaining ?? 0);
+    const elScans = document.getElementById('statQrScans');
+    const elRem = document.getElementById('statQrRemaining');
+    if (elScans) elScans.textContent = scans;
+    if (elRem) elRem.textContent = rem;
+    const qs = document.getElementById('qrStatScans');
+    const qr = document.getElementById('qrStatRemaining');
+    const ql = document.getElementById('qrStatLinked');
+    const qa = document.getElementById('qrStatActive');
+    if (qs) qs.textContent = scans;
+    if (qr) qr.textContent = rem;
+    if (ql) ql.textContent = String(s.linked ?? 0);
+    if (qa) qa.textContent = String(s.activeEvents ?? 0);
+  } catch (_) {
+    /* ignore on overview if qr routes unavailable */
+  }
+}
+
+async function updateQrEstimate() {
+  const qty = Number(document.getElementById('qrQty')?.value) || 100;
+  const paper = document.getElementById('qrPaper')?.value || 'a4';
+  try {
+    const e = await api(`/api/admin/qr/estimate?quantity=${qty}&paperSize=${paper}`);
+    const el = document.getElementById('qrEstimate');
+    if (el) {
+      el.textContent = `About ${e.pages} page(s) ? ${e.perPage} cards/page (${e.cols}?${e.rows}) on ${paper.toUpperCase()}`;
+    }
+  } catch (_) {}
+}
+
+async function refreshQrTemplates() {
+  const list = await api('/api/admin/qr/templates');
+  const wrap = document.getElementById('qrTemplateList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  for (const t of list.templates || []) {
+    const div = document.createElement('div');
+    div.className = 'frame-card';
+    div.innerHTML = `
+      <img src="${t.url}" alt="" />
+      <strong>${t.name}${t.active ? ' ? active' : ''}</strong>
+      <code>${t.source}</code>
+      <div class="row wrap">
+        <button type="button" class="btn ghost set-active" ${t.active ? 'disabled' : ''}>Use</button>
+        ${t.source === 'upload' ? '<button type="button" class="btn ghost delete">Delete</button>' : ''}
+      </div>
+    `;
+    div.querySelector('.set-active')?.addEventListener('click', async () => {
+      await api('/api/admin/qr/templates/active', { method: 'POST', body: JSON.stringify({ id: t.id }) });
+      setStatus(`Active template: ${t.name}`);
+      await refreshQrTemplates();
+    });
+    div.querySelector('.delete')?.addEventListener('click', async () => {
+      if (!confirm('Delete this template?')) return;
+      await api(`/api/admin/qr/templates/${encodeURIComponent(t.id)}`, { method: 'DELETE' });
+      await refreshQrTemplates();
+    });
+    wrap.appendChild(div);
+  }
+}
+
+async function refreshQrBatches() {
+  const list = await api('/api/admin/qr/batches');
+  const sessions = await api('/api/admin/sessions').catch(() => ({ sessions: [] }));
+  const albumOptions = (sessions.sessions || []).filter((s) => !s.expired);
+  const wrap = document.getElementById('qrBatchList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const batches = list.batches || [];
+  if (!batches.length) {
+    wrap.innerHTML = '<p class="meta">No QR batches yet — create one above.</p>';
+  } else {
+    for (const b of batches) wrap.appendChild(renderQrBatchCard(b, false, albumOptions));
+  }
+
+  const archivedWrap = document.getElementById('qrArchivedList');
+  if (archivedWrap) {
+    const archived = await api('/api/admin/qr/batches/archived');
+    archivedWrap.innerHTML = '';
+    const rows = archived.batches || [];
+    if (!rows.length) {
+      archivedWrap.innerHTML = '<p class="meta">No archived batches.</p>';
+    } else {
+      for (const b of rows) archivedWrap.appendChild(renderQrBatchCard(b, true, albumOptions));
+    }
+  }
+}
+
+function renderQrBatchCard(b, isArchived, albumOptions = []) {
+  const div = document.createElement('div');
+  div.className = 'session-item';
+  const st = b.stats || {};
+  const album = b.linkedAlbum;
+  const albumLabel = album
+    ? `Album: ${album.title}${album.expired ? ' (expired)' : ''} · ${album.photoCount} photos`
+    : 'No album connected';
+
+  const albumSelect = isArchived
+    ? ''
+    : `<div class="row wrap" style="margin-top:0.35rem;align-items:center">
+        <label class="meta" style="margin:0">Connect album</label>
+        <select class="input album-link" style="max-width:16rem">
+          <option value="">— none —</option>
+          ${albumOptions
+            .map(
+              (s) =>
+                `<option value="${s.id}" ${b.linkedSessionId === s.id ? 'selected' : ''}>${s.title || s.slug}</option>`,
+            )
+            .join('')}
+        </select>
+        <button type="button" class="btn ghost save-album">Save</button>
+        ${album?.galleryUrl ? `<a class="btn ghost" href="${album.galleryUrl}" target="_blank" rel="noopener">Open album</a>` : ''}
+      </div>`;
+
+  const actions = isArchived
+    ? `<button type="button" class="btn danger delete-forever">Delete permanently</button>
+        <button type="button" class="btn ghost restore">Restore to draft</button>`
+    : `<button type="button" class="btn ghost open-detail">Codes</button>
+        ${b.status !== 'active' ? '<button type="button" class="btn primary activate">Activate</button>' : '<button type="button" class="btn ghost deactivate">Deactivate</button>'}
+        <button type="button" class="btn ghost reset">Reset session</button>
+        <a class="btn ghost" href="/api/admin/qr/batches/${encodeURIComponent(b.id)}/pdf" data-pdf>PDF</a>
+        <button type="button" class="btn ghost regen-a4">Regen A4</button>
+        <button type="button" class="btn ghost regen-a3">Regen A3</button>
+        <a class="btn ghost" href="/qr-scan?batch=${encodeURIComponent(b.id)}" target="_blank" rel="noopener">Attendant</a>
+        <a class="btn ghost" href="/api/admin/qr/batches/${encodeURIComponent(b.id)}/codes.csv" data-csv>CSV</a>
+        <button type="button" class="btn ghost feature">${b.featured ? 'Unfeature' : 'Feature'}</button>
+        <button type="button" class="btn ghost archive">Archive</button>
+        ${b.status !== 'active' ? '<button type="button" class="btn danger delete-forever">Delete</button>' : ''}`;
+
+  div.innerHTML = `
+      <strong>${b.name}</strong>
+      <span class="meta">${b.eventLabel || '—'} · ${b.quantity} cards · ${b.paperSize?.toUpperCase()} · ${b.status}
+      · scanned ${st.scanned ?? 0}/${st.total ?? b.quantity} · linked ${st.linked ?? 0}${b.featured ? ' · featured' : ''}</span>
+      <span class="meta">${albumLabel}</span>
+      ${albumSelect}
+      <div class="row wrap">${actions}</div>
+    `;
+
+  const withPin = async (url) => {
+    const res = await fetch(url, { headers: { 'X-Admin-Pin': pin() } });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = url.includes('csv') ? `${b.name}-codes.csv` : `${b.name}.pdf`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  div.querySelector('[data-pdf]')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      await withPin(`/api/admin/qr/batches/${encodeURIComponent(b.id)}/pdf`);
+    } catch (err) {
+      setStatus(String(err.message || err));
+    }
+  });
+  div.querySelector('[data-csv]')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      await withPin(`/api/admin/qr/batches/${encodeURIComponent(b.id)}/codes.csv`);
+    } catch (err) {
+      setStatus(String(err.message || err));
+    }
+  });
+  div.querySelector('.save-album')?.addEventListener('click', async () => {
+    const sel = div.querySelector('.album-link');
+    const linkedSessionId = sel?.value || null;
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ linkedSessionId }),
+    });
+    setStatus(
+      linkedSessionId ? `Connected ${b.name} to album` : `Disconnected album from ${b.name}`,
+    );
+    await refreshQrBatches();
+  });
+  div.querySelector('.open-detail')?.addEventListener('click', () => {
+    qrSelectedBatchId = b.id;
+    void refreshQrDetail();
+  });
+  div.querySelector('.activate')?.addEventListener('click', async () => {
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'active' }),
+    });
+    setStatus(`Activated ${b.name}`);
+    await refreshQrSection();
+  });
+  div.querySelector('.deactivate')?.addEventListener('click', async () => {
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'inactive' }),
+    });
+    await refreshQrSection();
+  });
+  div.querySelector('.reset')?.addEventListener('click', async () => {
+    if (
+      !confirm(
+        `Reset session for "${b.name}"? ${st.scanned || 0} scans will move to history; cards become reusable.`,
+      )
+    )
+      return;
+    const r = await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}/reset`, {
+      method: 'POST',
+    });
+    setStatus(`Reset complete — archived ${r.archivedScans || 0} scans`);
+    await refreshQrSection();
+  });
+  div.querySelector('.regen-a4')?.addEventListener('click', async () => {
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}/regenerate-pdf`, {
+      method: 'POST',
+      body: JSON.stringify({ paperSize: 'a4' }),
+    });
+    setStatus('A4 PDF regenerated');
+    await refreshQrBatches();
+  });
+  div.querySelector('.regen-a3')?.addEventListener('click', async () => {
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}/regenerate-pdf`, {
+      method: 'POST',
+      body: JSON.stringify({ paperSize: 'a3' }),
+    });
+    setStatus('A3 PDF regenerated');
+    await refreshQrBatches();
+  });
+  div.querySelector('.feature')?.addEventListener('click', async () => {
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ featured: !b.featured }),
+    });
+    await refreshQrBatches();
+  });
+  div.querySelector('.archive')?.addEventListener('click', async () => {
+    if (b.status === 'active') {
+      alert('Deactivate the batch before archiving.');
+      return;
+    }
+    if (!confirm(`Archive "${b.name}"?`)) return;
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'archived' }),
+    });
+    qrSelectedBatchId = '';
+    document.getElementById('qrDetail').hidden = true;
+    await refreshQrSection();
+  });
+  div.querySelector('.restore')?.addEventListener('click', async () => {
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'draft' }),
+    });
+    setStatus(`Restored ${b.name} to draft`);
+    await refreshQrSection();
+  });
+  div.querySelector('.delete-forever')?.addEventListener('click', async () => {
+    if (
+      !confirm(
+        `Permanently delete "${b.name}"? All codes and PDFs will be removed. This cannot be undone.`,
+      )
+    )
+      return;
+    await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}`, { method: 'DELETE' });
+    if (qrSelectedBatchId === b.id) {
+      qrSelectedBatchId = '';
+      document.getElementById('qrDetail').hidden = true;
+    }
+    setStatus(`Deleted ${b.name}`);
+    await refreshQrSection();
+  });
+  return div;
+}
+
+async function refreshQrDetail() {
+  const detail = document.getElementById('qrDetail');
+  if (!qrSelectedBatchId || !detail) return;
+  detail.hidden = false;
+  const filter = document.getElementById('qrCodeFilter')?.value || 'all';
+  const q = document.getElementById('qrCodeSearch')?.value || '';
+  const data = await api(
+    `/api/admin/qr/batches/${encodeURIComponent(qrSelectedBatchId)}?filter=${encodeURIComponent(filter)}&q=${encodeURIComponent(q)}`,
+  );
+  const b = data.batch;
+  document.getElementById('qrDetailMeta').textContent =
+    `${b.name} · epoch ${b.sessionEpoch} · ${data.codes?.length || 0} shown · ~${data.estimate?.pages || '?'} PDF pages`;
+  const table = document.getElementById('qrCodeTable');
+  table.innerHTML = '';
+  for (const c of data.codes || []) {
+    const row = document.createElement('div');
+    row.className = 'qr-code-row';
+    row.innerHTML = `
+      <span>#${c.serial}</span>
+      <code>${c.code}</code>
+      <span>${c.status}</span>
+      <span class="meta">${c.scannedAt ? new Date(c.scannedAt).toLocaleString() : '—'}</span>
+      <span>${c.photo ? `<a href="${c.photo.url}" target="_blank" rel="noopener">photo</a>` : '—'}</span>
+      <button type="button" class="btn ghost void" ${c.status === 'void' ? 'disabled' : ''}>Void</button>
+    `;
+    row.querySelector('.void')?.addEventListener('click', async () => {
+      if (!confirm(`Void code #${c.serial}?`)) return;
+      await api(`/api/admin/qr/batches/${encodeURIComponent(qrSelectedBatchId)}/void/${encodeURIComponent(c.id)}`, {
+        method: 'POST',
+      });
+      await refreshQrDetail();
+      await refreshQrBatches();
+    });
+    table.appendChild(row);
+  }
+}
+
+async function refreshQrSection() {
+  await refreshQrOverviewStats();
+  await updateQrEstimate();
+  await refreshQrTemplates();
+  await refreshQrBatches();
+  if (qrSelectedBatchId) await refreshQrDetail();
+}
+
+document.querySelectorAll('.qr-qty').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.getElementById('qrQty').value = btn.dataset.qty;
+    void updateQrEstimate();
+  });
+});
+document.getElementById('qrQty')?.addEventListener('input', () => void updateQrEstimate());
+document.getElementById('qrPaper')?.addEventListener('change', () => void updateQrEstimate());
+
+document.getElementById('btnQrCreate')?.addEventListener('click', async () => {
+  const name = String(document.getElementById('qrName')?.value || '').trim();
+  const quantity = Number(document.getElementById('qrQty')?.value);
+  if (!name) {
+    setStatus('Enter an event name before generating.');
+    document.getElementById('qrName')?.focus();
+    return;
+  }
+  if (!Number.isFinite(quantity) || quantity < 1 || quantity > 500) {
+    setStatus('Quantity must be between 1 and 500.');
+    document.getElementById('qrQty')?.focus();
+    return;
+  }
+  setStatus('Generating QR batch + PDF?');
+  try {
+    const r = await api('/api/admin/qr/batches', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        eventLabel: document.getElementById('qrLabel')?.value,
+        quantity,
+        paperSize: document.getElementById('qrPaper')?.value,
+        notes: document.getElementById('qrNotes')?.value,
+      }),
+    });
+    setStatus(`Created ${r.batch?.name} � ${r.pdf?.pages || '?'} PDF page(s). Activate it to use on /qr-scan.`);
+    document.getElementById('qrName').value = '';
+    qrSelectedBatchId = r.batch?.id || '';
+    await refreshQrSection();
+  } catch (e) {
+    setStatus(`QR generate failed: ${e.message || e}`);
+  }
+});
+
+document.getElementById('btnQrResetAll')?.addEventListener('click', async () => {
+  if (!confirm('Reset ALL active QR event sessions? Cards become reusable.')) return;
+  const r = await api('/api/admin/qr/reset-active', { method: 'POST' });
+  setStatus(`Reset ${r.batchesReset} events`);
+  await refreshQrSection();
+});
+
+document.getElementById('btnQrRefreshDetail')?.addEventListener('click', () => void refreshQrDetail());
+document.getElementById('qrCodeFilter')?.addEventListener('change', () => void refreshQrDetail());
+document.getElementById('qrCodeSearch')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') void refreshQrDetail();
+});
+
+document.getElementById('btnQrUploadTemplate')?.addEventListener('click', async () => {
+  const file = document.getElementById('qrTemplateFile')?.files?.[0];
+  if (!file) return;
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('setActive', '1');
+    const res = await fetch('/api/admin/qr/templates/upload', {
+      method: 'POST',
+      headers: { 'X-Admin-Pin': pin() },
+      body: fd,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    setStatus('Template uploaded and set active');
+    await refreshQrTemplates();
   } catch (e) {
     setStatus(String(e.message || e));
   }

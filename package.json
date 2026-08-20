@@ -20,6 +20,9 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "multer": "^2.2.0",
-    "nanoid": "^5.1.0"
+    "nanoid": "^5.1.0",
+    "pdfkit": "^0.19.1",
+    "qrcode": "^1.5.4",
+    "selfsigned": "^5.5.0"
   }
 }

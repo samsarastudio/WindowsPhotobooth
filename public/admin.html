@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260818-1" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260820-1" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -28,6 +28,16 @@
         <h2>Sign in</h2>
         <form id="loginForm" autocomplete="on">
           <label for="pin">Admin PIN</label>
+          <input
+            id="adminUsername"
+            name="username"
+            type="text"
+            autocomplete="username"
+            value="moments-admin"
+            tabindex="-1"
+            aria-hidden="true"
+            style="position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0"
+          />
           <input id="pin" class="input" name="pin" type="password" autocomplete="current-password" />
           <button type="submit" class="btn primary" id="btnLogin">Unlock</button>
         </form>
@@ -41,6 +51,7 @@
             <button type="button" class="admin-tab active" data-tab="overview">Overview</button>
             <button type="button" class="admin-tab" data-tab="albums">Albums</button>
             <button type="button" class="admin-tab" data-tab="photos">Photos</button>
+            <button type="button" class="admin-tab" data-tab="qr">QR events</button>
             <button type="button" class="admin-tab" data-tab="frames">Frames</button>
             <button type="button" class="admin-tab" data-tab="wall">Mosaic wall</button>
             <button type="button" class="admin-tab" data-tab="settings">Settings</button>
@@ -54,8 +65,10 @@
               <div class="stat"><strong id="statAlbums">0</strong><span>Albums</span></div>
               <div class="stat"><strong id="statPhotos">0</strong><span>Photos</span></div>
               <div class="stat"><strong id="statFrames">0</strong><span>Frames</span></div>
+              <div class="stat"><strong id="statQrScans">0</strong><span>QR scans today</span></div>
+              <div class="stat"><strong id="statQrRemaining">0</strong><span>QR remaining</span></div>
             </div>
-            <p class="meta">Public URLs: <code>/wall</code> · <code>/wall/slideshow</code> · <code>/{session}</code> · <code>/{session}/wall</code></p>
+            <p class="meta">Public URLs: <code>/wall</code> · <code>/qr-scan</code> · <code>/q/{code}</code> · <code>/{session}</code></p>
             <div class="row wrap">
               <button type="button" class="btn primary" id="btnSeed">Add sample photos</button>
               <button type="button" class="btn ghost" id="btnPurge">Purge expired now</button>
@@ -81,6 +94,79 @@
             </div>
             <p id="photoSelectionMeta" class="meta">Select photos with the checkboxes to delete several at once.</p>
             <div id="photoGrid" class="photo-admin-grid"></div>
+          </section>
+
+          <section class="card admin-section" data-section="qr" hidden>
+            <h2>QR events</h2>
+            <p class="meta">
+              Print fixed batches of cards. Attendants open <code>/qr-scan</code> on an iPad/phone.
+              Guests who scan a card see <code>/q/{code}</code>. Connect an album so share-page
+              <strong>Link my card</strong> attaches photos from that event. Reset reuses the same prints.
+            </p>
+            <div class="stat-grid" style="margin-bottom: 1rem">
+              <div class="stat"><strong id="qrStatScans">0</strong><span>Scans today</span></div>
+              <div class="stat"><strong id="qrStatRemaining">0</strong><span>Remaining</span></div>
+              <div class="stat"><strong id="qrStatLinked">0</strong><span>Linked</span></div>
+              <div class="stat"><strong id="qrStatActive">0</strong><span>Active events</span></div>
+            </div>
+            <div class="row wrap">
+              <a class="btn primary" href="/qr-scan" target="_blank" rel="noopener">Open attendant page</a>
+              <button type="button" class="btn ghost" id="btnQrResetAll">Reset all active sessions</button>
+            </div>
+
+            <h3 class="admin-subhead">Create batch</h3>
+            <label>Event name</label>
+            <input id="qrName" class="input" placeholder="e.g. Onam Night" />
+            <label>Label (shown on attendant + preview)</label>
+            <input id="qrLabel" class="input" placeholder="Optional subtitle" />
+            <label>Quantity</label>
+            <div class="row wrap">
+              <button type="button" class="btn ghost qr-qty" data-qty="50">50</button>
+              <button type="button" class="btn ghost qr-qty" data-qty="100">100</button>
+              <button type="button" class="btn ghost qr-qty" data-qty="200">200</button>
+              <input id="qrQty" class="input" type="number" min="1" max="500" value="100" style="max-width: 7rem" />
+            </div>
+            <label>Paper size</label>
+            <select id="qrPaper" class="input">
+              <option value="a4">A4</option>
+              <option value="a3">A3</option>
+            </select>
+            <p id="qrEstimate" class="meta"></p>
+            <label>Notes</label>
+            <input id="qrNotes" class="input" placeholder="Optional" />
+            <button type="button" class="btn primary" id="btnQrCreate">Generate batch + PDF</button>
+
+            <h3 class="admin-subhead">Batches</h3>
+            <div id="qrBatchList" class="session-list"></div>
+
+            <h3 class="admin-subhead">Archived</h3>
+            <p class="meta">Archived batches are hidden from attendants. Delete permanently removes codes and PDFs.</p>
+            <div id="qrArchivedList" class="session-list"></div>
+
+            <div id="qrDetail" hidden>
+              <h3 class="admin-subhead">Batch detail</h3>
+              <p id="qrDetailMeta" class="meta"></p>
+              <div class="row wrap">
+                <input id="qrCodeSearch" class="input" placeholder="Search code / serial" />
+                <select id="qrCodeFilter" class="input" style="max-width: 10rem">
+                  <option value="all">All</option>
+                  <option value="unused">Unused</option>
+                  <option value="scanned">Scanned</option>
+                  <option value="linked">Linked</option>
+                  <option value="void">Void</option>
+                </select>
+                <button type="button" class="btn ghost" id="btnQrRefreshDetail">Refresh</button>
+              </div>
+              <div id="qrCodeTable" class="qr-code-table"></div>
+            </div>
+
+            <h3 class="admin-subhead">Card templates</h3>
+            <p class="meta">Active template is used when generating or regenerating PDFs. Default is the AI inmoment frame.</p>
+            <div id="qrTemplateList" class="frame-grid"></div>
+            <div class="row wrap">
+              <input id="qrTemplateFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              <button type="button" class="btn ghost" id="btnQrUploadTemplate">Upload template</button>
+            </div>
           </section>
 
           <section class="card admin-section" data-section="frames" hidden>
@@ -182,6 +268,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260818-2" type="module"></script>
+    <script src="/js/admin.js?v=20260820-5" type="module"></script>
   </body>
 </html>

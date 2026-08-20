@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f9f6ee"/>
+      <stop offset="100%" stop-color="#eef2eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" rx="36" fill="url(#bg)"/>
+  <rect x="22" y="22" width="756" height="956" rx="28" fill="none" stroke="#2f5d3a" stroke-width="7"/>
+  <rect x="42" y="42" width="716" height="916" rx="20" fill="none" stroke="#c4a35a" stroke-width="2.2"/>
+
+  <!-- corner sprigs -->
+  <g fill="#5a7a5e" opacity="0.9">
+    <g transform="translate(78,78) rotate(35)">
+      <ellipse cx="28" cy="0" rx="28" ry="11" transform="rotate(-18)"/>
+      <ellipse cx="22" cy="-10" rx="20" ry="9" transform="rotate(28)"/>
+      <ellipse cx="20" cy="10" rx="18" ry="8" transform="rotate(-48)"/>
+    </g>
+    <g transform="translate(722,78) rotate(145)">
+      <ellipse cx="28" cy="0" rx="28" ry="11" transform="rotate(-18)"/>
+      <ellipse cx="22" cy="-10" rx="20" ry="9" transform="rotate(28)"/>
+      <ellipse cx="20" cy="10" rx="18" ry="8" transform="rotate(-48)"/>
+    </g>
+    <g transform="translate(78,922) rotate(-35)">
+      <ellipse cx="28" cy="0" rx="28" ry="11" transform="rotate(-18)"/>
+      <ellipse cx="22" cy="-10" rx="20" ry="9" transform="rotate(28)"/>
+      <ellipse cx="20" cy="10" rx="18" ry="8" transform="rotate(-48)"/>
+    </g>
+    <g transform="translate(722,922) rotate(-145)">
+      <ellipse cx="28" cy="0" rx="28" ry="11" transform="rotate(-18)"/>
+      <ellipse cx="22" cy="-10" rx="20" ry="9" transform="rotate(28)"/>
+      <ellipse cx="20" cy="10" rx="18" ry="8" transform="rotate(-48)"/>
+    </g>
+  </g>
+
+  <text x="400" y="130" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="52" fill="#2f5d3a" letter-spacing="8">inmoment</text>
+
+  <rect x="210" y="280" width="380" height="380" rx="18" fill="#ffffff" stroke="#c4a35a" stroke-width="2"/>
+
+  <!-- Instagram -->
+  <g transform="translate(232,720)">
+    <rect x="0" y="0" width="36" height="36" rx="9" fill="none" stroke="#2f5d3a" stroke-width="2.5"/>
+    <circle cx="18" cy="18" r="8" fill="none" stroke="#2f5d3a" stroke-width="2.5"/>
+    <circle cx="27" cy="9" r="2.2" fill="#2f5d3a"/>
+    <text x="48" y="25" font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#6b7468">@_in_moment_photography_</text>
+  </g>
+
+  <text x="400" y="920" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="22" fill="#6b7468">#000 / 50</text>
+</svg>

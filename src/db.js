@@ -41,8 +41,104 @@ export function initDb() {
     );
     CREATE INDEX IF NOT EXISTS idx_photos_session ON photos(session_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+    CREATE TABLE IF NOT EXISTS qr_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      source TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS qr_batches (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      event_label TEXT,
+      quantity INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      paper_size TEXT NOT NULL,
+      template_id TEXT,
+      notes TEXT,
+      featured INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      activated_at TEXT,
+      pdf_filename TEXT,
+      session_epoch INTEGER NOT NULL DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS qr_codes (
+      id TEXT PRIMARY KEY,
+      batch_id TEXT NOT NULL REFERENCES qr_batches(id) ON DELETE CASCADE,
+      code TEXT NOT NULL UNIQUE,
+      serial INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      scanned_at TEXT,
+      session_epoch INTEGER NOT NULL DEFAULT 1,
+      attached_photo_id TEXT,
+      attached_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS qr_scans (
+      id TEXT PRIMARY KEY,
+      code_id TEXT NOT NULL REFERENCES qr_codes(id) ON DELETE CASCADE,
+      batch_id TEXT NOT NULL REFERENCES qr_batches(id) ON DELETE CASCADE,
+      day_key TEXT NOT NULL,
+      scanned_at TEXT NOT NULL,
+      user_agent TEXT,
+      ip_hash TEXT,
+      result TEXT NOT NULL,
+      session_epoch INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS qr_scan_history (
+      id TEXT PRIMARY KEY,
+      batch_id TEXT NOT NULL,
+      code_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      scanned_at TEXT,
+      day_key TEXT,
+      session_epoch INTEGER NOT NULL,
+      attached_photo_id TEXT,
+      reset_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_qr_codes_batch ON qr_codes(batch_id, serial);
+    CREATE INDEX IF NOT EXISTS idx_qr_codes_code ON qr_codes(code);
+    CREATE INDEX IF NOT EXISTS idx_qr_scans_batch_epoch ON qr_scans(batch_id, session_epoch, scanned_at);
+    CREATE INDEX IF NOT EXISTS idx_qr_scans_day ON qr_scans(day_key);
   `);
+
+  ensureColumn(db, 'qr_batches', 'linked_session_id', 'TEXT');
+  ensureBuiltinQrTemplate(db);
   return db;
+}
+
+function ensureColumn(database, table, column, typeSql) {
+  const cols = database.prepare(`PRAGMA table_info(${table})`).all();
+  if (cols.some((c) => c.name === column)) return;
+  database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${typeSql}`);
+}
+
+function ensureBuiltinQrTemplate(database) {
+  const row = database
+    .prepare(`SELECT id, filename FROM qr_templates WHERE source = 'builtin' LIMIT 1`)
+    .get();
+  if (row) {
+    if (row.filename !== 'default-inmoment.png') {
+      database
+        .prepare(`UPDATE qr_templates SET filename = 'default-inmoment.png', name = 'inmoment default' WHERE id = ?`)
+        .run(row.id);
+    }
+    return;
+  }
+  const now = new Date().toISOString();
+  database
+    .prepare(
+      `INSERT INTO qr_templates (id, name, filename, source, created_at)
+       VALUES (?, ?, ?, 'builtin', ?)`,
+    )
+    .run('tpl_default_inmoment', 'inmoment default', 'default-inmoment.png', now);
 }
 
 export function loadSettings() {

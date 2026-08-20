@@ -268,3 +268,28 @@
     grid-template-columns: 1fr;
   }
 }
+
+.qr-code-table {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.qr-code-row {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 5rem 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.55rem;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 800px) {
+  .qr-code-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
