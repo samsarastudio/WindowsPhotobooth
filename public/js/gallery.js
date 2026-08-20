@@ -43,9 +43,11 @@ const els = {
   btnAttachCard: document.getElementById('btnAttachCard'),
   attachPanel: document.getElementById('attachPanel'),
   attachVideo: document.getElementById('attachVideo'),
-  attachCodeInput: document.getElementById('attachCodeInput'),
   attachStatus: document.getElementById('attachStatus'),
-  btnAttachSubmit: document.getElementById('btnAttachSubmit'),
+  attachLinked: document.getElementById('attachLinked'),
+  attachLinkedUrl: document.getElementById('attachLinkedUrl'),
+  attachCameraWrap: document.getElementById('attachCameraWrap'),
+  attachCameraHint: document.querySelector('.attach-camera-hint'),
   btnAttachCancel: document.getElementById('btnAttachCancel'),
   mosaic: document.getElementById('mosaic'),
   mosaicStage: document.getElementById('mosaicStage'),
@@ -187,9 +189,6 @@ function renderGuestPhoto() {
   const photo = photos[0] || null;
   if (!photo) {
     els.guestPhotoImg.removeAttribute('src');
-    if (els.guestPhotoDownload) {
-      els.guestPhotoDownload.removeAttribute('href');
-    }
     setStatus('Photo not found or no longer available.');
     return;
   }
@@ -197,15 +196,47 @@ function renderGuestPhoto() {
   els.guestPhotoImg.src = photo.url;
   els.title.textContent = 'Your photo';
   els.meta.textContent = photo.variant || '';
-  if (els.guestPhotoDownload) {
-    els.guestPhotoDownload.href = photo.url;
-    els.guestPhotoDownload.download = `${photo.id}-${photo.variant || 'photo'}.jpg`;
-  }
   if (els.attachStatus) {
     els.attachStatus.hidden = true;
     els.attachStatus.textContent = '';
   }
+  if (els.attachLinked) els.attachLinked.hidden = true;
   if (els.attachPanel) els.attachPanel.hidden = true;
+  stopAttachCamera();
+}
+
+function isAppleTouchDevice() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** iPhone: share sheet (Save to Photos). Android/desktop: direct download. */
+async function savePhotoToDevice(url, filename = 'inmoment-photo.jpg') {
+  if (!url) return;
+  try {
+    if (isAppleTouchDevice() && navigator.share && navigator.canShare) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const type = blob.type || 'image/jpeg';
+      const file = new File([blob], filename, { type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'inmoment' });
+        return;
+      }
+    }
+  } catch (e) {
+    if (e?.name === 'AbortError') return;
+    /* fall through to download */
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 let attachStream = null;
@@ -238,14 +269,30 @@ function stopAttachCamera() {
 }
 
 async function startAttachCamera() {
-  if (!els.attachVideo || !navigator.mediaDevices?.getUserMedia) return;
+  if (!els.attachVideo || !navigator.mediaDevices?.getUserMedia) {
+    if (els.attachStatus) {
+      els.attachStatus.hidden = false;
+      els.attachStatus.textContent = 'Camera unavailable on this device.';
+    }
+    return;
+  }
+  if (!window.isSecureContext) {
+    if (els.attachStatus) {
+      els.attachStatus.hidden = false;
+      els.attachStatus.textContent = 'Camera needs HTTPS to scan your card.';
+    }
+    return;
+  }
   try {
+    stopAttachCamera();
+    if (els.attachCameraHint) els.attachCameraHint.textContent = 'Starting camera…';
     attachStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: { facingMode: { ideal: 'environment' } },
     });
     els.attachVideo.srcObject = attachStream;
     await els.attachVideo.play();
+    if (els.attachCameraHint) els.attachCameraHint.textContent = 'Looking for QR…';
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     const tick = () => {
@@ -263,9 +310,9 @@ async function startAttachCamera() {
         });
         if (found?.data) {
           const code = extractEventCode(found.data);
-          if (code && els.attachCodeInput) {
-            els.attachCodeInput.value = code;
-            void submitAttach(false);
+          if (code) {
+            if (els.attachCameraHint) els.attachCameraHint.textContent = 'Linking…';
+            void submitAttach(code, false);
             return;
           }
         }
@@ -274,54 +321,73 @@ async function startAttachCamera() {
     };
     attachRaf = requestAnimationFrame(tick);
   } catch {
-    /* camera optional — paste still works */
+    stopAttachCamera();
+    if (els.attachStatus) {
+      els.attachStatus.hidden = false;
+      els.attachStatus.textContent = 'Camera blocked — allow camera access and try again.';
+    }
   }
 }
 
-async function submitAttach(replace) {
+function showLinkedCard(previewUrl) {
+  if (els.attachLinked && els.attachLinkedUrl && previewUrl) {
+    els.attachLinkedUrl.href = previewUrl;
+    els.attachLinked.hidden = false;
+  }
+  if (els.attachStatus) {
+    els.attachStatus.hidden = false;
+    els.attachStatus.textContent = 'Card linked — tap Open card page anytime.';
+  }
+}
+
+async function submitAttach(code, replace) {
   const photo = photos[0];
   if (!photo?.id) return;
-  const code = extractEventCode(els.attachCodeInput?.value);
-  if (!code) {
-    if (els.attachStatus) {
-      els.attachStatus.hidden = false;
-      els.attachStatus.textContent = 'Enter or scan a card code.';
-    }
+  const resolved = extractEventCode(code);
+  if (!resolved) {
+    if (els.attachCameraHint) els.attachCameraHint.textContent = 'Looking for QR…';
     return;
   }
   try {
     const res = await fetch('/api/qr/attach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, photoId: photo.id, replace: !!replace }),
+      body: JSON.stringify({ code: resolved, photoId: photo.id, replace: !!replace }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 409 && data.needsConfirm) {
       if (confirm('This card is linked to another photo. Replace with this one?')) {
-        return submitAttach(true);
+        return submitAttach(resolved, true);
       }
+      stopAttachCamera();
+      if (els.attachPanel) els.attachPanel.hidden = true;
       return;
     }
     if (!res.ok) throw new Error(data.error || res.statusText);
     stopAttachCamera();
     if (els.attachPanel) els.attachPanel.hidden = true;
-    if (els.attachStatus) {
-      els.attachStatus.hidden = false;
-      els.attachStatus.textContent =
-        'Card linked — scan your card anytime to see this photo.';
-    }
+    const previewUrl = data.previewUrl || `/q/${encodeURIComponent(resolved)}`;
+    showLinkedCard(previewUrl);
   } catch (e) {
     if (els.attachStatus) {
       els.attachStatus.hidden = false;
       els.attachStatus.textContent = String(e.message || e);
     }
+    if (els.attachCameraHint) els.attachCameraHint.textContent = 'Looking for QR…';
+    setTimeout(() => {
+      if (els.attachPanel && !els.attachPanel.hidden) void startAttachCamera();
+    }, 1200);
   }
 }
 
 els.btnAttachCard?.addEventListener('click', () => {
   if (!els.attachPanel) return;
   els.attachPanel.hidden = false;
-  if (els.attachCodeInput) els.attachCodeInput.value = '';
+  if (els.attachLinked) els.attachLinked.hidden = true;
+  if (els.attachStatus) {
+    els.attachStatus.hidden = true;
+    els.attachStatus.textContent = '';
+  }
   void startAttachCamera();
 });
 
@@ -330,7 +396,17 @@ els.btnAttachCancel?.addEventListener('click', () => {
   if (els.attachPanel) els.attachPanel.hidden = true;
 });
 
-els.btnAttachSubmit?.addEventListener('click', () => void submitAttach(false));
+els.guestPhotoDownload?.addEventListener('click', () => {
+  const photo = photos[0];
+  if (!photo?.url) return;
+  void savePhotoToDevice(photo.url, `${photo.id}-${photo.variant || 'photo'}.jpg`);
+});
+
+els.lbDownload?.addEventListener('click', () => {
+  const photo = photos[index];
+  if (!photo?.url) return;
+  void savePhotoToDevice(photo.url, `${photo.id}-${photo.variant || 'photo'}.jpg`);
+});
 
 function seededRandom(seed) {
   let s = seed % 2147483647;
@@ -1246,8 +1322,6 @@ function openLightbox(i) {
   const photo = photos[index];
   els.lbImg.src = photo.url;
   els.lbVariant.textContent = photo.variant + (photo.sessionSlug ? ` · ${photo.sessionSlug}` : '');
-  els.lbDownload.href = photo.url;
-  els.lbDownload.download = `${photo.id}-${photo.variant}.jpg`;
   els.lightbox.hidden = false;
   if (route.slug) {
     history.replaceState(

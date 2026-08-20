@@ -121,24 +121,31 @@ function ensureColumn(database, table, column, typeSql) {
 }
 
 function ensureBuiltinQrTemplate(database) {
-  const row = database
-    .prepare(`SELECT id, filename FROM qr_templates WHERE source = 'builtin' LIMIT 1`)
-    .get();
-  if (row) {
-    if (row.filename !== 'default-inmoment.png') {
-      database
-        .prepare(`UPDATE qr_templates SET filename = 'default-inmoment.png', name = 'inmoment default' WHERE id = ?`)
-        .run(row.id);
-    }
-    return;
-  }
   const now = new Date().toISOString();
-  database
-    .prepare(
-      `INSERT INTO qr_templates (id, name, filename, source, created_at)
-       VALUES (?, ?, ?, 'builtin', ?)`,
-    )
-    .run('tpl_default_inmoment', 'inmoment default', 'default-inmoment.png', now);
+  const builtins = [
+    { id: 'tpl_default_inmoment', name: 'inmoment default', filename: 'default-inmoment.png' },
+    { id: 'tpl_botanical_blush', name: 'Botanical blush', filename: 'frame-botanical-blush.png' },
+    { id: 'tpl_classic_gold', name: 'Classic gold', filename: 'frame-classic-gold.png' },
+    { id: 'tpl_sage_minimal', name: 'Sage minimal', filename: 'frame-sage-minimal.png' },
+  ];
+  const insert = database.prepare(
+    `INSERT OR IGNORE INTO qr_templates (id, name, filename, source, created_at)
+     VALUES (?, ?, ?, 'builtin', ?)`,
+  );
+  const update = database.prepare(
+    `UPDATE qr_templates SET name = ?, filename = ?, source = 'builtin' WHERE id = ?`,
+  );
+  for (const t of builtins) {
+    insert.run(t.id, t.name, t.filename, now);
+    update.run(t.name, t.filename, t.id);
+  }
+  // Keep legacy single-builtin row pointed at default if it used another id
+  const any = database
+    .prepare(`SELECT id FROM qr_templates WHERE source = 'builtin' AND id = 'tpl_default_inmoment'`)
+    .get();
+  if (!any) {
+    insert.run('tpl_default_inmoment', 'inmoment default', 'default-inmoment.png', now);
+  }
 }
 
 export function loadSettings() {
