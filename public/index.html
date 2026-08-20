@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/gallery.css?v=20260820-1" />
+    <link rel="stylesheet" href="/css/gallery.css?v=20260820-9" />
   </head>
   <body>
     <div class="leaf leaf-tr" aria-hidden="true"></div>
@@ -33,33 +33,23 @@
       <p id="status" class="status" hidden></p>
       <p id="empty" class="empty" hidden>Photos will appear here as they’re taken…</p>
       <div id="grid" class="grid" aria-live="polite"></div>
-          <div id="guestPhoto" class="guest-photo" hidden>
-        <figure class="guest-photo-frame">
-          <img id="guestPhotoImg" alt="Your photo" />
-          <figcaption class="guest-photo-caption">
-            <p class="guest-photo-label">Your photo</p>
-            <div class="guest-photo-actions">
-              <button type="button" class="btn primary" id="guestPhotoDownload">Save photo</button>
-              <button type="button" class="btn ghost" id="btnAttachCard" title="Link my event card">
-                Link my card
-              </button>
-            </div>
-            <p id="attachStatus" class="guest-attach-status" hidden></p>
-            <p id="attachLinked" class="guest-attach-linked" hidden>
-              <a id="attachLinkedUrl" class="btn primary" href="#" target="_blank" rel="noopener">Open card page</a>
-            </p>
-          </figcaption>
-        </figure>
-        <div id="attachPanel" class="attach-panel" hidden>
-          <p class="guest-photo-label">Scan your event card</p>
-          <p class="guest-attach-help">Point your camera at the printed QR on your card.</p>
-          <div id="attachCameraWrap" class="attach-camera-wrap">
-            <video id="attachVideo" playsinline muted></video>
-            <p class="attach-camera-hint">Looking for QR…</p>
-          </div>
-          <div class="row wrap">
-            <button type="button" class="btn ghost" id="btnAttachCancel">Cancel</button>
-          </div>
+      <div id="guestPhoto" class="guest-photo" hidden>
+        <div class="guest-photo-layout">
+          <figure class="guest-photo-frame">
+            <img id="guestPhotoImg" alt="Your photo" />
+            <figcaption class="guest-photo-caption">
+              <p class="guest-photo-label">Your photo</p>
+              <div class="guest-photo-actions">
+                <button type="button" class="btn primary" id="btnAttachCard" title="Link my event card">
+                  Link my card
+                </button>
+              </div>
+              <p id="attachStatus" class="guest-attach-status" hidden></p>
+              <p id="attachLinked" class="guest-attach-linked" hidden>
+                <a id="attachLinkedUrl" class="btn primary" href="#" target="_blank" rel="noopener">Open card page</a>
+              </p>
+            </figcaption>
+          </figure>
         </div>
       </div>
       <div id="mosaic" class="mosaic" hidden aria-live="polite">
@@ -100,6 +90,18 @@
       <button type="button" class="lb-nav next" id="lbNext" aria-label="Next">›</button>
     </div>
 
+    <div id="attachPanel" class="attach-overlay" hidden>
+      <div class="attach-dialog" role="dialog" aria-modal="true" aria-labelledby="attachTitle">
+        <p class="guest-photo-label" id="attachTitle">Scan your event card</p>
+        <p class="guest-attach-help">Point at the printed QR on your card.</p>
+        <div id="attachCameraWrap" class="attach-camera-wrap">
+          <video id="attachVideo" playsinline muted></video>
+          <p class="attach-camera-hint">Looking for QR…</p>
+        </div>
+        <button type="button" class="btn ghost" id="btnAttachCancel">Cancel</button>
+      </div>
+    </div>
+
     <div id="slideshow" class="slideshow" hidden>
       <img id="ssImg" alt="" />
       <div class="ss-bar">
@@ -111,6 +113,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <script src="/js/gallery.js?v=20260820-6" type="module"></script>
+    <script src="/js/gallery.js?v=20260820-9" type="module"></script>
   </body>
 </html>
