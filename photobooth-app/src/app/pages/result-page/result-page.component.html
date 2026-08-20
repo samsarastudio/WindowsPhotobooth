@@ -1,4 +1,4 @@
-<div class="pb-page pb-result">
+<div class="pb-page pb-result" [class.is-share-open]="shareOpen()">
   <div class="pb-kiosk-surface pb-result-inner">
     <h1 class="pb-result-title">{{ copy().result.title }}</h1>
 
@@ -117,21 +117,23 @@
   </div>
 
   @if (shareOpen()) {
-    <div class="pb-share-overlay" role="dialog" aria-modal="true">
+    <div class="pb-share-overlay" role="dialog" aria-modal="true" aria-labelledby="pbShareTitle">
       <div class="pb-share-card">
-        <h2>{{ copy().result.shareQrTitle }}</h2>
+        <span class="pb-share-sprig pb-share-sprig-tl" aria-hidden="true"></span>
+        <span class="pb-share-sprig pb-share-sprig-tr" aria-hidden="true"></span>
+        <span class="pb-share-sprig pb-share-sprig-bl" aria-hidden="true"></span>
+        <span class="pb-share-sprig pb-share-sprig-br" aria-hidden="true"></span>
+        <p class="pb-share-brand">inmoment</p>
+        <h2 id="pbShareTitle">{{ copy().result.shareQrTitle }}</h2>
         <p class="pb-hint pb-share-lead">{{ copy().result.shareQrHint }}</p>
         @if (shareQrDataUrl(); as qr) {
-          <img class="pb-share-qr" [src]="qr" alt="Share QR code" />
+          <div class="pb-share-qr-frame">
+            <img class="pb-share-qr" [src]="qr" alt="Share QR code" />
+          </div>
         }
-        <div class="pb-share-actions">
-          <button type="button" class="pb-btn pb-btn-primary" (click)="openSharePage()">
-            {{ copy().result.shareOpenPage }}
-          </button>
-          <button type="button" class="pb-btn pb-btn-ghost" (click)="closeShare()">
-            {{ copy().result.shareBack }}
-          </button>
-        </div>
+        <button type="button" class="pb-btn pb-btn-ghost pb-share-back" (click)="closeShare()">
+          {{ copy().result.shareBack }}
+        </button>
       </div>
     </div>
   }

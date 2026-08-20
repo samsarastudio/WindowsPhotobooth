@@ -86,7 +86,6 @@ export interface PhotoboothCopyResult {
   sharing: string;
   shareQrTitle: string;
   shareQrHint: string;
-  shareOpenPage: string;
   shareBack: string;
   uploadFailed: string;
   /** One-shot print on the result / final page (when printing is enabled). */
@@ -420,9 +419,8 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
       'Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs.',
     share: 'Share',
     sharing: 'Uploading…',
-    shareQrTitle: 'Your Moments page',
-    shareQrHint: 'Scan to open the same photo page on your phone — save or link your event card there.',
-    shareOpenPage: 'Open Moments page',
+    shareQrTitle: 'Scan to view your photo',
+    shareQrHint: 'Scan with your phone to open your photo — save or link your event card there.',
     shareBack: 'Back',
     uploadFailed: 'Could not upload to gallery',
     print: 'Print',

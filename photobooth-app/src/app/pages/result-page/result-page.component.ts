@@ -229,21 +229,6 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  async openSharePage(): Promise<void> {
-    const url = this.galleryUpload.shareUrlFor(this.path());
-    if (!url) return;
-    try {
-      if (window.pbApi?.openExternal) {
-        const r = await window.pbApi.openExternal(url);
-        if (!r.ok) throw new Error(r.error || 'Could not open page');
-      } else {
-        window.open(url, '_blank', 'noopener');
-      }
-    } catch (e) {
-      this.aiErr.set(String(e));
-    }
-  }
-
   async retryShareUpload(): Promise<void> {
     const pp = this.path();
     if (!pp) return;

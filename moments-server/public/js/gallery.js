@@ -39,7 +39,6 @@ const els = {
   grid: document.getElementById('grid'),
   guestPhoto: document.getElementById('guestPhoto'),
   guestPhotoImg: document.getElementById('guestPhotoImg'),
-  guestPhotoDownload: document.getElementById('guestPhotoDownload'),
   btnAttachCard: document.getElementById('btnAttachCard'),
   attachPanel: document.getElementById('attachPanel'),
   attachVideo: document.getElementById('attachVideo'),
@@ -133,6 +132,7 @@ function setMode(mode, push = true) {
   document.body.classList.toggle('is-mosaic', immersive);
   document.body.classList.toggle('is-guest-photo', guestOnly);
   document.body.classList.toggle('is-slideshow-route', mode === 'slideshow');
+  if (!guestOnly) document.body.classList.remove('is-attaching');
   if (els.topBar) els.topBar.hidden = immersive;
   els.grid.hidden = mode !== 'grid';
   if (els.guestPhoto) els.guestPhoto.hidden = mode !== 'photo';
@@ -202,6 +202,7 @@ function renderGuestPhoto() {
   }
   if (els.attachLinked) els.attachLinked.hidden = true;
   if (els.attachPanel) els.attachPanel.hidden = true;
+  document.body.classList.remove('is-attaching');
   stopAttachCamera();
 }
 
@@ -266,6 +267,10 @@ function stopAttachCamera() {
     attachStream = null;
   }
   if (els.attachVideo) els.attachVideo.srcObject = null;
+}
+
+function setAttaching(on) {
+  document.body.classList.toggle('is-attaching', Boolean(on));
 }
 
 async function startAttachCamera() {
@@ -361,11 +366,13 @@ async function submitAttach(code, replace) {
       }
       stopAttachCamera();
       if (els.attachPanel) els.attachPanel.hidden = true;
+      setAttaching(false);
       return;
     }
     if (!res.ok) throw new Error(data.error || res.statusText);
     stopAttachCamera();
     if (els.attachPanel) els.attachPanel.hidden = true;
+    setAttaching(false);
     const previewUrl = data.previewUrl || `/q/${encodeURIComponent(resolved)}`;
     showLinkedCard(previewUrl);
   } catch (e) {
@@ -383,6 +390,7 @@ async function submitAttach(code, replace) {
 els.btnAttachCard?.addEventListener('click', () => {
   if (!els.attachPanel) return;
   els.attachPanel.hidden = false;
+  setAttaching(true);
   if (els.attachLinked) els.attachLinked.hidden = true;
   if (els.attachStatus) {
     els.attachStatus.hidden = true;
@@ -394,12 +402,14 @@ els.btnAttachCard?.addEventListener('click', () => {
 els.btnAttachCancel?.addEventListener('click', () => {
   stopAttachCamera();
   if (els.attachPanel) els.attachPanel.hidden = true;
+  setAttaching(false);
 });
 
-els.guestPhotoDownload?.addEventListener('click', () => {
-  const photo = photos[0];
-  if (!photo?.url) return;
-  void savePhotoToDevice(photo.url, `${photo.id}-${photo.variant || 'photo'}.jpg`);
+els.attachPanel?.addEventListener('click', (e) => {
+  if (e.target !== els.attachPanel) return;
+  stopAttachCamera();
+  els.attachPanel.hidden = true;
+  setAttaching(false);
 });
 
 els.lbDownload?.addEventListener('click', () => {

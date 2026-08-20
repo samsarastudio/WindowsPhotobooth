@@ -90,22 +90,34 @@ app.get('/media/:slug/:filename', (req, res) => {
   return res.sendFile(filePath);
 });
 
-app.use(express.static(config.publicDir, { index: false, maxAge: '1h' }));
+app.use(express.static(config.publicDir, {
+  index: false,
+  maxAge: 0,
+  setHeaders(res, filePath) {
+    if (/\.(html?|js|css)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+  },
+}));
 
 app.get(['/admin', '/admin/*'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(config.publicDir, 'admin.html'));
 });
 
 app.get(['/qr-scan', '/qr-scan/*'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(config.publicDir, 'qr-scan.html'));
 });
 
 app.get(['/q', '/q/:code'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(config.publicDir, 'q.html'));
 });
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/media')) return next();
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(config.publicDir, 'index.html'));
 });
 

@@ -156,12 +156,20 @@ main {
   display: none !important;
 }
 
-.guest-photo-frame {
-  margin: 0;
+.guest-photo-layout {
   width: min(92vw, 720px);
   display: grid;
   gap: 1rem;
+  justify-items: stretch;
+}
+
+.guest-photo-frame {
+  margin: 0;
+  width: 100%;
+  display: grid;
+  gap: 1rem;
   justify-items: center;
+  min-width: 0;
 }
 
 .guest-photo-frame img {
@@ -213,22 +221,49 @@ main {
   text-align: center;
 }
 
-.attach-panel {
-  width: min(100%, 420px);
-  margin: 1rem auto 0;
-  padding: 1rem;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(47, 93, 58, 0.15);
-  display: grid;
-  gap: 0.65rem;
+.attach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) 1rem max(1rem, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  background: rgba(20, 18, 16, 0.62);
+  backdrop-filter: blur(3px);
 }
 
-.attach-panel[hidden] {
+.attach-overlay[hidden] {
   display: none !important;
 }
 
+.attach-dialog {
+  width: min(100%, 22rem);
+  padding: 1.15rem 1.1rem 1.05rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f9f6ee 0%, #eef2eb 100%);
+  border: 2px solid rgba(47, 93, 58, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(196, 163, 90, 0.55),
+    0 22px 56px rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 0.65rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.attach-dialog .guest-photo-label {
+  font-size: 1.2rem;
+}
+
+.attach-dialog #btnAttachCancel {
+  width: min(100%, 12rem);
+  margin-top: 0.15rem;
+}
+
 .attach-camera-wrap {
+  width: 100%;
   border-radius: 12px;
   overflow: hidden;
   background: #111;
@@ -236,7 +271,8 @@ main {
   position: relative;
   display: grid;
   place-items: end center;
-  min-height: 12rem;
+  min-height: 10rem;
+  max-height: min(42vh, 280px);
 }
 
 .attach-camera-wrap video {
@@ -273,6 +309,10 @@ body.is-guest-photo .actions {
 
 body.is-guest-photo #empty {
   display: none !important;
+}
+
+body.is-attaching {
+  overflow: hidden;
 }
 
 .card-photo {
