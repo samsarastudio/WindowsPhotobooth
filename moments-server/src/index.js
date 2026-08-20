@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
@@ -9,15 +11,23 @@ import { sessionsRouter } from './routes/sessions.js';
 import { adminRouter } from './routes/admin.js';
 import { framesRouter, adminFramesRouter, ensureFramesDir } from './routes/frames.js';
 import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js';
+import { qrRouter, adminQrRouter } from './routes/qr.js';
+import { ensureQrDirs } from './qr/store.js';
 import { purgeExpiredSessions } from './purge.js';
+import { ensureHttpsCerts } from './https-certs.js';
 
 initDb();
 ensureFramesDir();
 ensureBrandingDir();
+ensureQrDirs();
 
 const app = express();
 app.disable('x-powered-by');
 app.use(cors());
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=()');
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (_req, res) => {
@@ -32,8 +42,10 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/frames', framesRouter);
 app.use('/api/wall', wallRouter);
+app.use('/api/qr', qrRouter);
 app.use('/api/admin/frames', adminFramesRouter);
 app.use('/api/admin/wall', adminWallRouter);
+app.use('/api/admin/qr', adminQrRouter);
 app.use('/api/admin', adminRouter);
 
 app.get('/media/frames/:filename', (req, res) => {
@@ -49,6 +61,15 @@ app.get('/media/branding/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
   if (filename.includes('..')) return res.status(400).end();
   const filePath = path.join(config.brandingDir, filename);
+  if (!fs.existsSync(filePath)) return res.status(404).end();
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.sendFile(filePath);
+});
+
+app.get('/media/qr-frames/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (filename.includes('..')) return res.status(400).end();
+  const filePath = path.join(config.qrFramesDir, filename);
   if (!fs.existsSync(filePath)) return res.status(404).end();
   res.setHeader('Cache-Control', 'public, max-age=3600');
   return res.sendFile(filePath);
@@ -75,6 +96,14 @@ app.get(['/admin', '/admin/*'], (_req, res) => {
   res.sendFile(path.join(config.publicDir, 'admin.html'));
 });
 
+app.get(['/qr-scan', '/qr-scan/*'], (_req, res) => {
+  res.sendFile(path.join(config.publicDir, 'qr-scan.html'));
+});
+
+app.get(['/q', '/q/:code'], (_req, res) => {
+  res.sendFile(path.join(config.publicDir, 'q.html'));
+});
+
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/media')) return next();
   res.sendFile(path.join(config.publicDir, 'index.html'));
@@ -98,11 +127,33 @@ setInterval(() => {
 }, PURGE_MS);
 purgeExpiredSessions();
 
-app.listen(config.port, config.host, () => {
+function lanHostsFromPublicUrl() {
+  try {
+    const u = new URL(config.publicBaseUrl);
+    return [u.hostname];
+  } catch {
+    return [];
+  }
+}
+
+const onListen = () => {
+  const scheme = config.https ? 'https' : 'http';
   console.log(
-    `[moments] listening on http://${config.host}:${config.port} → ${config.publicBaseUrl}`,
+    `[moments] listening on ${scheme}://${config.host}:${config.port} → ${config.publicBaseUrl}`,
   );
+  if (config.https) {
+    console.log(
+      '[moments] Phone camera needs HTTPS. On first visit, accept the certificate warning, then tap Enable camera.',
+    );
+  }
   if (!getUploadToken()) {
     console.warn('[moments] WARNING: UPLOAD_TOKEN is empty — set it in Admin → Settings or .env');
   }
-});
+};
+
+if (config.https) {
+  const { key, cert } = await ensureHttpsCerts(lanHostsFromPublicUrl());
+  https.createServer({ key, cert }, app).listen(config.port, config.host, onListen);
+} else {
+  http.createServer(app).listen(config.port, config.host, onListen);
+}

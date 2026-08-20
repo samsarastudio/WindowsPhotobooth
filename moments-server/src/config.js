@@ -16,6 +16,8 @@ export const config = {
   root,
   port: intEnv('PORT', 3020),
   host: process.env.HOST || '127.0.0.1',
+  /** When true, serve HTTPS (needed for phone camera on LAN; uses data/certs self-signed). */
+  https: String(process.env.HTTPS || '').toLowerCase() === '1' || String(process.env.HTTPS || '').toLowerCase() === 'true',
   publicBaseUrl: (process.env.PUBLIC_BASE_URL || 'http://127.0.0.1:3020').replace(/\/$/, ''),
   uploadToken: process.env.UPLOAD_TOKEN || '',
   adminPin: process.env.ADMIN_PIN || '2727',
@@ -35,8 +37,17 @@ export const config = {
   get brandingDir() {
     return path.join(this.dataDir, 'branding');
   },
+  get qrPdfsDir() {
+    return path.join(this.dataDir, 'qr-pdfs');
+  },
+  get qrFramesDir() {
+    return path.join(this.dataDir, 'qr-frames');
+  },
   get settingsPath() {
     return path.join(this.dataDir, 'settings.json');
   },
+  /** Minutes unused — kept for future; attach is guest-driven. */
+  qrMatchWindowMinutes: intEnv('QR_MATCH_WINDOW_MINUTES', 10),
   publicDir: path.join(root, 'public'),
+  builtinQrFramesDir: path.join(root, 'public', 'qr-frames'),
 };

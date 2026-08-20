@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Outfit:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/gallery.css?v=20260818-4" />
+    <link rel="stylesheet" href="/css/gallery.css?v=20260820-1" />
   </head>
   <body>
     <div class="leaf leaf-tr" aria-hidden="true"></div>
@@ -33,14 +33,31 @@
       <p id="status" class="status" hidden></p>
       <p id="empty" class="empty" hidden>Photos will appear here as they’re taken…</p>
       <div id="grid" class="grid" aria-live="polite"></div>
-      <div id="guestPhoto" class="guest-photo" hidden>
+          <div id="guestPhoto" class="guest-photo" hidden>
         <figure class="guest-photo-frame">
           <img id="guestPhotoImg" alt="Your photo" />
           <figcaption class="guest-photo-caption">
             <p class="guest-photo-label">Your photo</p>
-            <a id="guestPhotoDownload" class="btn primary" download>Save photo</a>
+            <div class="guest-photo-actions">
+              <a id="guestPhotoDownload" class="btn primary" download>Save photo</a>
+              <button type="button" class="btn ghost" id="btnAttachCard" title="Link my event card">
+                Link my card
+              </button>
+            </div>
+            <p id="attachStatus" class="guest-attach-status" hidden></p>
           </figcaption>
         </figure>
+        <div id="attachPanel" class="attach-panel" hidden>
+          <p class="guest-photo-label">Scan or paste your card</p>
+          <div class="attach-camera-wrap">
+            <video id="attachVideo" playsinline muted></video>
+          </div>
+          <input id="attachCodeInput" class="input" placeholder="Or paste card code / URL" />
+          <div class="row wrap">
+            <button type="button" class="btn primary" id="btnAttachSubmit">Link card</button>
+            <button type="button" class="btn ghost" id="btnAttachCancel">Cancel</button>
+          </div>
+        </div>
       </div>
       <div id="mosaic" class="mosaic" hidden aria-live="polite">
         <header class="mosaic-brand" aria-label="Branding">
@@ -90,6 +107,7 @@
       </div>
     </div>
 
-    <script src="/js/gallery.js?v=20260818-4" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="/js/gallery.js?v=20260820-1" type="module"></script>
   </body>
 </html>

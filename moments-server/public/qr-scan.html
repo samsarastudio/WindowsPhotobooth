@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>inmoment · scan</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Outfit:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/qr-scan.css?v=20260820-4" />
+  </head>
+  <body class="scan-body" data-mode="home">
+    <div id="offlineBanner" class="offline-banner" hidden>Offline — reconnect to keep scanning</div>
+    <header class="scan-header">
+      <p class="eyebrow">inmoment</p>
+      <div class="event-row">
+        <select id="eventSelect" class="event-select" aria-label="Active event"></select>
+        <span id="statusChip" class="chip">…</span>
+      </div>
+      <div class="counters">
+        <div><strong id="statScanned">0</strong><span>Scanned</span></div>
+        <div><strong id="statRemaining">0</strong><span>Remaining</span></div>
+        <div><strong id="statTotal">0</strong><span>Total</span></div>
+        <div><strong id="statLinked">0</strong><span>Linked</span></div>
+      </div>
+      <div class="progress"><div id="progressFill" class="progress-fill"></div></div>
+    </header>
+
+    <main class="scan-main">
+      <!-- Home -->
+      <section id="homePanel" class="panel-home">
+        <button type="button" id="btnScan" class="btn-scan">Scan card</button>
+        <p class="hint">Tap to open the camera, then point at the guest’s QR</p>
+        <label class="sound-toggle">
+          <input type="checkbox" id="soundToggle" checked />
+          Sound
+        </label>
+      </section>
+
+      <!-- Camera -->
+      <section id="scanPanel" class="panel-scan" hidden>
+        <div class="camera-wrap" id="cameraWrap">
+          <video id="video" playsinline muted></video>
+          <canvas id="canvas" hidden></canvas>
+          <div class="camera-frame" aria-hidden="true"></div>
+          <div id="cameraStatus" class="camera-status">Looking for QR…</div>
+        </div>
+        <p id="cameraHint" class="hint">Hold steady on one card</p>
+        <button type="button" id="btnCancelScan" class="btn-secondary">Cancel</button>
+      </section>
+
+      <!-- Result -->
+      <section id="resultPanel" class="panel-result" hidden>
+        <div id="resultCard" class="result-card is-valid">
+          <p id="resultTitle" class="result-title"></p>
+          <p id="resultDetail" class="result-detail"></p>
+        </div>
+        <div class="result-actions">
+          <button type="button" id="btnScanAgain" class="btn-scan">Scan again</button>
+          <button type="button" id="btnHome" class="btn-secondary">Home</button>
+        </div>
+      </section>
+    </main>
+
+    <section class="recent" id="recentSection">
+      <h2>Recent</h2>
+      <ul id="recentList"></ul>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="/js/qr-scan.js?v=20260820-4" type="module"></script>
+  </body>
+</html>
