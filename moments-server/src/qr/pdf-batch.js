@@ -147,9 +147,12 @@ export async function generateBatchPdf(opts) {
     ? db.prepare('SELECT * FROM qr_templates WHERE id = ?').get(templateId)
     : null;
   const framePath = template ? templateFilePath(template) : null;
-  // Custom uploads only — builtin is drawn in vector so brand/IG stay crisp and never double-print.
+  // Raster frames (uploads + AI builtins) — vector draw only for the default builtin.
+  const preferVectorDefault =
+    !template ||
+    (template.source === 'builtin' && template.filename === 'default-inmoment.png');
   const useCustomRaster =
-    template?.source === 'upload' &&
+    !preferVectorDefault &&
     framePath &&
     fs.existsSync(framePath) &&
     /\.(png|jpe?g|webp)$/i.test(framePath);

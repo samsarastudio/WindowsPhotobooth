@@ -47,6 +47,7 @@ export interface PbApi {
     maxLines?: number;
   }): Promise<{ ok: boolean; lines?: string[]; logFile?: string; error?: string }>;
   openLogsFolder(): Promise<{ ok: boolean; path?: string; error?: string }>;
+  openExternal(url: string): Promise<{ ok: boolean; error?: string }>;
   onAppLogEntry?(
     cb: (entry: {
       ts?: string;

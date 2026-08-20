@@ -7,6 +7,37 @@ function codeFromPath() {
 const stateEl = document.getElementById('qState');
 const eventEl = document.getElementById('qEvent');
 
+function isAppleTouchDevice() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+async function savePhotoToDevice(url, filename = 'inmoment-photo.jpg') {
+  if (!url) return;
+  try {
+    if (isAppleTouchDevice() && navigator.share && navigator.canShare) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'inmoment' });
+        return;
+      }
+    }
+  } catch (e) {
+    if (e?.name === 'AbortError') return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function renderWaiting(data) {
   if (data.eventLabel) {
     eventEl.hidden = false;
@@ -31,10 +62,21 @@ function renderPhoto(data) {
     eventEl.textContent = data.eventLabel;
   }
   const url = data.photo?.url || '';
+  const shareUrl = data.photo?.shareUrl || '';
   stateEl.innerHTML = `
     <div class="q-photo-wrap"><img src="${escapeAttr(url)}" alt="Your moment" /></div>
-    <a class="q-save" href="${escapeAttr(url)}" download>Save photo</a>
+    <div class="q-actions">
+      <button type="button" class="q-save" id="qSaveBtn">Save photo</button>
+      ${
+        shareUrl
+          ? `<a class="q-save q-save-ghost" href="${escapeAttr(shareUrl)}">Open share page</a>`
+          : ''
+      }
+    </div>
   `;
+  document.getElementById('qSaveBtn')?.addEventListener('click', () => {
+    void savePhotoToDevice(url, `inmoment-${data.serial || 'photo'}.jpg`);
+  });
 }
 
 function renderSoftError(message) {

@@ -120,12 +120,18 @@
     <div class="pb-share-overlay" role="dialog" aria-modal="true">
       <div class="pb-share-card">
         <h2>{{ copy().result.shareQrTitle }}</h2>
+        <p class="pb-hint pb-share-lead">{{ copy().result.shareQrHint }}</p>
         @if (shareQrDataUrl(); as qr) {
           <img class="pb-share-qr" [src]="qr" alt="Share QR code" />
         }
-        <button type="button" class="pb-btn pb-btn-ghost" (click)="closeShare()">
-          {{ copy().result.shareBack }}
-        </button>
+        <div class="pb-share-actions">
+          <button type="button" class="pb-btn pb-btn-primary" (click)="openSharePage()">
+            {{ copy().result.shareOpenPage }}
+          </button>
+          <button type="button" class="pb-btn pb-btn-ghost" (click)="closeShare()">
+            {{ copy().result.shareBack }}
+          </button>
+        </div>
       </div>
     </div>
   }

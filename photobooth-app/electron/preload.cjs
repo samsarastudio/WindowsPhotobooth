@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('pbApi', {
   log: (payload) => ipcRenderer.invoke('app:log', payload),
   readLogTail: (payload) => ipcRenderer.invoke('app:readLogTail', payload || {}),
   openLogsFolder: () => ipcRenderer.invoke('app:openLogsFolder'),
+  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   onAppLogEntry: (cb) => {
     const handler = (_event, entry) => cb(entry);
     ipcRenderer.on('app:log-entry', handler);

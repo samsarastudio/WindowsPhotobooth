@@ -1569,6 +1569,20 @@ ipcMain.handle('app:openLogsFolder', async () => {
   }
 });
 
+ipcMain.handle('app:openExternal', async (_e, url) => {
+  try {
+    const { shell } = require('electron');
+    const raw = String(url || '').trim();
+    if (!/^https?:\/\//i.test(raw)) {
+      return { ok: false, error: 'Only http(s) URLs are allowed' };
+    }
+    await shell.openExternal(raw);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
 ipcMain.handle('camera:invoke', async (_e, cmd) => {
   const cmdName = cmd?.cmd || 'unknown';
   if (cmdName !== 'preview') {
