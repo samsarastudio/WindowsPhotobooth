@@ -293,3 +293,29 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.booth-upload-progress {
+  margin: 0.75rem 0 0.25rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.booth-upload-track {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgba(28, 26, 23, 0.1);
+  overflow: hidden;
+}
+
+.booth-upload-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #2f5d3a;
+  transition: width 0.15s ease;
+}
+
+.session-card .booth-dl-link {
+  word-break: break-all;
+  font-size: 0.8rem;
+}

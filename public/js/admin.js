@@ -1,4 +1,4 @@
-const pinEl = document.getElementById('pin');
+﻿const pinEl = document.getElementById('pin');
 const loginCard = document.getElementById('loginCard');
 const panel = document.getElementById('panel');
 const loginErr = document.getElementById('loginErr');
@@ -1030,23 +1030,32 @@ async function refreshBoothUpdates() {
   try {
     const data = await api('/api/admin/booth-updates');
     const activeId = data.activeId || null;
-    if (statusEl) {
+    if (statusEl && !document.getElementById('boothUpdateProgressWrap')?.hidden) {
+      /* keep upload progress text */
+    } else if (statusEl) {
       const active = (data.releases || []).find((r) => r.id === activeId);
       statusEl.textContent = active
-        ? `Published: v${active.version} (${active.buildId}) ? install manually on each booth.`
-        : 'No package published ? upload a zip, then click Roll out.';
+        ? `Published: v${active.version} (${active.buildId}) — install manually on each booth.`
+        : 'No package published — upload a zip, then click Roll out.';
     }
     listEl.innerHTML = '';
     for (const r of data.releases || []) {
       const div = document.createElement('div');
       div.className = 'session-card';
+      const dlPath = r.adminDownloadUrl || `/api/admin/booth-updates/${encodeURIComponent(r.id)}/download`;
+      const boothUrl = r.downloadUrl || '';
       div.innerHTML = `
         <div>
           <strong>v${r.version}</strong>
           ${r.active ? '<span class="badge">rolled out</span>' : ''}
-          <p class="meta">build ${r.buildId} ? ${formatBytes(r.bytes)} ? ${r.createdAt || ''}</p>
+          <p class="meta">build ${r.buildId} · ${formatBytes(r.bytes)} · ${r.createdAt || ''}</p>
           ${r.notes ? `<p class="meta">${r.notes}</p>` : ''}
           <p class="meta"><code>${r.filename}</code></p>
+          ${
+            boothUrl
+              ? `<p class="meta booth-dl-link">Booth API: <code>${boothUrl}</code> (Bearer upload token)</p>`
+              : ''
+          }
         </div>
         <div class="row wrap">
           ${
@@ -1054,6 +1063,7 @@ async function refreshBoothUpdates() {
               ? ''
               : `<button type="button" class="btn primary rollout">Roll out</button>`
           }
+          <button type="button" class="btn ghost download">Download</button>
           <button type="button" class="btn danger delete">Delete</button>
         </div>
       `;
@@ -1070,6 +1080,28 @@ async function refreshBoothUpdates() {
         });
         setStatus(`Published v${r.version} for manual booth install`);
         await refreshBoothUpdates();
+      });
+      div.querySelector('.download')?.addEventListener('click', async () => {
+        try {
+          setStatus(`Downloading v${r.version}?`);
+          const res = await fetch(dlPath, { headers: { 'X-Admin-Pin': pin() } });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || res.statusText);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = r.filename || `PhotoBooth-${r.version}.zip`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          setStatus(`Downloaded v${r.version}`);
+        } catch (e) {
+          setStatus(String(e.message || e));
+        }
       });
       div.querySelector('.delete')?.addEventListener('click', async () => {
         if (!confirm(`Delete release v${r.version}?`)) return;
@@ -1097,50 +1129,17 @@ document.getElementById('btnBoothClearRollout')?.addEventListener('click', async
   await refreshBoothUpdates();
 });
 
+
 function parseBoothZipFilename(name) {
   const base = String(name || '').replace(/^.*[\\/]/, '');
   const m = base.match(
     /^PhotoBooth-Folder-(\d+\.\d+\.\d+(?:[.-][\w.]+)?)-(\d{8}-\d{6})\.zip$/i,
   );
   if (!m) return null;
-  return { version: m[1], buildId: m[2] };
+  return { version: m[1], buildId: m[2], source: 'filename' };
 }
 
-async function readBoothVersionFromZip(file) {
-  const fromName = parseBoothZipFilename(file?.name);
-  if (!file || typeof JSZip === 'undefined') {
-    return fromName;
-  }
-  try {
-    const zip = await JSZip.loadAsync(file);
-    let entry =
-      zip.file('version.json') ||
-      zip.file('./version.json') ||
-      Object.values(zip.files).find(
-        (f) => !f.dir && /(^|\/)version\.json$/i.test(f.name),
-      );
-    if (!entry) {
-      return fromName;
-    }
-    const text = await entry.async('string');
-    const meta = JSON.parse(text);
-    const version = String(meta.version || '').trim();
-    const buildId = String(meta.buildId || '').trim();
-    if (!version) return fromName;
-    return {
-      version,
-      buildId: buildId || fromName?.buildId || '',
-      builtAt: meta.builtAt || '',
-      channel: meta.channel || '',
-      source: 'version.json',
-    };
-  } catch (e) {
-    console.warn('[booth-update] zip meta', e);
-    return fromName ? { ...fromName, source: 'filename' } : null;
-  }
-}
-
-async function fillBoothUpdateFieldsFromZip(file) {
+function fillBoothUpdateFieldsFromZip(file) {
   const statusEl = document.getElementById('boothUpdateStatus');
   const verEl = document.getElementById('boothUpdateVersion');
   const buildEl = document.getElementById('boothUpdateBuildId');
@@ -1150,36 +1149,93 @@ async function fillBoothUpdateFieldsFromZip(file) {
     if (buildEl) buildEl.value = '';
     return;
   }
-  if (statusEl) statusEl.textContent = 'Reading version from zip?';
-  const meta = await readBoothVersionFromZip(file);
+  // Large Folder zips (~150MB+) must not be fully parsed in-browser.
+  const meta = parseBoothZipFilename(file.name);
   if (!meta?.version) {
     if (verEl) verEl.value = '';
     if (buildEl) buildEl.value = '';
     if (statusEl) {
       statusEl.textContent =
-        'Could not read version.json or PhotoBooth-Folder-<version>-<buildId>.zip name.';
+        'Name must look like PhotoBooth-Folder-1.1.0-20260820-232309.zip';
     }
     return;
   }
   if (verEl) verEl.value = meta.version;
   if (buildEl) buildEl.value = meta.buildId || '';
   if (notesEl && !notesEl.value.trim()) {
-    const bits = [`Folder build v${meta.version}`];
-    if (meta.buildId) bits.push(`build ${meta.buildId}`);
-    if (meta.builtAt) bits.push(meta.builtAt);
-    notesEl.value = bits.join(' � ');
+    notesEl.value = `Folder build v${meta.version} · build ${meta.buildId} · ${formatBytes(file.size)}`;
   }
   if (statusEl) {
-    const src = meta.source === 'version.json' ? 'version.json' : 'filename';
-    statusEl.textContent = `Ready to upload v${meta.version}${
-      meta.buildId ? ` (${meta.buildId})` : ''
-    } ? from ${src}.`;
+    statusEl.textContent = `Ready to upload v${meta.version} (${meta.buildId}) · ${formatBytes(file.size)}`;
   }
+}
+
+function setBoothUploadProgress(pct, label) {
+  const wrap = document.getElementById('boothUpdateProgressWrap');
+  const bar = document.getElementById('boothUpdateProgressBar');
+  const lab = document.getElementById('boothUpdateProgressLabel');
+  if (wrap) wrap.hidden = false;
+  if (bar) bar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  if (lab) lab.textContent = label || `${Math.round(pct)}%`;
+}
+
+function hideBoothUploadProgress() {
+  const wrap = document.getElementById('boothUpdateProgressWrap');
+  const bar = document.getElementById('boothUpdateProgressBar');
+  if (wrap) wrap.hidden = true;
+  if (bar) bar.style.width = '0%';
+}
+
+function uploadBoothPackageXhr(file, version, buildId, notes) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append('package', file);
+    fd.append('version', version);
+    if (buildId) fd.append('buildId', buildId);
+    if (notes) fd.append('notes', notes);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/admin/booth-updates');
+    xhr.setRequestHeader('X-Admin-Pin', pin());
+    xhr.timeout = 0;
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) {
+        setBoothUploadProgress(0, 'Uploading…');
+        return;
+      }
+      const pct = (e.loaded / e.total) * 100;
+      setBoothUploadProgress(
+        pct,
+        `Uploading ${formatBytes(e.loaded)} / ${formatBytes(e.total)} (${Math.round(pct)}%)`,
+      );
+    };
+    xhr.onload = () => {
+      let data = {};
+      try {
+        data = JSON.parse(xhr.responseText || '{}');
+      } catch {
+        data = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+        resolve(data);
+        return;
+      }
+      reject(new Error(data.error || `Upload failed (HTTP ${xhr.status})`));
+    };
+    xhr.onerror = () => {
+      reject(
+        new Error(
+          'Network error / connection reset — retry on a stable link. Large zips can take several minutes.',
+        ),
+      );
+    };
+    xhr.ontimeout = () => reject(new Error('Upload timed out'));
+    xhr.send(fd);
+  });
 }
 
 document.getElementById('boothUpdateFile')?.addEventListener('change', (e) => {
   const file = e.target?.files?.[0] || null;
-  void fillBoothUpdateFieldsFromZip(file);
+  fillBoothUpdateFieldsFromZip(file);
 });
 
 document.getElementById('btnBoothUpdateUpload')?.addEventListener('click', async () => {
@@ -1188,34 +1244,30 @@ document.getElementById('btnBoothUpdateUpload')?.addEventListener('click', async
   let buildId = document.getElementById('boothUpdateBuildId')?.value?.trim();
   const notes = document.getElementById('boothUpdateNotes')?.value?.trim();
   const statusEl = document.getElementById('boothUpdateStatus');
+  const btn = document.getElementById('btnBoothUpdateUpload');
   if (!file) {
     if (statusEl) statusEl.textContent = 'Choose a .zip file first.';
     return;
   }
   if (!version) {
-    await fillBoothUpdateFieldsFromZip(file);
+    fillBoothUpdateFieldsFromZip(file);
     version = document.getElementById('boothUpdateVersion')?.value?.trim();
     buildId = document.getElementById('boothUpdateBuildId')?.value?.trim();
   }
   if (!version) {
-    if (statusEl) statusEl.textContent = 'Version missing ? use a stamped Folder build zip.';
+    if (statusEl) statusEl.textContent = 'Version missing — use a stamped Folder build zip.';
     return;
   }
   try {
-    if (statusEl) statusEl.textContent = 'Uploading? this can take a few minutes.';
-    const fd = new FormData();
-    fd.append('package', file);
-    fd.append('version', version);
-    if (buildId) fd.append('buildId', buildId);
-    if (notes) fd.append('notes', notes);
-    const res = await fetch('/api/admin/booth-updates', {
-      method: 'POST',
-      headers: { 'X-Admin-Pin': pin() },
-      body: fd,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || res.statusText);
+    if (btn) btn.disabled = true;
+    setBoothUploadProgress(0, 'Starting upload…');
+    if (statusEl) statusEl.textContent = 'Uploading — keep this tab open.';
+    const data = await uploadBoothPackageXhr(file, version, buildId, notes);
+    setBoothUploadProgress(100, 'Upload complete');
     setStatus(`Uploaded v${data.release?.version || version}`);
+    if (statusEl) {
+      statusEl.textContent = `Uploaded v${data.release?.version || version}. Click Roll out when ready.`;
+    }
     const verEl = document.getElementById('boothUpdateVersion');
     const buildEl = document.getElementById('boothUpdateBuildId');
     const notesEl = document.getElementById('boothUpdateNotes');
@@ -1224,8 +1276,12 @@ document.getElementById('btnBoothUpdateUpload')?.addEventListener('click', async
     if (buildEl) buildEl.value = '';
     if (notesEl) notesEl.value = '';
     if (fileEl) fileEl.value = '';
+    setTimeout(() => hideBoothUploadProgress(), 1200);
     await refreshBoothUpdates();
   } catch (e) {
+    hideBoothUploadProgress();
     if (statusEl) statusEl.textContent = String(e.message || e);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 });

@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260820-1" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260821-4" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -256,8 +256,8 @@
             <label>Folder build zip</label>
             <input id="boothUpdateFile" type="file" accept=".zip,application/zip" />
             <p class="meta">
-              Pick <code>PhotoBooth-Folder-&lt;version&gt;-&lt;buildId&gt;.zip</code> — version and build id
-              are read from <code>version.json</code> inside the package (filename used as fallback).
+              Pick <code>PhotoBooth-Folder-&lt;version&gt;-&lt;buildId&gt;.zip</code>. Version fields
+              fill from the filename (large zips are not fully opened in the browser).
             </p>
             <label>Version</label>
             <input id="boothUpdateVersion" class="input" readonly placeholder="Filled from zip…" />
@@ -269,6 +269,12 @@
               <button type="button" class="btn primary" id="btnBoothUpdateUpload">Upload package</button>
               <button type="button" class="btn ghost" id="btnBoothUpdateRefresh">Refresh</button>
               <button type="button" class="btn ghost" id="btnBoothClearRollout">Clear rollout</button>
+            </div>
+            <div id="boothUpdateProgressWrap" class="booth-upload-progress" hidden>
+              <div class="booth-upload-track" aria-hidden="true">
+                <div id="boothUpdateProgressBar" class="booth-upload-bar"></div>
+              </div>
+              <p id="boothUpdateProgressLabel" class="meta">0%</p>
             </div>
             <p id="boothUpdateStatus" class="meta"></p>
             <h3 class="admin-subhead">Releases</h3>
@@ -301,7 +307,6 @@
         </div>
       </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="/js/admin.js?v=20260821-3" type="module"></script>
+    <script src="/js/admin.js?v=20260821-4" type="module"></script>
   </body>
 </html>
