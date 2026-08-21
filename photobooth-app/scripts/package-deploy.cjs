@@ -1,17 +1,20 @@
 /**
  * After electron-builder: stage a deploy folder that matches win-unpacked
- * (edsdk-bridge + Canon DLLs + config + themes) and pair the portable exe
- * with native sidecar files so the SDK is next to the launcher.
+ * (edsdk-bridge + Canon DLLs + config + themes), stamp version.json, zip for
+ * Moments OTA upload, and pair the portable exe with native sidecars.
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const appRoot = path.join(__dirname, '..');
 const releaseDir = path.join(appRoot, 'release');
 const binDir = path.join(appRoot, 'bin');
 const buildsRoot = path.join(appRoot, '..', 'builds');
 const unpacked = path.join(releaseDir, 'win-unpacked');
-const portableExe = path.join(releaseDir, 'PhotoBooth-Portable-1.0.0.exe');
+const pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
+const version = String(pkg.version || '0.0.0');
+const portableExe = path.join(releaseDir, `PhotoBooth-Portable-${version}.exe`);
 
 const NATIVE = ['edsdk-bridge.exe', 'EDSDK.dll', 'EdsImage.dll'];
 
@@ -53,6 +56,27 @@ function assertNativeIn(dir, label) {
   console.log(`[package-deploy] ${label}: OK (${NATIVE.join(', ')})`);
 }
 
+function writeVersionFile(dir, buildId, channel) {
+  const payload = {
+    version,
+    buildId,
+    builtAt: new Date().toISOString(),
+    channel,
+    productName: 'PhotoBooth',
+  };
+  fs.writeFileSync(path.join(dir, 'version.json'), JSON.stringify(payload, null, 2), 'utf8');
+  return payload;
+}
+
+function zipFolder(folderPath, zipPath) {
+  if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+  // Windows tar creates zip with -a; contents are rooted at folderPath.
+  execFileSync('tar', ['-a', '-c', '-f', zipPath, '-C', folderPath, '.'], {
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+}
+
 function main() {
   if (!fs.existsSync(unpacked)) {
     throw new Error(`Missing win-unpacked at ${unpacked}. Run electron-builder first.`);
@@ -66,7 +90,6 @@ function main() {
     }
   }
 
-  // Ensure win-unpacked always has fresh natives from bin/
   for (const f of NATIVE) {
     copyFile(path.join(binDir, f), path.join(unpacked, f));
   }
@@ -75,21 +98,25 @@ function main() {
   const ts = stamp();
   fs.mkdirSync(buildsRoot, { recursive: true });
 
-  // 1) Full folder build (same layout as release/win-unpacked) — preferred for DSLR
-  const folderOut = path.join(buildsRoot, `PhotoBooth-Folder-1.0.0-${ts}`);
+  const folderOut = path.join(buildsRoot, `PhotoBooth-Folder-${version}-${ts}`);
   console.log(`[package-deploy] Copying folder build → ${folderOut}`);
   copyDir(unpacked, folderOut);
+  const meta = writeVersionFile(folderOut, ts, 'folder');
   assertNativeIn(folderOut, 'folder build');
 
-  // 2) Portable exe + native sidecars + default config/themes next to it
-  if (fs.existsSync(portableExe)) {
-    const portableDir = path.join(buildsRoot, `PhotoBooth-Portable-1.0.0-${ts}`);
-    fs.mkdirSync(portableDir, { recursive: true });
-    const portableName = `PhotoBooth-Portable-1.0.0-${ts}.exe`;
-    copyFile(portableExe, path.join(portableDir, portableName));
-    // Also keep a flat copy at builds/ root for convenience
-    copyFile(portableExe, path.join(buildsRoot, portableName));
+  const zipOut = path.join(buildsRoot, `PhotoBooth-Folder-${version}-${ts}.zip`);
+  console.log(`[package-deploy] Zipping OTA package → ${zipOut}`);
+  zipFolder(folderOut, zipOut);
+  console.log(
+    `[package-deploy] Upload this zip in Moments Admin → Booth updates (version ${meta.version}, build ${meta.buildId}).`,
+  );
 
+  if (fs.existsSync(portableExe)) {
+    const portableDir = path.join(buildsRoot, `PhotoBooth-Portable-${version}-${ts}`);
+    fs.mkdirSync(portableDir, { recursive: true });
+    const portableName = `PhotoBooth-Portable-${version}-${ts}.exe`;
+    copyFile(portableExe, path.join(portableDir, portableName));
+    copyFile(portableExe, path.join(buildsRoot, portableName));
     for (const f of NATIVE) {
       copyFile(path.join(binDir, f), path.join(portableDir, f));
     }
@@ -98,15 +125,21 @@ function main() {
     if (fs.existsSync(path.join(appRoot, 'theme-template'))) {
       copyDir(path.join(appRoot, 'theme-template'), path.join(portableDir, 'theme-template'));
     }
+    writeVersionFile(portableDir, ts, 'portable');
     assertNativeIn(portableDir, 'portable package');
     console.log(`[package-deploy] Portable package → ${portableDir}`);
     console.log(`[package-deploy] Flat portable exe → ${path.join(buildsRoot, portableName)}`);
+    console.log(
+      '[package-deploy] Note: OTA self-update supports Folder builds only (not portable exe).',
+    );
   } else {
     console.warn(`[package-deploy] Portable exe not found at ${portableExe}`);
   }
 
   console.log('[package-deploy] Done.');
-  console.log('[package-deploy] For Canon DSLR on tablets/kiosks, prefer the Folder build (PhotoBooth.exe + edsdk-bridge beside it).');
+  console.log(
+    '[package-deploy] For Canon DSLR on tablets/kiosks, prefer the Folder build (PhotoBooth.exe + edsdk-bridge beside it).',
+  );
 }
 
 main();

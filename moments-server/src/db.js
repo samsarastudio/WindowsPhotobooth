@@ -107,9 +107,22 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_qr_codes_code ON qr_codes(code);
     CREATE INDEX IF NOT EXISTS idx_qr_scans_batch_epoch ON qr_scans(batch_id, session_epoch, scanned_at);
     CREATE INDEX IF NOT EXISTS idx_qr_scans_day ON qr_scans(day_key);
+
+    CREATE TABLE IF NOT EXISTS booth_releases (
+      id TEXT PRIMARY KEY,
+      version TEXT NOT NULL,
+      build_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      bytes INTEGER NOT NULL,
+      sha256 TEXT,
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_booth_releases_created ON booth_releases(created_at);
   `);
 
   ensureColumn(db, 'qr_batches', 'linked_session_id', 'TEXT');
+  fs.mkdirSync(config.boothUpdatesDir, { recursive: true });
   ensureBuiltinQrTemplate(db);
   return db;
 }
@@ -164,6 +177,8 @@ export function loadSettings() {
     wallBrandRevealEnabled: false,
     wallBrandRevealSeconds: 45,
     wallBrandRevealHoldSeconds: 6,
+    /** Active booth app release id rolled out to kiosks (empty = no forced update). */
+    boothUpdateActiveId: '',
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {

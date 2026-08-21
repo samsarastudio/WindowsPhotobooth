@@ -7,6 +7,11 @@ const os = require('os');
 const { spawn, execFile, execFileSync } = require('child_process');
 const { promisify } = require('util');
 const readline = require('readline');
+const {
+  readLocalVersion,
+  canSelfUpdate,
+  pollAndApply,
+} = require('./booth-update.cjs');
 
 const execFileAsync = promisify(execFile);
 
@@ -1516,6 +1521,7 @@ app.on('before-quit', () => killBridge());
 
 ipcMain.handle('app:getPaths', () => {
   const captureDir = getCaptureDir();
+  const local = readLocalVersion(getPortableRoot(), getBundleRoot());
   return {
     portableRoot: getPortableRoot(),
     captureDir,
@@ -1524,7 +1530,37 @@ ipcMain.handle('app:getPaths', () => {
     logsDir: getLogsDir(),
     logFile: getLogFilePath(),
     hasBridge: !!findBridgeExecutable(),
+    appVersion: local.version,
+    appBuildId: local.buildId,
+    appChannel: local.channel,
+    canSelfUpdate: canSelfUpdate(app, getPortableRoot()),
   };
+});
+
+ipcMain.handle('app:getVersion', () => {
+  const local = readLocalVersion(getPortableRoot(), getBundleRoot());
+  return {
+    ok: true,
+    ...local,
+    canSelfUpdate: canSelfUpdate(app, getPortableRoot()),
+  };
+});
+
+ipcMain.handle('app:checkBoothUpdate', async (_e, payload) => {
+  try {
+    const apply = payload?.apply === true;
+    return await pollAndApply({
+      app,
+      loadMergedConfig,
+      getPortableRoot,
+      getBundleRoot,
+      appendAppLog,
+      killBridge,
+      apply,
+    });
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
 });
 
 ipcMain.handle('app:log', async (_e, payload) => {

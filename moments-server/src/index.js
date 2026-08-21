@@ -12,6 +12,7 @@ import { adminRouter } from './routes/admin.js';
 import { framesRouter, adminFramesRouter, ensureFramesDir } from './routes/frames.js';
 import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js';
 import { qrRouter, adminQrRouter } from './routes/qr.js';
+import { boothUpdateRouter, adminBoothUpdateRouter } from './routes/booth-update.js';
 import { ensureQrDirs } from './qr/store.js';
 import { purgeExpiredSessions } from './purge.js';
 import { ensureHttpsCerts } from './https-certs.js';
@@ -43,9 +44,11 @@ app.use('/api/sessions', sessionsRouter);
 app.use('/api/frames', framesRouter);
 app.use('/api/wall', wallRouter);
 app.use('/api/qr', qrRouter);
+app.use('/api/booth-update', boothUpdateRouter);
 app.use('/api/admin/frames', adminFramesRouter);
 app.use('/api/admin/wall', adminWallRouter);
 app.use('/api/admin/qr', adminQrRouter);
+app.use('/api/admin/booth-updates', adminBoothUpdateRouter);
 app.use('/api/admin', adminRouter);
 
 app.get('/media/frames/:filename', (req, res) => {

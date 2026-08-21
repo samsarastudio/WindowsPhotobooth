@@ -110,6 +110,10 @@ export class AdminDashboardComponent implements OnInit {
   openAiKeyDraft = '';
   hasBridge = signal(false);
   logFilePath = signal<string | null>(null);
+  appVersionLabel = signal('…');
+  canSelfUpdate = signal(false);
+  updateBusy = signal(false);
+  pendingUpdateLabel = signal<string | null>(null);
   sdkCameras = signal<string[]>([]);
   webcamDevices = signal<WebcamDeviceOption[]>([]);
   printers = signal<PrinterOption[]>([]);
@@ -131,6 +135,113 @@ export class AdminDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.syncFromService();
     void this.refreshThemes();
+    void this.refreshAppVersion();
+  }
+
+  async refreshAppVersion(): Promise<void> {
+    try {
+      if (window.pbApi?.getVersion) {
+        const r = await window.pbApi.getVersion();
+        if (r.ok) {
+          const build = r.buildId ? ` (${r.buildId})` : '';
+          this.appVersionLabel.set(`v${r.version || '?'}${build}`);
+          this.canSelfUpdate.set(!!r.canSelfUpdate);
+          return;
+        }
+      }
+      const paths = await window.pbApi?.getPaths?.();
+      if (paths?.appVersion) {
+        const build = paths.appBuildId ? ` (${paths.appBuildId})` : '';
+        this.appVersionLabel.set(`v${paths.appVersion}${build}`);
+        this.canSelfUpdate.set(!!paths.canSelfUpdate);
+      } else {
+        this.appVersionLabel.set('unknown');
+      }
+    } catch {
+      this.appVersionLabel.set('unknown');
+    }
+  }
+
+  async checkBoothUpdateNow(): Promise<void> {
+    if (!window.pbApi?.checkBoothUpdate) {
+      this.status.set('Update check requires Electron Folder build.');
+      return;
+    }
+    this.updateBusy.set(true);
+    this.status.set(null);
+    this.pendingUpdateLabel.set(null);
+    try {
+      const r = await window.pbApi.checkBoothUpdate({ apply: false });
+      if (r.skipped) {
+        this.status.set(`Update check skipped (${r.reason || 'n/a'}).`);
+        return;
+      }
+      if (!r.ok) {
+        this.status.set(r.error || 'Update check failed.');
+        return;
+      }
+      if (r.updateAvailable && r.release) {
+        const build = r.release.buildId ? ` (${r.release.buildId})` : '';
+        this.pendingUpdateLabel.set(`v${r.release.version}${build}`);
+        this.status.set(`Update available: v${r.release.version}. Tap Install when ready.`);
+        return;
+      }
+      this.status.set(
+        r.active
+          ? `Up to date (rolled out v${r.active.version}).`
+          : 'No roll-out active on Moments.',
+      );
+    } catch (e) {
+      this.status.set(String(e));
+    } finally {
+      this.updateBusy.set(false);
+      void this.refreshAppVersion();
+    }
+  }
+
+  async installBoothUpdateNow(): Promise<void> {
+    if (!window.pbApi?.checkBoothUpdate) {
+      this.status.set('Install requires Electron Folder build.');
+      return;
+    }
+    const label = this.pendingUpdateLabel() || 'the available update';
+    if (
+      !confirm(
+        `Install ${label} now?\n\nPhotoBooth will quit, replace files, and relaunch. Config, captures, and data are kept.`,
+      )
+    ) {
+      return;
+    }
+    this.updateBusy.set(true);
+    this.status.set('Downloading update…');
+    try {
+      const r = await window.pbApi.checkBoothUpdate({ apply: true });
+      if (r.applying) {
+        this.status.set(
+          `Updating to v${r.release?.version || '?'} — app will close and relaunch…`,
+        );
+        return;
+      }
+      if (r.skipped) {
+        this.status.set(`Install skipped (${r.reason || 'n/a'}).`);
+        return;
+      }
+      if (!r.ok) {
+        this.status.set(r.error || 'Install failed.');
+        return;
+      }
+      if (r.updateAvailable === false) {
+        this.pendingUpdateLabel.set(null);
+        this.status.set('No update to install.');
+        return;
+      }
+      this.status.set('Unexpected update response.');
+    } catch (e) {
+      this.status.set(String(e));
+    } finally {
+      this.updateBusy.set(false);
+      void this.refreshAppVersion();
+    }
   }
 
   private syncFromService(): void {
@@ -181,6 +292,9 @@ export class AdminDashboardComponent implements OnInit {
     }
     if (t === 'frames') {
       void this.refreshPhotoFramesAndSync();
+    }
+    if (t === 'gallery') {
+      void this.refreshAppVersion();
     }
     if (t === 'print') {
       void this.refreshPrinters();

@@ -535,6 +535,45 @@
             </button>
           </div>
         </section>
+
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>App version / OTA</h2>
+          <p class="pb-hint">
+            Updates are <strong>manual</strong>. Moments Admin publishes a package (Roll out), then on
+            this booth tap Check, and Install only when you are ready — the app will quit, replace
+            files (keeping config / capture / data), and relaunch.
+          </p>
+          <p class="pb-hint pb-hint-tight">
+            Installed:
+            <strong>{{ appVersionLabel() }}</strong>
+            @if (canSelfUpdate()) {
+              · Folder build (OTA supported)
+            } @else {
+              · OTA needs a Folder install (not portable exe / not ng serve)
+            }
+          </p>
+          @if (pendingUpdateLabel()) {
+            <p class="pb-hint pb-hint-tight">Available: <strong>{{ pendingUpdateLabel() }}</strong></p>
+          }
+          <div class="pb-row pb-row-wrap">
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
+              [disabled]="busy() || updateBusy()"
+              (click)="checkBoothUpdateNow()"
+            >
+              {{ updateBusy() ? 'Checking…' : 'Check for update' }}
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-primary"
+              [disabled]="busy() || updateBusy() || !pendingUpdateLabel()"
+              (click)="installBoothUpdateNow()"
+            >
+              {{ updateBusy() ? 'Working…' : 'Install update now' }}
+            </button>
+          </div>
+        </section>
       </div>
     }
 

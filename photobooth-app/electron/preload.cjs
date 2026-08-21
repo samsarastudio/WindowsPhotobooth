@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pbApi', {
   getPaths: () => ipcRenderer.invoke('app:getPaths'),
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  checkBoothUpdate: (payload) => ipcRenderer.invoke('app:checkBoothUpdate', payload || {}),
   log: (payload) => ipcRenderer.invoke('app:log', payload),
   readLogTail: (payload) => ipcRenderer.invoke('app:readLogTail', payload || {}),
   openLogsFolder: () => ipcRenderer.invoke('app:openLogsFolder'),

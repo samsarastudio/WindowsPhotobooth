@@ -6,6 +6,10 @@ export interface PbPaths {
   logsDir?: string;
   logFile?: string;
   hasBridge: boolean;
+  appVersion?: string;
+  appBuildId?: string;
+  appChannel?: string;
+  canSelfUpdate?: boolean;
 }
 
 export interface PbCameraResult {
@@ -36,6 +40,27 @@ export interface PbThemeListItem {
 
 export interface PbApi {
   getPaths(): Promise<PbPaths>;
+  getVersion(): Promise<{
+    ok: boolean;
+    version?: string;
+    buildId?: string;
+    channel?: string;
+    canSelfUpdate?: boolean;
+    error?: string;
+  }>;
+  checkBoothUpdate(payload?: {
+    apply?: boolean;
+  }): Promise<{
+    ok: boolean;
+    updateAvailable?: boolean;
+    applying?: boolean;
+    skipped?: boolean;
+    reason?: string;
+    local?: { version?: string; buildId?: string };
+    active?: { version?: string; buildId?: string } | null;
+    release?: { version?: string; buildId?: string };
+    error?: string;
+  }>;
   log(payload: {
     level?: 'info' | 'warn' | 'error' | 'debug';
     scope?: string;
