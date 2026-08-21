@@ -8,6 +8,8 @@ import type {
   PhotoboothDebugConfig,
   PhotoboothGalleryConfig,
   PhotoboothPhotoFramesConfig,
+  PhotoboothPhysicalFrameConfig,
+  PhotoboothBoothModeId,
   PhotoboothPrintConfig,
 } from '../models/photobooth-config.model';
 import {
@@ -19,6 +21,7 @@ import {
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
   PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
+  PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   PHOTOBOOTH_DEFAULT_PRINT,
 } from '../models/photobooth-config.model';
 
@@ -269,6 +272,26 @@ function normalizeGalleryConfig(
   };
 }
 
+function normalizePhysicalFrameConfig(
+  patch?: Partial<PhotoboothPhysicalFrameConfig> | null,
+): PhotoboothPhysicalFrameConfig {
+  const base = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME;
+  if (!patch) return { ...base };
+  const rot = Number(patch.rotateDegrees);
+  return {
+    cellWidthIn: clampRange(patch.cellWidthIn, 1, 20, base.cellWidthIn),
+    cellHeightIn: clampRange(patch.cellHeightIn, 1, 24, base.cellHeightIn),
+    gapIn: clampRange(patch.gapIn, 0, 2, base.gapIn),
+    marginIn: clampRange(patch.marginIn, 0, 2, base.marginIn),
+    dpi: Math.round(clampRange(patch.dpi, 72, 600, base.dpi)),
+    rotateDegrees: rot === -90 ? -90 : 90,
+  };
+}
+
+function normalizeBoothMode(raw: unknown): PhotoboothBoothModeId {
+  return raw === 'physicalFrame' ? 'physicalFrame' : 'default';
+}
+
 function normalizePrintConfig(
   patch?: Partial<PhotoboothPrintConfig> | null,
 ): PhotoboothPrintConfig {
@@ -340,6 +363,10 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const debug = normalizeDebugConfig(
     (rest['debug'] as Partial<PhotoboothDebugConfig> | undefined) ?? undefined,
   );
+  const boothMode = normalizeBoothMode(rest['boothMode']);
+  const physicalFrame = normalizePhysicalFrameConfig(
+    (rest['physicalFrame'] as Partial<PhotoboothPhysicalFrameConfig> | undefined) ?? undefined,
+  );
   const requireQrUnlock =
     typeof rest['requireQrUnlock'] === 'boolean' ? rest['requireQrUnlock'] : false;
   const aiGenerationEnabled =
@@ -358,6 +385,8 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     print,
     debug,
     copy,
+    boothMode,
+    physicalFrame,
     requireQrUnlock,
     aiGenerationEnabled,
     defaultAiModeId,
@@ -367,7 +396,10 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 }
 
 export type BoothAdminSavePartial = Partial<
-  Omit<PhotoboothConfig, 'branding' | 'camera' | 'photoFrames' | 'gallery' | 'print' | 'debug'>
+  Omit<
+    PhotoboothConfig,
+    'branding' | 'camera' | 'photoFrames' | 'gallery' | 'print' | 'debug' | 'physicalFrame'
+  >
 > & {
   openAiApiKey?: string;
   branding?: Partial<PhotoboothBranding>;
@@ -376,6 +408,7 @@ export type BoothAdminSavePartial = Partial<
   gallery?: Partial<PhotoboothGalleryConfig>;
   print?: Partial<PhotoboothPrintConfig>;
   debug?: Partial<PhotoboothDebugConfig>;
+  physicalFrame?: Partial<PhotoboothPhysicalFrameConfig>;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -393,6 +426,11 @@ export class BoothConfigService {
   readonly print = computed(() => this.state()?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
   readonly debug = computed(() => this.state()?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
   readonly debugEnabled = computed(() => this.debug().enabled === true);
+  readonly boothMode = computed(() => this.state()?.boothMode ?? 'default');
+  readonly physicalFrame = computed(
+    () => this.state()?.physicalFrame ?? PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
+  );
+  readonly isPhysicalFrameMode = computed(() => this.boothMode() === 'physicalFrame');
   readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'inmoment');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
@@ -406,7 +444,11 @@ export class BoothConfigService {
   });
   readonly skipAiModeSelection = computed(() => this.fixedAiModeId() !== null);
   readonly shouldShowAiModeStep = computed(
-    () => this.aiGenerationEnabled() && !this.skipAiModeSelection() && this.aiModes().length > 0,
+    () =>
+      !this.isPhysicalFrameMode() &&
+      this.aiGenerationEnabled() &&
+      !this.skipAiModeSelection() &&
+      this.aiModes().length > 0,
   );
   readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
   readonly openAiConfigured = computed(() => this.state()?.openAiConfigured ?? false);
@@ -430,6 +472,8 @@ export class BoothConfigService {
         print: { ...PHOTOBOOTH_DEFAULT_PRINT },
         debug: { ...PHOTOBOOTH_DEFAULT_DEBUG },
         copy: PHOTOBOOTH_DEFAULT_COPY,
+        boothMode: 'default',
+        physicalFrame: { ...PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME },
         requireQrUnlock: false,
         aiGenerationEnabled: false,
         defaultAiModeId: null,

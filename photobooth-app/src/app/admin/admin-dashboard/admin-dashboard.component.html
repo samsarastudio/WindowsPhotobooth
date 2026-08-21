@@ -28,6 +28,9 @@
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'frames'" (click)="setTab('frames')">
             Frames
           </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'modes'" (click)="setTab('modes')">
+            Modes
+          </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'gallery'" (click)="setTab('gallery')">
             Gallery
           </button>
@@ -36,6 +39,9 @@
           </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'ai'" (click)="setTab('ai')">
             AI
+          </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'system'" (click)="setTab('system')">
+            System
           </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'debug'" (click)="setTab('debug')">
             Debug
@@ -535,23 +541,147 @@
             </button>
           </div>
         </section>
+      </div>
+    }
 
+    @if (tab === 'modes') {
+      <div class="pb-admin-modes">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Booth modes</h2>
+          <p class="pb-hint">
+            Choose how each guest session finishes after capture. Switch anytime — settings are kept
+            for both modes.
+          </p>
+          <label class="pb-admin-check">
+            <input type="radio" name="boothMode" [(ngModel)]="draftBoothMode" [value]="'default'" />
+            <strong>Default</strong> — photo + digital frames / caption / AI as configured
+          </label>
+          <label class="pb-admin-check">
+            <input
+              type="radio"
+              name="boothMode"
+              [(ngModel)]="draftBoothMode"
+              [value]="'physicalFrame'"
+            />
+            <strong>Physical frame</strong> — landscape capture, rotate 90°, print sheet with
+            <em>two identical</em> portrait cells for cutting into frames
+          </label>
+
+          @if (draftBoothMode === 'physicalFrame') {
+            <h3 class="pb-admin-subhead">Cut-sheet layout (inches at DPI)</h3>
+            <p class="pb-hint pb-hint-tight">
+              Defaults: each cell <strong>5.8 × 8.8</strong> (portrait), two columns, white padding.
+              Capture should be landscape; the app rotates before fitting.
+            </p>
+            <div class="pb-row pb-row-wrap">
+              <label>
+                Cell width (in)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="0.1"
+                  [(ngModel)]="draftPhysicalFrame.cellWidthIn"
+                />
+              </label>
+              <label>
+                Cell height (in)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="1"
+                  max="24"
+                  step="0.1"
+                  [(ngModel)]="draftPhysicalFrame.cellHeightIn"
+                />
+              </label>
+              <label>
+                Column gap (in)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.05"
+                  [(ngModel)]="draftPhysicalFrame.gapIn"
+                />
+              </label>
+              <label>
+                Outer margin (in)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.05"
+                  [(ngModel)]="draftPhysicalFrame.marginIn"
+                />
+              </label>
+              <label>
+                DPI
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="72"
+                  max="600"
+                  step="1"
+                  [(ngModel)]="draftPhysicalFrame.dpi"
+                />
+              </label>
+              <label>
+                Rotate
+                <select class="pb-input" [(ngModel)]="draftPhysicalFrame.rotateDegrees">
+                  <option [ngValue]="90">90° clockwise</option>
+                  <option [ngValue]="-90">90° counter-clockwise</option>
+                </select>
+              </label>
+            </div>
+            <p class="pb-hint pb-hint-tight">
+              Sheet size ≈
+              {{
+                (
+                  draftPhysicalFrame.marginIn * 2 +
+                  draftPhysicalFrame.cellWidthIn * 2 +
+                  draftPhysicalFrame.gapIn
+                ).toFixed(2)
+              }}
+              ×
+              {{ (draftPhysicalFrame.marginIn * 2 + draftPhysicalFrame.cellHeightIn).toFixed(2) }}
+              in. Use a printer/paper that can hold that for clean cuts (SELPHY 6×4 will crop).
+            </p>
+          }
+
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveModes()">
+              Save modes
+            </button>
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (tab === 'system') {
+      <div class="pb-admin-system">
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>App version / OTA</h2>
           <p class="pb-hint">
-            Updates are <strong>manual</strong>. Moments Admin publishes a package (Roll out), then on
-            this booth tap Check, and Install only when you are ready — the app will quit, replace
-            files (keeping config / capture / data), and relaunch.
+            Version comes from <code>version.json</code> beside <code>PhotoBooth.exe</code> (Folder
+            build stamp). Updates are <strong>manual</strong>: Moments Admin rolls out a package,
+            then Check → Install on this booth (app quits, replaces files, keeps config / capture /
+            data, relaunches).
           </p>
           <p class="pb-hint pb-hint-tight">
-            Installed:
-            <strong>{{ appVersionLabel() }}</strong>
+            Installed: <strong>{{ appVersionLabel() }}</strong>
             @if (canSelfUpdate()) {
               · Folder build (OTA supported)
             } @else {
               · OTA needs a Folder install (not portable exe / not ng serve)
             }
           </p>
+          @if (installRootLabel(); as root) {
+            <p class="pb-hint pb-hint-tight">Install folder: <code>{{ root }}</code></p>
+          }
           @if (pendingUpdateLabel()) {
             <p class="pb-hint pb-hint-tight">Available: <strong>{{ pendingUpdateLabel() }}</strong></p>
           }

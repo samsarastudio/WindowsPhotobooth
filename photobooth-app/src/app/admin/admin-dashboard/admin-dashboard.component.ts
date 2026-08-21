@@ -3,11 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import type {
   PhotoboothAiMode,
+  PhotoboothBoothModeId,
   PhotoboothBranding,
   PhotoboothCameraConfig,
   PhotoboothCopy,
   PhotoboothDebugConfig,
   PhotoboothGalleryConfig,
+  PhotoboothPhysicalFrameConfig,
   PhotoboothPrintConfig,
 } from '../../models/photobooth-config.model';
 import {
@@ -20,6 +22,7 @@ import {
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
+  PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   PHOTOBOOTH_DEFAULT_PRINT,
   PLAIN_PHOTO_MODE_ID,
 } from '../../models/photobooth-config.model';
@@ -74,14 +77,29 @@ interface AdminFrameItem {
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
-  tab: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai' | 'debug' =
-    'copy';
+  tab:
+    | 'copy'
+    | 'themes'
+    | 'branding'
+    | 'camera'
+    | 'frames'
+    | 'modes'
+    | 'gallery'
+    | 'print'
+    | 'ai'
+    | 'system'
+    | 'debug' = 'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
   draftBranding: PhotoboothBranding = structuredClone(PHOTOBOOTH_DEFAULT_BRANDING);
   draftCamera: PhotoboothCameraConfig = structuredClone(PHOTOBOOTH_DEFAULT_CAMERA);
   draftGallery: PhotoboothGalleryConfig = structuredClone(PHOTOBOOTH_DEFAULT_GALLERY);
   draftPrint: PhotoboothPrintConfig = structuredClone(PHOTOBOOTH_DEFAULT_PRINT);
   draftDebug: PhotoboothDebugConfig = structuredClone(PHOTOBOOTH_DEFAULT_DEBUG);
+  draftBoothMode: PhotoboothBoothModeId = 'default';
+  draftPhysicalFrame: PhotoboothPhysicalFrameConfig = structuredClone(
+    PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
+  );
+  installRootLabel = signal<string | null>(null);
   activeThemeId = 'default';
   draftAiEnabled = false;
   draftRequireQrUnlock = false;
@@ -143,22 +161,27 @@ export class AdminDashboardComponent implements OnInit {
       if (window.pbApi?.getVersion) {
         const r = await window.pbApi.getVersion();
         if (r.ok) {
-          const build = r.buildId ? ` (${r.buildId})` : '';
-          this.appVersionLabel.set(`v${r.version || '?'}${build}`);
+          const build = r.buildId ? ` · build ${r.buildId}` : '';
+          const ch = r.channel ? ` · ${r.channel}` : '';
+          this.appVersionLabel.set(`v${r.version || '?'}${build}${ch}`);
           this.canSelfUpdate.set(!!r.canSelfUpdate);
+          this.installRootLabel.set(r.installRoot || null);
           return;
         }
       }
       const paths = await window.pbApi?.getPaths?.();
       if (paths?.appVersion) {
-        const build = paths.appBuildId ? ` (${paths.appBuildId})` : '';
+        const build = paths.appBuildId ? ` · build ${paths.appBuildId}` : '';
         this.appVersionLabel.set(`v${paths.appVersion}${build}`);
         this.canSelfUpdate.set(!!paths.canSelfUpdate);
+        this.installRootLabel.set(paths.portableRoot || null);
       } else {
         this.appVersionLabel.set('unknown');
+        this.installRootLabel.set(null);
       }
     } catch {
       this.appVersionLabel.set('unknown');
+      this.installRootLabel.set(null);
     }
   }
 
@@ -274,11 +297,26 @@ export class AdminDashboardComponent implements OnInit {
     this.draftGallery = structuredClone(cfg?.gallery ?? PHOTOBOOTH_DEFAULT_GALLERY);
     this.draftPrint = structuredClone(cfg?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
     this.draftDebug = structuredClone(cfg?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
+    this.draftBoothMode = cfg?.boothMode === 'physicalFrame' ? 'physicalFrame' : 'default';
+    this.draftPhysicalFrame = structuredClone(
+      cfg?.physicalFrame ?? PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
+    );
     this.openAiKeyDraft = '';
   }
 
   setTab(
-    t: 'copy' | 'themes' | 'branding' | 'camera' | 'frames' | 'gallery' | 'print' | 'ai' | 'debug',
+    t:
+      | 'copy'
+      | 'themes'
+      | 'branding'
+      | 'camera'
+      | 'frames'
+      | 'modes'
+      | 'gallery'
+      | 'print'
+      | 'ai'
+      | 'system'
+      | 'debug',
   ): void {
     this.tab = t;
     if (t === 'themes') {
@@ -293,7 +331,7 @@ export class AdminDashboardComponent implements OnInit {
     if (t === 'frames') {
       void this.refreshPhotoFramesAndSync();
     }
-    if (t === 'gallery') {
+    if (t === 'system') {
       void this.refreshAppVersion();
     }
     if (t === 'print') {
@@ -304,6 +342,27 @@ export class AdminDashboardComponent implements OnInit {
     }
     if (t === 'debug') {
       void this.refreshDebugPanel();
+    }
+  }
+
+  async saveModes(): Promise<void> {
+    this.busy.set(true);
+    this.status.set(null);
+    try {
+      const ok = await this.booth.save({
+        boothMode: this.draftBoothMode,
+        physicalFrame: { ...this.draftPhysicalFrame },
+      });
+      this.status.set(
+        ok
+          ? this.draftBoothMode === 'physicalFrame'
+            ? 'Modes saved — Physical frame (dual cut sheet).'
+            : 'Modes saved — Default (frames / AI as configured).'
+          : 'Failed to save modes.',
+      );
+      this.syncFromService();
+    } finally {
+      this.busy.set(false);
     }
   }
 

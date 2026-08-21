@@ -305,6 +305,37 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   guestTextBrushOpacity: 0.22,
 };
 
+/** Guest experience mode — selected in Admin → Modes. */
+export type PhotoboothBoothModeId = 'default' | 'physicalFrame';
+
+/**
+ * Dual cut-sheet for physical photo frames.
+ * Landscape capture is rotated 90°, then placed twice in portrait cells (columns).
+ * Sizes are inches at `dpi` (default 300).
+ */
+export interface PhotoboothPhysicalFrameConfig {
+  /** Width of each cut cell (inches). */
+  cellWidthIn: number;
+  /** Height of each cut cell (inches). */
+  cellHeightIn: number;
+  /** Gap between the two columns (inches). */
+  gapIn: number;
+  /** Outer margin around the sheet (inches). */
+  marginIn: number;
+  dpi: number;
+  /** Rotate landscape capture before fitting into each cell (90 or -90). */
+  rotateDegrees: 90 | -90;
+}
+
+export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = {
+  cellWidthIn: 5.8,
+  cellHeightIn: 8.8,
+  gapIn: 0.25,
+  marginIn: 0.25,
+  dpi: 300,
+  rotateDegrees: 90,
+};
+
 /** Fields returned to the renderer (admin PIN and OpenAI API key are never included). */
 export interface PhotoboothConfig {
   activeThemeId: string;
@@ -315,6 +346,9 @@ export interface PhotoboothConfig {
   print: PhotoboothPrintConfig;
   debug: PhotoboothDebugConfig;
   copy: PhotoboothCopy;
+  /** Guest flow mode: digital frames (default) or dual physical-frame cut sheet. */
+  boothMode: PhotoboothBoothModeId;
+  physicalFrame: PhotoboothPhysicalFrameConfig;
   /** When true, guests must pass the QR / code unlock screen. */
   requireQrUnlock: boolean;
   /** When true, after unlock the guest picks an AI style before capture. */

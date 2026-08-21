@@ -1,6 +1,15 @@
 {
   "activeThemeId": "inmoment",
   "adminPin": "2727",
+  "boothMode": "default",
+  "physicalFrame": {
+    "cellWidthIn": 5.8,
+    "cellHeightIn": 8.8,
+    "gapIn": 0.25,
+    "marginIn": 0.25,
+    "dpi": 300,
+    "rotateDegrees": 90
+  },
   "requireQrUnlock": false,
   "aiGenerationEnabled": false,
   "defaultAiModeId": null,

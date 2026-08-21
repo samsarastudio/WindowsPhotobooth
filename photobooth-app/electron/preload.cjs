@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld('pbApi', {
   openAiGenerateImage: (payload) => ipcRenderer.invoke('openai:generateImage', payload),
   listPhotoFrames: () => ipcRenderer.invoke('frames:list'),
   applyPhotoFrame: (payload) => ipcRenderer.invoke('frames:apply', payload),
+  applyPhysicalFrameLayout: (payload) =>
+    ipcRenderer.invoke('layouts:physicalFrameDual', payload || {}),
   adminPickPhotoFrameImage: () => ipcRenderer.invoke('admin:pickPhotoFrameImage'),
   adminInstallPhotoFrame: (sourcePath) => ipcRenderer.invoke('admin:installPhotoFrame', sourcePath),
   adminDeletePhotoFrame: (filename) => ipcRenderer.invoke('admin:deletePhotoFrame', filename),

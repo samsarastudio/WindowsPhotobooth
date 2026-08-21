@@ -589,6 +589,52 @@ async function compositePhotoIntoFrame(
   return composed;
 }
 
+/**
+ * Physical-frame cut sheet: rotate landscape capture, place two identical
+ * portrait cells side-by-side (5.8×8.8" default) with padding for trimming.
+ */
+async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
+  const dpi = Math.max(72, Math.min(600, Math.round(Number(opts.dpi) || 300)));
+  const cellWIn = Math.max(1, Number(opts.cellWidthIn) || 5.8);
+  const cellHIn = Math.max(1, Number(opts.cellHeightIn) || 8.8);
+  const gapIn = Math.max(0, Number(opts.gapIn) || 0.25);
+  const marginIn = Math.max(0, Number(opts.marginIn) || 0.25);
+  const rotate = Number(opts.rotateDegrees) === -90 ? -90 : 90;
+
+  const cellW = Math.round(cellWIn * dpi);
+  const cellH = Math.round(cellHIn * dpi);
+  const gap = Math.round(gapIn * dpi);
+  const margin = Math.round(marginIn * dpi);
+  const sheetW = margin * 2 + cellW * 2 + gap;
+  const sheetH = margin * 2 + cellH;
+
+  const photoCell = await sharpMod(photoPath)
+    .rotate(rotate)
+    .resize(cellW, cellH, { fit: 'cover', position: 'centre' })
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+
+  const left0 = margin;
+  const left1 = margin + cellW + gap;
+  const top = margin;
+
+  return sharpMod({
+    create: {
+      width: sheetW,
+      height: sheetH,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .composite([
+      { input: photoCell, left: left0, top },
+      { input: photoCell, left: left1, top },
+    ])
+    .png()
+    .toBuffer();
+}
+
 function escapeXmlText(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -1539,9 +1585,17 @@ ipcMain.handle('app:getPaths', () => {
 
 ipcMain.handle('app:getVersion', () => {
   const local = readLocalVersion(getPortableRoot(), getBundleRoot());
+  let electronVersion = '';
+  try {
+    electronVersion = String(app.getVersion() || '');
+  } catch (_) {
+    /* ignore */
+  }
   return {
     ok: true,
     ...local,
+    electronVersion,
+    installRoot: getPortableRoot(),
     canSelfUpdate: canSelfUpdate(app, getPortableRoot()),
   };
 });
@@ -2241,6 +2295,42 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
     return { ok: true, path: outPath, frameFile };
   } catch (e) {
     appendAppLog('error', 'frames', 'apply failed', String(e));
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('layouts:physicalFrameDual', async (_e, payload) => {
+  try {
+    let sharpMod;
+    try {
+      sharpMod = require('sharp');
+    } catch (_dep) {
+      return { ok: false, error: 'sharp is not available.' };
+    }
+    const imagePath =
+      payload && typeof payload.imagePath === 'string' ? payload.imagePath.trim() : '';
+    if (!imagePath || !fs.existsSync(imagePath)) {
+      return { ok: false, error: 'Source photo not found.' };
+    }
+    const cfg = loadMergedConfig()?.physicalFrame || {};
+    const opts = {
+      cellWidthIn: payload?.cellWidthIn ?? cfg.cellWidthIn,
+      cellHeightIn: payload?.cellHeightIn ?? cfg.cellHeightIn,
+      gapIn: payload?.gapIn ?? cfg.gapIn,
+      marginIn: payload?.marginIn ?? cfg.marginIn,
+      dpi: payload?.dpi ?? cfg.dpi,
+      rotateDegrees: payload?.rotateDegrees ?? cfg.rotateDegrees,
+    };
+    appendAppLog('info', 'layouts', 'physicalFrameDual start', { imagePath, ...opts });
+    const outBuf = await compositePhysicalFrameDual(sharpMod, imagePath, opts);
+    const dir = path.dirname(imagePath);
+    const base = path.basename(imagePath, path.extname(imagePath));
+    const outPath = path.join(dir, `${base}_physical.png`);
+    fs.writeFileSync(outPath, outBuf);
+    appendAppLog('info', 'layouts', 'physicalFrameDual ok', { outPath });
+    return { ok: true, path: outPath };
+  } catch (e) {
+    appendAppLog('error', 'layouts', 'physicalFrameDual failed', String(e));
     return { ok: false, error: String(e) };
   }
 });

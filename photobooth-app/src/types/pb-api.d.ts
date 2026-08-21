@@ -45,6 +45,8 @@ export interface PbApi {
     version?: string;
     buildId?: string;
     channel?: string;
+    electronVersion?: string;
+    installRoot?: string;
     canSelfUpdate?: boolean;
     error?: string;
   }>;
@@ -164,6 +166,15 @@ export interface PbApi {
     /** Optional credit under guest text. */
     creditLine?: string;
   }): Promise<{ ok: boolean; path?: string; frameFile?: string; error?: string }>;
+  applyPhysicalFrameLayout(payload: {
+    imagePath: string;
+    cellWidthIn?: number;
+    cellHeightIn?: number;
+    gapIn?: number;
+    marginIn?: number;
+    dpi?: number;
+    rotateDegrees?: 90 | -90;
+  }): Promise<{ ok: boolean; path?: string; error?: string }>;
   adminPickPhotoFrameImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
   adminInstallPhotoFrame(
     sourcePath: string,

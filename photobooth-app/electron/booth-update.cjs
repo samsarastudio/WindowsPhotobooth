@@ -1,5 +1,11 @@
 /**
  * Moments-hosted OTA updates for Folder builds (manual install only).
+ *
+ * Supported packaging / publish path (do not regress):
+ * 1. `package-deploy.cjs` → Compress-Archive zip (not Windows `tar -a`)
+ * 2. Moments Admin chunked multipart upload (or Pi `register-booth-zip.mjs` / scp)
+ * 3. Booth Install → detached PowerShell apply (cmd `start`, lock retries, version.json verify)
+ *
  * Booth Admin checks for a rolled-out package, then the operator confirms
  * Install — which downloads the zip and spawns a detached PowerShell script
  * that waits for PhotoBooth to exit, replaces files (preserving config /

@@ -441,6 +441,10 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async navigateResult(filePath: string): Promise<void> {
+    if (this.booth.isPhysicalFrameMode()) {
+      await this.applyPhysicalFrameAndNavigate(filePath);
+      return;
+    }
     const framesCfg = this.booth.photoFrames();
     if (framesCfg.enabled) {
       if (framesCfg.autoApplyFrame) {
@@ -452,6 +456,33 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     }
     this.galleryUpload.queueUpload(filePath, 'original');
     await this.router.navigate(['/result'], { state: { path: filePath } });
+  }
+
+  /** Dual polaroid-size cut sheet (2 columns) for physical frames. */
+  private async applyPhysicalFrameAndNavigate(filePath: string): Promise<void> {
+    this.galleryUpload.queueUpload(filePath, 'original');
+    if (!window.pbApi?.applyPhysicalFrameLayout) {
+      this.hint.set('Physical frame layout requires Electron.');
+      await this.router.navigate(['/result'], { state: { path: filePath } });
+      return;
+    }
+    try {
+      const pf = this.booth.physicalFrame();
+      const r = await window.pbApi.applyPhysicalFrameLayout({
+        imagePath: filePath,
+        ...pf,
+      });
+      if (!r.ok || !r.path) {
+        this.hint.set(r.error || 'Physical frame layout failed.');
+        await this.router.navigate(['/result'], { state: { path: filePath } });
+        return;
+      }
+      this.galleryUpload.queueUpload(r.path, 'framed');
+      await this.router.navigate(['/result'], { state: { path: r.path } });
+    } catch (e) {
+      this.hint.set(String(e));
+      await this.router.navigate(['/result'], { state: { path: filePath } });
+    }
   }
 
   /**
