@@ -1187,9 +1187,13 @@ function hideBoothUploadProgress() {
 }
 
 async function uploadBoothPackageXhr(file, version, buildId, notes) {
-  const chunkSize = 2 * 1024 * 1024; // 2MB — keeps TLS records small
+  // 512KB multipart chunks — self-signed HTTPS often dies on large raw bodies.
+  const chunkSize = 512 * 1024;
   const totalChunks = Math.ceil(file.size / chunkSize);
-  setBoothUploadProgress(0, `Preparing ${totalChunks} chunks…`);
+  setBoothUploadProgress(
+    0,
+    `Chunked upload · 0 / ${totalChunks} · ${formatBytes(file.size)}`,
+  );
 
   const initRes = await fetch('/api/admin/booth-updates/init', {
     method: 'POST',
@@ -1215,19 +1219,30 @@ async function uploadBoothPackageXhr(file, version, buildId, notes) {
     const start = i * chunkSize;
     const end = Math.min(file.size, start + chunkSize);
     const blob = file.slice(start, end);
-    const buf = await blob.arrayBuffer();
-    // retry each chunk a few times (SSL blips)
     let lastErr = null;
-    for (let attempt = 1; attempt <= 4; attempt += 1) {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
       try {
         // eslint-disable-next-line no-await-in-loop
         await new Promise((resolve, reject) => {
+          const fd = new FormData();
+          fd.append('chunk', blob, `part-${i}.bin`);
           const xhr = new XMLHttpRequest();
-          xhr.open('PUT', `/api/admin/booth-updates/chunk/${encodeURIComponent(uploadId)}`);
+          xhr.open(
+            'POST',
+            `/api/admin/booth-updates/chunk/${encodeURIComponent(uploadId)}`,
+          );
           xhr.setRequestHeader('X-Admin-Pin', pin());
-          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
           xhr.setRequestHeader('X-Chunk-Index', String(i));
-          xhr.timeout = 0;
+          xhr.timeout = 120000;
+          xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            const loaded = start + e.loaded;
+            const pct = (loaded / file.size) * 100;
+            setBoothUploadProgress(
+              pct,
+              `Chunk ${i + 1}/${totalChunks} · ${formatBytes(loaded)} / ${formatBytes(file.size)}`,
+            );
+          };
           xhr.onload = () => {
             let data = {};
             try {
@@ -1241,25 +1256,27 @@ async function uploadBoothPackageXhr(file, version, buildId, notes) {
             }
             reject(new Error(data.error || `Chunk ${i} failed (HTTP ${xhr.status})`));
           };
-          xhr.onerror = () => reject(new Error(`Chunk ${i} network error`));
+          xhr.onerror = () =>
+            reject(new Error(`Chunk ${i} network/SSL error — retrying…`));
           xhr.ontimeout = () => reject(new Error(`Chunk ${i} timed out`));
-          xhr.send(buf);
+          xhr.send(fd);
         });
         lastErr = null;
         break;
       } catch (e) {
         lastErr = e;
-        // brief backoff
+        setBoothUploadProgress(
+          (start / file.size) * 100,
+          `Chunk ${i + 1}/${totalChunks} failed (${attempt}/5): ${e.message || e}`,
+        );
         // eslint-disable-next-line no-await-in-loop
-        await new Promise((r) => setTimeout(r, 400 * attempt));
+        await new Promise((r) => setTimeout(r, 500 * attempt));
       }
     }
     if (lastErr) throw lastErr;
-    const loaded = end;
-    const pct = (loaded / file.size) * 100;
     setBoothUploadProgress(
-      pct,
-      `Uploading chunk ${i + 1}/${totalChunks} · ${formatBytes(loaded)} / ${formatBytes(file.size)}`,
+      (end / file.size) * 100,
+      `Chunk ${i + 1}/${totalChunks} done · ${formatBytes(end)} / ${formatBytes(file.size)}`,
     );
   }
 

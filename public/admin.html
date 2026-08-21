@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260821-5" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260821-7" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -256,9 +256,14 @@
             <label>Folder build zip</label>
             <input id="boothUpdateFile" type="file" accept=".zip,application/zip" />
             <p class="meta">
-              Pick <code>PhotoBooth-Folder-&lt;version&gt;-&lt;buildId&gt;.zip</code> from a fresh
-              Windows build. Uploads go in <strong>2MB chunks</strong> (more reliable over HTTPS).
-              Version fields fill from the filename.
+              Production Moments runs on the <strong>Pi</strong> behind Cloudflare
+              (<code>moments.inmomentservices.com</code>). Prefer small-chunk browser
+              upload after the Pi has pulled latest <code>moments-server</code>.
+              If a ~150&nbsp;MB zip still stalls, copy the zip onto the Pi and register
+              locally (bypasses Cloudflare body limits):
+              <code>scp zip pi@HOST:~/moments-server/incoming/</code> then on the Pi
+              <code>node scripts/register-booth-zip.mjs ~/moments-server/incoming/….zip</code>
+              → Admin Refresh → Roll out.
             </p>
             <label>Version</label>
             <input id="boothUpdateVersion" class="input" readonly placeholder="Filled from zip…" />
@@ -308,6 +313,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260821-5" type="module"></script>
+    <script src="/js/admin.js?v=20260821-7" type="module"></script>
   </body>
 </html>
