@@ -54,6 +54,7 @@
             <button type="button" class="admin-tab" data-tab="qr">QR events</button>
             <button type="button" class="admin-tab" data-tab="frames">Frames</button>
             <button type="button" class="admin-tab" data-tab="wall">Mosaic wall</button>
+            <button type="button" class="admin-tab" data-tab="booth">Booth updates</button>
             <button type="button" class="admin-tab" data-tab="settings">Settings</button>
           </nav>
         </aside>
@@ -242,6 +243,38 @@
             <button type="button" class="btn primary" id="btnSaveWall">Save wall settings</button>
           </section>
 
+          <section class="card admin-section" data-section="booth" hidden>
+            <h2>Booth updates</h2>
+            <p class="meta">
+              Upload a <strong>PhotoBooth Folder</strong> zip from
+              <code>builds/PhotoBooth-Folder-…zip</code> (created by the Windows build).
+              Click <strong>Roll out</strong> to publish it. Each booth installs
+              <strong>manually</strong> from Photobooth Admin → Gallery → Install update
+              (app quits, replaces files, keeps config / capture / data, then relaunches).
+            </p>
+            <h3 class="admin-subhead">Upload release</h3>
+            <label>Folder build zip</label>
+            <input id="boothUpdateFile" type="file" accept=".zip,application/zip" />
+            <p class="meta">
+              Pick <code>PhotoBooth-Folder-&lt;version&gt;-&lt;buildId&gt;.zip</code> — version and build id
+              are read from <code>version.json</code> inside the package (filename used as fallback).
+            </p>
+            <label>Version</label>
+            <input id="boothUpdateVersion" class="input" readonly placeholder="Filled from zip…" />
+            <label>Build id</label>
+            <input id="boothUpdateBuildId" class="input" readonly placeholder="Filled from zip…" />
+            <label>Notes (optional)</label>
+            <input id="boothUpdateNotes" class="input" placeholder="What changed" />
+            <div class="row wrap">
+              <button type="button" class="btn primary" id="btnBoothUpdateUpload">Upload package</button>
+              <button type="button" class="btn ghost" id="btnBoothUpdateRefresh">Refresh</button>
+              <button type="button" class="btn ghost" id="btnBoothClearRollout">Clear rollout</button>
+            </div>
+            <p id="boothUpdateStatus" class="meta"></p>
+            <h3 class="admin-subhead">Releases</h3>
+            <div id="boothUpdateList" class="session-list"></div>
+          </section>
+
           <section class="card admin-section" data-section="settings" hidden>
             <h2>Settings</h2>
             <label>Default TTL (days) for new albums</label>
@@ -268,6 +301,7 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260820-5" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="/js/admin.js?v=20260821-3" type="module"></script>
   </body>
 </html>

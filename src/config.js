@@ -46,6 +46,9 @@ export const config = {
   get settingsPath() {
     return path.join(this.dataDir, 'settings.json');
   },
+  get boothUpdatesDir() {
+    return path.join(this.dataDir, 'booth-updates');
+  },
   /** Minutes unused — kept for future; attach is guest-driven. */
   qrMatchWindowMinutes: intEnv('QR_MATCH_WINDOW_MINUTES', 10),
   publicDir: path.join(root, 'public'),

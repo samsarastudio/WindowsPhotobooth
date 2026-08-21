@@ -113,6 +113,7 @@ function setTab(tab) {
   if (name === 'frames') void refreshFrames();
   if (name === 'albums') void refreshAlbums();
   if (name === 'qr') void refreshQrSection();
+  if (name === 'booth') void refreshBoothUpdates();
   if (name === 'overview') void refreshQrOverviewStats();
 }
 
@@ -691,7 +692,7 @@ async function refreshQrBatches() {
   wrap.innerHTML = '';
   const batches = list.batches || [];
   if (!batches.length) {
-    wrap.innerHTML = '<p class="meta">No QR batches yet — create one above.</p>';
+    wrap.innerHTML = '<p class="meta">No QR batches yet ? create one above.</p>';
   } else {
     for (const b of batches) wrap.appendChild(renderQrBatchCard(b, false, albumOptions));
   }
@@ -715,7 +716,7 @@ function renderQrBatchCard(b, isArchived, albumOptions = []) {
   const st = b.stats || {};
   const album = b.linkedAlbum;
   const albumLabel = album
-    ? `Album: ${album.title}${album.expired ? ' (expired)' : ''} · ${album.photoCount} photos`
+    ? `Album: ${album.title}${album.expired ? ' (expired)' : ''} ? ${album.photoCount} photos`
     : 'No album connected';
 
   const albumSelect = isArchived
@@ -723,7 +724,7 @@ function renderQrBatchCard(b, isArchived, albumOptions = []) {
     : `<div class="row wrap" style="margin-top:0.35rem;align-items:center">
         <label class="meta" style="margin:0">Connect album</label>
         <select class="input album-link" style="max-width:16rem">
-          <option value="">— none —</option>
+          <option value="">? none ?</option>
           ${albumOptions
             .map(
               (s) =>
@@ -752,8 +753,8 @@ function renderQrBatchCard(b, isArchived, albumOptions = []) {
 
   div.innerHTML = `
       <strong>${b.name}</strong>
-      <span class="meta">${b.eventLabel || '—'} · ${b.quantity} cards · ${b.paperSize?.toUpperCase()} · ${b.status}
-      · scanned ${st.scanned ?? 0}/${st.total ?? b.quantity} · linked ${st.linked ?? 0}${b.featured ? ' · featured' : ''}</span>
+      <span class="meta">${b.eventLabel || '?'} ? ${b.quantity} cards ? ${b.paperSize?.toUpperCase()} ? ${b.status}
+      ? scanned ${st.scanned ?? 0}/${st.total ?? b.quantity} ? linked ${st.linked ?? 0}${b.featured ? ' ? featured' : ''}</span>
       <span class="meta">${albumLabel}</span>
       ${albumSelect}
       <div class="row wrap">${actions}</div>
@@ -827,7 +828,7 @@ function renderQrBatchCard(b, isArchived, albumOptions = []) {
     const r = await api(`/api/admin/qr/batches/${encodeURIComponent(b.id)}/reset`, {
       method: 'POST',
     });
-    setStatus(`Reset complete — archived ${r.archivedScans || 0} scans`);
+    setStatus(`Reset complete ? archived ${r.archivedScans || 0} scans`);
     await refreshQrSection();
   });
   div.querySelector('.regen-a4')?.addEventListener('click', async () => {
@@ -904,7 +905,7 @@ async function refreshQrDetail() {
   );
   const b = data.batch;
   document.getElementById('qrDetailMeta').textContent =
-    `${b.name} · epoch ${b.sessionEpoch} · ${data.codes?.length || 0} shown · ~${data.estimate?.pages || '?'} PDF pages`;
+    `${b.name} ? epoch ${b.sessionEpoch} ? ${data.codes?.length || 0} shown ? ~${data.estimate?.pages || '?'} PDF pages`;
   const table = document.getElementById('qrCodeTable');
   table.innerHTML = '';
   for (const c of data.codes || []) {
@@ -914,8 +915,8 @@ async function refreshQrDetail() {
       <span>#${c.serial}</span>
       <code>${c.code}</code>
       <span>${c.status}</span>
-      <span class="meta">${c.scannedAt ? new Date(c.scannedAt).toLocaleString() : '—'}</span>
-      <span>${c.photo ? `<a href="${c.photo.url}" target="_blank" rel="noopener">photo</a>` : '—'}</span>
+      <span class="meta">${c.scannedAt ? new Date(c.scannedAt).toLocaleString() : '?'}</span>
+      <span>${c.photo ? `<a href="${c.photo.url}" target="_blank" rel="noopener">photo</a>` : '?'}</span>
       <button type="button" class="btn ghost void" ${c.status === 'void' ? 'disabled' : ''}>Void</button>
     `;
     row.querySelector('.void')?.addEventListener('click', async () => {
@@ -972,7 +973,7 @@ document.getElementById('btnQrCreate')?.addEventListener('click', async () => {
         notes: document.getElementById('qrNotes')?.value,
       }),
     });
-    setStatus(`Created ${r.batch?.name} � ${r.pdf?.pages || '?'} PDF page(s). Activate it to use on /qr-scan.`);
+    setStatus(`Created ${r.batch?.name} ? ${r.pdf?.pages || '?'} PDF page(s). Activate it to use on /qr-scan.`);
     document.getElementById('qrName').value = '';
     qrSelectedBatchId = r.batch?.id || '';
     await refreshQrSection();
@@ -1012,5 +1013,219 @@ document.getElementById('btnQrUploadTemplate')?.addEventListener('click', async 
     await refreshQrTemplates();
   } catch (e) {
     setStatus(String(e.message || e));
+  }
+});
+
+function formatBytes(n) {
+  const v = Number(n) || 0;
+  if (v < 1024) return `${v} B`;
+  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+  return `${(v / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function refreshBoothUpdates() {
+  const statusEl = document.getElementById('boothUpdateStatus');
+  const listEl = document.getElementById('boothUpdateList');
+  if (!listEl) return;
+  try {
+    const data = await api('/api/admin/booth-updates');
+    const activeId = data.activeId || null;
+    if (statusEl) {
+      const active = (data.releases || []).find((r) => r.id === activeId);
+      statusEl.textContent = active
+        ? `Published: v${active.version} (${active.buildId}) ? install manually on each booth.`
+        : 'No package published ? upload a zip, then click Roll out.';
+    }
+    listEl.innerHTML = '';
+    for (const r of data.releases || []) {
+      const div = document.createElement('div');
+      div.className = 'session-card';
+      div.innerHTML = `
+        <div>
+          <strong>v${r.version}</strong>
+          ${r.active ? '<span class="badge">rolled out</span>' : ''}
+          <p class="meta">build ${r.buildId} ? ${formatBytes(r.bytes)} ? ${r.createdAt || ''}</p>
+          ${r.notes ? `<p class="meta">${r.notes}</p>` : ''}
+          <p class="meta"><code>${r.filename}</code></p>
+        </div>
+        <div class="row wrap">
+          ${
+            r.active
+              ? ''
+              : `<button type="button" class="btn primary rollout">Roll out</button>`
+          }
+          <button type="button" class="btn danger delete">Delete</button>
+        </div>
+      `;
+      div.querySelector('.rollout')?.addEventListener('click', async () => {
+        if (
+          !confirm(
+            `Publish v${r.version} as the available update?\nBooths will not install until an operator taps Install on each machine.`,
+          )
+        ) {
+          return;
+        }
+        await api(`/api/admin/booth-updates/${encodeURIComponent(r.id)}/rollout`, {
+          method: 'POST',
+        });
+        setStatus(`Published v${r.version} for manual booth install`);
+        await refreshBoothUpdates();
+      });
+      div.querySelector('.delete')?.addEventListener('click', async () => {
+        if (!confirm(`Delete release v${r.version}?`)) return;
+        await api(`/api/admin/booth-updates/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+        setStatus(`Deleted v${r.version}`);
+        await refreshBoothUpdates();
+      });
+      listEl.appendChild(div);
+    }
+    if (!(data.releases || []).length) {
+      listEl.innerHTML = '<p class="meta">No booth packages uploaded yet.</p>';
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = String(e.message || e);
+  }
+}
+
+document.getElementById('btnBoothUpdateRefresh')?.addEventListener('click', () => {
+  void refreshBoothUpdates();
+});
+
+document.getElementById('btnBoothClearRollout')?.addEventListener('click', async () => {
+  await api('/api/admin/booth-updates/clear-rollout', { method: 'POST' });
+  setStatus('Booth rollout cleared');
+  await refreshBoothUpdates();
+});
+
+function parseBoothZipFilename(name) {
+  const base = String(name || '').replace(/^.*[\\/]/, '');
+  const m = base.match(
+    /^PhotoBooth-Folder-(\d+\.\d+\.\d+(?:[.-][\w.]+)?)-(\d{8}-\d{6})\.zip$/i,
+  );
+  if (!m) return null;
+  return { version: m[1], buildId: m[2] };
+}
+
+async function readBoothVersionFromZip(file) {
+  const fromName = parseBoothZipFilename(file?.name);
+  if (!file || typeof JSZip === 'undefined') {
+    return fromName;
+  }
+  try {
+    const zip = await JSZip.loadAsync(file);
+    let entry =
+      zip.file('version.json') ||
+      zip.file('./version.json') ||
+      Object.values(zip.files).find(
+        (f) => !f.dir && /(^|\/)version\.json$/i.test(f.name),
+      );
+    if (!entry) {
+      return fromName;
+    }
+    const text = await entry.async('string');
+    const meta = JSON.parse(text);
+    const version = String(meta.version || '').trim();
+    const buildId = String(meta.buildId || '').trim();
+    if (!version) return fromName;
+    return {
+      version,
+      buildId: buildId || fromName?.buildId || '',
+      builtAt: meta.builtAt || '',
+      channel: meta.channel || '',
+      source: 'version.json',
+    };
+  } catch (e) {
+    console.warn('[booth-update] zip meta', e);
+    return fromName ? { ...fromName, source: 'filename' } : null;
+  }
+}
+
+async function fillBoothUpdateFieldsFromZip(file) {
+  const statusEl = document.getElementById('boothUpdateStatus');
+  const verEl = document.getElementById('boothUpdateVersion');
+  const buildEl = document.getElementById('boothUpdateBuildId');
+  const notesEl = document.getElementById('boothUpdateNotes');
+  if (!file) {
+    if (verEl) verEl.value = '';
+    if (buildEl) buildEl.value = '';
+    return;
+  }
+  if (statusEl) statusEl.textContent = 'Reading version from zip?';
+  const meta = await readBoothVersionFromZip(file);
+  if (!meta?.version) {
+    if (verEl) verEl.value = '';
+    if (buildEl) buildEl.value = '';
+    if (statusEl) {
+      statusEl.textContent =
+        'Could not read version.json or PhotoBooth-Folder-<version>-<buildId>.zip name.';
+    }
+    return;
+  }
+  if (verEl) verEl.value = meta.version;
+  if (buildEl) buildEl.value = meta.buildId || '';
+  if (notesEl && !notesEl.value.trim()) {
+    const bits = [`Folder build v${meta.version}`];
+    if (meta.buildId) bits.push(`build ${meta.buildId}`);
+    if (meta.builtAt) bits.push(meta.builtAt);
+    notesEl.value = bits.join(' � ');
+  }
+  if (statusEl) {
+    const src = meta.source === 'version.json' ? 'version.json' : 'filename';
+    statusEl.textContent = `Ready to upload v${meta.version}${
+      meta.buildId ? ` (${meta.buildId})` : ''
+    } ? from ${src}.`;
+  }
+}
+
+document.getElementById('boothUpdateFile')?.addEventListener('change', (e) => {
+  const file = e.target?.files?.[0] || null;
+  void fillBoothUpdateFieldsFromZip(file);
+});
+
+document.getElementById('btnBoothUpdateUpload')?.addEventListener('click', async () => {
+  const file = document.getElementById('boothUpdateFile')?.files?.[0];
+  let version = document.getElementById('boothUpdateVersion')?.value?.trim();
+  let buildId = document.getElementById('boothUpdateBuildId')?.value?.trim();
+  const notes = document.getElementById('boothUpdateNotes')?.value?.trim();
+  const statusEl = document.getElementById('boothUpdateStatus');
+  if (!file) {
+    if (statusEl) statusEl.textContent = 'Choose a .zip file first.';
+    return;
+  }
+  if (!version) {
+    await fillBoothUpdateFieldsFromZip(file);
+    version = document.getElementById('boothUpdateVersion')?.value?.trim();
+    buildId = document.getElementById('boothUpdateBuildId')?.value?.trim();
+  }
+  if (!version) {
+    if (statusEl) statusEl.textContent = 'Version missing ? use a stamped Folder build zip.';
+    return;
+  }
+  try {
+    if (statusEl) statusEl.textContent = 'Uploading? this can take a few minutes.';
+    const fd = new FormData();
+    fd.append('package', file);
+    fd.append('version', version);
+    if (buildId) fd.append('buildId', buildId);
+    if (notes) fd.append('notes', notes);
+    const res = await fetch('/api/admin/booth-updates', {
+      method: 'POST',
+      headers: { 'X-Admin-Pin': pin() },
+      body: fd,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    setStatus(`Uploaded v${data.release?.version || version}`);
+    const verEl = document.getElementById('boothUpdateVersion');
+    const buildEl = document.getElementById('boothUpdateBuildId');
+    const notesEl = document.getElementById('boothUpdateNotes');
+    const fileEl = document.getElementById('boothUpdateFile');
+    if (verEl) verEl.value = '';
+    if (buildEl) buildEl.value = '';
+    if (notesEl) notesEl.value = '';
+    if (fileEl) fileEl.value = '';
+    await refreshBoothUpdates();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = String(e.message || e);
   }
 });
