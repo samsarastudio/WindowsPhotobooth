@@ -8,6 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
 const { spawn, execFileSync } = require('child_process');
 
 const PRESERVE = new Set(['config', 'capture', 'data', 'logs', 'updates']);
@@ -60,9 +62,13 @@ function psQuote(s) {
 }
 
 function sha256File(filePath) {
-  const hash = crypto.createHash('sha256');
-  hash.update(fs.readFileSync(filePath));
-  return hash.digest('hex');
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
 }
 
 function findPayloadRoot(stagingDir) {
@@ -77,29 +83,102 @@ function findPayloadRoot(stagingDir) {
   return stagingDir;
 }
 
-function writeUpdaterScript({ installRoot, stagingDir, zipPath, logPath }) {
+/** Stream a large Moments package to disk (avoid buffering ~150MB in RAM). */
+function downloadToFile(url, destPath, headers) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const req = lib.get(
+      url,
+      {
+        headers,
+        timeout: 0,
+      },
+      (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          downloadToFile(res.headers.location, destPath, headers).then(resolve, reject);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`Download failed HTTP ${res.statusCode}`));
+          return;
+        }
+        const out = fs.createWriteStream(destPath);
+        res.pipe(out);
+        out.on('finish', () => resolve({ shaHeader: res.headers['x-content-sha256'] || '' }));
+        out.on('error', reject);
+        res.on('error', reject);
+      },
+    );
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Download timed out'));
+    });
+  });
+}
+
+function writeUpdaterScript({
+  installRoot,
+  stagingDir,
+  zipPath,
+  logPath,
+  expectedVersion,
+  expectedBuildId,
+}) {
   const scriptPath = path.join(installRoot, 'updates', `apply-update-${Date.now()}.ps1`);
   fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
   const preserve = [...PRESERVE].map((p) => `'${p}'`).join(', ');
   const script = `
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'
 $InstallRoot = ${JSON.stringify(installRoot)}
 $StagingDir = ${JSON.stringify(stagingDir)}
 $ZipPath = ${JSON.stringify(zipPath)}
 $LogPath = ${JSON.stringify(logPath)}
+$ExpectedVersion = ${JSON.stringify(String(expectedVersion || ''))}
+$ExpectedBuildId = ${JSON.stringify(String(expectedBuildId || ''))}
 $Preserve = @(${preserve})
+
 function Log($m) {
   $line = "$(Get-Date -Format o) $m"
-  Add-Content -LiteralPath $LogPath -Value $line -ErrorAction SilentlyContinue
+  try { Add-Content -LiteralPath $LogPath -Value $line -Encoding utf8 } catch {}
 }
-Log 'updater started'
-for ($i = 0; $i -lt 90; $i++) {
+
+function Wait-Unlocked([string]$Path, [int]$Seconds = 60) {
+  for ($t = 0; $t -lt $Seconds; $t++) {
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
+    try {
+      $fs = [System.IO.File]::Open($Path, 'Open', 'ReadWrite', 'None')
+      $fs.Close()
+      return $true
+    } catch {
+      Start-Sleep -Milliseconds 500
+    }
+  }
+  return $false
+}
+
+function Copy-Tree([string]$Src, [string]$Dst) {
+  New-Item -ItemType Directory -Force -Path $Dst | Out-Null
+  & robocopy $Src $Dst /E /IS /IT /R:8 /W:2 /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+  $code = $LASTEXITCODE
+  if ($code -ge 8) { throw "robocopy failed code=$code src=$Src dest=$Dst" }
+}
+
+Log "updater started installRoot=$InstallRoot"
+Log "expected v$ExpectedVersion build=$ExpectedBuildId"
+
+# Wait until PhotoBooth.exe process is gone (up to ~3 minutes)
+for ($i = 0; $i -lt 180; $i++) {
   $procs = @(Get-Process -Name 'PhotoBooth' -ErrorAction SilentlyContinue)
   if ($procs.Count -eq 0) { break }
+  if ($i -eq 0 -or ($i % 10) -eq 0) { Log ("waiting for PhotoBooth exit; still running count=" + $procs.Count) }
   Start-Sleep -Seconds 1
 }
 Get-Process -Name 'edsdk-bridge','PhotoBooth' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 3
 Log 'processes cleared'
 
 $payload = $StagingDir
@@ -109,37 +188,116 @@ if (-not (Test-Path -LiteralPath (Join-Path $payload 'PhotoBooth.exe'))) {
   }
 }
 Log "payload=$payload"
+if (-not (Test-Path -LiteralPath (Join-Path $payload 'PhotoBooth.exe'))) {
+  Log 'FATAL: payload missing PhotoBooth.exe'
+  exit 2
+}
 
-Get-ChildItem -LiteralPath $payload -Force -ErrorAction SilentlyContinue | ForEach-Object {
-  if ($Preserve -contains $_.Name) { return }
-  $dest = Join-Path $InstallRoot $_.Name
-  if ($_.PSIsContainer) {
-    if (Test-Path -LiteralPath $dest) {
-      & robocopy $_.FullName $dest /E /IS /IT /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
-    } else {
-      Copy-Item -LiteralPath $_.FullName -Destination $dest -Recurse -Force
-    }
-  } else {
-    Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+# Prefer moving the running image aside so Replace is not blocked
+$exeDest = Join-Path $InstallRoot 'PhotoBooth.exe'
+$exeBak = Join-Path $InstallRoot ('PhotoBooth.exe.bak-' + (Get-Date -Format 'yyyyMMddHHmmss'))
+if (Test-Path -LiteralPath $exeDest) {
+  if (-not (Wait-Unlocked $exeDest 90)) { Log "WARN: exe still locked: $exeDest" }
+  try {
+    Move-Item -LiteralPath $exeDest -Destination $exeBak -Force
+    Log "moved old exe -> $exeBak"
+  } catch {
+    Log "WARN: could not move old exe: $($_.Exception.Message)"
   }
 }
 
-$exe = Join-Path $InstallRoot 'PhotoBooth.exe'
-if (Test-Path -LiteralPath $exe) {
-  Log "starting $exe"
-  Start-Process -FilePath $exe -WorkingDirectory $InstallRoot
-} else {
-  Log 'PhotoBooth.exe missing after copy'
+Get-ChildItem -LiteralPath $payload -Force | ForEach-Object {
+  if ($Preserve -contains $_.Name) {
+    Log "preserve skip $($_.Name)"
+    return
+  }
+  $dest = Join-Path $InstallRoot $_.Name
+  if ($_.PSIsContainer) {
+    Log "copy dir $($_.Name)"
+    Copy-Tree $_.FullName $dest
+  } else {
+    Log "copy file $($_.Name)"
+    $copied = $false
+    for ($a = 1; $a -le 10; $a++) {
+      try {
+        Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
+        $copied = $true
+        break
+      } catch {
+        Log "retry $a copy $($_.Name): $($_.Exception.Message)"
+        Start-Sleep -Seconds 1
+      }
+    }
+    if (-not $copied) { throw "Failed to copy $($_.Name)" }
+  }
 }
 
-Start-Sleep -Seconds 2
+$verPath = Join-Path $InstallRoot 'version.json'
+if (-not (Test-Path -LiteralPath $verPath)) {
+  Log 'FATAL: version.json missing after copy'
+  exit 3
+}
+try {
+  $ver = Get-Content -LiteralPath $verPath -Raw | ConvertFrom-Json
+  Log ("installed version.json => v" + $ver.version + " build=" + $ver.buildId)
+  if ($ExpectedVersion -and $ver.version -ne $ExpectedVersion) {
+    Log "FATAL: version mismatch got=$($ver.version) expected=$ExpectedVersion"
+    exit 4
+  }
+} catch {
+  Log "FATAL: cannot read version.json: $($_.Exception.Message)"
+  exit 5
+}
+
+if (-not (Test-Path -LiteralPath $exeDest)) {
+  Log 'FATAL: PhotoBooth.exe missing after copy'
+  exit 6
+}
+
+Log "starting $exeDest"
+Start-Process -FilePath $exeDest -WorkingDirectory $InstallRoot
+Start-Sleep -Seconds 4
+
+# Cleanup only after relaunch attempt
 Remove-Item -LiteralPath $StagingDir -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $ZipPath -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $exeBak) {
+  Remove-Item -LiteralPath $exeBak -Force -ErrorAction SilentlyContinue
+}
 Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
-Log 'updater done'
+Log 'updater done OK'
 `;
-  fs.writeFileSync(scriptPath, script, 'utf8');
+  fs.writeFileSync(scriptPath, script.replace(/\n/g, '\r\n'), 'utf8');
   return scriptPath;
+}
+
+function spawnDetachedUpdater(scriptPath, cwd) {
+  // `start` fully detaches so Electron exit cannot kill the updater.
+  const child = spawn(
+    process.env.ComSpec || 'cmd.exe',
+    [
+      '/c',
+      'start',
+      '',
+      '/min',
+      'powershell.exe',
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-WindowStyle',
+      'Hidden',
+      '-File',
+      scriptPath,
+    ],
+    {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      cwd,
+    },
+  );
+  child.unref();
+  return child;
 }
 
 let applying = false;
@@ -198,6 +356,7 @@ async function pollAndApply(deps) {
     appendAppLog?.('info', 'booth-update', 'update available (manual install)', {
       from: local,
       to: { version: release.version, buildId: release.buildId },
+      installRoot: portableRoot,
     });
     return { ok: true, updateAvailable: true, local, active: release, release };
   }
@@ -205,6 +364,7 @@ async function pollAndApply(deps) {
   appendAppLog?.('info', 'booth-update', 'manual update — downloading', {
     from: local,
     to: { version: release.version, buildId: release.buildId },
+    installRoot: portableRoot,
   });
 
   applying = true;
@@ -215,18 +375,24 @@ async function pollAndApply(deps) {
     const stagingDir = path.join(updatesDir, `staging-${release.version}-${release.buildId}`);
     if (fs.existsSync(stagingDir)) fs.rmSync(stagingDir, { recursive: true, force: true });
     fs.mkdirSync(stagingDir, { recursive: true });
+    if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
 
     const downloadUrl = `${base}/api/booth-update/download/${encodeURIComponent(release.id)}`;
-    const dlRes = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
-    if (!dlRes.ok) {
-      throw new Error(`Download failed HTTP ${dlRes.status}`);
-    }
-    const buf = Buffer.from(await dlRes.arrayBuffer());
-    fs.writeFileSync(zipPath, buf);
+    const { shaHeader } = await downloadToFile(downloadUrl, zipPath, {
+      Authorization: `Bearer ${token}`,
+    });
 
-    const expectedSha = release.sha256 || dlRes.headers.get('x-content-sha256') || '';
+    const st = fs.statSync(zipPath);
+    if (!st.size || st.size < 1000) {
+      throw new Error(`Downloaded zip too small (${st.size} bytes)`);
+    }
+    if (release.bytes && Math.abs(st.size - Number(release.bytes)) > 64) {
+      throw new Error(`Download size mismatch (got ${st.size}, expected ${release.bytes})`);
+    }
+
+    const expectedSha = release.sha256 || shaHeader || '';
     if (expectedSha) {
-      const got = sha256File(zipPath);
+      const got = await sha256File(zipPath);
       if (got.toLowerCase() !== String(expectedSha).toLowerCase()) {
         throw new Error(`SHA-256 mismatch (expected ${expectedSha}, got ${got})`);
       }
@@ -246,41 +412,51 @@ async function pollAndApply(deps) {
     if (!fs.existsSync(path.join(payload, 'PhotoBooth.exe'))) {
       throw new Error('Downloaded package does not contain PhotoBooth.exe');
     }
+    const stagedVerPath = path.join(payload, 'version.json');
+    if (fs.existsSync(stagedVerPath)) {
+      const stagedVer = JSON.parse(fs.readFileSync(stagedVerPath, 'utf8'));
+      if (release.version && stagedVer.version && stagedVer.version !== release.version) {
+        throw new Error(
+          `Staged version.json is ${stagedVer.version} but release is ${release.version}`,
+        );
+      }
+    }
 
     const logPath = path.join(portableRoot, 'logs', 'booth-update.log');
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(
+      logPath,
+      `${new Date().toISOString()} electron: spawning updater for v${release.version} into ${portableRoot}\n`,
+      'utf8',
+    );
     const scriptPath = writeUpdaterScript({
       installRoot: portableRoot,
       stagingDir,
       zipPath,
       logPath,
+      expectedVersion: release.version,
+      expectedBuildId: release.buildId,
     });
 
     appendAppLog?.('info', 'booth-update', 'quitting to apply update', {
       version: release.version,
       buildId: release.buildId,
       scriptPath,
+      installRoot: portableRoot,
+      logPath,
     });
 
-    const child = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath],
-      {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-        cwd: portableRoot,
-      },
-    );
-    child.unref();
+    spawnDetachedUpdater(scriptPath, portableRoot);
 
     try {
       killBridge?.();
     } catch (_) {}
+
+    // Give `start` time to launch PowerShell before this process dies.
     setTimeout(() => {
       app.exit(0);
-    }, 400);
-    return { ok: true, applying: true, release };
+    }, 1500);
+    return { ok: true, applying: true, release, installRoot: portableRoot, logPath };
   } catch (e) {
     applying = false;
     appendAppLog?.('error', 'booth-update', 'apply failed', String(e));
