@@ -137,6 +137,30 @@ sudo systemctl enable --now moments-gallery
 sudo systemctl status moments-gallery
 ```
 
+## Booth OTA packages (Pi)
+
+Folder builds are ~150MB zips. **Cloudflare can reset or size-limit large single uploads**, so:
+
+1. Deploy the Moments code that supports **chunked** admin upload (`git pull` on the Pi, restart `moments-gallery`).
+2. Prefer Admin → **Booth updates** chunked upload via `https://moments.inmomentservices.com/admin`.
+3. If the browser still stalls, register on the Pi itself (no Cloudflare, no browser TLS):
+
+```bash
+# From your Windows build PC
+scp builds/PhotoBooth-Folder-1.1.0-YYYYMMDD-HHMMSS.zip pi@PI_HOST:~/moments-server/incoming/
+
+# On the Pi
+mkdir -p ~/moments-server/incoming
+cd ~/moments-server
+node scripts/register-booth-zip.mjs incoming/PhotoBooth-Folder-1.1.0-YYYYMMDD-HHMMSS.zip
+# optional: add --rollout to activate immediately
+sudo systemctl restart moments-gallery   # only if you just git-pulled code
+```
+
+Then open Admin → Booth updates → **Refresh** → **Roll out** (unless you used `--rollout`).
+
+Booths install manually: Photobooth Admin → Gallery → **Install update**.
+
 ## Cloudflare Tunnel
 
 Add an ingress rule (keep existing hostnames for 3000/3001/5000):

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import multer from 'multer';
-import express, { Router } from 'express';
+import { Router } from 'express';
 import { nanoid } from 'nanoid';
 import { config } from '../config.js';
 import { getDb, loadSettings, saveSettings } from '../db.js';
@@ -170,43 +170,70 @@ adminBoothUpdateRouter.post('/init', (req, res) => {
     createdAt: new Date().toISOString(),
   };
   fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
-  return res.json({ ok: true, uploadId, chunkSizeHint: 2 * 1024 * 1024 });
+  return res.json({ ok: true, uploadId, chunkSizeHint: 512 * 1024 });
 });
 
-adminBoothUpdateRouter.put(
-  '/chunk/:uploadId',
-  express.raw({ type: () => true, limit: '12mb' }),
-  (req, res) => {
-    req.setTimeout(0);
-    res.setTimeout(0);
-    const uploadId = path.basename(String(req.params.uploadId || ''));
-    const meta = readStagingMeta(uploadId);
-    if (!meta) return res.status(404).json({ ok: false, error: 'Upload session not found' });
-    const index = Number(req.get('x-chunk-index'));
-    if (!Number.isInteger(index) || index < 0 || index >= meta.totalChunks) {
-      return res.status(400).json({ ok: false, error: 'Invalid x-chunk-index' });
+const chunkUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, _file, cb) => {
+      const uploadId = path.basename(String(req.params.uploadId || ''));
+      cb(null, stagingDir(uploadId));
+    },
+    filename: (req, _file, cb) => {
+      const index = Number(req.get('x-chunk-index') || req.body?.index);
+      const n = Number.isInteger(index) ? index : -1;
+      cb(null, `part-${String(n).padStart(5, '0')}.uploading`);
+    },
+  }),
+  limits: { fileSize: 4 * 1024 * 1024, files: 1 },
+});
+
+/** Multipart chunk POST — more reliable than raw PUT over flaky self-signed TLS. */
+adminBoothUpdateRouter.post('/chunk/:uploadId', (req, res) => {
+  req.setTimeout(0);
+  res.setTimeout(0);
+  chunkUpload.single('chunk')(req, res, (err) => {
+    if (err) {
+      console.error('[booth-update] chunk multer', err);
+      return res.status(400).json({ ok: false, error: err.message || 'Chunk upload failed' });
     }
-    const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
-    if (!buf.length) {
-      return res.status(400).json({ ok: false, error: 'Empty chunk' });
+    try {
+      const uploadId = path.basename(String(req.params.uploadId || ''));
+      const meta = readStagingMeta(uploadId);
+      if (!meta) {
+        if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(404).json({ ok: false, error: 'Upload session not found' });
+      }
+      const index = Number(req.get('x-chunk-index') || req.body?.index);
+      if (!Number.isInteger(index) || index < 0 || index >= meta.totalChunks) {
+        if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        return res.status(400).json({ ok: false, error: 'Invalid x-chunk-index' });
+      }
+      if (!req.file?.path) {
+        return res.status(400).json({ ok: false, error: 'Missing chunk file' });
+      }
+      const chunkPath = path.join(stagingDir(uploadId), `part-${String(index).padStart(5, '0')}`);
+      if (fs.existsSync(chunkPath)) fs.unlinkSync(chunkPath);
+      fs.renameSync(req.file.path, chunkPath);
+      if (!meta.received.includes(index)) meta.received.push(index);
+      meta.received.sort((a, b) => a - b);
+      fs.writeFileSync(
+        path.join(stagingDir(uploadId), 'meta.json'),
+        JSON.stringify(meta, null, 2),
+        'utf8',
+      );
+      return res.json({
+        ok: true,
+        index,
+        received: meta.received.length,
+        totalChunks: meta.totalChunks,
+      });
+    } catch (e) {
+      console.error('[booth-update] chunk', e);
+      return res.status(500).json({ ok: false, error: e?.message || 'Chunk failed' });
     }
-    const chunkPath = path.join(stagingDir(uploadId), `part-${String(index).padStart(5, '0')}`);
-    fs.writeFileSync(chunkPath, buf);
-    if (!meta.received.includes(index)) meta.received.push(index);
-    meta.received.sort((a, b) => a - b);
-    fs.writeFileSync(
-      path.join(stagingDir(uploadId), 'meta.json'),
-      JSON.stringify(meta, null, 2),
-      'utf8',
-    );
-    return res.json({
-      ok: true,
-      index,
-      received: meta.received.length,
-      totalChunks: meta.totalChunks,
-    });
-  },
-);
+  });
+});
 
 adminBoothUpdateRouter.post('/complete/:uploadId', async (req, res) => {
   req.setTimeout(0);
