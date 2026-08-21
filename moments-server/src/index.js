@@ -168,7 +168,16 @@ const onListen = () => {
 
 if (config.https) {
   const { key, cert } = await ensureHttpsCerts(lanHostsFromPublicUrl());
-  https.createServer({ key, cert }, app).listen(config.port, config.host, onListen);
+  const server = https.createServer({ key, cert }, app);
+  // Folder OTA zips are large — disable Node request timeouts.
+  server.requestTimeout = 0;
+  server.headersTimeout = 0;
+  server.timeout = 0;
+  server.listen(config.port, config.host, onListen);
 } else {
-  http.createServer(app).listen(config.port, config.host, onListen);
+  const server = http.createServer(app);
+  server.requestTimeout = 0;
+  server.headersTimeout = 0;
+  server.timeout = 0;
+  server.listen(config.port, config.host, onListen);
 }

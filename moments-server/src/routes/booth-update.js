@@ -14,9 +14,13 @@ function ensureUpdatesDir() {
 }
 
 function sha256File(filePath) {
-  const hash = crypto.createHash('sha256');
-  hash.update(fs.readFileSync(filePath));
-  return hash.digest('hex');
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
 }
 
 function parseVersionParts(v) {
@@ -53,6 +57,8 @@ function publicRelease(row) {
     notes: row.notes || '',
     createdAt: row.created_at,
     filename: row.filename,
+    downloadUrl: `${config.publicBaseUrl}/api/booth-update/download/${encodeURIComponent(row.id)}`,
+    adminDownloadUrl: `/api/admin/booth-updates/${encodeURIComponent(row.id)}/download`,
   };
 }
 
@@ -111,8 +117,12 @@ adminBoothUpdateRouter.get('/', (_req, res) => {
 });
 
 adminBoothUpdateRouter.post('/', (req, res) => {
-  diskUpload.single('package')(req, res, (err) => {
+  // Large Folder zips (100–400MB) need a long-lived request.
+  req.setTimeout(0);
+  res.setTimeout(0);
+  diskUpload.single('package')(req, res, async (err) => {
     if (err) {
+      console.error('[booth-update] multer', err);
       return res.status(400).json({ ok: false, error: err.message || 'Upload failed' });
     }
     try {
@@ -137,7 +147,7 @@ adminBoothUpdateRouter.post('/', (req, res) => {
       if (fs.existsSync(dest)) fs.unlinkSync(dest);
       fs.renameSync(req.file.path, dest);
       const st = fs.statSync(dest);
-      const sha256 = sha256File(dest);
+      const sha256 = await sha256File(dest);
       const createdAt = new Date().toISOString();
       getDb()
         .prepare(
@@ -154,6 +164,7 @@ adminBoothUpdateRouter.post('/', (req, res) => {
           notes,
           created_at: createdAt,
         });
+      console.log(`[booth-update] uploaded v${version} (${buildId}) ${st.size} bytes`);
       return res.json({
         ok: true,
         release: {
@@ -180,6 +191,25 @@ adminBoothUpdateRouter.post('/', (req, res) => {
       return res.status(500).json({ ok: false, error: e?.message || 'Upload failed' });
     }
   });
+});
+
+adminBoothUpdateRouter.get('/:id/download', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM booth_releases WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ ok: false, error: 'Release not found' });
+  const filePath = path.join(ensureUpdatesDir(), row.filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ ok: false, error: 'Package file missing on server' });
+  }
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Length', String(row.bytes));
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${row.filename.replace(/"/g, '')}"`,
+  );
+  if (row.sha256) res.setHeader('X-Content-SHA256', row.sha256);
+  req.setTimeout(0);
+  res.setTimeout(0);
+  return fs.createReadStream(filePath).pipe(res);
 });
 
 adminBoothUpdateRouter.post('/:id/rollout', (req, res) => {
