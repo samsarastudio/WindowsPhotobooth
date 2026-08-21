@@ -1186,51 +1186,96 @@ function hideBoothUploadProgress() {
   if (bar) bar.style.width = '0%';
 }
 
-function uploadBoothPackageXhr(file, version, buildId, notes) {
-  return new Promise((resolve, reject) => {
-    const fd = new FormData();
-    fd.append('package', file);
-    fd.append('version', version);
-    if (buildId) fd.append('buildId', buildId);
-    if (notes) fd.append('notes', notes);
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/admin/booth-updates');
-    xhr.setRequestHeader('X-Admin-Pin', pin());
-    xhr.timeout = 0;
-    xhr.upload.onprogress = (e) => {
-      if (!e.lengthComputable) {
-        setBoothUploadProgress(0, 'Uploading…');
-        return;
-      }
-      const pct = (e.loaded / e.total) * 100;
-      setBoothUploadProgress(
-        pct,
-        `Uploading ${formatBytes(e.loaded)} / ${formatBytes(e.total)} (${Math.round(pct)}%)`,
-      );
-    };
-    xhr.onload = () => {
-      let data = {};
-      try {
-        data = JSON.parse(xhr.responseText || '{}');
-      } catch {
-        data = {};
-      }
-      if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
-        resolve(data);
-        return;
-      }
-      reject(new Error(data.error || `Upload failed (HTTP ${xhr.status})`));
-    };
-    xhr.onerror = () => {
-      reject(
-        new Error(
-          'Network error / connection reset — retry on a stable link. Large zips can take several minutes.',
-        ),
-      );
-    };
-    xhr.ontimeout = () => reject(new Error('Upload timed out'));
-    xhr.send(fd);
+async function uploadBoothPackageXhr(file, version, buildId, notes) {
+  const chunkSize = 2 * 1024 * 1024; // 2MB — keeps TLS records small
+  const totalChunks = Math.ceil(file.size / chunkSize);
+  setBoothUploadProgress(0, `Preparing ${totalChunks} chunks…`);
+
+  const initRes = await fetch('/api/admin/booth-updates/init', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Admin-Pin': pin(),
+    },
+    body: JSON.stringify({
+      version,
+      buildId,
+      notes,
+      bytes: file.size,
+      totalChunks,
+    }),
   });
+  const initData = await initRes.json().catch(() => ({}));
+  if (!initRes.ok || !initData.ok || !initData.uploadId) {
+    throw new Error(initData.error || `Init failed (HTTP ${initRes.status})`);
+  }
+  const uploadId = initData.uploadId;
+
+  for (let i = 0; i < totalChunks; i += 1) {
+    const start = i * chunkSize;
+    const end = Math.min(file.size, start + chunkSize);
+    const blob = file.slice(start, end);
+    const buf = await blob.arrayBuffer();
+    // retry each chunk a few times (SSL blips)
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', `/api/admin/booth-updates/chunk/${encodeURIComponent(uploadId)}`);
+          xhr.setRequestHeader('X-Admin-Pin', pin());
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.setRequestHeader('X-Chunk-Index', String(i));
+          xhr.timeout = 0;
+          xhr.onload = () => {
+            let data = {};
+            try {
+              data = JSON.parse(xhr.responseText || '{}');
+            } catch {
+              data = {};
+            }
+            if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+              resolve(data);
+              return;
+            }
+            reject(new Error(data.error || `Chunk ${i} failed (HTTP ${xhr.status})`));
+          };
+          xhr.onerror = () => reject(new Error(`Chunk ${i} network error`));
+          xhr.ontimeout = () => reject(new Error(`Chunk ${i} timed out`));
+          xhr.send(buf);
+        });
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        // brief backoff
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+    if (lastErr) throw lastErr;
+    const loaded = end;
+    const pct = (loaded / file.size) * 100;
+    setBoothUploadProgress(
+      pct,
+      `Uploading chunk ${i + 1}/${totalChunks} · ${formatBytes(loaded)} / ${formatBytes(file.size)}`,
+    );
+  }
+
+  setBoothUploadProgress(99, 'Assembling on server…');
+  const doneRes = await fetch(
+    `/api/admin/booth-updates/complete/${encodeURIComponent(uploadId)}`,
+    {
+      method: 'POST',
+      headers: { 'X-Admin-Pin': pin() },
+    },
+  );
+  const doneData = await doneRes.json().catch(() => ({}));
+  if (!doneRes.ok || !doneData.ok) {
+    throw new Error(doneData.error || `Complete failed (HTTP ${doneRes.status})`);
+  }
+  return doneData;
 }
 
 document.getElementById('boothUpdateFile')?.addEventListener('change', (e) => {

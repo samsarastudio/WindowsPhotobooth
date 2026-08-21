@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260821-4" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260821-5" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -256,8 +256,9 @@
             <label>Folder build zip</label>
             <input id="boothUpdateFile" type="file" accept=".zip,application/zip" />
             <p class="meta">
-              Pick <code>PhotoBooth-Folder-&lt;version&gt;-&lt;buildId&gt;.zip</code>. Version fields
-              fill from the filename (large zips are not fully opened in the browser).
+              Pick <code>PhotoBooth-Folder-&lt;version&gt;-&lt;buildId&gt;.zip</code> from a fresh
+              Windows build. Uploads go in <strong>2MB chunks</strong> (more reliable over HTTPS).
+              Version fields fill from the filename.
             </p>
             <label>Version</label>
             <input id="boothUpdateVersion" class="input" readonly placeholder="Filled from zip…" />
@@ -307,6 +308,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260821-4" type="module"></script>
+    <script src="/js/admin.js?v=20260821-5" type="module"></script>
   </body>
 </html>

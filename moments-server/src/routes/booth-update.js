@@ -2,15 +2,38 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import multer from 'multer';
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { nanoid } from 'nanoid';
 import { config } from '../config.js';
 import { getDb, loadSettings, saveSettings } from '../db.js';
 import { requireAdminPin, requireUploadToken } from '../auth.js';
 
+const CHUNK_STAGING = () => path.join(ensureUpdatesDir(), '_chunks');
+
 function ensureUpdatesDir() {
   fs.mkdirSync(config.boothUpdatesDir, { recursive: true });
   return config.boothUpdatesDir;
+}
+
+function stagingDir(uploadId) {
+  const dir = path.join(CHUNK_STAGING(), path.basename(String(uploadId || '')));
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function readStagingMeta(uploadId) {
+  const metaPath = path.join(stagingDir(uploadId), 'meta.json');
+  if (!fs.existsSync(metaPath)) return null;
+  return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+}
+
+function cleanupStaging(uploadId) {
+  const dir = path.join(CHUNK_STAGING(), path.basename(String(uploadId || '')));
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 }
 
 function sha256File(filePath) {
@@ -114,6 +137,161 @@ adminBoothUpdateRouter.get('/', (_req, res) => {
       active: r.id === activeId,
     })),
   });
+});
+
+/** Start a chunked upload (avoids SSL failures on huge single POSTs). */
+adminBoothUpdateRouter.post('/init', (req, res) => {
+  const version = String(req.body?.version || '').trim();
+  if (!/^\d+\.\d+\.\d+([.-][\w.]+)?$/.test(version)) {
+    return res.status(400).json({ ok: false, error: 'version required (semver, e.g. 1.1.0)' });
+  }
+  const buildId =
+    String(req.body?.buildId || '').trim() ||
+    new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  const notes = String(req.body?.notes || '').trim().slice(0, 2000);
+  const bytes = Number(req.body?.bytes);
+  const totalChunks = Number(req.body?.totalChunks);
+  if (!Number.isFinite(bytes) || bytes < 1 || bytes > 600 * 1024 * 1024) {
+    return res.status(400).json({ ok: false, error: 'bytes required (1…600MB)' });
+  }
+  if (!Number.isFinite(totalChunks) || totalChunks < 1 || totalChunks > 5000) {
+    return res.status(400).json({ ok: false, error: 'totalChunks invalid' });
+  }
+  const uploadId = nanoid(16);
+  const dir = stagingDir(uploadId);
+  const meta = {
+    uploadId,
+    version,
+    buildId,
+    notes,
+    bytes,
+    totalChunks,
+    received: [],
+    createdAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+  return res.json({ ok: true, uploadId, chunkSizeHint: 2 * 1024 * 1024 });
+});
+
+adminBoothUpdateRouter.put(
+  '/chunk/:uploadId',
+  express.raw({ type: () => true, limit: '12mb' }),
+  (req, res) => {
+    req.setTimeout(0);
+    res.setTimeout(0);
+    const uploadId = path.basename(String(req.params.uploadId || ''));
+    const meta = readStagingMeta(uploadId);
+    if (!meta) return res.status(404).json({ ok: false, error: 'Upload session not found' });
+    const index = Number(req.get('x-chunk-index'));
+    if (!Number.isInteger(index) || index < 0 || index >= meta.totalChunks) {
+      return res.status(400).json({ ok: false, error: 'Invalid x-chunk-index' });
+    }
+    const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || []);
+    if (!buf.length) {
+      return res.status(400).json({ ok: false, error: 'Empty chunk' });
+    }
+    const chunkPath = path.join(stagingDir(uploadId), `part-${String(index).padStart(5, '0')}`);
+    fs.writeFileSync(chunkPath, buf);
+    if (!meta.received.includes(index)) meta.received.push(index);
+    meta.received.sort((a, b) => a - b);
+    fs.writeFileSync(
+      path.join(stagingDir(uploadId), 'meta.json'),
+      JSON.stringify(meta, null, 2),
+      'utf8',
+    );
+    return res.json({
+      ok: true,
+      index,
+      received: meta.received.length,
+      totalChunks: meta.totalChunks,
+    });
+  },
+);
+
+adminBoothUpdateRouter.post('/complete/:uploadId', async (req, res) => {
+  req.setTimeout(0);
+  res.setTimeout(0);
+  const uploadId = path.basename(String(req.params.uploadId || ''));
+  const meta = readStagingMeta(uploadId);
+  if (!meta) return res.status(404).json({ ok: false, error: 'Upload session not found' });
+  if (meta.received.length !== meta.totalChunks) {
+    return res.status(400).json({
+      ok: false,
+      error: `Missing chunks (${meta.received.length}/${meta.totalChunks})`,
+    });
+  }
+  try {
+    const id = nanoid(12);
+    const filename = `PhotoBooth-${meta.version}-${meta.buildId}.zip`;
+    const dest = path.join(ensureUpdatesDir(), filename);
+    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    const fd = fs.openSync(dest, 'w');
+    try {
+      for (let i = 0; i < meta.totalChunks; i += 1) {
+        const chunkPath = path.join(stagingDir(uploadId), `part-${String(i).padStart(5, '0')}`);
+        if (!fs.existsSync(chunkPath)) {
+          cleanupStaging(uploadId);
+          return res.status(400).json({ ok: false, error: `Missing chunk ${i}` });
+        }
+        const buf = fs.readFileSync(chunkPath);
+        fs.writeSync(fd, buf);
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+    const st = fs.statSync(dest);
+    if (st.size !== meta.bytes) {
+      try {
+        fs.unlinkSync(dest);
+      } catch {
+        /* ignore */
+      }
+      cleanupStaging(uploadId);
+      return res.status(400).json({
+        ok: false,
+        error: `Size mismatch (got ${st.size}, expected ${meta.bytes})`,
+      });
+    }
+    const sha256 = await sha256File(dest);
+    const createdAt = new Date().toISOString();
+    getDb()
+      .prepare(
+        `INSERT INTO booth_releases (id, version, build_id, filename, bytes, sha256, notes, created_at)
+         VALUES (@id, @version, @build_id, @filename, @bytes, @sha256, @notes, @created_at)`,
+      )
+      .run({
+        id,
+        version: meta.version,
+        build_id: meta.buildId,
+        filename,
+        bytes: st.size,
+        sha256,
+        notes: meta.notes || '',
+        created_at: createdAt,
+      });
+    cleanupStaging(uploadId);
+    console.log(`[booth-update] chunked upload complete v${meta.version} (${meta.buildId}) ${st.size} bytes`);
+    return res.json({
+      ok: true,
+      release: {
+        ...publicRelease({
+          id,
+          version: meta.version,
+          build_id: meta.buildId,
+          filename,
+          bytes: st.size,
+          sha256,
+          notes: meta.notes || '',
+          created_at: createdAt,
+        }),
+        active: false,
+      },
+    });
+  } catch (e) {
+    console.error('[booth-update] complete', e);
+    cleanupStaging(uploadId);
+    return res.status(500).json({ ok: false, error: e?.message || 'Assemble failed' });
+  }
 });
 
 adminBoothUpdateRouter.post('/', (req, res) => {

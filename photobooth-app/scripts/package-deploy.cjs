@@ -5,6 +5,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 
 const appRoot = path.join(__dirname, '..');
@@ -68,13 +69,69 @@ function writeVersionFile(dir, buildId, channel) {
   return payload;
 }
 
+function psQuote(s) {
+  return "'" + String(s).replace(/'/g, "''") + "'";
+}
+
+function assertZipHasPhotoBooth(zipPath) {
+  const listing = execFileSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Add-Type -AssemblyName System.IO.Compression.FileSystem; $z=[IO.Compression.ZipFile]::OpenRead(${psQuote(zipPath)}); try { $z.Entries | Where-Object { $_.FullName -match 'PhotoBooth\\.exe$' } | Select-Object -ExpandProperty FullName } finally { $z.Dispose() }`,
+    ],
+    { windowsHide: true, encoding: 'utf8' },
+  );
+  if (!/PhotoBooth\.exe/i.test(listing)) {
+    throw new Error('Zip is missing PhotoBooth.exe — aborting.');
+  }
+  const count = execFileSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      `Add-Type -AssemblyName System.IO.Compression.FileSystem; $z=[IO.Compression.ZipFile]::OpenRead(${psQuote(zipPath)}); try { $z.Entries.Count } finally { $z.Dispose() }`,
+    ],
+    { windowsHide: true, encoding: 'utf8' },
+  ).trim();
+  console.log(
+    `[package-deploy] zip OK (${Math.round(fs.statSync(zipPath).size / (1024 * 1024))} MB, ${count} entries) includes:\n${listing.trim()}`,
+  );
+}
+
 function zipFolder(folderPath, zipPath) {
   if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-  // Windows tar creates zip with -a; contents are rooted at folderPath.
-  execFileSync('tar', ['-a', '-c', '-f', zipPath, '-C', folderPath, '.'], {
-    stdio: 'inherit',
-    windowsHide: true,
-  });
+  // Copy to temp first so locks from a running PhotoBooth.exe don't break zipping.
+  // Avoid Windows `tar -a` — those zips often show as empty in Explorer.
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-ota-zip-'));
+  const staged = path.join(tmpRoot, 'payload');
+  try {
+    console.log(`[package-deploy] Staging zip copy → ${staged}`);
+    copyDir(folderPath, staged);
+    execFileSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$items = @(Get-ChildItem -LiteralPath ${psQuote(staged)}).FullName; if (-not $items.Count) { throw 'Folder is empty' }; Compress-Archive -LiteralPath $items -DestinationPath ${psQuote(zipPath)} -CompressionLevel Optimal -Force`,
+      ],
+      { windowsHide: true, stdio: 'inherit' },
+    );
+  } finally {
+    try {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  if (!fs.existsSync(zipPath) || fs.statSync(zipPath).size < 1000) {
+    throw new Error(`Zip failed or too small: ${zipPath}`);
+  }
+  assertZipHasPhotoBooth(zipPath);
 }
 
 function main() {
