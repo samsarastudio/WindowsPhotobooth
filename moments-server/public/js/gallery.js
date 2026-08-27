@@ -14,7 +14,13 @@ function parseRoute() {
     return { kind: 'wall', mode };
   }
   if (parts.length >= 3 && parts[1] === 'p') {
-    return { kind: 'photo', slug: parts[0], photoId: parts[2], mode: 'grid' };
+    let photoId = parts[2];
+    try {
+      photoId = decodeURIComponent(photoId);
+    } catch {
+      /* keep raw */
+    }
+    return { kind: 'photo', slug: parts[0], photoId, mode: 'grid' };
   }
   if (parts.length >= 2 && (parts[1] === 'wall' || parts[1] === 'mosaic')) {
     return { kind: 'session', slug: parts[0], mode: 'mosaic' };
