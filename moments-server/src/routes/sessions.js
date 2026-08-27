@@ -111,7 +111,16 @@ sessionsRouter.get('/:slug', (req, res) => {
   if (isSessionExpired(session)) {
     return res.status(410).json({ ok: false, error: 'Session expired' });
   }
-  return res.json({ ok: true, session: publicSession(session, listPublicPhotos(session.id)) });
+  const photos = listPublicPhotos(session.id);
+  // Share deep-link: include this photo even when filtered from the public gallery list.
+  const wantId = String(req.query.photoId || req.query.p || '').trim();
+  if (wantId && !photos.some((p) => p.id === wantId)) {
+    const row = getDb()
+      .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
+      .get(wantId, session.id);
+    if (row) photos.push(row);
+  }
+  return res.json({ ok: true, session: publicSession(session, photos) });
 });
 
 /** Single photo for share/QR deep links (any variant, including plain originals). */
