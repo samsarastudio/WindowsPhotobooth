@@ -39,6 +39,7 @@ const els = {
   grid: document.getElementById('grid'),
   guestPhoto: document.getElementById('guestPhoto'),
   guestPhotoImg: document.getElementById('guestPhotoImg'),
+  btnSaveGuestPhoto: document.getElementById('btnSaveGuestPhoto'),
   btnAttachCard: document.getElementById('btnAttachCard'),
   attachPanel: document.getElementById('attachPanel'),
   attachVideo: document.getElementById('attachVideo'),
@@ -213,31 +214,68 @@ function isAppleTouchDevice() {
   );
 }
 
-/** iPhone: share sheet (Save to Photos). Android/desktop: direct download. */
+/** Family key so original + framed/ai of the same capture group together. */
+function captureFamilyKey(photo) {
+  const raw = String(photo?.sourceLocalName || photo?.filename || photo?.url || '')
+    .toLowerCase()
+    .replace(/\\/g, '/');
+  const base = raw.split('/').pop() || raw;
+  return base
+    .replace(/_framed(?=\.|$)/g, '')
+    .replace(/_physical(?=\.|$)/g, '')
+    .replace(/_ai(?=\.|$)/g, '')
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/\/media\/[^/]+\//, '');
+}
+
+/** Keep framed/ai; keep originals only when no framed/ai sibling is present. */
+function selectDisplayPhotosClient(list) {
+  const rows = Array.isArray(list) ? list : [];
+  const framedAi = rows.filter((p) => p.variant && p.variant !== 'original');
+  const covered = new Set(framedAi.map((p) => captureFamilyKey(p)).filter(Boolean));
+  const orphans = rows.filter((p) => {
+    if (p.variant !== 'original') return false;
+    const key = captureFamilyKey(p);
+    return key ? !covered.has(key) : true;
+  });
+  return [...framedAi, ...orphans].sort((a, b) =>
+    String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
+  );
+}
+
+/** iPhone: share sheet (Save to Photos). Android/desktop: blob download (more reliable than <a download>). */
 async function savePhotoToDevice(url, filename = 'inmoment-photo.jpg') {
   if (!url) return;
   try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const type = blob.type || 'image/jpeg';
     if (isAppleTouchDevice() && navigator.share && navigator.canShare) {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const type = blob.type || 'image/jpeg';
-      const file = new File([blob], filename, { type });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'inmoment' });
-        return;
+      try {
+        const file = new File([blob], filename, { type });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'inmoment' });
+          return;
+        }
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
       }
     }
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(obj), 1500);
   } catch (e) {
-    if (e?.name === 'AbortError') return;
-    /* fall through to download */
+    console.warn('savePhotoToDevice failed', e);
+    // Last resort: open in new tab
+    window.open(url, '_blank', 'noopener');
   }
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
 }
 
 let attachStream = null;
@@ -414,6 +452,12 @@ els.attachPanel?.addEventListener('click', (e) => {
 
 els.lbDownload?.addEventListener('click', () => {
   const photo = photos[index];
+  if (!photo?.url) return;
+  void savePhotoToDevice(photo.url, `${photo.id}-${photo.variant || 'photo'}.jpg`);
+});
+
+els.btnSaveGuestPhoto?.addEventListener('click', () => {
+  const photo = photos[0];
   if (!photo?.url) return;
   void savePhotoToDevice(photo.url, `${photo.id}-${photo.variant || 'photo'}.jpg`);
 });
@@ -1296,13 +1340,24 @@ function stopMosaicLoops() {
 }
 
 function upsertPhoto(photo) {
-  if (!photo?.id || photo.variant === 'original') return;
+  if (!photo?.id) return;
   // Guest QR view stays locked to that one photo.
   if (route.kind === 'photo') {
     if (photo.id !== route.photoId) return;
     photos = [photo];
     if (viewMode === 'photo') renderGuestPhoto();
     return;
+  }
+  const family = captureFamilyKey(photo);
+  if (photo.variant && photo.variant !== 'original' && family) {
+    // Framed/AI replaces a plain original of the same capture on the live wall/grid.
+    photos = photos.filter(
+      (p) => !(p.variant === 'original' && captureFamilyKey(p) === family && p.id !== photo.id),
+    );
+  } else if (photo.variant === 'original' && family) {
+    if (photos.some((p) => p.variant !== 'original' && captureFamilyKey(p) === family)) {
+      return;
+    }
   }
   const i = photos.findIndex((p) => p.id === photo.id);
   const isNew = i < 0;
@@ -1440,11 +1495,22 @@ async function loadSession(slug) {
   } catch {
     /* optional */
   }
-  photos = (data.session.photos || []).filter((p) => p.variant !== 'original');
+  photos = selectDisplayPhotosClient(data.session.photos || []);
 
   if (route.kind === 'photo' && route.photoId) {
     // QR / share link: only this guest’s photo — never the full session grid.
-    const mine = photos.find((p) => p.id === route.photoId);
+    let mine = (data.session.photos || []).find((p) => p.id === route.photoId);
+    if (!mine) {
+      try {
+        const pr = await fetch(
+          `/api/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(route.photoId)}`,
+        );
+        const pd = await pr.json().catch(() => ({}));
+        if (pr.ok && pd.photo) mine = pd.photo;
+      } catch {
+        /* optional */
+      }
+    }
     photos = mine ? [mine] : [];
     els.meta.textContent = photos.length ? '' : 'Photo unavailable';
     connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
@@ -1467,7 +1533,7 @@ async function loadWall() {
   }
   setStatus('', false);
   wallCfg = { ...wallCfg, ...(data.wall || {}) };
-  photos = (data.photos || []).filter((p) => p.variant !== 'original');
+  photos = selectDisplayPhotosClient(data.photos || []);
   els.title.textContent = wallCfg.title || 'Wall of moments';
   els.meta.textContent = `${photos.length} photos · ${data.sessions?.length || 0} active sessions`;
   connectStream('/api/wall/stream');

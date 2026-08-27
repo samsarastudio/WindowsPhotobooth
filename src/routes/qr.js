@@ -218,7 +218,7 @@ qrRouter.post('/attach', (req, res) => {
 
   const db = getDb();
   const photo = db.prepare('SELECT * FROM photos WHERE id = ?').get(photoId);
-  if (!photo || photo.variant === 'original') {
+  if (!photo) {
     return res.status(404).json({ ok: false, error: 'Photo not found' });
   }
   const row = db.prepare('SELECT * FROM qr_codes WHERE code = ?').get(code);

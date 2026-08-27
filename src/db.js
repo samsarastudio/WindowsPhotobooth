@@ -224,6 +224,46 @@ export function publicPhoto(sessionSlug, row) {
   };
 }
 
+/**
+ * Family key so original + framed/ai of the same capture group together.
+ * @param {string | null | undefined} sourceLocalName
+ * @param {string | null | undefined} filename
+ */
+export function captureFamilyKey(sourceLocalName, filename) {
+  const raw = String(sourceLocalName || filename || '')
+    .toLowerCase()
+    .replace(/\\/g, '/');
+  const base = raw.split('/').pop() || raw;
+  return base
+    .replace(/_framed(?=\.|$)/g, '')
+    .replace(/_physical(?=\.|$)/g, '')
+    .replace(/_ai(?=\.|$)/g, '')
+    .replace(/\.[a-z0-9]+$/i, '');
+}
+
+/**
+ * Guest gallery + mosaic wall photos:
+ * - framed + ai always
+ * - originals only when that capture has no framed/ai sibling (plain digital shots)
+ * @param {Array<Record<string, unknown>>} rows DB photo rows (or public photos with sourceLocalName)
+ */
+export function selectDisplayPhotos(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const created = (p) => String(p.created_at || p.createdAt || '');
+  const framedAi = list.filter((p) => p.variant && p.variant !== 'original');
+  const covered = new Set(
+    framedAi.map((p) =>
+      captureFamilyKey(p.source_local_name || p.sourceLocalName, p.filename),
+    ),
+  );
+  const orphanOriginals = list.filter((p) => {
+    if (p.variant !== 'original') return false;
+    const key = captureFamilyKey(p.source_local_name || p.sourceLocalName, p.filename);
+    return key ? !covered.has(key) : true;
+  });
+  return [...framedAi, ...orphanOriginals].sort((a, b) => created(a).localeCompare(created(b)));
+}
+
 export function publicSession(row, photos = []) {
   return {
     id: row.id,

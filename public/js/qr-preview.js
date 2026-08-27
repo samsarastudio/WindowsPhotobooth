@@ -17,25 +17,34 @@ function isAppleTouchDevice() {
 async function savePhotoToDevice(url, filename = 'inmoment-photo.jpg') {
   if (!url) return;
   try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const type = blob.type || 'image/jpeg';
     if (isAppleTouchDevice() && navigator.share && navigator.canShare) {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'inmoment' });
-        return;
+      try {
+        const file = new File([blob], filename, { type });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'inmoment' });
+          return;
+        }
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
       }
     }
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(obj), 1500);
   } catch (e) {
-    if (e?.name === 'AbortError') return;
+    console.warn('savePhotoToDevice failed', e);
+    window.open(url, '_blank', 'noopener');
   }
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
 }
 
 function renderWaiting(data) {

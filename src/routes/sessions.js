@@ -10,6 +10,7 @@ import {
   loadSettings,
   publicPhoto,
   publicSession,
+  selectDisplayPhotos,
 } from '../db.js';
 import { requireUploadToken } from '../auth.js';
 import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
@@ -54,9 +55,9 @@ function listPhotos(sessionId) {
     .all(sessionId);
 }
 
-/** Guest-facing gallery: framed + AI only (originals stay in admin). */
+/** Guest-facing: framed + AI, plus plain originals when no framed sibling exists. */
 function listPublicPhotos(sessionId) {
-  return listPhotos(sessionId).filter((p) => p.variant !== 'original');
+  return selectDisplayPhotos(listPhotos(sessionId));
 }
 
 export const sessionsRouter = Router();
@@ -109,6 +110,20 @@ sessionsRouter.get('/:slug', (req, res) => {
     return res.status(410).json({ ok: false, error: 'Session expired' });
   }
   return res.json({ ok: true, session: publicSession(session, listPublicPhotos(session.id)) });
+});
+
+/** Single photo for share/QR deep links (any variant, including plain originals). */
+sessionsRouter.get('/:slug/photos/:photoId', (req, res) => {
+  const session = getSessionBySlug(req.params.slug);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  if (isSessionExpired(session)) {
+    return res.status(410).json({ ok: false, error: 'Session expired' });
+  }
+  const row = getDb()
+    .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
+    .get(req.params.photoId, session.id);
+  if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  return res.json({ ok: true, photo: publicPhoto(session.slug, row) });
 });
 
 sessionsRouter.get('/:slug/stream', (req, res) => {
@@ -189,15 +204,13 @@ sessionsRouter.post(
       .run(row);
 
     const photo = publicPhoto(session.slug, row);
-    // Originals are admin-only — do not push to live public galleries / wall.
-    if (variant !== 'original') {
-      broadcastPhotoAdded(session.slug, photo);
-      notifyWallPhoto({
-        ...photo,
-        sessionSlug: session.slug,
-        sessionTitle: session.title,
-      });
-    }
+    // Push displayable photos (incl. plain originals) to live gallery + wall.
+    broadcastPhotoAdded(session.slug, photo);
+    notifyWallPhoto({
+      ...photo,
+      sessionSlug: session.slug,
+      sessionTitle: session.title,
+    });
     return res.status(201).json({ ok: true, photo });
   },
 );
