@@ -221,15 +221,26 @@ function renderGuestPhoto() {
 
 /** Share / QR deep links must resolve any variant (incl. non-framed originals). */
 async function fetchSharePhoto(slug, photoId) {
-  if (!slug || !photoId) return null;
+  if (!photoId) return null;
+  // 1) Global by-id (works even if nested session route is missing on an old process).
   try {
-    const pr = await fetch(
-      `/api/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photoId)}`,
-    );
+    const pr = await fetch(`/api/photos/${encodeURIComponent(photoId)}`);
     const pd = await pr.json().catch(() => ({}));
     if (pr.ok && pd.photo?.url) return pd.photo;
   } catch {
-    /* fall through */
+    /* try next */
+  }
+  // 2) Nested session route.
+  if (slug) {
+    try {
+      const pr = await fetch(
+        `/api/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photoId)}`,
+      );
+      const pd = await pr.json().catch(() => ({}));
+      if (pr.ok && pd.photo?.url) return pd.photo;
+    } catch {
+      /* try next */
+    }
   }
   return null;
 }
@@ -1510,7 +1521,11 @@ function connectStream(url) {
 
 async function loadSession(slug) {
   setStatus('Loading gallery…');
-  const res = await fetch(`/api/sessions/${encodeURIComponent(slug)}`);
+  const photoQs =
+    route.kind === 'photo' && route.photoId
+      ? `?photoId=${encodeURIComponent(route.photoId)}`
+      : '';
+  const res = await fetch(`/api/sessions/${encodeURIComponent(slug)}${photoQs}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     setStatus(data.error || 'Gallery unavailable');
@@ -1537,9 +1552,15 @@ async function loadSession(slug) {
   photos = selectDisplayPhotosClient(data.session.photos || []);
 
   if (route.kind === 'photo' && route.photoId) {
-    // Share / QR: fetch by id — originals are often excluded from the public album list.
-    const mine = await fetchSharePhoto(slug, route.photoId);
-    photos = mine ? [mine] : [];
+    // Prefer by-id APIs; fall back to session payload (may include photoId query inject).
+    let mine =
+      (data.session.photos || []).find((p) => p.id === route.photoId) ||
+      photos.find((p) => p.id === route.photoId) ||
+      null;
+    if (!mine?.url) {
+      mine = await fetchSharePhoto(slug, route.photoId);
+    }
+    photos = mine?.url ? [mine] : [];
     els.meta.textContent = photos.length ? '' : 'Photo unavailable';
     connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
     setMode('photo', false);

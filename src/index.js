@@ -5,7 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
-import { initDb, getDb, isSessionExpired } from './db.js';
+import { initDb, getDb, isSessionExpired, publicPhoto } from './db.js';
 import { getUploadToken } from './auth.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { adminRouter } from './routes/admin.js';
@@ -37,6 +37,24 @@ app.get('/api/health', (_req, res) => {
     service: 'moments-server',
     port: config.port,
     publicBaseUrl: config.publicBaseUrl,
+  });
+});
+
+/** Share / QR deep-link: resolve any photo by id (incl. non-framed originals). */
+app.get('/api/photos/:photoId', (req, res) => {
+  const photoId = String(req.params.photoId || '').trim();
+  if (!photoId) return res.status(400).json({ ok: false, error: 'photoId required' });
+  const row = getDb().prepare('SELECT * FROM photos WHERE id = ?').get(photoId);
+  if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  const session = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(row.session_id);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  if (isSessionExpired(session)) {
+    return res.status(410).json({ ok: false, error: 'Session expired' });
+  }
+  return res.json({
+    ok: true,
+    photo: publicPhoto(session.slug, row),
+    session: { slug: session.slug, title: session.title, expiresAt: session.expires_at },
   });
 });
 
