@@ -306,20 +306,27 @@ async function refreshPhotos() {
   for (const p of photos) {
     const card = document.createElement('article');
     card.className = 'photo-admin-card';
+    if (p.fileExists === false) card.classList.add('is-missing-file');
     const shareHref = sharePageHref(slug, p);
+    const missing = p.fileExists === false;
     card.innerHTML = `
       <label class="photo-select">
         <input type="checkbox" class="photo-check" data-id="${p.id}" />
         <span class="sr-only">Select photo</span>
       </label>
-      <img src="${p.url}" alt="" loading="lazy" />
+      ${
+        missing
+          ? `<div class="photo-missing" title="DB row exists but file is gone from disk">File missing</div>`
+          : `<img src="${p.url}" alt="" loading="lazy" />`
+      }
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
+        ${missing ? `<span class="badge badge-warn">missing on disk</span>` : ''}
         <code style="font-size:0.68rem;word-break:break-all">${p.id}</code>
         <div class="photo-admin-actions">
-          <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener">Open</a>
+          <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener" ${missing ? 'aria-disabled="true" tabindex="-1"' : ''}>Open</a>
           <button type="button" class="btn ghost delete">Delete</button>
-          <button type="button" class="btn ghost download">Download</button>
+          <button type="button" class="btn ghost download" ${missing ? 'disabled' : ''}>Download</button>
         </div>
       </div>
     `;
@@ -335,10 +342,11 @@ async function refreshPhotos() {
       updatePhotoSelectionUi();
     });
     card.querySelector('.download')?.addEventListener('click', () => {
+      if (missing) return;
       void downloadAdminPhoto(slug, p);
     });
     card.querySelector('.delete').addEventListener('click', async () => {
-      if (!confirm('Delete this photo from the album?')) return;
+      if (!confirm(missing ? 'Remove this broken DB entry (file already missing)?' : 'Delete this photo from the album?')) return;
       await api(`/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(p.id)}`, {
         method: 'DELETE',
       });
