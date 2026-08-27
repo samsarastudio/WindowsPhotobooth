@@ -189,15 +189,26 @@ function renderGrid() {
 function renderGuestPhoto() {
   if (!els.guestPhotoImg) return;
   const photo = photos[0] || null;
-  if (!photo) {
+  if (!photo?.url) {
     els.guestPhotoImg.removeAttribute('src');
+    els.guestPhotoImg.hidden = true;
+    if (els.btnSaveGuestPhoto) els.btnSaveGuestPhoto.hidden = true;
     setStatus('Photo not found or no longer available.');
     return;
   }
   setStatus('', false);
+  els.guestPhotoImg.hidden = false;
+  if (els.btnSaveGuestPhoto) els.btnSaveGuestPhoto.hidden = false;
+  els.guestPhotoImg.onerror = () => {
+    els.guestPhotoImg.removeAttribute('src');
+    els.guestPhotoImg.hidden = true;
+    if (els.btnSaveGuestPhoto) els.btnSaveGuestPhoto.hidden = true;
+    setStatus('Could not load this photo. Try again in a moment.');
+  };
   els.guestPhotoImg.src = photo.url;
   els.title.textContent = 'Your photo';
-  els.meta.textContent = photo.variant || '';
+  els.meta.textContent =
+    photo.variant === 'original' ? 'Original capture' : photo.variant || '';
   if (els.attachStatus) {
     els.attachStatus.hidden = true;
     els.attachStatus.textContent = '';
@@ -206,6 +217,21 @@ function renderGuestPhoto() {
   if (els.attachPanel) els.attachPanel.hidden = true;
   document.body.classList.remove('is-attaching');
   stopAttachCamera();
+}
+
+/** Share / QR deep links must resolve any variant (incl. non-framed originals). */
+async function fetchSharePhoto(slug, photoId) {
+  if (!slug || !photoId) return null;
+  try {
+    const pr = await fetch(
+      `/api/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photoId)}`,
+    );
+    const pd = await pr.json().catch(() => ({}));
+    if (pr.ok && pd.photo?.url) return pd.photo;
+  } catch {
+    /* fall through */
+  }
+  return null;
 }
 
 function isAppleTouchDevice() {
@@ -1511,19 +1537,8 @@ async function loadSession(slug) {
   photos = selectDisplayPhotosClient(data.session.photos || []);
 
   if (route.kind === 'photo' && route.photoId) {
-    // QR / share link: only this guest’s photo — never the full session grid.
-    let mine = (data.session.photos || []).find((p) => p.id === route.photoId);
-    if (!mine) {
-      try {
-        const pr = await fetch(
-          `/api/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(route.photoId)}`,
-        );
-        const pd = await pr.json().catch(() => ({}));
-        if (pr.ok && pd.photo) mine = pd.photo;
-      } catch {
-        /* optional */
-      }
-    }
+    // Share / QR: fetch by id — originals are often excluded from the public album list.
+    const mine = await fetchSharePhoto(slug, route.photoId);
     photos = mine ? [mine] : [];
     els.meta.textContent = photos.length ? '' : 'Photo unavailable';
     connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
