@@ -38,8 +38,10 @@ function listWallPhotos(limit = 4000) {
        ORDER BY created_at DESC LIMIT ?`,
     )
     .all(...sessions.map((s) => s.id), limit);
-  // Prefer framed/ai; include plain originals when that capture has no framed sibling.
-  const displayRows = selectDisplayPhotos(rows);
+  // Prefer framed/ai; optionally include plain originals when that capture has no framed sibling.
+  const displayRows = selectDisplayPhotos(rows, {
+    includeOriginals: loadSettings().showOriginalPhotos !== false,
+  });
   const photos = displayRows
     .map((row) => {
       const session = byId.get(row.session_id);
@@ -115,6 +117,8 @@ export function wallSettings() {
       typeof s.wallBrandRevealHoldSeconds === 'number'
         ? Math.min(30, Math.max(3, Math.round(s.wallBrandRevealHoldSeconds)))
         : 6,
+    /** Include plain non-framed captures on wall + guest galleries (orphan originals). */
+    showOriginalPhotos: s.showOriginalPhotos !== false,
   };
 }
 
@@ -174,6 +178,9 @@ adminWallRouter.patch('/settings', (req, res) => {
   }
   if (typeof req.body?.brandRevealHoldSeconds === 'number') {
     patch.wallBrandRevealHoldSeconds = Math.min(30, Math.max(3, Math.round(req.body.brandRevealHoldSeconds)));
+  }
+  if (typeof req.body?.showOriginalPhotos === 'boolean') {
+    patch.showOriginalPhotos = req.body.showOriginalPhotos;
   }
   if (req.body?.clearBrandLogo === true) {
     const cur = loadSettings();

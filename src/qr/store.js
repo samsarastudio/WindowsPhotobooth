@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { customAlphabet } from 'nanoid';
 import { config } from '../config.js';
-import { getDb, isSessionExpired, publicPhoto, selectDisplayPhotos } from '../db.js';
+import { getDb, isSessionExpired, publicPhoto, selectDisplayPhotos, loadSettings } from '../db.js';
 
 const codeAlphabet = customAlphabet('23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz', 8);
 
@@ -121,6 +121,7 @@ export function resolveLinkedAlbum(sessionId) {
   const expired = isSessionExpired(session);
   const photoCount = selectDisplayPhotos(
     db.prepare(`SELECT * FROM photos WHERE session_id = ?`).all(session.id),
+    { includeOriginals: loadSettings().showOriginalPhotos !== false },
   ).length;
   return {
     id: session.id,

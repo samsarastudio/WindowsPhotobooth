@@ -17,6 +17,7 @@ const wallBackdropOpacityLabel = document.getElementById('wallBackdropOpacityLab
 const wallBrandRevealEnabled = document.getElementById('wallBrandRevealEnabled');
 const wallBrandRevealSeconds = document.getElementById('wallBrandRevealSeconds');
 const wallBrandRevealHoldSeconds = document.getElementById('wallBrandRevealHoldSeconds');
+const wallShowOriginalPhotos = document.getElementById('wallShowOriginalPhotos');
 const wallModeStatus = document.getElementById('wallModeStatus');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
@@ -329,6 +330,7 @@ function applyWallForm(wall) {
   if (wallBrandRevealEnabled) wallBrandRevealEnabled.checked = wall.brandRevealEnabled === true;
   if (wallBrandRevealSeconds) wallBrandRevealSeconds.value = String(wall.brandRevealSeconds ?? 45);
   if (wallBrandRevealHoldSeconds) wallBrandRevealHoldSeconds.value = String(wall.brandRevealHoldSeconds ?? 6);
+  if (wallShowOriginalPhotos) wallShowOriginalPhotos.checked = wall.showOriginalPhotos !== false;
   if (wallBrandPreview) {
     wallBrandPreview.textContent = wall.brandLogoUrl
       ? `Partner logo on file${wall.brandText ? ` ? ${wall.brandText}` : ''}${
@@ -431,6 +433,7 @@ document.getElementById('btnSaveWall').addEventListener('click', async () => {
         brandRevealEnabled: !!wallBrandRevealEnabled?.checked,
         brandRevealSeconds: Number(wallBrandRevealSeconds?.value || 45),
         brandRevealHoldSeconds: Number(wallBrandRevealHoldSeconds?.value || 6),
+        showOriginalPhotos: !!wallShowOriginalPhotos?.checked,
       }),
     });
     setStatus('Wall settings saved');

@@ -177,6 +177,11 @@ export function loadSettings() {
     wallBrandRevealEnabled: false,
     wallBrandRevealSeconds: 45,
     wallBrandRevealHoldSeconds: 6,
+    /**
+     * When true, plain non-framed (original) captures appear on mosaic wall + guest galleries
+     * if that shot has no framed/AI sibling.
+     */
+    showOriginalPhotos: true,
     /** Active booth app release id rolled out to kiosks (empty = no forced update). */
     boothUpdateActiveId: '',
   };
@@ -244,13 +249,18 @@ export function captureFamilyKey(sourceLocalName, filename) {
 /**
  * Guest gallery + mosaic wall photos:
  * - framed + ai always
- * - originals only when that capture has no framed/ai sibling (plain digital shots)
- * @param {Array<Record<string, unknown>>} rows DB photo rows (or public photos with sourceLocalName)
+ * - originals only when `includeOriginals` and that capture has no framed/ai sibling
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {{ includeOriginals?: boolean }} [opts]
  */
-export function selectDisplayPhotos(rows) {
+export function selectDisplayPhotos(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
+  const includeOriginals = opts.includeOriginals !== false;
   const created = (p) => String(p.created_at || p.createdAt || '');
   const framedAi = list.filter((p) => p.variant && p.variant !== 'original');
+  if (!includeOriginals) {
+    return framedAi.sort((a, b) => created(a).localeCompare(created(b)));
+  }
   const covered = new Set(
     framedAi.map((p) =>
       captureFamilyKey(p.source_local_name || p.sourceLocalName, p.filename),

@@ -55,9 +55,11 @@ function listPhotos(sessionId) {
     .all(sessionId);
 }
 
-/** Guest-facing: framed + AI, plus plain originals when no framed sibling exists. */
+/** Guest-facing: framed + AI; originals when admin enables Show non-framed photos. */
 function listPublicPhotos(sessionId) {
-  return selectDisplayPhotos(listPhotos(sessionId));
+  return selectDisplayPhotos(listPhotos(sessionId), {
+    includeOriginals: loadSettings().showOriginalPhotos !== false,
+  });
 }
 
 export const sessionsRouter = Router();
@@ -204,13 +206,16 @@ sessionsRouter.post(
       .run(row);
 
     const photo = publicPhoto(session.slug, row);
-    // Push displayable photos (incl. plain originals) to live gallery + wall.
-    broadcastPhotoAdded(session.slug, photo);
-    notifyWallPhoto({
-      ...photo,
-      sessionSlug: session.slug,
-      sessionTitle: session.title,
-    });
+    const showOriginals = loadSettings().showOriginalPhotos !== false;
+    const pushLive = variant !== 'original' || showOriginals;
+    if (pushLive) {
+      broadcastPhotoAdded(session.slug, photo);
+      notifyWallPhoto({
+        ...photo,
+        sessionSlug: session.slug,
+        sessionTitle: session.title,
+      });
+    }
     return res.status(201).json({ ok: true, photo });
   },
 );
