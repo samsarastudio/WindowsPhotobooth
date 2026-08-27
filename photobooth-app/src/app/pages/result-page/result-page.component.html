@@ -68,7 +68,7 @@
 
     <div class="pb-row pb-result-actions">
       <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ copy().result.retake }}</button>
-      @if (galleryUpload.enabled()) {
+      @if (showGalleryShare()) {
         @if (canShare()) {
           <button
             type="button"

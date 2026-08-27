@@ -9,6 +9,7 @@ import type {
   PhotoboothGalleryConfig,
   PhotoboothPhotoFramesConfig,
   PhotoboothPhysicalFrameConfig,
+  PhotoboothGuestModesConfig,
   PhotoboothBoothModeId,
   PhotoboothPrintConfig,
 } from '../models/photobooth-config.model';
@@ -20,6 +21,7 @@ import {
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
+  PHOTOBOOTH_DEFAULT_GUEST_MODES,
   PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
   PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   PHOTOBOOTH_DEFAULT_PRINT,
@@ -33,6 +35,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     capture: { ...base.capture, ...patch.capture },
     result: { ...base.result, ...patch.result },
     aiMode: { ...base.aiMode, ...patch.aiMode },
+    boothMode: { ...base.boothMode, ...patch.boothMode },
     frame: { ...base.frame, ...patch.frame },
     caption: { ...base.caption, ...patch.caption },
   };
@@ -272,6 +275,30 @@ function normalizeGalleryConfig(
   };
 }
 
+function normalizeGuestModesConfig(
+  patch?: Partial<PhotoboothGuestModesConfig> | null,
+  legacyBoothMode?: unknown,
+): PhotoboothGuestModesConfig {
+  const base = PHOTOBOOTH_DEFAULT_GUEST_MODES;
+  if (patch && typeof patch === 'object') {
+    const def =
+      typeof patch.defaultEnabled === 'boolean' ? patch.defaultEnabled : base.defaultEnabled;
+    const phys =
+      typeof patch.physicalFrameEnabled === 'boolean'
+        ? patch.physicalFrameEnabled
+        : base.physicalFrameEnabled;
+    // At least one mode must stay on.
+    if (!def && !phys) return { ...base };
+    return { defaultEnabled: def, physicalFrameEnabled: phys };
+  }
+  // Migrate exclusive admin boothMode → guest offer flags.
+  if (legacyBoothMode === 'physicalFrame') {
+    return { defaultEnabled: false, physicalFrameEnabled: true };
+  }
+  // Prior "default-only" admin setting → offer both so guests can choose.
+  return { ...base };
+}
+
 function normalizePhysicalFrameConfig(
   patch?: Partial<PhotoboothPhysicalFrameConfig> | null,
 ): PhotoboothPhysicalFrameConfig {
@@ -286,10 +313,6 @@ function normalizePhysicalFrameConfig(
     dpi: Math.round(clampRange(patch.dpi, 72, 600, base.dpi)),
     rotateDegrees: rot === -90 ? -90 : 90,
   };
-}
-
-function normalizeBoothMode(raw: unknown): PhotoboothBoothModeId {
-  return raw === 'physicalFrame' ? 'physicalFrame' : 'default';
 }
 
 function normalizePrintConfig(
@@ -363,7 +386,11 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const debug = normalizeDebugConfig(
     (rest['debug'] as Partial<PhotoboothDebugConfig> | undefined) ?? undefined,
   );
-  const boothMode = normalizeBoothMode(rest['boothMode']);
+  const boothModeLegacy = rest['boothMode'];
+  const guestModes = normalizeGuestModesConfig(
+    (rest['guestModes'] as Partial<PhotoboothGuestModesConfig> | undefined) ?? undefined,
+    boothModeLegacy,
+  );
   const physicalFrame = normalizePhysicalFrameConfig(
     (rest['physicalFrame'] as Partial<PhotoboothPhysicalFrameConfig> | undefined) ?? undefined,
   );
@@ -385,7 +412,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     print,
     debug,
     copy,
-    boothMode,
+    guestModes,
     physicalFrame,
     requireQrUnlock,
     aiGenerationEnabled,
@@ -398,7 +425,14 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
 export type BoothAdminSavePartial = Partial<
   Omit<
     PhotoboothConfig,
-    'branding' | 'camera' | 'photoFrames' | 'gallery' | 'print' | 'debug' | 'physicalFrame'
+    | 'branding'
+    | 'camera'
+    | 'photoFrames'
+    | 'gallery'
+    | 'print'
+    | 'debug'
+    | 'physicalFrame'
+    | 'guestModes'
   >
 > & {
   openAiApiKey?: string;
@@ -409,6 +443,7 @@ export type BoothAdminSavePartial = Partial<
   print?: Partial<PhotoboothPrintConfig>;
   debug?: Partial<PhotoboothDebugConfig>;
   physicalFrame?: Partial<PhotoboothPhysicalFrameConfig>;
+  guestModes?: Partial<PhotoboothGuestModesConfig>;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -426,11 +461,21 @@ export class BoothConfigService {
   readonly print = computed(() => this.state()?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
   readonly debug = computed(() => this.state()?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
   readonly debugEnabled = computed(() => this.debug().enabled === true);
-  readonly boothMode = computed(() => this.state()?.boothMode ?? 'default');
+  readonly guestModes = computed(
+    () => this.state()?.guestModes ?? PHOTOBOOTH_DEFAULT_GUEST_MODES,
+  );
   readonly physicalFrame = computed(
     () => this.state()?.physicalFrame ?? PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   );
-  readonly isPhysicalFrameMode = computed(() => this.boothMode() === 'physicalFrame');
+  /** Modes the guest may pick (order: default, then physical). */
+  readonly offeredBoothModes = computed((): PhotoboothBoothModeId[] => {
+    const g = this.guestModes();
+    const out: PhotoboothBoothModeId[] = [];
+    if (g.defaultEnabled) out.push('default');
+    if (g.physicalFrameEnabled) out.push('physicalFrame');
+    return out.length ? out : (['default'] as PhotoboothBoothModeId[]);
+  });
+  readonly shouldShowBoothModeStep = computed(() => this.offeredBoothModes().length > 1);
   readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'inmoment');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
@@ -443,9 +488,12 @@ export class BoothConfigService {
     return this.aiModes().some((m) => m.id === id) ? id : null;
   });
   readonly skipAiModeSelection = computed(() => this.fixedAiModeId() !== null);
+  /**
+   * AI style step only for digital (default) sessions — physical-frame skips it.
+   * Callers should also check BoothModeService.isPhysicalFrameMode for the live session.
+   */
   readonly shouldShowAiModeStep = computed(
     () =>
-      !this.isPhysicalFrameMode() &&
       this.aiGenerationEnabled() &&
       !this.skipAiModeSelection() &&
       this.aiModes().length > 0,
@@ -472,7 +520,7 @@ export class BoothConfigService {
         print: { ...PHOTOBOOTH_DEFAULT_PRINT },
         debug: { ...PHOTOBOOTH_DEFAULT_DEBUG },
         copy: PHOTOBOOTH_DEFAULT_COPY,
-        boothMode: 'default',
+        guestModes: { ...PHOTOBOOTH_DEFAULT_GUEST_MODES },
         physicalFrame: { ...PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME },
         requireQrUnlock: false,
         aiGenerationEnabled: false,

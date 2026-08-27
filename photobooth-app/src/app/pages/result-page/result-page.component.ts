@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { AiStyleService } from '../../services/ai-style.service';
+import { BoothModeService } from '../../services/booth-mode.service';
 import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
 import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
@@ -16,6 +17,7 @@ import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 export class ResultPageComponent implements OnInit, OnDestroy {
   readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
+  private readonly boothMode = inject(BoothModeService);
   private readonly gallerySession = inject(AiGallerySessionService);
   readonly galleryUpload = inject(GalleryUploadService);
   readonly copy = this.booth.copy;
@@ -45,20 +47,26 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   readonly uploadRecord = computed(() => this.galleryUpload.recordFor(this.path()));
   readonly canShare = computed(() => {
+    if (this.boothMode.isPhysicalFrameMode()) return false;
     if (!this.galleryUpload.enabled()) return false;
     const r = this.uploadRecord();
     return r?.status === 'ok' && !!r.shareUrl;
   });
   readonly shareUploading = computed(() => {
+    if (this.boothMode.isPhysicalFrameMode()) return false;
     if (!this.galleryUpload.enabled()) return false;
     const r = this.uploadRecord();
     return !r || r.status === 'pending' || r.status === 'queued';
   });
   readonly shareFailed = computed(() => {
+    if (this.boothMode.isPhysicalFrameMode()) return false;
     if (!this.galleryUpload.enabled()) return false;
     const r = this.uploadRecord();
     return r?.status === 'error';
   });
+  readonly showGalleryShare = computed(
+    () => this.galleryUpload.enabled() && !this.boothMode.isPhysicalFrameMode(),
+  );
   readonly showPrint = computed(() => this.booth.print().enabled === true);
   readonly canPrint = computed(
     () => this.showPrint() && !!this.path() && !this.printBusy() && !this.printDone(),
@@ -120,8 +128,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       this.err.set(String(e));
     }
 
-    // Keep Share state live while background upload finishes; recover if stuck.
-    if (this.galleryUpload.enabled()) {
+    // Physical-frame cut sheets stay local — do not upload to Moments / wall.
+    if (this.galleryUpload.enabled() && !this.boothMode.isPhysicalFrameMode()) {
       void this.galleryUpload.ensureShareUpload(pp);
       let ticks = 0;
       this.sharePoll = setInterval(() => {
@@ -284,6 +292,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     this.gallerySession.clear();
     this.galleryUpload.clearGuestSession();
     this.aiStyle.clear();
+    this.boothMode.clear();
     void this.camera.closeSession().catch(() => {});
     void this.router.navigate(['/']);
   }

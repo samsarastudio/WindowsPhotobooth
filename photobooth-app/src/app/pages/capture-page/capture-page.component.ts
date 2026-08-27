@@ -15,6 +15,7 @@ import { BoothConfigService } from '../../services/booth-config.service';
 import { BoothLogService } from '../../services/booth-log.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { GalleryUploadService } from '../../services/gallery-upload.service';
+import { BoothModeService } from '../../services/booth-mode.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
 
@@ -41,6 +42,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl') videoRef?: ElementRef<HTMLVideoElement>;
 
   private readonly booth = inject(BoothConfigService);
+  private readonly boothMode = inject(BoothModeService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly boothLog = inject(BoothLogService);
   private readonly galleryUpload = inject(GalleryUploadService);
@@ -441,7 +443,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async navigateResult(filePath: string): Promise<void> {
-    if (this.booth.isPhysicalFrameMode()) {
+    if (this.boothMode.isPhysicalFrameMode()) {
       await this.applyPhysicalFrameAndNavigate(filePath);
       return;
     }
@@ -458,9 +460,8 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
-  /** Dual polaroid-size cut sheet (2 columns) for physical frames. */
+  /** Dual polaroid-size cut sheet (2 columns) for physical frames — local only, not wall/gallery. */
   private async applyPhysicalFrameAndNavigate(filePath: string): Promise<void> {
-    this.galleryUpload.queueUpload(filePath, 'original');
     if (!window.pbApi?.applyPhysicalFrameLayout) {
       this.hint.set('Physical frame layout requires Electron.');
       await this.router.navigate(['/result'], { state: { path: filePath } });
@@ -477,7 +478,6 @@ export class CapturePageComponent implements OnInit, OnDestroy {
         await this.router.navigate(['/result'], { state: { path: filePath } });
         return;
       }
-      this.galleryUpload.queueUpload(r.path, 'framed');
       await this.router.navigate(['/result'], { state: { path: r.path } });
     } catch (e) {
       this.hint.set(String(e));

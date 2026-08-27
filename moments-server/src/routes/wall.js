@@ -3,7 +3,7 @@ import path from 'node:path';
 import multer from 'multer';
 import { Router } from 'express';
 import { config } from '../config.js';
-import { getDb, isSessionExpired, publicPhoto, loadSettings, saveSettings } from '../db.js';
+import { getDb, isSessionExpired, publicPhoto, loadSettings, saveSettings, selectDisplayPhotos } from '../db.js';
 import { subscribeSession, broadcastPhotoAdded, broadcastEvent } from '../sse.js';
 import { requireAdminPin } from '../auth.js';
 
@@ -38,19 +38,19 @@ function listWallPhotos(limit = 4000) {
        ORDER BY created_at DESC LIMIT ?`,
     )
     .all(...sessions.map((s) => s.id), limit);
-  const photos = rows
+  // Prefer framed/ai; include plain originals when that capture has no framed sibling.
+  const displayRows = selectDisplayPhotos(rows);
+  const photos = displayRows
     .map((row) => {
       const session = byId.get(row.session_id);
       if (!session) return null;
-      if (row.variant === 'original') return null;
       return {
         ...publicPhoto(session.slug, row),
         sessionSlug: session.slug,
         sessionTitle: session.title,
       };
     })
-    .filter(Boolean)
-    .reverse();
+    .filter(Boolean);
   return {
     photos,
     sessions: sessions.map((s) => ({

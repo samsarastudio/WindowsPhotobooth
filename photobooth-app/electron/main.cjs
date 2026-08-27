@@ -3183,96 +3183,130 @@ ipcMain.handle('gallery:deleteRemoteFrame', async (_e, payload) => {
   }
 });
 
-ipcMain.handle('print:listPrinters', async () => {
+/** Classify Windows printer driver/port for SELPHY booth use (USB-only UI). */
+function classifyPrinter(driverName, portName, printerName) {
+  const d = String(driverName || '');
+  const p = String(portName || '');
+  const n = String(printerName || '');
+  const isVirtual =
+    /pdf|xps|onenote|fax|microsoft\s+print\s+to|send\s+to|document\s+writer|onenote|redirect|nul:/i.test(
+      `${n} ${d} ${p}`,
+    ) || /^FILE:|^PORTPROMPT:|^nul:/i.test(p);
+  const isIppClass =
+    /ipp|wsd|microsoft\s+ipp|class\s+driver/i.test(d) ||
+    /ipp|wsd|https?:|\\/i.test(p) ||
+    /^IP_/i.test(p);
+  // Local USB queues: USB001 / DOT4_* (USB parallel-class). Exclude network/share/IPP.
+  const isUsb =
+    !isVirtual &&
+    !isIppClass &&
+    (/^USB\d+/i.test(p) || /^DOT4_/i.test(p) || (/USB/i.test(p) && !/^\\\\/.test(p)));
+  const isCanonDriver = /canon|selphy/i.test(d) && !isIppClass;
+  return { isIppClass, isCanonDriver, isUsb, isVirtual };
+}
+
+function mapWinPrinter(w) {
+  const name = String(w.Name || '');
+  const driverName = String(w.DriverName || '');
+  const portName = String(w.PortName || '');
+  const flags = classifyPrinter(driverName, portName, name);
+  return {
+    name,
+    displayName: name,
+    description: driverName,
+    isDefault: !!w.Default,
+    status: 0,
+    driverName,
+    portName,
+    ...flags,
+  };
+}
+
+/** Prefer USB Canon/SELPHY; otherwise any USB queue. */
+function pickBestUsbPrinter(printers) {
+  const usb = (printers || []).filter((p) => p && p.isUsb && !p.isVirtual);
+  if (!usb.length) return null;
+  const canon = usb.find((p) => p.isCanonDriver) || usb.find((p) => /canon|selphy/i.test(p.name));
+  return canon || usb.find((p) => p.isDefault) || usb[0];
+}
+
+async function listWindowsPrintersDetailed() {
+  let winDetails = [];
   try {
-    /** Enrich with Win32 driver/port so admin can spot Microsoft IPP vs real Canon. */
-    let winDetails = [];
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        `Get-CimInstance Win32_Printer | Select-Object Name,DriverName,PortName,Default | ConvertTo-Json -Compress`,
+      ],
+      { windowsHide: true, encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
+    );
+    const parsed = JSON.parse(String(stdout || '[]').trim() || '[]');
+    winDetails = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  } catch (e) {
+    appendAppLog('warn', 'print', 'Win32_Printer enrich failed', String(e));
+  }
+
+  const byName = new Map();
+  for (const w of winDetails) {
+    if (w && w.Name) byName.set(String(w.Name), w);
+  }
+
+  /** @type {ReturnType<typeof mapWinPrinter>[]} */
+  let printers = [];
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
     try {
-      const { stdout } = await execFileAsync(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          `Get-CimInstance Win32_Printer | Select-Object Name,DriverName,PortName,Default | ConvertTo-Json -Compress`,
-        ],
-        { windowsHide: true, encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
-      );
-      const parsed = JSON.parse(String(stdout || '[]').trim() || '[]');
-      winDetails = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
-    } catch (e) {
-      appendAppLog('warn', 'print', 'Win32_Printer enrich failed', String(e));
-    }
-
-    const byName = new Map();
-    for (const w of winDetails) {
-      if (w && w.Name) byName.set(String(w.Name), w);
-    }
-
-    const classify = (driverName, portName) => {
-      const d = String(driverName || '');
-      const p = String(portName || '');
-      const isIppClass = /ipp|wsd|microsoft\s+ipp|class\s+driver/i.test(d) || /ipp|wsd|https?:/i.test(p);
-      const isCanonDriver = /canon|selphy/i.test(d) && !isIppClass;
-      return { isIppClass, isCanonDriver };
-    };
-
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      // Still return Win32 list if Electron printers unavailable
-      const printers = winDetails.map((w) => {
-        const flags = classify(w.DriverName, w.PortName);
+      const electronPrinters = await mainWindow.webContents.getPrintersAsync();
+      printers = (electronPrinters || []).map((p) => {
+        const w = byName.get(p.name);
+        const driverName = w ? String(w.DriverName || '') : '';
+        const portName = w ? String(w.PortName || '') : '';
+        const flags = classifyPrinter(driverName, portName, p.name);
         return {
-          name: String(w.Name),
-          displayName: String(w.Name),
-          description: String(w.DriverName || ''),
-          isDefault: !!w.Default,
-          status: 0,
-          driverName: String(w.DriverName || ''),
-          portName: String(w.PortName || ''),
+          name: p.name,
+          displayName: p.displayName || p.name,
+          description: p.description || driverName || '',
+          isDefault: !!p.isDefault || !!(w && w.Default),
+          status: p.status,
+          driverName,
+          portName,
           ...flags,
         };
       });
-      return { ok: true, printers };
+    } catch (e) {
+      appendAppLog('warn', 'print', 'getPrintersAsync failed', String(e));
     }
+  }
 
-    const electronPrinters = await mainWindow.webContents.getPrintersAsync();
-    const printers = (electronPrinters || []).map((p) => {
-      const w = byName.get(p.name);
-      const driverName = w ? String(w.DriverName || '') : '';
-      const portName = w ? String(w.PortName || '') : '';
-      const flags = classify(driverName, portName);
-      return {
-        name: p.name,
-        displayName: p.displayName || p.name,
-        description: p.description || driverName || '',
-        isDefault: !!p.isDefault || !!(w && w.Default),
-        status: p.status,
-        driverName,
-        portName,
-        ...flags,
-      };
-    });
-
-    // Include any Win32 printers Electron missed
+  if (!printers.length) {
+    printers = winDetails.map(mapWinPrinter);
+  } else {
     for (const w of winDetails) {
       const name = String(w.Name);
       if (printers.some((p) => p.name === name)) continue;
-      const flags = classify(w.DriverName, w.PortName);
-      printers.push({
-        name,
-        displayName: name,
-        description: String(w.DriverName || ''),
-        isDefault: !!w.Default,
-        status: 0,
-        driverName: String(w.DriverName || ''),
-        portName: String(w.PortName || ''),
-        ...flags,
-      });
+      printers.push(mapWinPrinter(w));
     }
+  }
 
-    return { ok: true, printers };
+  return printers;
+}
+
+ipcMain.handle('print:listPrinters', async () => {
+  try {
+    const all = await listWindowsPrintersDetailed();
+    // Booth UI: USB printers only (Canon SELPHY on USB001/DOT4, etc.).
+    const printers = all.filter((p) => p.isUsb && !p.isVirtual);
+    return {
+      ok: true,
+      printers,
+      usbCount: printers.length,
+      totalCount: all.length,
+    };
   } catch (e) {
     appendAppLog('error', 'print', 'listPrinters failed', String(e));
     return { ok: false, printers: [], error: String(e) };
@@ -3443,11 +3477,6 @@ ipcMain.handle('print:photo', async (_e, payload) => {
     if (printCfg.enabled !== true) {
       return { ok: false, error: 'Printing is disabled in Admin → Print.' };
     }
-    const chosen =
-      deviceName ||
-      (typeof printCfg.printerName === 'string' && printCfg.printerName.trim()
-        ? printCfg.printerName.trim()
-        : null);
     const bleedScale =
       typeof printCfg.bleedScale === 'number' && Number.isFinite(printCfg.bleedScale)
         ? printCfg.bleedScale
@@ -3456,6 +3485,46 @@ ipcMain.handle('print:photo', async (_e, payload) => {
     const abs = path.resolve(filePath);
     if (process.platform !== 'win32') {
       return { ok: false, error: 'Photo printing is only supported on Windows.' };
+    }
+
+    const all = await listWindowsPrintersDetailed();
+    const usbList = all.filter((p) => p.isUsb && !p.isVirtual);
+    if (!usbList.length) {
+      return {
+        ok: false,
+        error:
+          'No USB printer found. Plug in the Canon SELPHY by USB, wait for Windows to install it, then try again.',
+      };
+    }
+
+    const preferred =
+      deviceName ||
+      (typeof printCfg.printerName === 'string' && printCfg.printerName.trim()
+        ? printCfg.printerName.trim()
+        : null);
+
+    let chosen = preferred;
+    const preferredMeta = preferred ? all.find((p) => p.name === preferred) : null;
+    // Never send booth prints to IPP / PDF / Wi‑Fi — force a USB queue.
+    if (!preferredMeta || !preferredMeta.isUsb || preferredMeta.isVirtual || preferredMeta.isIppClass) {
+      const auto = pickBestUsbPrinter(usbList);
+      if (!auto) {
+        return { ok: false, error: 'No usable USB printer queue found.' };
+      }
+      chosen = auto.name;
+      if (preferred && preferred !== chosen) {
+        appendAppLog('warn', 'print', 'redirected print to USB printer', {
+          requested: preferred,
+          used: chosen,
+          reason: preferredMeta
+            ? preferredMeta.isIppClass
+              ? 'ipp'
+              : preferredMeta.isVirtual
+                ? 'virtual'
+                : 'not-usb'
+            : 'missing',
+        });
+      }
     }
 
     const result = await printPhotoViaWindowsSpooler(abs, chosen, bleedScale);

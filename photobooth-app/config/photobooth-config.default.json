@@ -1,7 +1,10 @@
 {
   "activeThemeId": "inmoment",
   "adminPin": "2727",
-  "boothMode": "default",
+  "guestModes": {
+    "defaultEnabled": true,
+    "physicalFrameEnabled": true
+  },
   "physicalFrame": {
     "cellWidthIn": 5.8,
     "cellHeightIn": 8.8,
@@ -16,7 +19,7 @@
   "photoFrames": {
     "enabled": true,
     "photoScale": 1,
-    "defaultFrameFile": "onam-grma-2026.png",
+    "defaultFrameFile": "botanical-landscape.png",
     "guestFrameFiles": [],
     "guestTextEnabled": false,
     "guestTextOptional": true,

@@ -549,26 +549,23 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Booth modes</h2>
           <p class="pb-hint">
-            Choose how each guest session finishes after capture. Switch anytime — settings are kept
-            for both modes.
+            Guests pick a mode after <strong>Tap to start</strong>. Enable one or both options
+            below. If only one is enabled, that mode runs automatically (no picker).
+            <strong>Physical frame</strong> prints stay on the booth only — they are not uploaded
+            to Moments / the mosaic wall.
           </p>
           <label class="pb-admin-check">
-            <input type="radio" name="boothMode" [(ngModel)]="draftBoothMode" [value]="'default'" />
-            <strong>Default</strong> — photo + digital frames / caption / AI as configured
+            <input type="checkbox" [(ngModel)]="draftGuestModes.defaultEnabled" />
+            <strong>Digital frame</strong> — photo + digital frames / caption / AI as configured
           </label>
           <label class="pb-admin-check">
-            <input
-              type="radio"
-              name="boothMode"
-              [(ngModel)]="draftBoothMode"
-              [value]="'physicalFrame'"
-            />
-            <strong>Physical frame</strong> — landscape capture, rotate 90°, print sheet with
+            <input type="checkbox" [(ngModel)]="draftGuestModes.physicalFrameEnabled" />
+            <strong>Physical frame</strong> — landscape capture, rotate 90°, sheet with
             <em>two identical</em> portrait cells for cutting into frames
           </label>
 
-          @if (draftBoothMode === 'physicalFrame') {
-            <h3 class="pb-admin-subhead">Cut-sheet layout (inches at DPI)</h3>
+          @if (draftGuestModes.physicalFrameEnabled) {
+            <h3 class="pb-admin-subhead">Physical cut-sheet layout (inches at DPI)</h3>
             <p class="pb-hint pb-hint-tight">
               Defaults: each cell <strong>5.8 × 8.8</strong> (portrait), two columns, white padding.
               Capture should be landscape; the app rotates before fitting.
@@ -718,22 +715,25 @@
             <input type="checkbox" [(ngModel)]="draftPrint.enabled" />
             Enable printing on the result / final page
           </label>
-          <label>Printer queue</label>
+          <label>USB printer</label>
           <select class="pb-input" [(ngModel)]="draftPrint.printerName">
-            <option [ngValue]="null">Windows default printer</option>
+            <option [ngValue]="null">Auto (USB Canon / SELPHY)</option>
             @for (p of printers(); track p.name) {
               <option [ngValue]="p.name">{{ printerLabel(p) }}</option>
             }
           </select>
+          @if (!printers().length) {
+            <p class="pb-hint pb-hint-tight">
+              No USB printers found. Plug the SELPHY in by USB, wait for Windows to finish installing the
+              driver, then tap <strong>Refresh printers</strong>.
+            </p>
+          }
           @if (selectedPrinter(); as sp) {
             <p class="pb-hint pb-hint-tight">
               Driver: <code>{{ sp.driverName || 'unknown' }}</code>
               · Port: <code>{{ sp.portName || 'unknown' }}</code>
               @if (sp.isCanonDriver) {
-                · <strong>Canon driver — good</strong>
-              }
-              @if (sp.isIppClass) {
-                · <strong>IPP/WSD — often grayscale + portrait (not recommended)</strong>
+                · <strong>Canon USB — ready</strong>
               }
             </p>
           }
@@ -751,27 +751,10 @@
             Use <code>1.03</code>–<code>1.08</code> if you still see white or too much crop.
           </p>
 
-          <h3 class="pb-admin-subhead">USB (recommended / backup)</h3>
           <p class="pb-hint pb-hint-tight">
-            Plug SELPHY in by USB and choose the queue whose driver name contains <strong>Canon</strong> /
-            <strong>SELPHY</strong>. That path is confirmed correct for color + 6×4.
+            Only <strong>USB</strong> printer queues are listed (ports like <code>USB001</code>). Wi‑Fi / IPP /
+            PDF printers are hidden — they often print grayscale or wrong size.
           </p>
-
-          <h3 class="pb-admin-subhead">Wi‑Fi / IPP (fix if wrong)</h3>
-          <p class="pb-hint pb-hint-tight">
-            Windows “IPP” or “Microsoft IPP Class Driver” queues often print <strong>grayscale</strong>,
-            <strong>portrait</strong>, and crop badly. That is a driver problem — not the booth app.
-            To use Wi‑Fi correctly:
-          </p>
-          <ol class="pb-hint pb-admin-steps">
-            <li>Install the official <strong>Canon SELPHY CP1500</strong> driver/software from Canon.</li>
-            <li>In Windows Printers &amp; scanners, remove the IPP/WSD SELPHY queue if it misbehaves.</li>
-            <li>
-              Add the printer again with the <strong>Canon</strong> driver on a
-              <strong>Standard TCP/IP</strong> port (SELPHY’s IP), not “Internet Printing Protocol”.
-            </li>
-            <li>Refresh printers here and select that Canon Wi‑Fi queue — or keep USB as the booth default.</li>
-          </ol>
 
           <div class="pb-row pb-row-wrap">
             <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="savePrint()">
@@ -779,9 +762,6 @@
             </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="refreshPrinters()">
               Refresh printers
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" (click)="openWindowsPrinters()">
-              How to fix Wi‑Fi driver
             </button>
           </div>
         </section>
@@ -793,9 +773,11 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Photo frame overlays</h2>
           <p class="pb-hint">
-            Choose which decorative frames guests see after capture. Moments Admin is the master
-            library — this booth pulls it on load and drops overlays that were deleted on the server.
-            Offline, the last local copies keep working.
+            Choose which decorative frames guests see after capture (Digital frame mode). Prefer
+            landscape overlays with a transparent photo hole and no caption bar — e.g.
+            <code>botanical-landscape.png</code>. Moments Admin is the master library — this booth
+            pulls it on load and drops overlays that were deleted on the server. Offline, the last
+            local copies keep working.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftFramesEnabled" />

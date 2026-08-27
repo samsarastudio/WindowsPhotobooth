@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import type {
   PhotoboothAiMode,
-  PhotoboothBoothModeId,
+  PhotoboothGuestModesConfig,
   PhotoboothBranding,
   PhotoboothCameraConfig,
   PhotoboothCopy,
@@ -22,6 +22,7 @@ import {
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
+  PHOTOBOOTH_DEFAULT_GUEST_MODES,
   PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   PHOTOBOOTH_DEFAULT_PRINT,
   PLAIN_PHOTO_MODE_ID,
@@ -60,6 +61,7 @@ interface PrinterOption {
   portName?: string;
   isIppClass?: boolean;
   isCanonDriver?: boolean;
+  isUsb?: boolean;
 }
 
 interface AdminFrameItem {
@@ -95,7 +97,7 @@ export class AdminDashboardComponent implements OnInit {
   draftGallery: PhotoboothGalleryConfig = structuredClone(PHOTOBOOTH_DEFAULT_GALLERY);
   draftPrint: PhotoboothPrintConfig = structuredClone(PHOTOBOOTH_DEFAULT_PRINT);
   draftDebug: PhotoboothDebugConfig = structuredClone(PHOTOBOOTH_DEFAULT_DEBUG);
-  draftBoothMode: PhotoboothBoothModeId = 'default';
+  draftGuestModes: PhotoboothGuestModesConfig = structuredClone(PHOTOBOOTH_DEFAULT_GUEST_MODES);
   draftPhysicalFrame: PhotoboothPhysicalFrameConfig = structuredClone(
     PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   );
@@ -297,7 +299,7 @@ export class AdminDashboardComponent implements OnInit {
     this.draftGallery = structuredClone(cfg?.gallery ?? PHOTOBOOTH_DEFAULT_GALLERY);
     this.draftPrint = structuredClone(cfg?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
     this.draftDebug = structuredClone(cfg?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
-    this.draftBoothMode = cfg?.boothMode === 'physicalFrame' ? 'physicalFrame' : 'default';
+    this.draftGuestModes = structuredClone(cfg?.guestModes ?? PHOTOBOOTH_DEFAULT_GUEST_MODES);
     this.draftPhysicalFrame = structuredClone(
       cfg?.physicalFrame ?? PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
     );
@@ -349,15 +351,19 @@ export class AdminDashboardComponent implements OnInit {
     this.busy.set(true);
     this.status.set(null);
     try {
+      if (!this.draftGuestModes.defaultEnabled && !this.draftGuestModes.physicalFrameEnabled) {
+        this.draftGuestModes.defaultEnabled = true;
+      }
       const ok = await this.booth.save({
-        boothMode: this.draftBoothMode,
+        guestModes: { ...this.draftGuestModes },
         physicalFrame: { ...this.draftPhysicalFrame },
       });
+      const parts: string[] = [];
+      if (this.draftGuestModes.defaultEnabled) parts.push('Digital frame');
+      if (this.draftGuestModes.physicalFrameEnabled) parts.push('Physical frame');
       this.status.set(
         ok
-          ? this.draftBoothMode === 'physicalFrame'
-            ? 'Modes saved — Physical frame (dual cut sheet).'
-            : 'Modes saved — Default (frames / AI as configured).'
+          ? `Modes saved — guests can choose: ${parts.join(' · ')}.`
           : 'Failed to save modes.',
       );
       this.syncFromService();
@@ -573,33 +579,33 @@ export class AdminDashboardComponent implements OnInit {
         portName: p.portName || '',
         isIppClass: !!p.isIppClass,
         isCanonDriver: !!p.isCanonDriver,
+        isUsb: p.isUsb !== false,
       })),
     );
     if (
       this.draftPrint.printerName &&
       !r.printers.some((p) => p.name === this.draftPrint.printerName)
     ) {
+      this.draftPrint.printerName = null;
       this.status.set(
-        `Saved printer “${this.draftPrint.printerName}” is not currently available. Pick another or use Windows default.`,
+        `Saved printer was not a USB queue (or is offline). Switched to Auto — plug in SELPHY USB and Refresh if needed.`,
       );
+    } else if (!r.printers.length) {
+      this.status.set('No USB printers found. Connect the SELPHY by USB, then Refresh.');
     } else {
-      const selected = r.printers.find((p) => p.name === this.draftPrint.printerName);
-      if (selected?.isIppClass) {
-        this.status.set(
-          'Selected printer uses Microsoft IPP/WSD — often grayscale + wrong layout. Prefer the USB Canon SELPHY queue, or add Wi‑Fi with the real Canon driver (see notes below).',
-        );
-      }
+      this.status.set(
+        `${r.printers.length} USB printer${r.printers.length === 1 ? '' : 's'} available.`,
+      );
     }
   }
 
   printerLabel(p: PrinterOption): string {
     const tags: string[] = [];
     if (p.isDefault) tags.push('Windows default');
-    if (p.isCanonDriver) tags.push('Canon driver');
-    if (p.isIppClass) tags.push('IPP — avoid');
+    if (p.isCanonDriver) tags.push('Canon');
+    if (p.portName) tags.push(p.portName);
     const tag = tags.length ? ` [${tags.join(', ')}]` : '';
-    const drv = p.driverName ? ` — ${p.driverName}` : '';
-    return `${p.displayName}${tag}${drv}`;
+    return `${p.displayName}${tag}`;
   }
 
   selectedPrinter(): PrinterOption | null {
@@ -621,35 +627,19 @@ export class AdminDashboardComponent implements OnInit {
       });
       if (ok) {
         this.syncFromService();
-        const sel = this.selectedPrinter();
-        if (this.draftPrint.enabled && sel?.isIppClass) {
-          this.status.set(
-            'Saved — but this queue is IPP. Expect grayscale/wrong layout until you switch to USB Canon or a Canon TCP/IP queue.',
-          );
-        } else {
-          this.status.set(
-            this.draftPrint.enabled
-              ? 'Print enabled (SELPHY 6×4, borderless bleed). Guests see a one-shot Print button.'
-              : 'Print settings saved (printing disabled).',
-          );
-        }
+        this.status.set(
+          this.draftPrint.enabled
+            ? this.draftPrint.printerName
+              ? `Print enabled → ${this.draftPrint.printerName} (USB).`
+              : 'Print enabled → Auto USB Canon/SELPHY.'
+            : 'Print settings saved (printing disabled).',
+        );
       } else {
         this.status.set('Save failed (run in Electron).');
       }
     } finally {
       this.busy.set(false);
     }
-  }
-
-  async openWindowsPrinters(): Promise<void> {
-    if (!window.pbApi) {
-      this.status.set('Open Windows Settings → Printers & scanners manually.');
-      return;
-    }
-    // Reuse logs folder opener pattern — add a dedicated IPC would be nicer; use shell via log for now
-    this.status.set(
-      'Open Windows Settings → Bluetooth & devices → Printers & scanners. Prefer the USB Canon SELPHY entry, or add Wi‑Fi with Canon’s driver (not “IPP”).',
-    );
   }
 
   async uploadPhotoFrame(): Promise<void> {

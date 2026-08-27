@@ -282,11 +282,15 @@ export interface PbApi {
       status: number;
       driverName?: string;
       portName?: string;
-      /** Microsoft IPP / WSD — often grayscale + wrong layout on SELPHY */
+      /** Microsoft IPP / WSD — filtered out of the USB-only list */
       isIppClass?: boolean;
-      /** Real Canon / SELPHY driver (USB or TCP/IP with Canon software) */
+      /** Real Canon / SELPHY driver */
       isCanonDriver?: boolean;
+      /** Local USB port (USB001 / DOT4_*) */
+      isUsb?: boolean;
     }[];
+    usbCount?: number;
+    totalCount?: number;
     error?: string;
   }>;
   printPhoto(payload: {

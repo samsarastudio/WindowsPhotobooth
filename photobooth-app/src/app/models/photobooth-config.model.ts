@@ -132,9 +132,8 @@ export interface PhotoboothPrintConfig {
   /** Show a one-shot Print button on the result / final gallery screen. */
   enabled: boolean;
   /**
-   * Windows printer name from the system printer list.
-   * Empty / null = use the OS default printer.
-   * Prefer the USB Canon SELPHY queue (real Canon driver). Wi‑Fi IPP queues often print grayscale / wrong layout.
+   * Windows USB printer queue name.
+   * Empty / null = auto-pick USB Canon/SELPHY (never Windows default / IPP / PDF).
    */
   printerName: string | null;
   /**
@@ -159,6 +158,16 @@ export interface PhotoboothCopyAiMode {
    * Use "Photocapture", "Default", etc. — not an admin `aiModes` row.
    */
   plainPhotoLabel: string;
+}
+
+export interface PhotoboothCopyBoothMode {
+  title: string;
+  subtitle: string;
+  defaultLabel: string;
+  defaultHint: string;
+  physicalLabel: string;
+  physicalHint: string;
+  back: string;
 }
 
 /**
@@ -190,6 +199,7 @@ export interface PhotoboothCopy {
   capture: PhotoboothCopyCapture;
   result: PhotoboothCopyResult;
   aiMode: PhotoboothCopyAiMode;
+  boothMode: PhotoboothCopyBoothMode;
   frame: PhotoboothCopyFrame;
   caption: PhotoboothCopyCaption;
 }
@@ -288,7 +298,7 @@ export interface PhotoboothPhotoFramesConfig {
 export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   enabled: true,
   photoScale: 1,
-  defaultFrameFile: 'onam-grma-2026.png',
+  defaultFrameFile: 'botanical-landscape.png',
   guestFrameFiles: [],
   autoApplyFrame: false,
   guestTextEnabled: false,
@@ -305,8 +315,21 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   guestTextBrushOpacity: 0.22,
 };
 
-/** Guest experience mode — selected in Admin → Modes. */
+/** Guest experience mode ids. */
 export type PhotoboothBoothModeId = 'default' | 'physicalFrame';
+
+/** Which experience buttons guests see after Tap to start. */
+export interface PhotoboothGuestModesConfig {
+  /** Classic digital frames / AI flow. */
+  defaultEnabled: boolean;
+  /** Dual cut-sheet for physical photo frames. */
+  physicalFrameEnabled: boolean;
+}
+
+export const PHOTOBOOTH_DEFAULT_GUEST_MODES: PhotoboothGuestModesConfig = {
+  defaultEnabled: true,
+  physicalFrameEnabled: true,
+};
 
 /**
  * Dual cut-sheet for physical photo frames.
@@ -346,8 +369,11 @@ export interface PhotoboothConfig {
   print: PhotoboothPrintConfig;
   debug: PhotoboothDebugConfig;
   copy: PhotoboothCopy;
-  /** Guest flow mode: digital frames (default) or dual physical-frame cut sheet. */
-  boothMode: PhotoboothBoothModeId;
+  /**
+   * Which guest modes are offered after Tap to start.
+   * When more than one is enabled, guests pick on `/booth-mode`.
+   */
+  guestModes: PhotoboothGuestModesConfig;
   physicalFrame: PhotoboothPhysicalFrameConfig;
   /** When true, guests must pass the QR / code unlock screen. */
   requireQrUnlock: boolean;
@@ -467,6 +493,15 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     subtitle: 'Pick how we transform your photo',
     back: 'Back',
     plainPhotoLabel: 'Photocapture',
+  },
+  boothMode: {
+    title: 'Choose a mode',
+    subtitle: 'How should we finish your photo?',
+    defaultLabel: 'Digital frame',
+    defaultHint: 'Photo with frames and styles',
+    physicalLabel: 'Physical frame',
+    physicalHint: 'Two prints to cut for a photo frame',
+    back: 'Back',
   },
   frame: {
     title: 'Choose a frame',

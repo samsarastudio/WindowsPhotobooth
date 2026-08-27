@@ -9,6 +9,7 @@ import {
 import { Router } from '@angular/router';
 import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
+import { BoothModeService } from '../../services/booth-mode.service';
 import { AiStyleService } from '../../services/ai-style.service';
 
 @Component({
@@ -18,6 +19,7 @@ import { AiStyleService } from '../../services/ai-style.service';
 })
 export class QrPageComponent implements OnInit, OnDestroy {
   private readonly booth = inject(BoothConfigService);
+  private readonly boothMode = inject(BoothModeService);
   private readonly aiStyle = inject(AiStyleService);
   readonly branding = inject(BrandingLogoService);
   readonly copy = this.booth.copy;
@@ -42,6 +44,11 @@ export class QrPageComponent implements OnInit, OnDestroy {
   }
 
   private nextAfterUnlock(): void {
+    if (this.boothMode.isPhysicalFrameMode()) {
+      this.aiStyle.clear();
+      void this.router.navigate(['/capture']);
+      return;
+    }
     const fixed = this.booth.fixedAiModeId();
     if (fixed) {
       this.aiStyle.selectMode(fixed);
