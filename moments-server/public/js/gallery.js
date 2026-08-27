@@ -225,6 +225,48 @@ function renderGuestPhoto() {
   stopAttachCamera();
 }
 
+/** Last-resort: photo files are named `{id}.jpg|png|webp` under /media/{slug}/. */
+async function guessMediaPhoto(slug, photoId) {
+  if (!slug || !photoId) return null;
+  const exts = ['.jpg', '.jpeg', '.png', '.webp'];
+  for (const ext of exts) {
+    const url = `/media/${encodeURIComponent(slug)}/${encodeURIComponent(photoId)}${ext}`;
+    try {
+      const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (!res.ok) continue;
+      return {
+        id: photoId,
+        variant: 'original',
+        url,
+        sharePath: `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photoId)}`,
+      };
+    } catch {
+      /* try next */
+    }
+  }
+  // Some hosts block HEAD — try a ranged GET.
+  for (const ext of exts) {
+    const url = `/media/${encodeURIComponent(slug)}/${encodeURIComponent(photoId)}${ext}`;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        cache: 'no-store',
+      });
+      if (!(res.ok || res.status === 206)) continue;
+      return {
+        id: photoId,
+        variant: 'original',
+        url,
+        sharePath: `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photoId)}`,
+      };
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
 /** Share / QR deep links must resolve any variant (incl. non-framed originals). */
 async function fetchSharePhoto(slug, photoId) {
   if (!photoId) return null;
@@ -252,7 +294,8 @@ async function fetchSharePhoto(slug, photoId) {
       /* try next */
     }
   }
-  return null;
+  // 3) Direct media file (APIs may be stale until Moments Node restart).
+  return guessMediaPhoto(slug, photoId);
 }
 
 /** Guest share page — load by photo id (slug in URL may be stale). */
@@ -277,6 +320,9 @@ async function loadSharePhoto(route) {
 
   if (!mine?.url) {
     mine = await fetchSharePhoto(route.slug, route.photoId);
+  }
+  if (!mine?.url) {
+    mine = await guessMediaPhoto(route.slug, route.photoId);
   }
 
   if (!mine?.url) {
