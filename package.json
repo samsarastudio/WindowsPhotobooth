@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "purge": "node src/purge-cli.js",
+    "qa:share": "node scripts/qa-share.mjs",
     "seed": "node -e \"import('./src/db.js').then(async m=>{m.initDb(); const {seedSampleGallery}=await import('./src/seed-samples.js'); console.log(JSON.stringify(seedSampleGallery(),null,2))})\""
   },
   "engines": {

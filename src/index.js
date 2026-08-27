@@ -37,19 +37,27 @@ app.get('/api/health', (_req, res) => {
     service: 'moments-server',
     port: config.port,
     publicBaseUrl: config.publicBaseUrl,
+    /** Bumped when share APIs change — use to confirm Pi restarted the right build. */
+    build: '20260827-share-qa',
+    shareApi: true,
   });
 });
 
-/** Share / QR deep-link: resolve any photo by id (incl. non-framed originals).
- * Still works after album TTL — guests/admin must be able to open saved share links. */
-app.get('/api/photos/:photoId', (req, res) => {
-  const photoId = String(req.params.photoId || '').trim();
-  if (!photoId) return res.status(400).json({ ok: false, error: 'photoId required' });
-  const row = getDb().prepare('SELECT * FROM photos WHERE id = ?').get(photoId);
-  if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
+function findPhotoRowById(photoId) {
+  const id = String(photoId || '').trim();
+  if (!id) return null;
+  const exact = getDb().prepare('SELECT * FROM photos WHERE id = ?').get(id);
+  if (exact) return exact;
+  // Case-insensitive fallback (URL / copy-paste quirks).
+  return getDb()
+    .prepare('SELECT * FROM photos WHERE lower(id) = lower(?) LIMIT 1')
+    .get(id);
+}
+
+function sharePhotoPayload(row) {
   const session = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(row.session_id);
-  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  return res.json({
+  if (!session) return null;
+  return {
     ok: true,
     photo: publicPhoto(session.slug, row),
     session: {
@@ -58,7 +66,26 @@ app.get('/api/photos/:photoId', (req, res) => {
       expiresAt: session.expires_at,
       expired: isSessionExpired(session),
     },
-  });
+  };
+}
+
+/** Share / QR deep-link: resolve any photo by id (incl. non-framed originals).
+ * Still works after album TTL — guests/admin must be able to open saved share links. */
+app.get('/api/photos/:photoId', (req, res) => {
+  const row = findPhotoRowById(req.params.photoId);
+  if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  const payload = sharePhotoPayload(row);
+  if (!payload) return res.status(404).json({ ok: false, error: 'Session not found' });
+  return res.json(payload);
+});
+
+/** Alias kept for older clients / clearer ops debugging. */
+app.get('/api/share/:photoId', (req, res) => {
+  const row = findPhotoRowById(req.params.photoId);
+  if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  const payload = sharePhotoPayload(row);
+  if (!payload) return res.status(404).json({ ok: false, error: 'Session not found' });
+  return res.json(payload);
 });
 
 app.use('/api/sessions', sessionsRouter);

@@ -115,10 +115,17 @@ sessionsRouter.get('/:slug', (req, res) => {
   }
   const photos = wantId && isSessionExpired(session) ? [] : listPublicPhotos(session.id);
   // Share deep-link: include this photo even when filtered from the public gallery list.
-  if (wantId && !photos.some((p) => p.id === wantId)) {
-    const row = getDb()
+  if (wantId && !photos.some((p) => p.id === wantId || String(p.id).toLowerCase() === wantId.toLowerCase())) {
+    let row = getDb()
       .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
       .get(wantId, session.id);
+    if (!row) {
+      row = getDb()
+        .prepare(
+          'SELECT * FROM photos WHERE session_id = ? AND lower(id) = lower(?) LIMIT 1',
+        )
+        .get(session.id, wantId);
+    }
     if (row) photos.push(row);
   }
   return res.json({ ok: true, session: publicSession(session, photos) });
@@ -129,10 +136,31 @@ sessionsRouter.get('/:slug/photos/:photoId', (req, res) => {
   const session = getSessionBySlug(req.params.slug);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
   // Share links stay valid after TTL while the file remains on disk.
-  const row = getDb()
+  let row = getDb()
     .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
     .get(req.params.photoId, session.id);
-  if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  if (!row) {
+    row = getDb()
+      .prepare(
+        'SELECT * FROM photos WHERE session_id = ? AND lower(id) = lower(?) LIMIT 1',
+      )
+      .get(session.id, req.params.photoId);
+  }
+  // Wrong slug in URL but valid id → still return the photo (correct media slug).
+  if (!row) {
+    row = getDb().prepare('SELECT * FROM photos WHERE id = ?').get(req.params.photoId);
+    if (!row) {
+      row = getDb()
+        .prepare('SELECT * FROM photos WHERE lower(id) = lower(?) LIMIT 1')
+        .get(req.params.photoId);
+    }
+    if (row) {
+      const owner = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(row.session_id);
+      if (!owner) return res.status(404).json({ ok: false, error: 'Photo not found' });
+      return res.json({ ok: true, photo: publicPhoto(owner.slug, row) });
+    }
+    return res.status(404).json({ ok: false, error: 'Photo not found' });
+  }
   return res.json({ ok: true, photo: publicPhoto(session.slug, row) });
 });
 
