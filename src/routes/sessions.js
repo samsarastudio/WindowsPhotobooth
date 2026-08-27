@@ -196,6 +196,7 @@ sessionsRouter.post(
     const sourceLocalName = String(req.body?.sourceLocalName || req.file.originalname || '').trim() || null;
 
     // Dedupe: same local capture filename + variant in this session → return existing.
+    // If the DB row exists but the file was deleted, rewrite the file so thumbnails aren't black.
     if (sourceLocalName) {
       const existing = getDb()
         .prepare(
@@ -205,6 +206,16 @@ sessionsRouter.post(
         )
         .get(session.id, variant, sourceLocalName);
       if (existing) {
+        const existingPath = path.join(config.photosDir, session.slug, existing.filename);
+        if (!fs.existsSync(existingPath) || fs.statSync(existingPath).size <= 0) {
+          fs.mkdirSync(path.dirname(existingPath), { recursive: true });
+          fs.writeFileSync(existingPath, req.file.buffer);
+          getDb()
+            .prepare('UPDATE photos SET bytes = ?, mime = ? WHERE id = ?')
+            .run(req.file.buffer.length, req.file.mimetype || existing.mime, existing.id);
+          existing.bytes = req.file.buffer.length;
+          existing.mime = req.file.mimetype || existing.mime;
+        }
         const photo = publicPhoto(session.slug, existing);
         return res.json({ ok: true, photo, deduped: true });
       }
@@ -218,7 +229,20 @@ sessionsRouter.post(
     const sessionDir = path.join(config.photosDir, session.slug);
     fs.mkdirSync(sessionDir, { recursive: true });
     const dest = path.join(sessionDir, filename);
-    fs.writeFileSync(dest, req.file.buffer);
+    try {
+      fs.writeFileSync(dest, req.file.buffer);
+      const st = fs.statSync(dest);
+      if (!st.isFile() || st.size <= 0) {
+        throw new Error('Photo write produced an empty file');
+      }
+    } catch (e) {
+      try {
+        fs.unlinkSync(dest);
+      } catch {
+        /* ignore */
+      }
+      return res.status(500).json({ ok: false, error: `Failed to save photo: ${e.message || e}` });
+    }
 
     const row = {
       id,
@@ -232,14 +256,23 @@ sessionsRouter.post(
       height: Number.isFinite(height) ? height : null,
       created_at: new Date().toISOString(),
     };
-    getDb()
-      .prepare(
-        `INSERT INTO photos
-         (id, session_id, variant, filename, mime, bytes, source_local_name, width, height, created_at)
-         VALUES
-         (@id, @session_id, @variant, @filename, @mime, @bytes, @source_local_name, @width, @height, @created_at)`,
-      )
-      .run(row);
+    try {
+      getDb()
+        .prepare(
+          `INSERT INTO photos
+           (id, session_id, variant, filename, mime, bytes, source_local_name, width, height, created_at)
+           VALUES
+           (@id, @session_id, @variant, @filename, @mime, @bytes, @source_local_name, @width, @height, @created_at)`,
+        )
+        .run(row);
+    } catch (e) {
+      try {
+        fs.unlinkSync(dest);
+      } catch {
+        /* ignore */
+      }
+      return res.status(500).json({ ok: false, error: `Failed to record photo: ${e.message || e}` });
+    }
 
     const photo = publicPhoto(session.slug, row);
     const showOriginals = loadSettings().showOriginalPhotos !== false;
