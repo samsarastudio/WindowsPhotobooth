@@ -100,6 +100,7 @@ let wallCfg = {
   brandRevealEnabled: false,
   brandRevealSeconds: 45,
   brandRevealHoldSeconds: 6,
+  showOriginalPhotos: true,
 };
 let route = parseRoute();
 let mosaicShineTimer = null;
@@ -228,10 +229,15 @@ function captureFamilyKey(photo) {
     .replace(/\/media\/[^/]+\//, '');
 }
 
-/** Keep framed/ai; keep originals only when no framed/ai sibling is present. */
-function selectDisplayPhotosClient(list) {
+/** Keep framed/ai; keep originals only when enabled and no framed/ai sibling is present. */
+function selectDisplayPhotosClient(list, includeOriginals = wallCfg.showOriginalPhotos !== false) {
   const rows = Array.isArray(list) ? list : [];
   const framedAi = rows.filter((p) => p.variant && p.variant !== 'original');
+  if (!includeOriginals) {
+    return framedAi.sort((a, b) =>
+      String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
+    );
+  }
   const covered = new Set(framedAi.map((p) => captureFamilyKey(p)).filter(Boolean));
   const orphans = rows.filter((p) => {
     if (p.variant !== 'original') return false;
@@ -1349,15 +1355,16 @@ function upsertPhoto(photo) {
     return;
   }
   const family = captureFamilyKey(photo);
-  if (photo.variant && photo.variant !== 'original' && family) {
+  if (photo.variant === 'original') {
+    if (wallCfg.showOriginalPhotos === false) return;
+    if (family && photos.some((p) => p.variant !== 'original' && captureFamilyKey(p) === family)) {
+      return;
+    }
+  } else if (family) {
     // Framed/AI replaces a plain original of the same capture on the live wall/grid.
     photos = photos.filter(
       (p) => !(p.variant === 'original' && captureFamilyKey(p) === family && p.id !== photo.id),
     );
-  } else if (photo.variant === 'original' && family) {
-    if (photos.some((p) => p.variant !== 'original' && captureFamilyKey(p) === family)) {
-      return;
-    }
   }
   const i = photos.findIndex((p) => p.id === photo.id);
   const isNew = i < 0;
@@ -1433,6 +1440,7 @@ function onWallSettingsEvent(ev) {
   try {
     const wall = JSON.parse(ev.data);
     const prevCompleted = !!wallCfg.completedView;
+    const prevShowOriginals = wallCfg.showOriginalPhotos !== false;
     wallCfg = { ...wallCfg, ...wall };
     updateMosaicBranding();
     if (viewMode === 'mosaic') {
@@ -1440,6 +1448,11 @@ function onWallSettingsEvent(ev) {
       if (prevCompleted !== !!wallCfg.completedView) {
         applyMosaicLayoutMode(true);
       }
+    }
+    const nextShowOriginals = wallCfg.showOriginalPhotos !== false;
+    if (prevShowOriginals !== nextShowOriginals) {
+      if (route.kind === 'wall') void loadWall();
+      else if (route.kind === 'session' && route.slug) void loadSession(route.slug);
     }
   } catch {
     /* ignore */

@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260821-8" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260826-2" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -202,6 +202,15 @@
                 <button type="button" class="btn ghost" id="btnShowLiveCollage">Back to live collage</button>
               </div>
             </div>
+            <label class="check-row">
+              <input id="wallShowOriginalPhotos" type="checkbox" checked />
+              Show non-framed photos as well
+            </label>
+            <p class="meta">
+              When on, plain captures (no frame overlay) appear on the mosaic wall and guest galleries.
+              Framed / AI versions still take priority when both exist for the same shot. Admin Photos
+              always lists every variant.
+            </p>
             <label>Wall title</label>
             <input id="wallTitle" class="input" />
             <label>Center overlay text (optional)</label>
@@ -319,6 +328,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260821-8" type="module"></script>
+    <script src="/js/admin.js?v=20260826-2" type="module"></script>
   </body>
 </html>
