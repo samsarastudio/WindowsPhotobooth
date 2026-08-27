@@ -232,8 +232,9 @@ function clampPercent(value: unknown, fallback: number): number {
 }
 
 function clampRange(value: unknown, min: number, max: number, fallback: number): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
-  return Math.min(max, Math.max(min, value));
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
 }
 
 function parseHexColor(value: unknown, fallback: string): string {
@@ -330,7 +331,9 @@ function normalizePrintConfig(
   let bleedScale =
     typeof patch.bleedScale === 'number' && Number.isFinite(patch.bleedScale)
       ? patch.bleedScale
-      : base.bleedScale;
+      : Number.isFinite(Number(patch.bleedScale))
+        ? Number(patch.bleedScale)
+        : base.bleedScale;
   bleedScale = Math.min(1.12, Math.max(1.0, bleedScale));
   return {
     enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,

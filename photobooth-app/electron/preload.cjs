@@ -63,4 +63,5 @@ contextBridge.exposeInMainWorld('pbApi', {
   galleryDeleteRemoteFrame: (payload) => ipcRenderer.invoke('gallery:deleteRemoteFrame', payload),
   listPrinters: () => ipcRenderer.invoke('print:listPrinters'),
   printPhoto: (payload) => ipcRenderer.invoke('print:photo', payload),
+  printTest: () => ipcRenderer.invoke('print:test'),
 });

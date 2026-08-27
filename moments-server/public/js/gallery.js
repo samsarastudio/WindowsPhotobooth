@@ -226,7 +226,11 @@ async function fetchSharePhoto(slug, photoId) {
   try {
     const pr = await fetch(`/api/photos/${encodeURIComponent(photoId)}`);
     const pd = await pr.json().catch(() => ({}));
-    if (pr.ok && pd.photo?.url) return pd.photo;
+    if (pr.ok && pd.photo?.url) {
+      const photo = { ...pd.photo };
+      if (pd.session?.slug) photo.sessionSlug = pd.session.slug;
+      return photo;
+    }
   } catch {
     /* try next */
   }
@@ -243,6 +247,45 @@ async function fetchSharePhoto(slug, photoId) {
     }
   }
   return null;
+}
+
+/** Guest share page — load by photo id (slug in URL may be stale). */
+async function loadSharePhoto(route) {
+  setStatus('Loading your photo…');
+  let mine = null;
+
+  // Same-album admin links: session + photoId inject works even when by-id routes are missing.
+  if (route.slug) {
+    try {
+      const res = await fetch(
+        `/api/sessions/${encodeURIComponent(route.slug)}?photoId=${encodeURIComponent(route.photoId)}`,
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        mine = (data.session?.photos || []).find((p) => p.id === route.photoId) || null;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  if (!mine?.url) {
+    mine = await fetchSharePhoto(route.slug, route.photoId);
+  }
+
+  if (!mine?.url) {
+    photos = [];
+    setStatus('Photo not found or no longer available.');
+    setMode('photo', false);
+    return;
+  }
+  photos = [mine];
+  if (!route.slug && mine.sessionSlug) route.slug = mine.sessionSlug;
+  setStatus('', false);
+  if (route.slug) {
+    connectStream(`/api/sessions/${encodeURIComponent(route.slug)}/stream`);
+  }
+  setMode('photo', false);
 }
 
 function isAppleTouchDevice() {
@@ -1552,13 +1595,12 @@ async function loadSession(slug) {
   photos = selectDisplayPhotosClient(data.session.photos || []);
 
   if (route.kind === 'photo' && route.photoId) {
-    // Prefer by-id APIs; fall back to session payload (may include photoId query inject).
-    let mine =
-      (data.session.photos || []).find((p) => p.id === route.photoId) ||
-      photos.find((p) => p.id === route.photoId) ||
-      null;
+    let mine = await fetchSharePhoto(slug, route.photoId);
     if (!mine?.url) {
-      mine = await fetchSharePhoto(slug, route.photoId);
+      mine =
+        (data.session.photos || []).find((p) => p.id === route.photoId) ||
+        photos.find((p) => p.id === route.photoId) ||
+        null;
     }
     photos = mine?.url ? [mine] : [];
     els.meta.textContent = photos.length ? '' : 'Photo unavailable';
@@ -1656,6 +1698,8 @@ if (route.kind === 'home') {
   els.empty.hidden = true;
 } else if (route.kind === 'wall') {
   loadWall().catch((e) => setStatus(String(e)));
-} else if (route.kind === 'session' || route.kind === 'photo') {
+} else if (route.kind === 'photo') {
+  loadSharePhoto(route).catch((e) => setStatus(String(e)));
+} else if (route.kind === 'session') {
   loadSession(route.slug).catch((e) => setStatus(String(e)));
 }

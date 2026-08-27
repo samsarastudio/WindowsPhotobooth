@@ -242,6 +242,20 @@
   gap: 0.35rem;
 }
 
+.photo-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.photo-admin-actions .btn {
+  flex: 1 1 auto;
+  min-width: 4.5rem;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
+
 .photo-admin-card .badge {
   display: inline-block;
   font-size: 0.7rem;

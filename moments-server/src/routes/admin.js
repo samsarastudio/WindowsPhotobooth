@@ -140,6 +140,26 @@ adminRouter.delete('/sessions/:slug', (req, res) => {
   return res.json({ ok: true, removed: row.slug });
 });
 
+adminRouter.get('/sessions/:slug/photos/:photoId/file', (req, res) => {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
+  if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });
+  const photo = getDb()
+    .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
+    .get(req.params.photoId, row.id);
+  if (!photo) return res.status(404).json({ ok: false, error: 'Photo not found' });
+  const filePath = path.join(config.photosDir, row.slug, photo.filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ ok: false, error: 'Photo file missing on disk' });
+  }
+  const ext = path.extname(photo.filename) || '.jpg';
+  res.setHeader('Content-Type', photo.mime || 'application/octet-stream');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${photo.variant}-${photo.id}${ext}"`,
+  );
+  return res.sendFile(filePath);
+});
+
 adminRouter.delete('/sessions/:slug/photos/:photoId', (req, res) => {
   const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
   if (!row) return res.status(404).json({ ok: false, error: 'Session not found' });

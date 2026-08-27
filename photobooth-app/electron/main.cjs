@@ -635,6 +635,30 @@ async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
     .toBuffer();
 }
 
+function isPhysicalFrameLayoutPath(filePath) {
+  const base = path.basename(String(filePath || '')).toLowerCase();
+  return /_physical\.(png|jpe?g|webp)$/.test(base);
+}
+
+/**
+ * Flatten the dual-column cut sheet to one 6×4 landscape JPEG.
+ * SELPHY drivers may split a wide PNG into separate prints per column; one postcard raster avoids that.
+ */
+async function preparePhysicalFramePrintRaster(sharpMod, imagePath, dpi = 300) {
+  const pageW = Math.round(6 * dpi);
+  const pageH = Math.round(4 * dpi);
+  const buf = await sharpMod(imagePath)
+    .resize(pageW, pageH, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255 },
+    })
+    .jpeg({ quality: 95, mozjpeg: true })
+    .toBuffer();
+  const tmp = path.join(os.tmpdir(), `pb-physical-print-${Date.now()}.jpg`);
+  fs.writeFileSync(tmp, buf);
+  return tmp;
+}
+
 function escapeXmlText(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -3185,24 +3209,42 @@ ipcMain.handle('gallery:deleteRemoteFrame', async (_e, payload) => {
 
 /** Classify Windows printer driver/port for SELPHY booth use (USB-only UI). */
 function classifyPrinter(driverName, portName, printerName) {
-  const d = String(driverName || '');
-  const p = String(portName || '');
-  const n = String(printerName || '');
+  const d = String(driverName || '').trim();
+  const p = String(portName || '').trim();
+  const n = String(printerName || '').trim();
+  const blob = `${n} ${d} ${p}`;
   const isVirtual =
-    /pdf|xps|onenote|fax|microsoft\s+print\s+to|send\s+to|document\s+writer|onenote|redirect|nul:/i.test(
-      `${n} ${d} ${p}`,
-    ) || /^FILE:|^PORTPROMPT:|^nul:/i.test(p);
+    /pdf|xps|onenote|fax|microsoft\s+print\s+to|send\s+to|document\s+writer|redirect/i.test(blob) ||
+    /^FILE:|^PORTPROMPT:|^nul:|^SHRFAX:/i.test(p);
+  const isNetworkPort =
+    /^\\\\/.test(p) ||
+    /^(IP_|WSD-|WSD_|IPP|HTTP|HTTPS|TCP)/i.test(p) ||
+    /^(WSD|IPP)/i.test(p) ||
+    /https?:/i.test(p);
+  // Only Microsoft IPP / WSD class drivers — NOT Canon "… Class Driver" (real USB SELPHY).
   const isIppClass =
-    /ipp|wsd|microsoft\s+ipp|class\s+driver/i.test(d) ||
-    /ipp|wsd|https?:|\\/i.test(p) ||
-    /^IP_/i.test(p);
-  // Local USB queues: USB001 / DOT4_* (USB parallel-class). Exclude network/share/IPP.
+    /microsoft\s+ipp|ipp\s+class\s+driver/i.test(d) ||
+    (/class\s+driver/i.test(d) && /microsoft|ipp|wsd/i.test(d)) ||
+    (/\bwsd\b/i.test(d) && !/canon|selphy/i.test(d)) ||
+    isNetworkPort;
+  const isCanonDriver = /canon|selphy/i.test(d) && !/microsoft\s+ipp/i.test(d);
+  const isCanonName = /canon|selphy/i.test(n);
+  // USB001, USB002, USB, DOT4_* — strongest signal the SELPHY is on a local cable.
+  const isUsbPort =
+    !!p &&
+    !isNetworkPort &&
+    (/^USB\d*$/i.test(p) ||
+      /^DOT4_/i.test(p) ||
+      (/USB/i.test(p) && !/^\\\\/.test(p)));
+  // USB port always wins over a misleading "class driver" label.
   const isUsb =
-    !isVirtual &&
-    !isIppClass &&
-    (/^USB\d+/i.test(p) || /^DOT4_/i.test(p) || (/USB/i.test(p) && !/^\\\\/.test(p)));
-  const isCanonDriver = /canon|selphy/i.test(d) && !isIppClass;
-  return { isIppClass, isCanonDriver, isUsb, isVirtual };
+    !isVirtual && (isUsbPort || (!isIppClass && !isNetworkPort && (isCanonDriver || isCanonName)));
+  return {
+    isIppClass: isIppClass && !isUsbPort,
+    isCanonDriver: isCanonDriver || (isCanonName && !(isIppClass && !isUsbPort)),
+    isUsb,
+    isVirtual,
+  };
 }
 
 function mapWinPrinter(w) {
@@ -3222,9 +3264,9 @@ function mapWinPrinter(w) {
   };
 }
 
-/** Prefer USB Canon/SELPHY; otherwise any USB queue. */
+/** Prefer USB Canon/SELPHY; otherwise any USB / local Canon queue. */
 function pickBestUsbPrinter(printers) {
-  const usb = (printers || []).filter((p) => p && p.isUsb && !p.isVirtual);
+  const usb = (printers || []).filter((p) => p && p.isUsb && !p.isVirtual && !p.isIppClass);
   if (!usb.length) return null;
   const canon = usb.find((p) => p.isCanonDriver) || usb.find((p) => /canon|selphy/i.test(p.name));
   return canon || usb.find((p) => p.isDefault) || usb[0];
@@ -3251,61 +3293,62 @@ async function listWindowsPrintersDetailed() {
     appendAppLog('warn', 'print', 'Win32_Printer enrich failed', String(e));
   }
 
-  const byName = new Map();
-  for (const w of winDetails) {
-    if (w && w.Name) byName.set(String(w.Name), w);
-  }
-
+  // Win32 is source of truth for PortName (Electron often omits it → false "no USB").
   /** @type {ReturnType<typeof mapWinPrinter>[]} */
-  let printers = [];
+  const printers = winDetails.map(mapWinPrinter);
+  const byName = new Map(printers.map((p) => [p.name.toLowerCase(), p]));
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     try {
       const electronPrinters = await mainWindow.webContents.getPrintersAsync();
-      printers = (electronPrinters || []).map((p) => {
-        const w = byName.get(p.name);
-        const driverName = w ? String(w.DriverName || '') : '';
-        const portName = w ? String(w.PortName || '') : '';
-        const flags = classifyPrinter(driverName, portName, p.name);
-        return {
-          name: p.name,
-          displayName: p.displayName || p.name,
-          description: p.description || driverName || '',
-          isDefault: !!p.isDefault || !!(w && w.Default),
-          status: p.status,
-          driverName,
-          portName,
+      for (const ep of electronPrinters || []) {
+        const key = String(ep.name || '').toLowerCase();
+        const existing = byName.get(key);
+        if (existing) {
+          if (ep.isDefault) existing.isDefault = true;
+          if (ep.displayName) existing.displayName = ep.displayName;
+          if (typeof ep.status === 'number') existing.status = ep.status;
+          continue;
+        }
+        // Electron-only entry with no Win32 row — classify without port (Canon name still helps).
+        const flags = classifyPrinter('', '', ep.name);
+        const row = {
+          name: ep.name,
+          displayName: ep.displayName || ep.name,
+          description: ep.description || '',
+          isDefault: !!ep.isDefault,
+          status: ep.status,
+          driverName: '',
+          portName: '',
           ...flags,
         };
-      });
+        printers.push(row);
+        byName.set(key, row);
+      }
     } catch (e) {
       appendAppLog('warn', 'print', 'getPrintersAsync failed', String(e));
-    }
-  }
-
-  if (!printers.length) {
-    printers = winDetails.map(mapWinPrinter);
-  } else {
-    for (const w of winDetails) {
-      const name = String(w.Name);
-      if (printers.some((p) => p.name === name)) continue;
-      printers.push(mapWinPrinter(w));
     }
   }
 
   return printers;
 }
 
+function boothPrintQueues(all) {
+  return (all || []).filter((p) => p && p.isUsb && !p.isVirtual && !p.isIppClass);
+}
+
 ipcMain.handle('print:listPrinters', async () => {
   try {
     const all = await listWindowsPrintersDetailed();
-    // Booth UI: USB printers only (Canon SELPHY on USB001/DOT4, etc.).
-    const printers = all.filter((p) => p.isUsb && !p.isVirtual);
+    const printers = boothPrintQueues(all);
     return {
       ok: true,
       printers,
       usbCount: printers.length,
       totalCount: all.length,
+      skipped: all
+        .filter((p) => !printers.some((u) => u.name === p.name))
+        .map((p) => ({ name: p.name, portName: p.portName, driverName: p.driverName })),
     };
   } catch (e) {
     appendAppLog('error', 'print', 'listPrinters failed', String(e));
@@ -3317,12 +3360,13 @@ ipcMain.handle('print:listPrinters', async () => {
  * Windows photo print for kiosk / Canon SELPHY CP1500 — postcard 6″×4″ landscape.
  * Prefer the USB (or Canon TCP/IP) queue — Microsoft IPP Wi‑Fi queues print wrong.
  */
-async function printPhotoViaWindowsSpooler(imagePath, printerName, bleedScale = 1.06) {
+async function printPhotoViaWindowsSpooler(imagePath, printerName, bleedScale = 1.06, options = {}) {
   const abs = path.resolve(imagePath);
   if (!fs.existsSync(abs)) {
     throw new Error('Photo file not found.');
   }
   const bleed = Math.min(1.12, Math.max(1.0, Number(bleedScale) || 1.06));
+  const fitMode = options.fitMode === 'contain' ? 'contain' : 'cover';
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-spool-'));
   const ps1 = path.join(tmpDir, 'photoprint.ps1');
   const script = `
@@ -3331,6 +3375,7 @@ Add-Type -AssemblyName System.Drawing
 $imgPath = ${psQuote(abs)}
 $printerName = ${printerName ? psQuote(printerName) : "''"}
 $bleed = ${bleed}
+$fitMode = ${psQuote(fitMode)}
 $img = [System.Drawing.Image]::FromFile($imgPath)
 try {
   $doc = New-Object System.Drawing.Printing.PrintDocument
@@ -3387,6 +3432,7 @@ try {
   $script:pbImg = $img
   $script:paperName = $chosenPaper.PaperName
   $script:bleed = $bleed
+  $script:fitMode = $fitMode
   $doc.add_PrintPage({
     param($sender, $e)
     # Use full physical page; overscan kills thin white borders on SELPHY USB
@@ -3394,7 +3440,11 @@ try {
     $iw = [double]$script:pbImg.Width
     $ih = [double]$script:pbImg.Height
     if ($iw -le 0 -or $ih -le 0) { throw 'Image has zero size' }
-    $scale = [Math]::Max(($page.Width / $iw), ($page.Height / $ih)) * [double]$script:bleed
+    if ($script:fitMode -eq 'contain') {
+      $scale = [Math]::Min(($page.Width / $iw), ($page.Height / $ih)) * [double]$script:bleed
+    } else {
+      $scale = [Math]::Max(($page.Width / $iw), ($page.Height / $ih)) * [double]$script:bleed
+    }
     $w = [int]([Math]::Ceiling($iw * $scale))
     $h = [int]([Math]::Ceiling($ih * $scale))
     $x = $page.X + [int]([Math]::Floor(($page.Width - $w) / 2.0))
@@ -3462,6 +3512,56 @@ try {
 /**
  * One-shot photo print of the original capture file (DSLR → SELPHY postcard).
  */
+async function resolveBoothPrinter(preferredName) {
+  const all = await listWindowsPrintersDetailed();
+  const usbList = boothPrintQueues(all);
+  if (!usbList.length) {
+    const seen = all
+      .slice(0, 8)
+      .map((p) => `${p.name} [${p.portName || 'no-port'}]`)
+      .join('; ');
+    return {
+      ok: false,
+      error: seen
+        ? `No USB/Canon SELPHY queue found. Windows sees: ${seen}. Plug SELPHY in by USB and install the Canon driver.`
+        : 'No USB printer found. Plug in the Canon SELPHY by USB, wait for Windows to install it, then try again.',
+      all,
+      usbList,
+    };
+  }
+
+  const preferred =
+    typeof preferredName === 'string' && preferredName.trim() ? preferredName.trim() : null;
+  let chosen = preferred;
+  const preferredMeta = preferred ? all.find((p) => p.name === preferred) : null;
+  if (
+    !preferredMeta ||
+    !preferredMeta.isUsb ||
+    preferredMeta.isVirtual ||
+    preferredMeta.isIppClass
+  ) {
+    const auto = pickBestUsbPrinter(usbList);
+    if (!auto) {
+      return { ok: false, error: 'No usable USB printer queue found.', all, usbList };
+    }
+    chosen = auto.name;
+    if (preferred && preferred !== chosen) {
+      appendAppLog('warn', 'print', 'redirected print to USB printer', {
+        requested: preferred,
+        used: chosen,
+        reason: preferredMeta
+          ? preferredMeta.isIppClass
+            ? 'ipp'
+            : preferredMeta.isVirtual
+              ? 'virtual'
+              : 'not-usb'
+          : 'missing',
+      });
+    }
+  }
+  return { ok: true, chosen, all, usbList };
+}
+
 ipcMain.handle('print:photo', async (_e, payload) => {
   try {
     const filePath = String(payload?.filePath || '').trim();
@@ -3474,7 +3574,7 @@ ipcMain.handle('print:photo', async (_e, payload) => {
     }
     const cfg = loadMergedConfig();
     const printCfg = cfg.print || {};
-    if (printCfg.enabled !== true) {
+    if (!(printCfg.enabled === true || printCfg.enabled === 'true' || printCfg.enabled === 1)) {
       return { ok: false, error: 'Printing is disabled in Admin → Print.' };
     }
     const bleedScale =
@@ -3487,62 +3587,122 @@ ipcMain.handle('print:photo', async (_e, payload) => {
       return { ok: false, error: 'Photo printing is only supported on Windows.' };
     }
 
-    const all = await listWindowsPrintersDetailed();
-    const usbList = all.filter((p) => p.isUsb && !p.isVirtual);
-    if (!usbList.length) {
-      return {
-        ok: false,
-        error:
-          'No USB printer found. Plug in the Canon SELPHY by USB, wait for Windows to install it, then try again.',
-      };
-    }
-
     const preferred =
       deviceName ||
       (typeof printCfg.printerName === 'string' && printCfg.printerName.trim()
         ? printCfg.printerName.trim()
         : null);
+    const resolved = await resolveBoothPrinter(preferred);
+    if (!resolved.ok) return { ok: false, error: resolved.error };
 
-    let chosen = preferred;
-    const preferredMeta = preferred ? all.find((p) => p.name === preferred) : null;
-    // Never send booth prints to IPP / PDF / Wi‑Fi — force a USB queue.
-    if (!preferredMeta || !preferredMeta.isUsb || preferredMeta.isVirtual || preferredMeta.isIppClass) {
-      const auto = pickBestUsbPrinter(usbList);
-      if (!auto) {
-        return { ok: false, error: 'No usable USB printer queue found.' };
+    const physicalLayout =
+      payload?.layoutMode === 'physicalFrame' || isPhysicalFrameLayoutPath(abs);
+    let printPath = abs;
+    let printTmp = null;
+    if (physicalLayout) {
+      let sharpMod;
+      try {
+        sharpMod = require('sharp');
+      } catch (_dep) {
+        return { ok: false, error: 'Physical frame print requires sharp.' };
       }
-      chosen = auto.name;
-      if (preferred && preferred !== chosen) {
-        appendAppLog('warn', 'print', 'redirected print to USB printer', {
-          requested: preferred,
-          used: chosen,
-          reason: preferredMeta
-            ? preferredMeta.isIppClass
-              ? 'ipp'
-              : preferredMeta.isVirtual
-                ? 'virtual'
-                : 'not-usb'
-            : 'missing',
-        });
-      }
+      printTmp = await preparePhysicalFramePrintRaster(
+        sharpMod,
+        abs,
+        Math.round(Number(loadMergedConfig()?.physicalFrame?.dpi) || 300),
+      );
+      printPath = printTmp;
+      appendAppLog('info', 'print', 'physical layout flattened for single spool', {
+        source: abs,
+        raster: printPath,
+      });
     }
 
-    const result = await printPhotoViaWindowsSpooler(abs, chosen, bleedScale);
-    appendAppLog('info', 'print', 'photoprint spooled', {
-      filePath: abs,
-      bytes: fs.statSync(abs).size,
-      deviceName: result.printer || chosen || 'default',
-      paper: result.paper || null,
-      bleed: result.bleed || bleedScale,
-    });
-    return {
-      ok: true,
-      deviceName: result.printer || chosen || null,
-      paper: result.paper || null,
-    };
+    try {
+      const result = await printPhotoViaWindowsSpooler(printPath, resolved.chosen, bleedScale, {
+        fitMode: physicalLayout ? 'contain' : 'cover',
+      });
+      appendAppLog('info', 'print', 'photoprint spooled', {
+        filePath: abs,
+        printPath,
+        physicalLayout,
+        bytes: fs.statSync(printPath).size,
+        deviceName: result.printer || resolved.chosen || 'default',
+        paper: result.paper || null,
+        bleed: result.bleed || bleedScale,
+      });
+      return {
+        ok: true,
+        deviceName: result.printer || resolved.chosen || null,
+        paper: result.paper || null,
+      };
+    } finally {
+      if (printTmp) {
+        try {
+          fs.unlinkSync(printTmp);
+        } catch (_) {}
+      }
+    }
   } catch (e) {
     const msg = String(e?.message || e);
     appendAppLog('error', 'print', 'print:photo failed', msg);
     return { ok: false, error: msg.replace(/\s+/g, ' ').trim().slice(0, 400) };
+  }
+});
+
+/** Admin test print — solid 6×4 JPEG to verify SELPHY USB path. */
+ipcMain.handle('print:test', async () => {
+  let tmp = null;
+  try {
+    if (process.platform !== 'win32') {
+      return { ok: false, error: 'Photo printing is only supported on Windows.' };
+    }
+    const cfg = loadMergedConfig();
+    const printCfg = cfg.print || {};
+    const preferred =
+      typeof printCfg.printerName === 'string' && printCfg.printerName.trim()
+        ? printCfg.printerName.trim()
+        : null;
+    const resolved = await resolveBoothPrinter(preferred);
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+
+    const sharp = require('sharp');
+    tmp = path.join(os.tmpdir(), `pb-print-test-${Date.now()}.jpg`);
+    // 1800×1200 ≈ 6×4 @ 300dpi
+    await sharp({
+      create: {
+        width: 1800,
+        height: 1200,
+        channels: 3,
+        background: { r: 34, g: 90, b: 56 },
+      },
+    })
+      .jpeg({ quality: 92 })
+      .toFile(tmp);
+
+    const bleedScale =
+      typeof printCfg.bleedScale === 'number' && Number.isFinite(printCfg.bleedScale)
+        ? printCfg.bleedScale
+        : 1.06;
+    const result = await printPhotoViaWindowsSpooler(tmp, resolved.chosen, bleedScale);
+    appendAppLog('info', 'print', 'test print spooled', {
+      deviceName: result.printer || resolved.chosen,
+      paper: result.paper || null,
+    });
+    return {
+      ok: true,
+      deviceName: result.printer || resolved.chosen || null,
+      paper: result.paper || null,
+    };
+  } catch (e) {
+    const msg = String(e?.message || e);
+    appendAppLog('error', 'print', 'print:test failed', msg);
+    return { ok: false, error: msg.replace(/\s+/g, ' ').trim().slice(0, 400) };
+  } finally {
+    if (tmp) {
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch (_) {}
+    }
   }
 });

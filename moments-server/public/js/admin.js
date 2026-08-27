@@ -235,6 +235,46 @@ async function refreshAlbums() {
   }
 }
 
+async function downloadAdminPhoto(slug, photo) {
+  if (!photo?.id) return;
+  setStatus('Downloading…');
+  try {
+    const res = await fetch(
+      `/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photo.id)}/file`,
+      { headers: { 'X-Admin-Pin': pin() } },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || res.statusText || 'Download failed');
+    }
+    const blob = await res.blob();
+    const ext =
+      photo.url?.match(/\.(jpe?g|png|webp)/i)?.[0] ||
+      (photo.mime?.includes('png') ? '.png' : photo.mime?.includes('webp') ? '.webp' : '.jpg');
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj;
+    a.download = `${photo.variant || 'photo'}-${photo.id}${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(obj), 1500);
+    setStatus('Download started.');
+  } catch (e) {
+    setStatus(`Download failed: ${e.message || e}`);
+  }
+}
+
+function sharePageHref(slug, photo) {
+  const path =
+    photo?.sharePath ||
+    (slug && photo?.id
+      ? `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photo.id)}`
+      : null);
+  if (!path) return '#';
+  return `${window.location.origin}${path}`;
+}
+
 async function refreshPhotos() {
   if (!photoAlbum.value) {
     if (albumsCache[0]) photoAlbum.value = albumsCache[0].slug;
@@ -257,6 +297,7 @@ async function refreshPhotos() {
   for (const p of photos) {
     const card = document.createElement('article');
     card.className = 'photo-admin-card';
+    const shareHref = sharePageHref(slug, p);
     card.innerHTML = `
       <label class="photo-select">
         <input type="checkbox" class="photo-check" data-id="${p.id}" />
@@ -266,8 +307,11 @@ async function refreshPhotos() {
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
         <code style="font-size:0.68rem;word-break:break-all">${p.id}</code>
-        <a class="btn ghost" href="${p.shareUrl}" target="_blank" rel="noopener">Open</a>
-        <button type="button" class="btn ghost delete">Delete photo</button>
+        <div class="photo-admin-actions">
+          <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener">Open</a>
+          <button type="button" class="btn ghost delete">Delete</button>
+          <button type="button" class="btn ghost download">Download</button>
+        </div>
       </div>
     `;
     const check = card.querySelector('.photo-check');
@@ -280,6 +324,9 @@ async function refreshPhotos() {
         card.classList.remove('is-selected');
       }
       updatePhotoSelectionUi();
+    });
+    card.querySelector('.download')?.addEventListener('click', () => {
+      void downloadAdminPhoto(slug, p);
     });
     card.querySelector('.delete').addEventListener('click', async () => {
       if (!confirm('Delete this photo from the album?')) return;

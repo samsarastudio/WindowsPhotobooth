@@ -296,7 +296,10 @@ export interface PbApi {
   printPhoto(payload: {
     filePath: string;
     deviceName?: string | null;
+    /** Dual-column physical frame cut sheet — one postcard with both photos. */
+    layoutMode?: 'physicalFrame';
   }): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;
+  printTest(): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;
 }
 
 declare global {

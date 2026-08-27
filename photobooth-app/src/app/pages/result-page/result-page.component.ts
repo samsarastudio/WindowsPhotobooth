@@ -266,6 +266,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       const r = await window.pbApi.printPhoto({
         filePath: pp,
         deviceName: deviceName || undefined,
+        layoutMode: this.boothMode.isPhysicalFrameMode() ? 'physicalFrame' : undefined,
       });
       if (!r.ok) {
         this.printErr.set(r.error ?? 'Print failed.');

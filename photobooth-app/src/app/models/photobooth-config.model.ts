@@ -500,7 +500,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     defaultLabel: 'Digital frame',
     defaultHint: 'Photo with frames and styles',
     physicalLabel: 'Physical frame',
-    physicalHint: 'Two prints to cut for a photo frame',
+    physicalHint: 'One dual-photo sheet — print once, then cut for your frame',
     back: 'Back',
   },
   frame: {

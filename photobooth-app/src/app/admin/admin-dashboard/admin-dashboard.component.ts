@@ -642,6 +642,39 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
+  async testPrint(): Promise<void> {
+    if (!window.pbApi?.printTest) {
+      this.status.set('Test print requires Electron.');
+      return;
+    }
+    this.busy.set(true);
+    this.status.set('Sending test print…');
+    try {
+      // Persist current draft first so Auto / selected queue matches what we test.
+      await this.booth.save({
+        print: {
+          enabled: true,
+          printerName: this.draftPrint.printerName?.trim() || null,
+          bleedScale: this.draftPrint.bleedScale ?? 1.06,
+        },
+      });
+      this.draftPrint.enabled = true;
+      this.syncFromService();
+      const r = await window.pbApi.printTest();
+      if (r.ok) {
+        this.status.set(
+          `Test print sent${r.deviceName ? ` → ${r.deviceName}` : ''}${r.paper ? ` (${r.paper})` : ''}.`,
+        );
+      } else {
+        this.status.set(r.error || 'Test print failed.');
+      }
+    } catch (e) {
+      this.status.set(String(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   async uploadPhotoFrame(): Promise<void> {
     if (!window.pbApi?.adminPickPhotoFrameImage || !window.pbApi.adminInstallPhotoFrame) {
       this.status.set('Frame upload requires Electron.');
