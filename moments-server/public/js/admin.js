@@ -317,7 +317,7 @@ async function refreshPhotos() {
       ${
         missing
           ? `<div class="photo-missing" title="DB row exists but file is gone from disk">File missing</div>`
-          : `<img src="${p.url}" alt="" loading="lazy" />`
+          : `<img src="${p.url}" alt="" loading="lazy" data-photo-id="${p.id}" />`
       }
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
@@ -330,6 +330,29 @@ async function refreshPhotos() {
         </div>
       </div>
     `;
+    const thumb = card.querySelector('img[data-photo-id]');
+    if (thumb) {
+      thumb.addEventListener('error', () => {
+        card.classList.add('is-missing-file');
+        const wrap = document.createElement('div');
+        wrap.className = 'photo-missing';
+        wrap.title = 'Image failed to load — file missing or unreadable on disk';
+        wrap.textContent = 'File missing';
+        thumb.replaceWith(wrap);
+        const actions = card.querySelector('.photo-admin-actions');
+        const dl = actions?.querySelector('.download');
+        if (dl) dl.disabled = true;
+        const meta = card.querySelector('.meta-block');
+        if (meta && !meta.querySelector('.badge-warn')) {
+          const warn = document.createElement('span');
+          warn.className = 'badge badge-warn';
+          warn.textContent = 'missing on disk';
+          const firstBadge = meta.querySelector('.badge');
+          if (firstBadge) firstBadge.after(warn);
+          else meta.prepend(warn);
+        }
+      });
+    }
     const check = card.querySelector('.photo-check');
     check?.addEventListener('change', () => {
       if (check.checked) {
