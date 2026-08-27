@@ -168,6 +168,12 @@ export interface PbApi {
   }): Promise<{ ok: boolean; path?: string; frameFile?: string; error?: string }>;
   applyPhysicalFrameLayout(payload: {
     imagePath: string;
+    cellWidthCm?: number;
+    cellHeightCm?: number;
+    innerPaddingMm?: number;
+    gapMm?: number;
+    marginMm?: number;
+    borderEnabled?: boolean;
     cellWidthIn?: number;
     cellHeightIn?: number;
     gapIn?: number;

@@ -70,6 +70,8 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   readonly logFilePath = signal<string | null>(null);
   readonly hint = signal<string | null>(null);
   readonly countdown = signal<number | null>(null);
+  /** True from shutter through frame/layout processing — hides stale preview frames. */
+  readonly capturing = signal(false);
   /** Width ÷ height — frame hugs preview pixels without letterboxing when known. */
   readonly previewAspectRatio = signal<number | null>(null);
   /** Placeholder while SDK boots or before webcam stream is attached. */
@@ -195,7 +197,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private applyPreviewResult(res: PbCameraResult): void {
-    if (!res.ok) return;
+    if (!res.ok || this.capturing()) return;
     const v = ++this.previewFrameSeq;
     let raw: string | null = null;
     if (res.previewFileUrl) {
@@ -356,6 +358,16 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     this.countdown.set(null);
   }
 
+  private resetPreviewBuffers(): void {
+    this.sdkPreviewUrl0.set(this.emptyPreviewSrc);
+    this.sdkPreviewUrl1.set(this.emptyPreviewSrc);
+    this.sdkPreviewActiveLayer.set(0);
+    this.sdkPreviewHasFrame.set(false);
+    this.pendingReveal = null;
+    this.previewFrameSeq = 0;
+    this.layerSeq = [0, 0];
+  }
+
   private startCountdown(): void {
     this.clearCountdown();
     let n = 5;
@@ -365,6 +377,8 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       if (n <= 0) {
         if (this.countdownTimer) clearInterval(this.countdownTimer);
         this.countdown.set(0);
+        this.capturing.set(true);
+        this.resetPreviewBuffers();
         void this.captureShot();
       } else {
         this.countdown.set(n);
@@ -381,7 +395,9 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async captureShot(): Promise<void> {
+    this.capturing.set(true);
     this.clearCountdown();
+    this.resetPreviewBuffers();
     if (this.previewTimer) {
       clearInterval(this.previewTimer);
       this.previewTimer = undefined;
@@ -402,6 +418,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       } else {
         this.hint.set('Could not grab a frame — waiting for camera…');
         this.cameraReady.set(false);
+        this.capturing.set(false);
         this.watchForPreviewReady();
       }
       return;
@@ -414,6 +431,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       return;
     }
     this.hint.set(`Capture failed (${res.msg ?? res.err}).`);
+    this.capturing.set(false);
     if (!this.previewTimer) {
       this.startSdkPreview();
     }

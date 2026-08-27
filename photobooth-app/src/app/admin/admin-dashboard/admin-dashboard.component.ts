@@ -544,6 +544,29 @@ export class AdminDashboardComponent implements OnInit {
     return `${prefix}-${y}-${m}-${day}`;
   }
 
+  /** Cut-sheet width in cm (two cells + gap + margins). */
+  physicalSheetWidthCm(): number {
+    const pf = this.draftPhysicalFrame;
+    return pf.cellWidthCm * 2 + pf.gapMm / 10 + (pf.marginMm * 2) / 10;
+  }
+
+  physicalSheetHeightCm(): number {
+    const pf = this.draftPhysicalFrame;
+    return pf.cellHeightCm + (pf.marginMm * 2) / 10;
+  }
+
+  physicalSheetPixelW(): number {
+    const pf = this.draftPhysicalFrame;
+    const dpi = pf.dpi || 300;
+    return Math.round((this.physicalSheetWidthCm() / 2.54) * dpi);
+  }
+
+  physicalSheetPixelH(): number {
+    const pf = this.draftPhysicalFrame;
+    const dpi = pf.dpi || 300;
+    return Math.round((this.physicalSheetHeightCm() / 2.54) * dpi);
+  }
+
   todayGalleryUrl(): string {
     const base = (this.draftGallery.apiBaseUrl || '').replace(/\/$/, '');
     return base ? `${base}/${this.todayGallerySlug()}` : '';
@@ -844,16 +867,21 @@ export class AdminDashboardComponent implements OnInit {
     const r = await window.pbApi.gallerySyncFrames({
       apiBaseUrl: creds.apiBaseUrl,
       uploadToken: creds.uploadToken || undefined,
-      pushLocal: false,
+      pushLocal: !!creds.uploadToken,
       pruneLocal: true,
       timeoutMs: 20000,
     });
     if (!quiet) {
       if (r.ok) {
         const pruned = r.prunedCount ?? r.pruned?.length ?? 0;
+        const published = r.publishedCount ?? r.published?.length ?? 0;
+        const failHint =
+          r.failed?.length && r.failed[0]
+            ? ` — ${r.failed[0].filename}: ${r.failed[0].error || 'failed'}`
+            : '';
         this.status.set(
-          `Synced with Moments: pulled ${r.count ?? 0}, already current ${r.skippedCount ?? 0}, removed ${pruned} local` +
-            (r.failed?.length ? ` (${r.failed.length} failed)` : '') +
+          `Synced with Moments: pulled ${r.count ?? 0}, published ${published}, already current ${r.skippedCount ?? 0}, removed ${pruned} local` +
+            (r.failed?.length ? ` (${r.failed.length} failed${failHint})` : '') +
             '.',
         );
       } else if (r.offline) {

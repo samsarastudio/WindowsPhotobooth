@@ -54,6 +54,8 @@ export interface PhotoboothCopyCapture {
   footerHint: string;
   /** Small line under countdown (e.g. Smile — capturing soon). */
   smileHint: string;
+  /** Shown on preview while shutter / frame processing runs. */
+  capturing: string;
 }
 
 export interface PhotoboothCopyResult {
@@ -112,7 +114,7 @@ export interface PhotoboothGalleryConfig {
 export const PHOTOBOOTH_DEFAULT_GALLERY: PhotoboothGalleryConfig = {
   enabled: true,
   apiBaseUrl: 'https://moments.inmomentservices.com',
-  uploadToken: 'd242f34d06615494f68726947dcf3e416a0faa5a1711792723af1860dffdc008',
+  uploadToken: '26bdcbbb413c1063f472b95cc2f75ab5137f28a9cdd8c7d5',
   sessionPrefix: 'onam',
   uploadOriginal: true,
   uploadFramed: true,
@@ -334,29 +336,35 @@ export const PHOTOBOOTH_DEFAULT_GUEST_MODES: PhotoboothGuestModesConfig = {
 /**
  * Dual cut-sheet for physical photo frames.
  * Landscape capture is rotated 90°, then placed twice in portrait cells (columns).
- * Sizes are inches at `dpi` (default 300).
+ * Cell size in cm; padding/gap/margin in mm; rasterized at `dpi` (default 300).
  */
 export interface PhotoboothPhysicalFrameConfig {
-  /** Width of each cut cell (inches). */
-  cellWidthIn: number;
-  /** Height of each cut cell (inches). */
-  cellHeightIn: number;
-  /** Gap between the two columns (inches). */
-  gapIn: number;
-  /** Outer margin around the sheet (inches). */
-  marginIn: number;
+  /** Width of each cut cell (cm). */
+  cellWidthCm: number;
+  /** Height of each cut cell (cm). */
+  cellHeightCm: number;
+  /** White inset between cell edge and decorative border (mm). Photo sits inside border. */
+  innerPaddingMm: number;
+  /** Gap between the two columns (mm). */
+  gapMm: number;
+  /** Outer margin around the sheet (mm). */
+  marginMm: number;
   dpi: number;
   /** Rotate landscape capture before fitting into each cell (90 or -90). */
   rotateDegrees: 90 | -90;
+  /** Draw thin double-line border with corner accents inside each cell. */
+  borderEnabled: boolean;
 }
 
 export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = {
-  cellWidthIn: 5.8,
-  cellHeightIn: 8.8,
-  gapIn: 0.25,
-  marginIn: 0.25,
+  cellWidthCm: 5.5,
+  cellHeightCm: 7.6,
+  innerPaddingMm: 3,
+  gapMm: 2,
+  marginMm: 2,
   dpi: 300,
   rotateDegrees: 90,
+  borderEnabled: true,
 };
 
 /** Fields returned to the renderer (admin PIN and OpenAI API key are never included). */
@@ -454,6 +462,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     readySubtitle: 'Center yourself in the frame. Your photo begins in…',
     footerHint: 'Look at the camera and hold still.',
     smileHint: 'Smile — capturing soon',
+    capturing: 'Capturing…',
   },
   result: {
     title: 'Your photo',

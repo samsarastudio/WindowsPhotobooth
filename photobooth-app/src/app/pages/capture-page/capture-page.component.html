@@ -14,8 +14,10 @@
         [class.pb-preview-wrap--empty]="showPreviewPlaceholder() || cameraFailed()"
         [style.--preview-ar]="previewAspectRatio() ?? 1.5"
       >
-        @if (showPreviewPlaceholder()) {
-          <div class="pb-preview pb-preview-placeholder">{{ copy().capture.starting }}</div>
+        @if (showPreviewPlaceholder() || capturing()) {
+          <div class="pb-preview pb-preview-placeholder">{{
+            capturing() ? copy().capture.capturing : copy().capture.starting
+          }}</div>
         } @else if (cameraFailed()) {
           <div class="pb-preview pb-preview-placeholder pb-preview-placeholder--error">
             Camera needed

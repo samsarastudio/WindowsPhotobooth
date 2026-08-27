@@ -104,6 +104,25 @@ export class GalleryUploadService implements OnDestroy {
     this.revision.update((n) => n + 1);
   }
 
+  /** Rewrite Pi localhost share links using Admin → Gallery API base URL. */
+  private normalizeShareUrl(shareUrl: string | undefined): string | undefined {
+    if (!shareUrl) return shareUrl;
+    const base = (this.booth.gallery().apiBaseUrl || '').replace(/\/$/, '');
+    if (!base) return shareUrl;
+    try {
+      const u = new URL(shareUrl);
+      if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
+        const b = new URL(base);
+        u.protocol = b.protocol;
+        u.host = b.host;
+        return u.toString();
+      }
+    } catch {
+      /* keep original */
+    }
+    return shareUrl;
+  }
+
   recordFor(path: string | null | undefined): GalleryUploadRecord | null {
     void this.revision();
     if (!path) return null;
@@ -112,7 +131,8 @@ export class GalleryUploadService implements OnDestroy {
 
   shareUrlFor(path: string | null | undefined): string | null {
     const r = this.recordFor(path);
-    return r?.status === 'ok' && r.shareUrl ? r.shareUrl : null;
+    const url = r?.status === 'ok' && r.shareUrl ? r.shareUrl : null;
+    return url ? this.normalizeShareUrl(url) ?? null : null;
   }
 
   clearGuestSession(): void {
@@ -175,7 +195,7 @@ export class GalleryUploadService implements OnDestroy {
       variant: (item.variant as GalleryPhotoVariant) || this.inferVariant(item.filePath),
       status,
       photoId: item.photoId,
-      shareUrl: item.shareUrl,
+      shareUrl: this.normalizeShareUrl(item.shareUrl),
       url: item.url,
       error: item.error,
     };
@@ -233,7 +253,7 @@ export class GalleryUploadService implements OnDestroy {
           variant,
           status: 'ok',
           photoId: r.photoId,
-          shareUrl: r.shareUrl,
+          shareUrl: this.normalizeShareUrl(r.shareUrl),
           url: r.url,
         }
       : r.queued || r.status === 'queued' || r.status === 'pending'

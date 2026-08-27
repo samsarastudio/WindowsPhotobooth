@@ -595,54 +595,66 @@
           </label>
 
           @if (draftGuestModes.physicalFrameEnabled) {
-            <h3 class="pb-admin-subhead">Physical cut-sheet layout (inches at DPI)</h3>
+            <h3 class="pb-admin-subhead">Physical cut-sheet layout (cm / mm at DPI)</h3>
             <p class="pb-hint pb-hint-tight">
-              Defaults: each cell <strong>5.8 × 8.8</strong> (portrait), two columns, white padding.
-              Capture should be landscape; the app rotates before fitting.
+              Each cell defaults to <strong>5.5 × 7.6 cm</strong> (portrait) with
+              <strong>3 mm</strong> white inset and a thin gold border; photo is scaled inside the border.
+              Capture stays landscape — the app rotates before fitting. Prints on one 6×4 sheet (scaled to fit).
             </p>
             <div class="pb-row pb-row-wrap">
               <label>
-                Cell width (in)
+                Cell width (cm)
                 <input
                   class="pb-input"
                   type="number"
-                  min="1"
-                  max="20"
+                  min="3"
+                  max="12"
                   step="0.1"
-                  [(ngModel)]="draftPhysicalFrame.cellWidthIn"
+                  [(ngModel)]="draftPhysicalFrame.cellWidthCm"
                 />
               </label>
               <label>
-                Cell height (in)
+                Cell height (cm)
                 <input
                   class="pb-input"
                   type="number"
-                  min="1"
-                  max="24"
+                  min="4"
+                  max="15"
                   step="0.1"
-                  [(ngModel)]="draftPhysicalFrame.cellHeightIn"
+                  [(ngModel)]="draftPhysicalFrame.cellHeightCm"
                 />
               </label>
               <label>
-                Column gap (in)
+                Photo inset (mm)
                 <input
                   class="pb-input"
                   type="number"
                   min="0"
-                  max="2"
-                  step="0.05"
-                  [(ngModel)]="draftPhysicalFrame.gapIn"
+                  max="12"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.innerPaddingMm"
                 />
               </label>
               <label>
-                Outer margin (in)
+                Column gap (mm)
                 <input
                   class="pb-input"
                   type="number"
                   min="0"
-                  max="2"
-                  step="0.05"
-                  [(ngModel)]="draftPhysicalFrame.marginIn"
+                  max="15"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.gapMm"
+                />
+              </label>
+              <label>
+                Sheet margin (mm)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="15"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.marginMm"
                 />
               </label>
               <label>
@@ -664,18 +676,18 @@
                 </select>
               </label>
             </div>
+            <label class="pb-admin-check">
+              <input type="checkbox" [(ngModel)]="draftPhysicalFrame.borderEnabled" />
+              Thin decorative border (double gold line + corner accents)
+            </label>
             <p class="pb-hint pb-hint-tight">
               Sheet size ≈
-              {{
-                (
-                  draftPhysicalFrame.marginIn * 2 +
-                  draftPhysicalFrame.cellWidthIn * 2 +
-                  draftPhysicalFrame.gapIn
-                ).toFixed(2)
-              }}
+              {{ physicalSheetWidthCm().toFixed(2) }}
               ×
-              {{ (draftPhysicalFrame.marginIn * 2 + draftPhysicalFrame.cellHeightIn).toFixed(2) }}
-              in. Use a printer/paper that can hold that for clean cuts (SELPHY 6×4 will crop).
+              {{ physicalSheetHeightCm().toFixed(2) }}
+              cm · file ≈
+              {{ physicalSheetPixelW() }}×{{ physicalSheetPixelH() }} px at
+              {{ draftPhysicalFrame.dpi }} DPI. SELPHY 6×4 scales this to fit one print.
             </p>
           }
 

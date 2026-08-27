@@ -300,19 +300,49 @@ function normalizeGuestModesConfig(
   return { ...base };
 }
 
+/** Legacy inch keys from configs saved before cm/mm migration. */
+function migratePhysicalFramePatch(
+  patch: Partial<PhotoboothPhysicalFrameConfig> & Record<string, unknown>,
+): Partial<PhotoboothPhysicalFrameConfig> {
+  const legacy = patch as Record<string, unknown>;
+  const out: Partial<PhotoboothPhysicalFrameConfig> = { ...patch };
+  if (out.cellWidthCm == null && legacy['cellWidthIn'] != null) {
+    out.cellWidthCm = Number(legacy['cellWidthIn']) * 2.54;
+  }
+  if (out.cellHeightCm == null && legacy['cellHeightIn'] != null) {
+    out.cellHeightCm = Number(legacy['cellHeightIn']) * 2.54;
+  }
+  if (out.gapMm == null && legacy['gapIn'] != null) {
+    out.gapMm = Number(legacy['gapIn']) * 25.4;
+  }
+  if (out.marginMm == null && legacy['marginIn'] != null) {
+    out.marginMm = Number(legacy['marginIn']) * 25.4;
+  }
+  if (out.innerPaddingMm == null) {
+    out.innerPaddingMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.innerPaddingMm;
+  }
+  if (out.borderEnabled == null) {
+    out.borderEnabled = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.borderEnabled;
+  }
+  return out;
+}
+
 function normalizePhysicalFrameConfig(
   patch?: Partial<PhotoboothPhysicalFrameConfig> | null,
 ): PhotoboothPhysicalFrameConfig {
   const base = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME;
   if (!patch) return { ...base };
-  const rot = Number(patch.rotateDegrees);
+  const p = migratePhysicalFramePatch(patch as Partial<PhotoboothPhysicalFrameConfig> & Record<string, unknown>);
+  const rot = Number(p.rotateDegrees);
   return {
-    cellWidthIn: clampRange(patch.cellWidthIn, 1, 20, base.cellWidthIn),
-    cellHeightIn: clampRange(patch.cellHeightIn, 1, 24, base.cellHeightIn),
-    gapIn: clampRange(patch.gapIn, 0, 2, base.gapIn),
-    marginIn: clampRange(patch.marginIn, 0, 2, base.marginIn),
-    dpi: Math.round(clampRange(patch.dpi, 72, 600, base.dpi)),
+    cellWidthCm: clampRange(p.cellWidthCm, 3, 12, base.cellWidthCm),
+    cellHeightCm: clampRange(p.cellHeightCm, 4, 15, base.cellHeightCm),
+    innerPaddingMm: clampRange(p.innerPaddingMm, 0, 12, base.innerPaddingMm),
+    gapMm: clampRange(p.gapMm, 0, 15, base.gapMm),
+    marginMm: clampRange(p.marginMm, 0, 15, base.marginMm),
+    dpi: Math.round(clampRange(p.dpi, 72, 600, base.dpi)),
     rotateDegrees: rot === -90 ? -90 : 90,
+    borderEnabled: typeof p.borderEnabled === 'boolean' ? p.borderEnabled : base.borderEnabled,
   };
 }
 

@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import QRCode from 'qrcode';
 import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
@@ -74,6 +75,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   private aiTimer?: ReturnType<typeof setInterval>;
   private sharePoll?: ReturnType<typeof setInterval>;
+  private navSub?: { unsubscribe(): void };
 
   readonly showAiSection = computed(() => {
     if (!this.booth.aiGenerationEnabled()) return false;
@@ -106,16 +108,32 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   async ngOnInit(): Promise<void> {
-    if (!this.path()) {
-      const st = history.state as { path?: string };
-      if (st?.path) {
-        this.path.set(st.path);
-      }
-    }
-    const pp = this.path();
+    this.navSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(() => {
+        if (this.router.url.includes('/result')) {
+          void this.loadPhotoFromRoute();
+        }
+      });
+    await this.loadPhotoFromRoute();
+  }
+
+  private async loadPhotoFromRoute(): Promise<void> {
+    const nav = this.router.getCurrentNavigation();
+    const fromNav = (nav?.extras?.state as { path?: string } | undefined)?.path;
+    const fromHistory = (history.state as { path?: string } | undefined)?.path;
+    const pp = fromNav || fromHistory || this.path();
     if (!pp) {
       this.err.set('No image path — go back and capture again.');
+      this.imageDataUrl.set(null);
       return;
+    }
+    if (pp !== this.path()) {
+      this.path.set(pp);
+      this.imageDataUrl.set(null);
+      this.resultAspectRatio.set(null);
+      this.shareOpen.set(false);
+      this.shareQrDataUrl.set(null);
     }
     if (!window.pbApi?.readFileBase64) {
       this.err.set('Preview needs Electron.');
@@ -123,45 +141,54 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     }
     try {
       const url = await window.pbApi.readFileBase64(pp);
+      if (this.path() !== pp) return;
       this.imageDataUrl.set(url);
+      this.err.set(null);
     } catch (e) {
       this.err.set(String(e));
     }
 
-    // Physical-frame cut sheets stay local — do not upload to Moments / wall.
-    if (this.galleryUpload.enabled() && !this.boothMode.isPhysicalFrameMode()) {
-      void this.galleryUpload.ensureShareUpload(pp);
-      let ticks = 0;
-      this.sharePoll = setInterval(() => {
-        ticks += 1;
-        void this.galleryUpload.recordFor(this.path());
-        if (this.canShare() && this.sharePoll) {
-          clearInterval(this.sharePoll);
-          this.sharePoll = undefined;
+    this.startShareUploadIfNeeded(pp);
+  }
+
+  private startShareUploadIfNeeded(pp: string): void {
+    if (this.sharePoll) {
+      clearInterval(this.sharePoll);
+      this.sharePoll = undefined;
+    }
+    if (!this.galleryUpload.enabled() || this.boothMode.isPhysicalFrameMode()) {
+      return;
+    }
+    void this.galleryUpload.ensureShareUpload(pp);
+    let ticks = 0;
+    this.sharePoll = setInterval(() => {
+      ticks += 1;
+      void this.galleryUpload.recordFor(this.path());
+      if (this.canShare() && this.sharePoll) {
+        clearInterval(this.sharePoll);
+        this.sharePoll = undefined;
+        return;
+      }
+      if (ticks % 10 === 0) {
+        void this.galleryUpload.ensureShareUpload(this.path() || pp);
+      }
+      if (ticks >= 60 && this.shareUploading()) {
+        const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        if (offline) {
+          ticks = 0;
+          void this.galleryUpload.flushQueue();
           return;
         }
-        // Re-kick every ~4s; after ~25s surface retry instead of infinite Uploading…
-        if (ticks % 10 === 0) {
-          void this.galleryUpload.ensureShareUpload(this.path() || pp);
+        const cur = this.galleryUpload.recordFor(this.path());
+        if (!cur || cur.status === 'pending' || cur.status === 'queued') {
+          this.galleryUpload.markUploadTimedOut(this.path() || pp);
         }
-        if (ticks >= 60 && this.shareUploading()) {
-          const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-          if (offline) {
-            ticks = 0;
-            void this.galleryUpload.flushQueue();
-            return;
-          }
-          const cur = this.galleryUpload.recordFor(this.path());
-          if (!cur || cur.status === 'pending' || cur.status === 'queued') {
-            this.galleryUpload.markUploadTimedOut(this.path() || pp);
-          }
-          if (this.sharePoll) {
-            clearInterval(this.sharePoll);
-            this.sharePoll = undefined;
-          }
+        if (this.sharePoll) {
+          clearInterval(this.sharePoll);
+          this.sharePoll = undefined;
         }
-      }, 400);
-    }
+      }
+    }, 400);
   }
 
   async generateAi(): Promise<void> {
@@ -307,6 +334,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopAiCountdown();
+    this.navSub?.unsubscribe();
     if (this.sharePoll) {
       clearInterval(this.sharePoll);
       this.sharePoll = undefined;

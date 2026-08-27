@@ -590,30 +590,121 @@ async function compositePhotoIntoFrame(
 }
 
 /**
- * Physical-frame cut sheet: rotate landscape capture, place two identical
- * portrait cells side-by-side (5.8×8.8" default) with padding for trimming.
+ * Physical-frame cut sheet: rotate landscape capture, two portrait cells (cm),
+ * inset padding, thin decorative border, photo scaled inside border.
  */
+function cmToPx(cm, dpi) {
+  return Math.round((Number(cm) / 2.54) * dpi);
+}
+
+function mmToPx(mm, dpi) {
+  return Math.round((Number(mm) / 25.4) * dpi);
+}
+
+function resolvePhysicalFrameLayoutPx(opts, dpi) {
+  const cellW =
+    opts.cellWidthCm != null
+      ? cmToPx(opts.cellWidthCm, dpi)
+      : Math.round((Number(opts.cellWidthIn) || 5.8) * dpi);
+  const cellH =
+    opts.cellHeightCm != null
+      ? cmToPx(opts.cellHeightCm, dpi)
+      : Math.round((Number(opts.cellHeightIn) || 8.8) * dpi);
+  const gap =
+    opts.gapMm != null ? mmToPx(opts.gapMm, dpi) : Math.round((Number(opts.gapIn) || 0.25) * dpi);
+  const margin =
+    opts.marginMm != null
+      ? mmToPx(opts.marginMm, dpi)
+      : Math.round((Number(opts.marginIn) || 0.25) * dpi);
+  const innerPad =
+    opts.innerPaddingMm != null ? mmToPx(opts.innerPaddingMm, dpi) : mmToPx(3, dpi);
+  return { cellW, cellH, gap, margin, innerPad };
+}
+
+function buildPhysicalCellBorderSvg(w, h, dpi) {
+  const stroke = Math.max(1, Math.round(dpi / 180));
+  const hair = Math.max(1, Math.round(dpi / 360));
+  const inset = Math.max(stroke * 2, Math.round(dpi / 120));
+  const x = inset;
+  const y = inset;
+  const bw = w - inset * 2;
+  const bh = h - inset * 2;
+  const corner = Math.min(bw, bh) * 0.11;
+  const c = corner * 0.55;
+  const paths = [
+    `M ${x} ${y + corner} L ${x} ${y} L ${x + corner} ${y}`,
+    `M ${x + bw - corner} ${y} L ${x + bw} ${y} L ${x + bw} ${y + corner}`,
+    `M ${x + bw} ${y + bh - corner} L ${x + bw} ${y + bh} L ${x + bw - corner} ${y + bh}`,
+    `M ${x + corner} ${y + bh} L ${x} ${y + bh} L ${x} ${y + bh - corner}`,
+  ];
+  const inner = stroke + hair + 2;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="none" stroke="#8b7348" stroke-width="${stroke}" opacity="0.92"/>
+  <rect x="${x + inner}" y="${y + inner}" width="${Math.max(1, bw - inner * 2)}" height="${Math.max(1, bh - inner * 2)}" fill="none" stroke="#dcc9a3" stroke-width="${hair}" opacity="0.78"/>
+  ${paths.map((d) => `<path d="${d}" fill="none" stroke="#a08858" stroke-width="${stroke}" stroke-linecap="square" opacity="0.88"/>`).join('\n  ')}
+  <circle cx="${x + c}" cy="${y + c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
+  <circle cx="${x + bw - c}" cy="${y + c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
+  <circle cx="${x + bw - c}" cy="${y + bh - c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
+  <circle cx="${x + c}" cy="${y + bh - c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
+</svg>`;
+}
+
+async function buildPhysicalFrameCell(sharpMod, photoPath, cellW, cellH, innerPad, rotate, borderEnabled, dpi) {
+  const borderStroke = borderEnabled ? Math.max(1, Math.round(dpi / 200)) : 0;
+  const frameW = Math.max(8, cellW - innerPad * 2);
+  const frameH = Math.max(8, cellH - innerPad * 2);
+  const photoW = Math.max(8, frameW - borderStroke * 4);
+  const photoH = Math.max(8, frameH - borderStroke * 4);
+
+  const photoBuf = await sharpMod(photoPath)
+    .rotate(rotate)
+    .resize(photoW, photoH, { fit: 'cover', position: 'centre' })
+    .jpeg({ quality: 94, mozjpeg: true })
+    .toBuffer();
+
+  const photoLeft = innerPad + borderStroke * 2;
+  const photoTop = innerPad + borderStroke * 2;
+  const composites = [{ input: photoBuf, left: photoLeft, top: photoTop }];
+
+  if (borderEnabled) {
+    composites.push({
+      input: Buffer.from(buildPhysicalCellBorderSvg(frameW, frameH, dpi)),
+      left: innerPad,
+      top: innerPad,
+    });
+  }
+
+  return sharpMod({
+    create: {
+      width: cellW,
+      height: cellH,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .composite(composites)
+    .png()
+    .toBuffer();
+}
+
 async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
   const dpi = Math.max(72, Math.min(600, Math.round(Number(opts.dpi) || 300)));
-  const cellWIn = Math.max(1, Number(opts.cellWidthIn) || 5.8);
-  const cellHIn = Math.max(1, Number(opts.cellHeightIn) || 8.8);
-  const gapIn = Math.max(0, Number(opts.gapIn) || 0.25);
-  const marginIn = Math.max(0, Number(opts.marginIn) || 0.25);
   const rotate = Number(opts.rotateDegrees) === -90 ? -90 : 90;
-
-  const cellW = Math.round(cellWIn * dpi);
-  const cellH = Math.round(cellHIn * dpi);
-  const gap = Math.round(gapIn * dpi);
-  const margin = Math.round(marginIn * dpi);
+  const borderEnabled = opts.borderEnabled !== false;
+  const { cellW, cellH, gap, margin, innerPad } = resolvePhysicalFrameLayoutPx(opts, dpi);
   const sheetW = margin * 2 + cellW * 2 + gap;
   const sheetH = margin * 2 + cellH;
 
-  const photoCell = await sharpMod(photoPath)
-    .rotate(rotate)
-    .resize(cellW, cellH, { fit: 'cover', position: 'centre' })
-    .ensureAlpha()
-    .png()
-    .toBuffer();
+  const photoCell = await buildPhysicalFrameCell(
+    sharpMod,
+    photoPath,
+    cellW,
+    cellH,
+    innerPad,
+    rotate,
+    borderEnabled,
+    dpi,
+  );
 
   const left0 = margin;
   const left1 = margin + cellW + gap;
@@ -2453,12 +2544,18 @@ ipcMain.handle('layouts:physicalFrameDual', async (_e, payload) => {
     }
     const cfg = loadMergedConfig()?.physicalFrame || {};
     const opts = {
+      cellWidthCm: payload?.cellWidthCm ?? cfg.cellWidthCm,
+      cellHeightCm: payload?.cellHeightCm ?? cfg.cellHeightCm,
+      innerPaddingMm: payload?.innerPaddingMm ?? cfg.innerPaddingMm,
+      gapMm: payload?.gapMm ?? cfg.gapMm,
+      marginMm: payload?.marginMm ?? cfg.marginMm,
       cellWidthIn: payload?.cellWidthIn ?? cfg.cellWidthIn,
       cellHeightIn: payload?.cellHeightIn ?? cfg.cellHeightIn,
       gapIn: payload?.gapIn ?? cfg.gapIn,
       marginIn: payload?.marginIn ?? cfg.marginIn,
       dpi: payload?.dpi ?? cfg.dpi,
       rotateDegrees: payload?.rotateDegrees ?? cfg.rotateDegrees,
+      borderEnabled: payload?.borderEnabled ?? cfg.borderEnabled,
     };
     appendAppLog('info', 'layouts', 'physicalFrameDual start', { imagePath, ...opts });
     const outBuf = await compositePhysicalFrameDual(sharpMod, imagePath, opts);
@@ -2610,6 +2707,24 @@ function galleryBaseUrl(raw) {
   return String(raw || '')
     .trim()
     .replace(/\/$/, '');
+}
+
+/** Pi often has PUBLIC_BASE_URL=127.0.0.1 — rewrite share links to the booth's configured gallery host. */
+function normalizeGalleryPublicUrl(url, apiBaseUrl) {
+  if (!url || !apiBaseUrl) return url;
+  try {
+    const u = new URL(String(url));
+    const base = new URL(apiBaseUrl);
+    const local = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+    if (local) {
+      u.protocol = base.protocol;
+      u.host = base.host;
+      return u.toString();
+    }
+  } catch (_) {
+    /* keep original */
+  }
+  return url;
 }
 
 async function galleryFetchJson(url, opts) {
@@ -2800,7 +2915,7 @@ async function uploadPhotoOnce(payload, signal) {
     ok: true,
     slug,
     photoId: data.photo?.id,
-    shareUrl: data.photo?.shareUrl,
+    shareUrl: normalizeGalleryPublicUrl(data.photo?.shareUrl, base),
     url: data.photo?.url,
     variant: data.photo?.variant,
   };
@@ -3153,7 +3268,7 @@ async function pullRemoteFramesToLocal(base, remoteFrames, signal) {
         }
       } catch (_) {}
     }
-    const url = frame.downloadUrl || `${base}${frame.url}`;
+    const url = `${base}${frame.url || `/media/frames/${encodeURIComponent(filename)}`}`;
     try {
       const imgRes = await fetch(url, { signal });
       if (!imgRes.ok) {
@@ -3214,7 +3329,8 @@ async function syncFramesWithMomentsOnce(payload) {
     const { synced, skipped, failed } = await pullRemoteFramesToLocal(base, remote, ac.signal);
 
     const pruned = [];
-    if (pruneLocal) {
+    const pullFailed = failed.length > 0;
+    if (pruneLocal && !pullFailed) {
       const dir = getPhotoFramesDir();
       for (const filename of listPhotoFrameFiles()) {
         if (remoteNames.has(filename)) continue;

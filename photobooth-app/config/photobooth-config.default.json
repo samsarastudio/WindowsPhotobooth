@@ -6,12 +6,14 @@
     "physicalFrameEnabled": true
   },
   "physicalFrame": {
-    "cellWidthIn": 5.8,
-    "cellHeightIn": 8.8,
-    "gapIn": 0.25,
-    "marginIn": 0.25,
+    "cellWidthCm": 5.5,
+    "cellHeightCm": 7.6,
+    "innerPaddingMm": 3,
+    "gapMm": 2,
+    "marginMm": 2,
     "dpi": 300,
-    "rotateDegrees": 90
+    "rotateDegrees": 90,
+    "borderEnabled": true
   },
   "requireQrUnlock": false,
   "aiGenerationEnabled": false,
@@ -37,7 +39,7 @@
   "gallery": {
     "enabled": true,
     "apiBaseUrl": "https://moments.inmomentservices.com",
-    "uploadToken": "d242f34d06615494f68726947dcf3e416a0faa5a1711792723af1860dffdc008",
+    "uploadToken": "26bdcbbb413c1063f472b95cc2f75ab5137f28a9cdd8c7d5",
     "sessionPrefix": "onam",
     "uploadOriginal": true,
     "uploadFramed": true,
