@@ -238,27 +238,38 @@ async function refreshAlbums() {
 async function downloadAdminPhoto(slug, photo) {
   if (!photo?.id) return;
   setStatus('Downloading…');
+  const ext =
+    photo.url?.match(/\.(jpe?g|png|webp)/i)?.[0] ||
+    (photo.mime?.includes('png') ? '.png' : photo.mime?.includes('webp') ? '.webp' : '.jpg');
+  const filename = `${photo.variant || 'photo'}-${photo.id}${ext}`;
+  const triggerBlob = (blob) => {
+    const obj = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = obj;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(obj), 1500);
+  };
   try {
     const res = await fetch(
       `/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photo.id)}/file`,
       { headers: { 'X-Admin-Pin': pin() } },
     );
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || res.statusText || 'Download failed');
+    if (res.ok) {
+      triggerBlob(await res.blob());
+      setStatus('Download started.');
+      return;
     }
-    const blob = await res.blob();
-    const ext =
-      photo.url?.match(/\.(jpe?g|png|webp)/i)?.[0] ||
-      (photo.mime?.includes('png') ? '.png' : photo.mime?.includes('webp') ? '.webp' : '.jpg');
-    const obj = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = obj;
-    a.download = `${photo.variant || 'photo'}-${photo.id}${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(obj), 1500);
+  } catch {
+    /* fall through to media URL */
+  }
+  try {
+    if (!photo.url) throw new Error('No photo URL');
+    const res = await fetch(photo.url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    triggerBlob(await res.blob());
     setStatus('Download started.');
   } catch (e) {
     setStatus(`Download failed: ${e.message || e}`);
@@ -266,13 +277,11 @@ async function downloadAdminPhoto(slug, photo) {
 }
 
 function sharePageHref(slug, photo) {
-  const path =
-    photo?.sharePath ||
-    (slug && photo?.id
-      ? `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photo.id)}`
-      : null);
-  if (!path) return '#';
-  return `${window.location.origin}${path}`;
+  // Always same-origin relative path — never PUBLIC_BASE_URL (often wrong on Pi).
+  if (slug && photo?.id) {
+    return `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photo.id)}`;
+  }
+  return photo?.sharePath || '#';
 }
 
 async function refreshPhotos() {

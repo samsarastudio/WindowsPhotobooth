@@ -108,12 +108,13 @@ sessionsRouter.put('/day', requireUploadToken, (req, res) => {
 sessionsRouter.get('/:slug', (req, res) => {
   const session = getSessionBySlug(req.params.slug);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  if (isSessionExpired(session)) {
+  const wantId = String(req.query.photoId || req.query.p || '').trim();
+  // Share deep-links (?photoId=) must work past album TTL; full album still blocks when expired.
+  if (isSessionExpired(session) && !wantId) {
     return res.status(410).json({ ok: false, error: 'Session expired' });
   }
-  const photos = listPublicPhotos(session.id);
+  const photos = wantId && isSessionExpired(session) ? [] : listPublicPhotos(session.id);
   // Share deep-link: include this photo even when filtered from the public gallery list.
-  const wantId = String(req.query.photoId || req.query.p || '').trim();
   if (wantId && !photos.some((p) => p.id === wantId)) {
     const row = getDb()
       .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
@@ -127,9 +128,7 @@ sessionsRouter.get('/:slug', (req, res) => {
 sessionsRouter.get('/:slug/photos/:photoId', (req, res) => {
   const session = getSessionBySlug(req.params.slug);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  if (isSessionExpired(session)) {
-    return res.status(410).json({ ok: false, error: 'Session expired' });
-  }
+  // Share links stay valid after TTL while the file remains on disk.
   const row = getDb()
     .prepare('SELECT * FROM photos WHERE id = ? AND session_id = ?')
     .get(req.params.photoId, session.id);

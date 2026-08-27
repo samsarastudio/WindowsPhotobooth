@@ -40,7 +40,8 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-/** Share / QR deep-link: resolve any photo by id (incl. non-framed originals). */
+/** Share / QR deep-link: resolve any photo by id (incl. non-framed originals).
+ * Still works after album TTL — guests/admin must be able to open saved share links. */
 app.get('/api/photos/:photoId', (req, res) => {
   const photoId = String(req.params.photoId || '').trim();
   if (!photoId) return res.status(400).json({ ok: false, error: 'photoId required' });
@@ -48,13 +49,15 @@ app.get('/api/photos/:photoId', (req, res) => {
   if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
   const session = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(row.session_id);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
-  if (isSessionExpired(session)) {
-    return res.status(410).json({ ok: false, error: 'Session expired' });
-  }
   return res.json({
     ok: true,
     photo: publicPhoto(session.slug, row),
-    session: { slug: session.slug, title: session.title, expiresAt: session.expires_at },
+    session: {
+      slug: session.slug,
+      title: session.title,
+      expiresAt: session.expires_at,
+      expired: isSessionExpired(session),
+    },
   });
 });
 
@@ -104,7 +107,7 @@ app.get('/media/:slug/:filename', (req, res) => {
   }
   const session = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(slug);
   if (!session) return res.status(404).end();
-  if (isSessionExpired(session)) return res.status(410).end();
+  // Serve while the file exists — share/download must work past album TTL.
   const filePath = path.join(config.photosDir, slug, filename);
   if (!fs.existsSync(filePath)) return res.status(404).end();
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
