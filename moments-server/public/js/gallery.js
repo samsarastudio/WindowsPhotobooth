@@ -199,16 +199,23 @@ function renderGuestPhoto() {
     els.guestPhotoImg.removeAttribute('src');
     els.guestPhotoImg.hidden = true;
     if (els.btnSaveGuestPhoto) els.btnSaveGuestPhoto.hidden = true;
+    if (els.btnAttachCard) els.btnAttachCard.hidden = true;
+    const label = document.querySelector('.guest-photo-label');
+    if (label) label.hidden = true;
     setStatus('Photo not found or no longer available.');
     return;
   }
   setStatus('', false);
   els.guestPhotoImg.hidden = false;
   if (els.btnSaveGuestPhoto) els.btnSaveGuestPhoto.hidden = false;
+  if (els.btnAttachCard) els.btnAttachCard.hidden = false;
+  const label = document.querySelector('.guest-photo-label');
+  if (label) label.hidden = false;
   els.guestPhotoImg.onerror = () => {
     els.guestPhotoImg.removeAttribute('src');
     els.guestPhotoImg.hidden = true;
     if (els.btnSaveGuestPhoto) els.btnSaveGuestPhoto.hidden = true;
+    if (els.btnAttachCard) els.btnAttachCard.hidden = true;
     setStatus('Could not load this photo. Try again in a moment.');
   };
   els.guestPhotoImg.src = photo.url;
@@ -225,54 +232,51 @@ function renderGuestPhoto() {
   stopAttachCamera();
 }
 
-/** Last-resort: photo files are named `{id}.jpg|png|webp` under /media/{slug}/. */
+/** Last-resort: probe `/media/{slug}/{id}.ext` via Image (no HEAD — proxies often hang/block HEAD). */
+function probeImageUrl(url, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timer = setTimeout(() => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = '';
+      resolve(false);
+    }, timeoutMs);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    img.src = url;
+  });
+}
+
 async function guessMediaPhoto(slug, photoId) {
   if (!slug || !photoId) return null;
   const exts = ['.jpg', '.jpeg', '.png', '.webp'];
   for (const ext of exts) {
     const url = `/media/${encodeURIComponent(slug)}/${encodeURIComponent(photoId)}${ext}`;
-    try {
-      const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-      if (!res.ok) continue;
+    // eslint-disable-next-line no-await-in-loop
+    if (await probeImageUrl(url)) {
       return {
         id: photoId,
         variant: 'original',
         url,
         sharePath: `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photoId)}`,
       };
-    } catch {
-      /* try next */
-    }
-  }
-  // Some hosts block HEAD — try a ranged GET.
-  for (const ext of exts) {
-    const url = `/media/${encodeURIComponent(slug)}/${encodeURIComponent(photoId)}${ext}`;
-    try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { Range: 'bytes=0-0' },
-        cache: 'no-store',
-      });
-      if (!(res.ok || res.status === 206)) continue;
-      return {
-        id: photoId,
-        variant: 'original',
-        url,
-        sharePath: `/${encodeURIComponent(slug)}/p/${encodeURIComponent(photoId)}`,
-      };
-    } catch {
-      /* try next */
     }
   }
   return null;
 }
 
-/** Share / QR deep links must resolve any variant (incl. non-framed originals). */
-async function fetchSharePhoto(slug, photoId) {
+/** API-only share resolve (no media guess). */
+async function fetchSharePhotoApi(slug, photoId) {
   if (!photoId) return null;
-  // 1) Global by-id (works even if nested session route is missing on an old process).
   try {
-    const pr = await fetch(`/api/photos/${encodeURIComponent(photoId)}`);
+    const pr = await fetch(`/api/photos/${encodeURIComponent(photoId)}`, { cache: 'no-store' });
     const pd = await pr.json().catch(() => ({}));
     if (pr.ok && pd.photo?.url) {
       const photo = { ...pd.photo };
@@ -282,11 +286,22 @@ async function fetchSharePhoto(slug, photoId) {
   } catch {
     /* try next */
   }
-  // 2) Nested session route.
+  try {
+    const pr = await fetch(`/api/share/${encodeURIComponent(photoId)}`, { cache: 'no-store' });
+    const pd = await pr.json().catch(() => ({}));
+    if (pr.ok && pd.photo?.url) {
+      const photo = { ...pd.photo };
+      if (pd.session?.slug) photo.sessionSlug = pd.session.slug;
+      return photo;
+    }
+  } catch {
+    /* try next */
+  }
   if (slug) {
     try {
       const pr = await fetch(
         `/api/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photoId)}`,
+        { cache: 'no-store' },
       );
       const pd = await pr.json().catch(() => ({}));
       if (pr.ok && pd.photo?.url) return pd.photo;
@@ -294,36 +309,45 @@ async function fetchSharePhoto(slug, photoId) {
       /* try next */
     }
   }
-  // 3) Direct media file (APIs may be stale until Moments Node restart).
+  return null;
+}
+
+/** Share / QR deep links must resolve any variant (incl. non-framed originals). */
+async function fetchSharePhoto(slug, photoId) {
+  const fromApi = await fetchSharePhotoApi(slug, photoId);
+  if (fromApi?.url) return fromApi;
   return guessMediaPhoto(slug, photoId);
 }
 
 /** Guest share page — load by photo id (slug in URL may be stale). */
 async function loadSharePhoto(route) {
   setStatus('Loading your photo…');
-  let mine = null;
+  const photoId = route.photoId;
+  const slug = route.slug;
 
-  // Same-album admin links: session + photoId inject works even when by-id routes are missing.
-  if (route.slug) {
-    try {
-      const res = await fetch(
-        `/api/sessions/${encodeURIComponent(route.slug)}?photoId=${encodeURIComponent(route.photoId)}`,
-      );
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        mine = (data.session?.photos || []).find((p) => p.id === route.photoId) || null;
+  // Parallel: media probe works even when Node APIs were not restarted.
+  const mediaPromise = guessMediaPhoto(slug, photoId);
+  const apiPromise = (async () => {
+    if (slug) {
+      try {
+        const res = await fetch(
+          `/api/sessions/${encodeURIComponent(slug)}?photoId=${encodeURIComponent(photoId)}`,
+          { cache: 'no-store' },
+        );
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          const hit = (data.session?.photos || []).find((p) => p.id === photoId);
+          if (hit?.url) return hit;
+        }
+      } catch {
+        /* fall through */
       }
-    } catch {
-      /* fall through */
     }
-  }
+    return fetchSharePhotoApi(slug, photoId);
+  })();
 
-  if (!mine?.url) {
-    mine = await fetchSharePhoto(route.slug, route.photoId);
-  }
-  if (!mine?.url) {
-    mine = await guessMediaPhoto(route.slug, route.photoId);
-  }
+  const [fromApi, fromMedia] = await Promise.all([apiPromise, mediaPromise]);
+  let mine = fromApi?.url ? fromApi : fromMedia;
 
   if (!mine?.url) {
     photos = [];
