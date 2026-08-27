@@ -11,7 +11,7 @@ import {
   saveSettings,
 } from '../db.js';
 import { getUploadToken, requireAdminPin } from '../auth.js';
-import { purgeExpiredSessions } from '../purge.js';
+import { purgeExpiredSessions, purgeMissingPhotoFiles } from '../purge.js';
 import { seedSampleGallery } from '../seed-samples.js';
 
 export const adminRouter = Router();
@@ -201,8 +201,13 @@ adminRouter.post('/sessions/:slug/photos/bulk-delete', (req, res) => {
 });
 
 adminRouter.post('/purge-expired', (_req, res) => {
-  const result = purgeExpiredSessions();
-  return res.json({ ok: true, ...result });
+  const expired = purgeExpiredSessions();
+  const missing = purgeMissingPhotoFiles();
+  return res.json({
+    ok: true,
+    ...expired,
+    missingFilesRemoved: missing.photosRemoved,
+  });
 });
 
 adminRouter.post('/seed-samples', (_req, res) => {
