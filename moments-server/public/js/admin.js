@@ -765,7 +765,16 @@ function renderQrBatchCard(b, isArchived, albumOptions = []) {
 
   const withPin = async (url) => {
     const res = await fetch(url, { headers: { 'X-Admin-Pin': pin() } });
-    if (!res.ok) throw new Error('Download failed');
+    if (!res.ok) {
+      let msg = `Download failed (${res.status})`;
+      try {
+        const data = await res.json();
+        if (data?.error) msg = data.error;
+      } catch {
+        /* not json */
+      }
+      throw new Error(msg);
+    }
     const blob = await res.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

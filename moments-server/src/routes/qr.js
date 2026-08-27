@@ -557,17 +557,50 @@ adminQrRouter.post('/batches/:id/void/:codeId', (req, res) => {
   return res.json({ ok: true });
 });
 
-adminQrRouter.get('/batches/:id/pdf', (req, res) => {
-  const batch = getDb().prepare('SELECT * FROM qr_batches WHERE id = ?').get(req.params.id);
-  if (!batch?.pdf_filename) return res.status(404).json({ ok: false, error: 'PDF not generated' });
-  const filePath = path.join(config.qrPdfsDir, batch.pdf_filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ ok: false, error: 'PDF missing' });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${batch.name.replace(/[^\w.-]+/g, '_')}-${batch.paper_size}.pdf"`,
-  );
-  return res.sendFile(filePath);
+adminQrRouter.get('/batches/:id/pdf', async (req, res) => {
+  try {
+    ensureQrDirs();
+    let batch = getDb().prepare('SELECT * FROM qr_batches WHERE id = ?').get(req.params.id);
+    if (!batch) return res.status(404).json({ ok: false, error: 'Batch not found' });
+
+    const paper = batch.paper_size === 'a3' ? 'a3' : 'a4';
+    const candidates = [
+      batch.pdf_filename ? path.join(config.qrPdfsDir, batch.pdf_filename) : null,
+      path.join(config.qrPdfsDir, `${batch.id}-${paper}.pdf`),
+      path.join(config.qrPdfsDir, `${batch.id}-a4.pdf`),
+      path.join(config.qrPdfsDir, `${batch.id}-a3.pdf`),
+    ].filter(Boolean);
+
+    let filePath = candidates.find((p) => fs.existsSync(p)) || null;
+
+    // DB points at a missing file (common after DATA_DIR move / wipe) — rebuild.
+    if (!filePath) {
+      await generateBatchPdf({ batchId: batch.id, paperSize: paper });
+      batch = getDb().prepare('SELECT * FROM qr_batches WHERE id = ?').get(req.params.id);
+      filePath = batch?.pdf_filename
+        ? path.join(config.qrPdfsDir, batch.pdf_filename)
+        : null;
+    } else if (batch.pdf_filename !== path.basename(filePath)) {
+      getDb()
+        .prepare(`UPDATE qr_batches SET pdf_filename = ? WHERE id = ?`)
+        .run(path.basename(filePath), batch.id);
+      batch.pdf_filename = path.basename(filePath);
+    }
+
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(500).json({ ok: false, error: 'PDF could not be generated' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${String(batch.name || 'batch').replace(/[^\w.-]+/g, '_')}-${paper}.pdf"`,
+    );
+    return res.sendFile(path.resolve(filePath));
+  } catch (e) {
+    console.error('[qr] pdf download failed', e);
+    return res.status(500).json({ ok: false, error: e.message || String(e) });
+  }
 });
 
 adminQrRouter.post('/batches/:id/regenerate-pdf', async (req, res) => {
