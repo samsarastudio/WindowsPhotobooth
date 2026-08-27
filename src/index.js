@@ -14,7 +14,7 @@ import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js
 import { qrRouter, adminQrRouter } from './routes/qr.js';
 import { boothUpdateRouter, adminBoothUpdateRouter } from './routes/booth-update.js';
 import { ensureQrDirs } from './qr/store.js';
-import { purgeExpiredSessions, purgeMissingPhotoFiles } from './purge.js';
+import { purgeExpiredSessions } from './purge.js';
 import { ensureHttpsCerts } from './https-certs.js';
 
 initDb();
@@ -184,23 +184,11 @@ setInterval(() => {
     if (r.sessionsRemoved) {
       console.log(`[moments] purged ${r.sessionsRemoved} sessions, ${r.photosRemoved} photos`);
     }
-    const missing = purgeMissingPhotoFiles();
-    if (missing.photosRemoved) {
-      console.log(`[moments] purged ${missing.photosRemoved} photos with missing files`);
-    }
   } catch (e) {
     console.error('[moments] purge failed', e);
   }
 }, PURGE_MS);
 purgeExpiredSessions();
-try {
-  const missing = purgeMissingPhotoFiles();
-  if (missing.photosRemoved) {
-    console.log(`[moments] startup: purged ${missing.photosRemoved} photos with missing files`);
-  }
-} catch (e) {
-  console.error('[moments] missing-file purge failed', e);
-}
 
 function lanHostsFromPublicUrl() {
   try {

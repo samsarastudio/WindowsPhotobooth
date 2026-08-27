@@ -19,20 +19,18 @@ export function purgeExpiredSessions(now = new Date()) {
 }
 
 /**
- * Remove photo DB rows whose image file is missing/empty on disk.
- * Prevents black/broken admin thumbnails from lingering orphan records.
+ * Find photo DB rows whose image file is missing or empty on disk.
  */
-export function purgeMissingPhotoFiles() {
+export function scanMissingPhotoFiles() {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT p.id AS photo_id, p.filename, s.slug AS session_slug
+      `SELECT p.id AS photo_id, p.filename, p.variant, s.slug AS session_slug
        FROM photos p
        JOIN sessions s ON s.id = p.session_id`,
     )
     .all();
-  const del = db.prepare('DELETE FROM photos WHERE id = ?');
-  let removed = 0;
+  const missing = [];
   for (const row of rows) {
     const filePath = path.join(config.photosDir, row.session_slug, row.filename);
     let ok = false;
@@ -43,9 +41,26 @@ export function purgeMissingPhotoFiles() {
       ok = false;
     }
     if (!ok) {
-      del.run(row.photo_id);
-      removed += 1;
+      missing.push({
+        id: row.photo_id,
+        album: row.session_slug,
+        filename: row.filename,
+        variant: row.variant,
+      });
     }
+  }
+  return { count: missing.length, items: missing };
+}
+
+/** Remove photo DB rows whose image file is missing/empty on disk. */
+export function purgeMissingPhotoFiles() {
+  const { items } = scanMissingPhotoFiles();
+  const db = getDb();
+  const del = db.prepare('DELETE FROM photos WHERE id = ?');
+  let removed = 0;
+  for (const row of items) {
+    del.run(row.id);
+    removed += 1;
   }
   return { photosRemoved: removed };
 }
