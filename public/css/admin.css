@@ -236,6 +236,27 @@
   background: #111;
 }
 
+.photo-admin-card .photo-missing {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  background: #1a1a1a;
+  color: #f0c0c0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.photo-admin-card.is-missing-file {
+  border-color: #b42318;
+}
+
+.photo-admin-card .badge.badge-warn {
+  background: #fde8e6;
+  color: #b42318;
+}
+
 .photo-admin-card .meta-block {
   padding: 0.55rem;
   display: grid;

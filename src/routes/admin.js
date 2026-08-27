@@ -92,14 +92,19 @@ adminRouter.get('/sessions/:slug', (req, res) => {
   const photos = getDb()
     .prepare('SELECT * FROM photos WHERE session_id = ? ORDER BY created_at DESC')
     .all(row.id);
-  return res.json({
-    ok: true,
-    session: {
-      ...publicSession(row, photos),
-      expired: isSessionExpired(row),
-      photoCount: photos.length,
-    },
+  const session = {
+    ...publicSession(row, photos),
+    expired: isSessionExpired(row),
+    photoCount: photos.length,
+  };
+  // Mark rows whose file is gone from disk (broken thumbnail / Open fails).
+  session.photos = session.photos.map((p, i) => {
+    const raw = photos[i];
+    const filePath = path.join(config.photosDir, row.slug, raw.filename);
+    const fileExists = fs.existsSync(filePath);
+    return { ...p, fileExists, filename: raw.filename };
   });
+  return res.json({ ok: true, session });
 });
 
 adminRouter.patch('/sessions/:slug', (req, res) => {
