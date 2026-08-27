@@ -215,6 +215,7 @@ export function isSessionExpired(session, now = new Date()) {
 }
 
 export function publicPhoto(sessionSlug, row) {
+  const sharePath = `/${encodeURIComponent(sessionSlug)}/p/${encodeURIComponent(row.id)}`;
   return {
     id: row.id,
     variant: row.variant,
@@ -225,7 +226,8 @@ export function publicPhoto(sessionSlug, row) {
     height: row.height,
     createdAt: row.created_at,
     url: `/media/${encodeURIComponent(sessionSlug)}/${encodeURIComponent(row.filename)}`,
-    shareUrl: `${config.publicBaseUrl}/${encodeURIComponent(sessionSlug)}/p/${encodeURIComponent(row.id)}`,
+    sharePath,
+    shareUrl: `${config.publicBaseUrl}${sharePath}`,
   };
 }
 
