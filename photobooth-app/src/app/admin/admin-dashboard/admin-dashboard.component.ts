@@ -72,6 +72,15 @@ interface AdminFrameItem {
   guestEnabled: boolean;
 }
 
+interface UploadQueueSummary {
+  uploadedOk: number;
+  queued: number;
+  pending: number;
+  error: number;
+  total: number;
+  retryable: number;
+}
+
 @Component({
   selector: 'pb-admin-dashboard',
   imports: [FormsModule, RouterLink],
@@ -142,6 +151,8 @@ export class AdminDashboardComponent implements OnInit {
   aiBackgrounds = signal<Record<string, AiBackgroundItem[]>>({});
   status = signal<string | null>(null);
   busy = signal(false);
+  uploadQueueSummary = signal<UploadQueueSummary | null>(null);
+  galleryForceResync = false;
 
   constructor(
     readonly booth: BoothConfigService,
@@ -332,6 +343,9 @@ export class AdminDashboardComponent implements OnInit {
     }
     if (t === 'frames') {
       void this.refreshPhotoFramesAndSync();
+    }
+    if (t === 'gallery') {
+      void this.refreshUploadQueueSummary();
     }
     if (t === 'system') {
       void this.refreshAppVersion();
@@ -553,6 +567,66 @@ export class AdminDashboardComponent implements OnInit {
       } else {
         this.status.set('Save failed (run in Electron).');
       }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async refreshUploadQueueSummary(): Promise<void> {
+    if (!window.pbApi?.galleryGetUploadQueueSummary) {
+      this.uploadQueueSummary.set(null);
+      return;
+    }
+    try {
+      const r = await window.pbApi.galleryGetUploadQueueSummary();
+      this.uploadQueueSummary.set(r.ok && r.summary ? r.summary : null);
+    } catch {
+      this.uploadQueueSummary.set(null);
+    }
+  }
+
+  async resyncUploadQueue(): Promise<void> {
+    if (!window.pbApi?.galleryResyncUploadQueue) {
+      this.status.set('Re-sync requires Electron.');
+      return;
+    }
+    if (!this.draftGallery.enabled) {
+      this.status.set('Enable gallery upload first.');
+      return;
+    }
+    const base = (this.draftGallery.apiBaseUrl || '').replace(/\/$/, '');
+    const token = this.draftGallery.uploadToken || '';
+    if (!base || !token) {
+      this.status.set('Set Gallery API URL and upload token first.');
+      return;
+    }
+    this.busy.set(true);
+    this.status.set('Re-syncing upload queue…');
+    try {
+      const r = await window.pbApi.galleryResyncUploadQueue({
+        apiBaseUrl: base,
+        uploadToken: token,
+        eventPrefix: this.draftGallery.sessionPrefix,
+        includeOk: this.galleryForceResync,
+      });
+      if (!r.ok) {
+        this.status.set(r.error ?? 'Re-sync failed.');
+        return;
+      }
+      const parts = [
+        r.uploaded ? `${r.uploaded} uploaded` : null,
+        r.requeued ? `${r.requeued} re-queued` : null,
+        r.discovered ? `${r.discovered} discovered in capture/` : null,
+        r.failed ? `${r.failed} failed` : null,
+        r.pending ? `${r.pending} still pending` : null,
+      ].filter(Boolean);
+      this.status.set(parts.length ? `Re-sync done: ${parts.join(', ')}.` : 'Re-sync done — queue is up to date.');
+      if (r.skippedMissing) {
+        this.status.update((s) => `${s ?? ''} ${r.skippedMissing} missing local file(s).`.trim());
+      }
+      await this.refreshUploadQueueSummary();
+    } catch (e) {
+      this.status.set(String(e));
     } finally {
       this.busy.set(false);
     }

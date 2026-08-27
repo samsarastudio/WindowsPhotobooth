@@ -11,7 +11,7 @@ import {
   saveSettings,
 } from '../db.js';
 import { getUploadToken, requireAdminPin } from '../auth.js';
-import { purgeExpiredSessions, purgeMissingPhotoFiles } from '../purge.js';
+import { purgeExpiredSessions, purgeMissingPhotoFiles, scanMissingPhotoFiles } from '../purge.js';
 import { seedSampleGallery } from '../seed-samples.js';
 
 export const adminRouter = Router();
@@ -200,14 +200,24 @@ adminRouter.post('/sessions/:slug/photos/bulk-delete', (req, res) => {
   return res.json({ ok: true, removed, count: removed.length });
 });
 
-adminRouter.post('/purge-expired', (_req, res) => {
-  const expired = purgeExpiredSessions();
-  const missing = purgeMissingPhotoFiles();
+adminRouter.get('/photos/missing-files', (_req, res) => {
+  const scan = scanMissingPhotoFiles();
+  return res.json({ ok: true, ...scan });
+});
+
+adminRouter.post('/photos/resolve-missing', (_req, res) => {
+  const before = scanMissingPhotoFiles();
+  const result = purgeMissingPhotoFiles();
   return res.json({
     ok: true,
-    ...expired,
-    missingFilesRemoved: missing.photosRemoved,
+    checked: before.count,
+    photosRemoved: result.photosRemoved,
   });
+});
+
+adminRouter.post('/purge-expired', (_req, res) => {
+  const result = purgeExpiredSessions();
+  return res.json({ ok: true, ...result });
 });
 
 adminRouter.post('/seed-samples', (_req, res) => {

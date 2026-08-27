@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('pbApi', {
   galleryEnsureDaySession: (payload) => ipcRenderer.invoke('gallery:ensureDaySession', payload),
   galleryUploadPhoto: (payload) => ipcRenderer.invoke('gallery:uploadPhoto', payload),
   galleryFlushUploadQueue: () => ipcRenderer.invoke('gallery:flushUploadQueue'),
+  galleryGetUploadQueueSummary: () => ipcRenderer.invoke('gallery:getUploadQueueSummary'),
+  galleryResyncUploadQueue: (payload) => ipcRenderer.invoke('gallery:resyncUploadQueue', payload),
   galleryGetUploadQueueItem: (filePath) => ipcRenderer.invoke('gallery:getUploadQueueItem', filePath),
   onGalleryUploadQueueUpdated: (cb) => {
     const handler = (_event, item) => cb(item);

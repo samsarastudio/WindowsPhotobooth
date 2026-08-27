@@ -1,4 +1,4 @@
-﻿const pinEl = document.getElementById('pin');
+const pinEl = document.getElementById('pin');
 const loginCard = document.getElementById('loginCard');
 const panel = document.getElementById('panel');
 const loginErr = document.getElementById('loginErr');
@@ -657,6 +657,40 @@ document.getElementById('btnSeed').addEventListener('click', async () => {
 });
 
 document.getElementById('btnRefreshPhotos')?.addEventListener('click', () => void refreshPhotos());
+
+document.getElementById('btnResolveBrokenPhotos')?.addEventListener('click', async () => {
+  try {
+    setStatus('Checking for broken photos…');
+    const check = await api('/api/admin/photos/missing-files');
+    const brokenMeta = document.getElementById('photoBrokenMeta');
+    if (!check.count) {
+      if (brokenMeta) brokenMeta.textContent = 'All photos have files on disk.';
+      setStatus('No broken photos found.');
+      return;
+    }
+    const preview = (check.items || [])
+      .slice(0, 5)
+      .map((p) => `${p.id} (${p.album})`)
+      .join(', ');
+    const more = check.count > 5 ? ` …and ${check.count - 5} more` : '';
+    const msg = `Remove ${check.count} broken photo record${check.count === 1 ? '' : 's'} with no file on disk?\n\n${preview}${more}`;
+    if (!confirm(msg)) {
+      if (brokenMeta) {
+        brokenMeta.textContent = `${check.count} broken photo${check.count === 1 ? '' : 's'} found (not removed).`;
+      }
+      setStatus(`Found ${check.count} broken — cancelled.`);
+      return;
+    }
+    const r = await api('/api/admin/photos/resolve-missing', { method: 'POST', body: '{}' });
+    if (brokenMeta) brokenMeta.textContent = 'Broken = DB record exists but image file is missing on disk (shows as black thumbnail).';
+    setStatus(`Removed ${r.photosRemoved} broken photo record${r.photosRemoved === 1 ? '' : 's'}.`);
+    await refreshAll();
+    await refreshPhotos();
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
 photoAlbum?.addEventListener('change', () => {
   updateOpenAlbumLink();
   void refreshPhotos();

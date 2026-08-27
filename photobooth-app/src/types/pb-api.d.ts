@@ -218,6 +218,49 @@ export interface PbApi {
     busy?: boolean;
     error?: string;
   }>;
+  galleryGetUploadQueueSummary(): Promise<{
+    ok: boolean;
+    summary?: {
+      uploadedOk: number;
+      queued: number;
+      pending: number;
+      error: number;
+      total: number;
+      retryable: number;
+    };
+    error?: string;
+  }>;
+  galleryResyncUploadQueue(payload: {
+    apiBaseUrl?: string;
+    uploadToken?: string;
+    eventPrefix?: string;
+    includeOk?: boolean;
+  }): Promise<{
+    ok: boolean;
+    uploaded?: number;
+    failed?: number;
+    pending?: number;
+    discovered?: number;
+    requeued?: number;
+    skippedMissing?: number;
+    before?: {
+      uploadedOk: number;
+      queued: number;
+      pending: number;
+      error: number;
+      total: number;
+      retryable: number;
+    };
+    after?: {
+      uploadedOk: number;
+      queued: number;
+      pending: number;
+      error: number;
+      total: number;
+      retryable: number;
+    };
+    error?: string;
+  }>;
   galleryGetUploadQueueItem(filePath: string): Promise<{
     ok: boolean;
     item?: {

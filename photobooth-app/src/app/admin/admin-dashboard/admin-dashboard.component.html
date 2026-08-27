@@ -541,6 +541,36 @@
             </button>
           </div>
         </section>
+
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Upload queue</h2>
+          <p class="pb-hint">
+            Photos upload in the background. If Moments was offline or uploads failed, use
+            <strong>Re-sync queue</strong> to retry. Scans <code>capture/</code> (last 7 days) for
+            photos not yet queued.
+          </p>
+          @if (uploadQueueSummary()) {
+            <p class="pb-hint pb-hint-tight">
+              Queue:
+              {{ uploadQueueSummary()!.uploadedOk }} uploaded ·
+              {{ uploadQueueSummary()!.queued }} queued ·
+              {{ uploadQueueSummary()!.pending }} in progress ·
+              {{ uploadQueueSummary()!.error }} failed
+            </p>
+          }
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="galleryForceResync" />
+            Force re-upload already completed photos (use if Moments lost files)
+          </label>
+          <div class="pb-row pb-row-wrap">
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="refreshUploadQueueSummary()">
+              Refresh queue status
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="resyncUploadQueue()">
+              Re-sync upload queue
+            </button>
+          </div>
+        </section>
       </div>
     }
 

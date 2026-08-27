@@ -640,6 +640,121 @@ function isPhysicalFrameLayoutPath(filePath) {
   return /_physical\.(png|jpe?g|webp)$/.test(base);
 }
 
+function inferGalleryVariantFromPath(filePath) {
+  const base = path.basename(String(filePath || '')).toLowerCase();
+  if (base.includes('_ai.') || base.endsWith('_ai.png')) return 'ai';
+  if (base.includes('_framed.') || base.includes('_framed_')) return 'framed';
+  return 'original';
+}
+
+function summarizeUploadQueue() {
+  const items = loadUploadQueue().items || [];
+  const summary = { uploadedOk: 0, queued: 0, pending: 0, error: 0, total: items.length };
+  for (const item of items) {
+    if (item.status === 'ok') summary.uploadedOk += 1;
+    else if (item.status === 'pending') summary.pending += 1;
+    else if (item.status === 'error') summary.error += 1;
+    else summary.queued += 1;
+  }
+  summary.retryable = summary.queued + summary.pending + summary.error;
+  return summary;
+}
+
+function prepareUploadQueueResync(payload = {}) {
+  const q = loadUploadQueue();
+  const base = galleryBaseUrl(payload?.apiBaseUrl);
+  const token = String(payload?.uploadToken || '').trim();
+  const eventPrefix = String(payload?.eventPrefix || 'session').trim() || 'session';
+  const includeOk = !!payload?.includeOk;
+  let requeued = 0;
+  let skippedMissing = 0;
+  const now = new Date().toISOString();
+
+  for (const item of q.items) {
+    if (base) item.apiBaseUrl = base;
+    if (token) item.uploadToken = token;
+    if (payload?.eventPrefix) item.eventPrefix = eventPrefix;
+
+    if (item.status === 'ok' && !includeOk) continue;
+    if (item.status !== 'ok' && item.status !== 'error' && item.status !== 'pending') continue;
+
+    if (!item.filePath || !fs.existsSync(item.filePath)) {
+      item.status = 'error';
+      item.error = 'Photo file missing';
+      item.updatedAt = now;
+      skippedMissing += 1;
+      notifyUploadQueueItem(item);
+      continue;
+    }
+
+    item.status = 'queued';
+    item.error = undefined;
+    item.updatedAt = now;
+    if (includeOk) {
+      item.photoId = undefined;
+      item.shareUrl = undefined;
+      item.url = undefined;
+      item.slug = undefined;
+    }
+    requeued += 1;
+    notifyUploadQueueItem(item);
+  }
+
+  saveUploadQueue(q);
+  return { requeued, skippedMissing };
+}
+
+function scanCaptureForQueue(payload = {}) {
+  const captureRoot = getCaptureDir();
+  if (!fs.existsSync(captureRoot)) return { discovered: 0 };
+
+  const hasActive = (items, abs, variant) =>
+    (items || []).some(
+      (i) =>
+        i.filePath === abs &&
+        i.variant === variant &&
+        (i.status === 'ok' || i.status === 'queued' || i.status === 'pending'),
+    );
+
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  let discovered = 0;
+  for (const name of fs.readdirSync(captureRoot)) {
+    const abs = path.resolve(path.join(captureRoot, name));
+    if (isPhysicalFrameLayoutPath(abs)) continue;
+    if (!/\.(jpe?g|png|webp)$/i.test(name)) continue;
+    let st;
+    try {
+      st = fs.statSync(abs);
+    } catch {
+      continue;
+    }
+    if (!st.isFile() || st.size <= 0 || st.mtimeMs < cutoff) continue;
+
+    const variant = inferGalleryVariantFromPath(abs);
+    if (hasActive(loadUploadQueue().items, abs, variant)) continue;
+    enqueueGalleryUpload({ ...payload, filePath: abs, variant });
+    discovered += 1;
+  }
+  return { discovered };
+}
+
+async function resyncUploadQueue(payload = {}) {
+  const scan = scanCaptureForQueue(payload);
+  const prep = prepareUploadQueueResync(payload);
+  const before = summarizeUploadQueue();
+  const flush = await flushUploadQueue();
+  const after = summarizeUploadQueue();
+  return {
+    ok: true,
+    ...flush,
+    discovered: scan.discovered,
+    requeued: prep.requeued,
+    skippedMissing: prep.skippedMissing,
+    before,
+    after,
+  };
+}
+
 /**
  * Flatten the dual-column cut sheet to one 6×4 landscape JPEG.
  * SELPHY drivers may split a wide PNG into separate prints per column; one postcard raster avoids that.
@@ -2915,6 +3030,22 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
 ipcMain.handle('gallery:flushUploadQueue', async () => {
   try {
     return await flushUploadQueue();
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('gallery:getUploadQueueSummary', async () => {
+  try {
+    return { ok: true, summary: summarizeUploadQueue() };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('gallery:resyncUploadQueue', async (_e, payload) => {
+  try {
+    return await resyncUploadQueue(payload || {});
   } catch (e) {
     return { ok: false, error: String(e) };
   }

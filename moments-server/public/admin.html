@@ -89,10 +89,12 @@
             <div class="row wrap">
               <button type="button" class="btn ghost" id="btnRefreshPhotos">Refresh</button>
               <a class="btn ghost" id="btnOpenAlbum" href="#" target="_blank" rel="noopener">Open gallery</a>
+              <button type="button" class="btn ghost" id="btnResolveBrokenPhotos">Check &amp; fix broken photos</button>
               <button type="button" class="btn ghost" id="btnSelectAllPhotos">Select all</button>
               <button type="button" class="btn ghost" id="btnClearPhotoSelection">Clear selection</button>
               <button type="button" class="btn danger" id="btnBulkDeletePhotos" disabled>Delete selected</button>
             </div>
+            <p id="photoBrokenMeta" class="meta">Broken = DB record exists but image file is missing on disk (shows as black thumbnail).</p>
             <p id="photoSelectionMeta" class="meta">Select photos with the checkboxes to delete several at once.</p>
             <div id="photoGrid" class="photo-admin-grid"></div>
           </section>
@@ -328,6 +330,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260827-qa2" type="module"></script>
+    <script src="/js/admin.js?v=20260827-qa3" type="module"></script>
   </body>
 </html>
