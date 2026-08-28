@@ -120,6 +120,16 @@
           <input class="pb-input" [(ngModel)]="draft.capture.footerHint" />
           <label>Smile hint</label>
           <input class="pb-input" [(ngModel)]="draft.capture.smileHint" />
+          <label>Countdown (seconds)</label>
+          <input
+            class="pb-input"
+            type="number"
+            min="1"
+            max="15"
+            step="1"
+            [(ngModel)]="draftCapture.countdownSeconds"
+          />
+          <p class="pb-hint pb-hint-tight">How long the 3-2-1 timer runs before the shutter (1–15).</p>
         </section>
 
         <section class="pb-admin-card">
@@ -190,7 +200,7 @@
         </section>
       </div>
       <div class="pb-admin-footer">
-        <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveCopy()">Save copy</button>
+        <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveCopy()">Save capture settings</button>
       </div>
     }
 
@@ -597,9 +607,9 @@
           @if (draftGuestModes.physicalFrameEnabled) {
             <h3 class="pb-admin-subhead">Physical cut-sheet layout (cm / mm at DPI)</h3>
             <p class="pb-hint pb-hint-tight">
-              Each cell defaults to <strong>5.5 × 7.6 cm</strong> (portrait) with
-              <strong>3 mm</strong> white inset and a thin gold border; photo is scaled inside the border.
-              Capture stays landscape — the app rotates before fitting. Prints on one 6×4 sheet (scaled to fit).
+              Landscape capture is rotated 90° into each portrait cell (two side-by-side on a 6×4
+              sheet). Photo uses <em>uniform scale only</em> inside the safe area — never stretched.
+              Adjust safe insets to match your physical frame window.
             </p>
             <div class="pb-row pb-row-wrap">
               <label>
@@ -633,6 +643,50 @@
                   max="12"
                   step="0.5"
                   [(ngModel)]="draftPhysicalFrame.innerPaddingMm"
+                />
+              </label>
+              <label>
+                Safe top (mm)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.safeInsetTopMm"
+                />
+              </label>
+              <label>
+                Safe bottom (mm)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="25"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.safeInsetBottomMm"
+                />
+              </label>
+              <label>
+                Safe left (mm)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="15"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.safeInsetLeftMm"
+                />
+              </label>
+              <label>
+                Safe right (mm)
+                <input
+                  class="pb-input"
+                  type="number"
+                  min="0"
+                  max="15"
+                  step="0.5"
+                  [(ngModel)]="draftPhysicalFrame.safeInsetRightMm"
                 />
               </label>
               <label>
@@ -678,7 +732,7 @@
             </div>
             <label class="pb-admin-check">
               <input type="checkbox" [(ngModel)]="draftPhysicalFrame.borderEnabled" />
-              Thin decorative border (double gold line + corner accents)
+              Thin gold border (double hairline)
             </label>
             <p class="pb-hint pb-hint-tight">
               Sheet size ≈

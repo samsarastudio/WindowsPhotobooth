@@ -1,0 +1,67 @@
+<div class="pb-page pb-history">
+  <div class="pb-kiosk-surface pb-history-inner">
+    <h1 class="pb-history-title">{{ copy().history.title }}</h1>
+
+    @if (loading()) {
+      <p class="pb-loading">{{ copy().result.loading }}</p>
+    } @else if (err()) {
+      <p class="pb-msg">{{ err() }}</p>
+    } @else if (!photos().length) {
+      <p class="pb-msg">{{ copy().history.empty }}</p>
+    } @else {
+      <div class="pb-history-layout">
+        <aside class="pb-history-thumbs" aria-label="Previous photos">
+          @for (photo of photos(); track photo.id) {
+            <button
+              type="button"
+              class="pb-history-thumb"
+              [class.pb-history-thumb-active]="selectedId() === photo.id"
+              (click)="selectPhoto(photo)"
+            >
+              @if (thumbUrls()[photo.id]; as thumb) {
+                <img [src]="thumb" alt="" />
+              } @else {
+                <span class="pb-history-thumb-placeholder" aria-hidden="true"></span>
+              }
+              <span class="pb-history-thumb-meta">
+                <span class="pb-history-thumb-label">{{ photo.label }}</span>
+                <span class="pb-history-thumb-time">{{ photo.capturedAt | date: 'short' }}</span>
+              </span>
+            </button>
+          }
+        </aside>
+
+        <div class="pb-history-main">
+          @if (heroUrl(); as hero) {
+            <div class="pb-history-frame" [style.--hero-ar]="heroAspectRatio() ?? 1.5">
+              <img class="pb-history-hero-img" [src]="hero" alt="" (load)="onHeroLoad($event)" />
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <div class="pb-row pb-history-actions">
+      <a routerLink="/" class="pb-btn pb-btn-ghost">{{ copy().history.back }}</a>
+      @if (showPrint() && photos().length) {
+        <button
+          type="button"
+          class="pb-btn pb-btn-primary"
+          [disabled]="!canPrint()"
+          (click)="printOnce()"
+        >
+          @if (printBusy()) {
+            {{ copy().result.printing }}
+          } @else if (printDone()) {
+            {{ copy().result.printed }}
+          } @else {
+            {{ copy().result.print }}
+          }
+        </button>
+      }
+    </div>
+    @if (printErr(); as pe) {
+      <p class="pb-msg">{{ copy().result.printFailed }}: {{ pe }}</p>
+    }
+  </div>
+</div>

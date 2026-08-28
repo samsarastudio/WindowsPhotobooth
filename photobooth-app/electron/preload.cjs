@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('pbApi', {
     return () => ipcRenderer.removeListener('app:log-entry', handler);
   },
   cameraInvoke: (cmd) => ipcRenderer.invoke('camera:invoke', cmd),
+  listCaptureHistory: (options) => ipcRenderer.invoke('capture:listHistory', options || {}),
   readFileBase64: (filePath) => ipcRenderer.invoke('file:readBase64', filePath),
   saveJpeg: (fullPath, base64Body) => ipcRenderer.invoke('file:saveJpeg', fullPath, base64Body),
   adminGetConfig: () => ipcRenderer.invoke('admin:getConfig'),

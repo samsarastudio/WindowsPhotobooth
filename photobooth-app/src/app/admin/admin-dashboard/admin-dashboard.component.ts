@@ -6,6 +6,7 @@ import type {
   PhotoboothGuestModesConfig,
   PhotoboothBranding,
   PhotoboothCameraConfig,
+  PhotoboothCaptureConfig,
   PhotoboothCopy,
   PhotoboothDebugConfig,
   PhotoboothGalleryConfig,
@@ -19,6 +20,7 @@ import {
   PHOTOBOOTH_DEFAULT_AI_MODES,
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
+  PHOTOBOOTH_DEFAULT_CAPTURE,
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
@@ -101,6 +103,7 @@ export class AdminDashboardComponent implements OnInit {
     | 'system'
     | 'debug' = 'copy';
   draft: PhotoboothCopy = structuredClone(PHOTOBOOTH_DEFAULT_COPY);
+  draftCapture: PhotoboothCaptureConfig = structuredClone(PHOTOBOOTH_DEFAULT_CAPTURE);
   draftBranding: PhotoboothBranding = structuredClone(PHOTOBOOTH_DEFAULT_BRANDING);
   draftCamera: PhotoboothCameraConfig = structuredClone(PHOTOBOOTH_DEFAULT_CAMERA);
   draftGallery: PhotoboothGalleryConfig = structuredClone(PHOTOBOOTH_DEFAULT_GALLERY);
@@ -282,6 +285,7 @@ export class AdminDashboardComponent implements OnInit {
 
   private syncFromService(): void {
     this.draft = structuredClone(this.booth.copy());
+    this.draftCapture = structuredClone(this.booth.capture());
     this.activeThemeId = this.booth.activeThemeId();
     const cfg = this.booth.config();
     this.draftAiEnabled = cfg?.aiGenerationEnabled ?? false;
@@ -1336,8 +1340,8 @@ export class AdminDashboardComponent implements OnInit {
     this.status.set(null);
     this.busy.set(true);
     try {
-      const ok = await this.booth.save({ copy: this.draft });
-      this.status.set(ok ? 'Copy saved.' : 'Save failed (run in Electron).');
+      const ok = await this.booth.save({ copy: this.draft, capture: this.draftCapture });
+      this.status.set(ok ? 'Capture settings saved.' : 'Save failed (run in Electron).');
     } finally {
       this.busy.set(false);
     }

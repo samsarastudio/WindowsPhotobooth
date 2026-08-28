@@ -12,13 +12,29 @@ function intEnv(name, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Strip internal listen port from public URLs (Cloudflare serves 443, not :3020). */
+function normalizePublicBaseUrl(raw) {
+  const fallback = 'http://127.0.0.1:3020';
+  const s = String(raw || fallback).trim().replace(/\/$/, '');
+  try {
+    const u = new URL(s);
+    const isLocal = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+    if (!isLocal && u.port === '3020') {
+      u.port = '';
+    }
+    return u.toString().replace(/\/$/, '');
+  } catch {
+    return s;
+  }
+}
+
 export const config = {
   root,
   port: intEnv('PORT', 3020),
   host: process.env.HOST || '127.0.0.1',
   /** When true, serve HTTPS (needed for phone camera on LAN; uses data/certs self-signed). */
   https: String(process.env.HTTPS || '').toLowerCase() === '1' || String(process.env.HTTPS || '').toLowerCase() === 'true',
-  publicBaseUrl: (process.env.PUBLIC_BASE_URL || 'http://127.0.0.1:3020').replace(/\/$/, ''),
+  publicBaseUrl: normalizePublicBaseUrl(process.env.PUBLIC_BASE_URL),
   uploadToken: process.env.UPLOAD_TOKEN || '',
   adminPin: process.env.ADMIN_PIN || '2727',
   defaultTtlDays: intEnv('DEFAULT_TTL_DAYS', 30),

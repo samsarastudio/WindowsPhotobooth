@@ -121,6 +121,15 @@ export const PHOTOBOOTH_DEFAULT_GALLERY: PhotoboothGalleryConfig = {
   uploadAi: true,
 };
 
+export interface PhotoboothCaptureConfig {
+  /** Seconds shown before shutter (3, 5, etc.). */
+  countdownSeconds: number;
+}
+
+export const PHOTOBOOTH_DEFAULT_CAPTURE: PhotoboothCaptureConfig = {
+  countdownSeconds: 5,
+};
+
 export interface PhotoboothDebugConfig {
   /** When true, Admin → Debug shows a live log panel (and a floating dock on guest screens). */
   enabled: boolean;
@@ -195,11 +204,19 @@ export interface PhotoboothCopyCaption {
   applying: string;
 }
 
+export interface PhotoboothCopyHistory {
+  title: string;
+  empty: string;
+  back: string;
+  ariaOpen: string;
+}
+
 export interface PhotoboothCopy {
   attract: PhotoboothCopyAttract;
   qr: PhotoboothCopyQr;
   capture: PhotoboothCopyCapture;
   result: PhotoboothCopyResult;
+  history: PhotoboothCopyHistory;
   aiMode: PhotoboothCopyAiMode;
   boothMode: PhotoboothCopyBoothMode;
   frame: PhotoboothCopyFrame;
@@ -343,8 +360,13 @@ export interface PhotoboothPhysicalFrameConfig {
   cellWidthCm: number;
   /** Height of each cut cell (cm). */
   cellHeightCm: number;
-  /** White inset between cell edge and decorative border (mm). Photo sits inside border. */
+  /** White inset between cell edge and decorative border (mm). */
   innerPaddingMm: number;
+  /** Safe photo area inside the frame — keeps heads inside physical insert (mm). */
+  safeInsetTopMm: number;
+  safeInsetBottomMm: number;
+  safeInsetLeftMm: number;
+  safeInsetRightMm: number;
   /** Gap between the two columns (mm). */
   gapMm: number;
   /** Outer margin around the sheet (mm). */
@@ -360,6 +382,10 @@ export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = 
   cellWidthCm: 5.5,
   cellHeightCm: 7.6,
   innerPaddingMm: 3,
+  safeInsetTopMm: 4,
+  safeInsetBottomMm: 14,
+  safeInsetLeftMm: 1.5,
+  safeInsetRightMm: 6,
   gapMm: 2,
   marginMm: 2,
   dpi: 300,
@@ -377,6 +403,7 @@ export interface PhotoboothConfig {
   print: PhotoboothPrintConfig;
   debug: PhotoboothDebugConfig;
   copy: PhotoboothCopy;
+  capture: PhotoboothCaptureConfig;
   /**
    * Which guest modes are offered after Tap to start.
    * When more than one is enabled, guests pick on `/booth-mode`.
@@ -496,6 +523,12 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     printing: 'Printing…',
     printed: 'Printed',
     printFailed: 'Print failed',
+  },
+  history: {
+    title: 'Print history',
+    empty: 'No photos yet — take one to see it here.',
+    back: 'Back to start',
+    ariaOpen: 'Reprint previous photos',
   },
   aiMode: {
     title: 'Choose a style',

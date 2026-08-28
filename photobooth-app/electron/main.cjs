@@ -590,8 +590,8 @@ async function compositePhotoIntoFrame(
 }
 
 /**
- * Physical-frame cut sheet: rotate landscape capture, two portrait cells (cm),
- * inset padding, thin decorative border, photo scaled inside border.
+ * Physical-frame cut sheet: two portrait cells (cm), safe-area insets,
+ * landscape capture rotated 90° into each cell, uniform scale (no stretch).
  */
 function cmToPx(cm, dpi) {
   return Math.round((Number(cm) / 2.54) * dpi);
@@ -618,9 +618,14 @@ function resolvePhysicalFrameLayoutPx(opts, dpi) {
       : Math.round((Number(opts.marginIn) || 0.25) * dpi);
   const innerPad =
     opts.innerPaddingMm != null ? mmToPx(opts.innerPaddingMm, dpi) : mmToPx(3, dpi);
-  return { cellW, cellH, gap, margin, innerPad };
+  const safeTop = mmToPx(opts.safeInsetTopMm ?? 4, dpi);
+  const safeBottom = mmToPx(opts.safeInsetBottomMm ?? 14, dpi);
+  const safeLeft = mmToPx(opts.safeInsetLeftMm ?? 1.5, dpi);
+  const safeRight = mmToPx(opts.safeInsetRightMm ?? 6, dpi);
+  return { cellW, cellH, gap, margin, innerPad, safeTop, safeBottom, safeLeft, safeRight };
 }
 
+/** Thin gold portrait border for physical-frame cells. */
 function buildPhysicalCellBorderSvg(w, h, dpi) {
   const stroke = Math.max(1, Math.round(dpi / 180));
   const hair = Math.max(1, Math.round(dpi / 360));
@@ -629,42 +634,48 @@ function buildPhysicalCellBorderSvg(w, h, dpi) {
   const y = inset;
   const bw = w - inset * 2;
   const bh = h - inset * 2;
-  const corner = Math.min(bw, bh) * 0.11;
-  const c = corner * 0.55;
-  const paths = [
-    `M ${x} ${y + corner} L ${x} ${y} L ${x + corner} ${y}`,
-    `M ${x + bw - corner} ${y} L ${x + bw} ${y} L ${x + bw} ${y + corner}`,
-    `M ${x + bw} ${y + bh - corner} L ${x + bw} ${y + bh} L ${x + bw - corner} ${y + bh}`,
-    `M ${x + corner} ${y + bh} L ${x} ${y + bh} L ${x} ${y + bh - corner}`,
-  ];
   const inner = stroke + hair + 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="none" stroke="#8b7348" stroke-width="${stroke}" opacity="0.92"/>
   <rect x="${x + inner}" y="${y + inner}" width="${Math.max(1, bw - inner * 2)}" height="${Math.max(1, bh - inner * 2)}" fill="none" stroke="#dcc9a3" stroke-width="${hair}" opacity="0.78"/>
-  ${paths.map((d) => `<path d="${d}" fill="none" stroke="#a08858" stroke-width="${stroke}" stroke-linecap="square" opacity="0.88"/>`).join('\n  ')}
-  <circle cx="${x + c}" cy="${y + c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
-  <circle cx="${x + bw - c}" cy="${y + c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
-  <circle cx="${x + bw - c}" cy="${y + bh - c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
-  <circle cx="${x + c}" cy="${y + bh - c}" r="${hair}" fill="#c4a574" opacity="0.55"/>
 </svg>`;
 }
 
-async function buildPhysicalFrameCell(sharpMod, photoPath, cellW, cellH, innerPad, rotate, borderEnabled, dpi) {
-  const borderStroke = borderEnabled ? Math.max(1, Math.round(dpi / 200)) : 0;
-  const frameW = Math.max(8, cellW - innerPad * 2);
-  const frameH = Math.max(8, cellH - innerPad * 2);
-  const photoW = Math.max(8, frameW - borderStroke * 4);
-  const photoH = Math.max(8, frameH - borderStroke * 4);
-
-  const photoBuf = await sharpMod(photoPath)
-    .rotate(rotate)
-    .resize(photoW, photoH, { fit: 'cover', position: 'centre' })
+async function fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rotateDeg) {
+  const rot = Number(rotateDeg) === -90 ? -90 : 90;
+  const inputBuf = fs.readFileSync(path.resolve(photoPath));
+  const before = await sharpMod(inputBuf).metadata();
+  // IMPORTANT: do NOT chain .rotate() (EXIF) before .rotate(angle) — Sharp ignores the angle.
+  const buf = await sharpMod(inputBuf)
+    .rotate(rot, { background: { r: 255, g: 255, b: 255 } })
+    .resize(safeW, safeH, { fit: 'inside', withoutEnlargement: false })
     .jpeg({ quality: 94, mozjpeg: true })
     .toBuffer();
+  const after = await sharpMod(buf).metadata();
+  appendAppLog('info', 'layouts', 'physical photo rotate+fit', {
+    source: `${before.width}x${before.height}`,
+    fitted: `${after.width}x${after.height}`,
+    safe: `${safeW}x${safeH}`,
+    rotateDegrees: rot,
+  });
+  return {
+    buf,
+    width: after.width || safeW,
+    height: after.height || safeH,
+  };
+}
 
-  const photoLeft = innerPad + borderStroke * 2;
-  const photoTop = innerPad + borderStroke * 2;
-  const composites = [{ input: photoBuf, left: photoLeft, top: photoTop }];
+async function buildPhysicalFrameCell(sharpMod, photoPath, layout, rotate, borderEnabled, dpi) {
+  const { cellW, cellH, innerPad, safeTop, safeBottom, safeLeft, safeRight } = layout;
+  const frameW = Math.max(8, cellW - innerPad * 2);
+  const frameH = Math.max(8, cellH - innerPad * 2);
+  const safeW = Math.max(8, frameW - safeLeft - safeRight);
+  const safeH = Math.max(8, frameH - safeTop - safeBottom);
+
+  const photo = await fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rotate);
+  const photoLeft = innerPad + safeLeft + Math.round((safeW - photo.width) / 2);
+  const photoTop = innerPad + safeTop + Math.round((safeH - photo.height) / 2);
+  const composites = [{ input: photo.buf, left: photoLeft, top: photoTop }];
 
   if (borderEnabled) {
     composites.push({
@@ -691,16 +702,15 @@ async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
   const dpi = Math.max(72, Math.min(600, Math.round(Number(opts.dpi) || 300)));
   const rotate = Number(opts.rotateDegrees) === -90 ? -90 : 90;
   const borderEnabled = opts.borderEnabled !== false;
-  const { cellW, cellH, gap, margin, innerPad } = resolvePhysicalFrameLayoutPx(opts, dpi);
+  const layout = resolvePhysicalFrameLayoutPx(opts, dpi);
+  const { cellW, cellH, gap, margin } = layout;
   const sheetW = margin * 2 + cellW * 2 + gap;
   const sheetH = margin * 2 + cellH;
 
   const photoCell = await buildPhysicalFrameCell(
     sharpMod,
     photoPath,
-    cellW,
-    cellH,
-    innerPad,
+    layout,
     rotate,
     borderEnabled,
     dpi,
@@ -1932,6 +1942,72 @@ ipcMain.handle('camera:invoke', async (_e, cmd) => {
   return res;
 });
 
+function listCaptureHistory(options = {}) {
+  const limit = Math.min(100, Math.max(1, Math.round(Number(options.limit) || 50)));
+  const maxAgeDays = Number(options.maxAgeDays);
+  const cutoff =
+    Number.isFinite(maxAgeDays) && maxAgeDays > 0
+      ? Date.now() - maxAgeDays * 24 * 60 * 60 * 1000
+      : 0;
+  const captureRoot = getCaptureDir();
+  if (!fs.existsSync(captureRoot)) return [];
+
+  const items = [];
+  for (const name of fs.readdirSync(captureRoot)) {
+    if (!/^capture_.+\.jpe?g$/i.test(name)) continue;
+    if (/_live_preview/i.test(name)) continue;
+    const abs = path.resolve(path.join(captureRoot, name));
+    let st;
+    try {
+      st = fs.statSync(abs);
+    } catch {
+      continue;
+    }
+    if (!st.isFile() || st.size <= 0) continue;
+    if (cutoff && st.mtimeMs < cutoff) continue;
+
+    const base = name.replace(/\.jpe?g$/i, '');
+    const framedPath = path.join(captureRoot, `${base}_framed.png`);
+    const physicalPath = path.join(captureRoot, `${base}_physical.png`);
+    const hasFramed = fs.existsSync(framedPath);
+    const hasPhysical = fs.existsSync(physicalPath);
+
+    let displayPath = abs;
+    let layoutMode;
+    let label = 'Digital';
+    if (hasPhysical) {
+      displayPath = physicalPath;
+      layoutMode = 'physicalFrame';
+      label = 'Physical frame';
+    } else if (hasFramed) {
+      displayPath = framedPath;
+      label = 'Framed';
+    }
+
+    items.push({
+      id: base,
+      capturedAt: st.mtime.toISOString(),
+      displayPath: displayPath.replace(/\\/g, '/'),
+      printPath: displayPath.replace(/\\/g, '/'),
+      layoutMode,
+      label,
+    });
+  }
+
+  items.sort((a, b) => (a.capturedAt < b.capturedAt ? 1 : -1));
+  return items.slice(0, limit);
+}
+
+ipcMain.handle('capture:listHistory', async (_e, options) => {
+  try {
+    const photos = listCaptureHistory(options || {});
+    return { ok: true, photos };
+  } catch (e) {
+    appendAppLog('error', 'capture', 'listHistory failed', String(e));
+    return { ok: false, error: String(e), photos: [] };
+  }
+});
+
 ipcMain.handle('file:readBase64', async (_e, filePath) => {
   const buf = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
@@ -2547,6 +2623,10 @@ ipcMain.handle('layouts:physicalFrameDual', async (_e, payload) => {
       cellWidthCm: payload?.cellWidthCm ?? cfg.cellWidthCm,
       cellHeightCm: payload?.cellHeightCm ?? cfg.cellHeightCm,
       innerPaddingMm: payload?.innerPaddingMm ?? cfg.innerPaddingMm,
+      safeInsetTopMm: payload?.safeInsetTopMm ?? cfg.safeInsetTopMm,
+      safeInsetBottomMm: payload?.safeInsetBottomMm ?? cfg.safeInsetBottomMm,
+      safeInsetLeftMm: payload?.safeInsetLeftMm ?? cfg.safeInsetLeftMm,
+      safeInsetRightMm: payload?.safeInsetRightMm ?? cfg.safeInsetRightMm,
       gapMm: payload?.gapMm ?? cfg.gapMm,
       marginMm: payload?.marginMm ?? cfg.marginMm,
       cellWidthIn: payload?.cellWidthIn ?? cfg.cellWidthIn,
@@ -2709,18 +2789,19 @@ function galleryBaseUrl(raw) {
     .replace(/\/$/, '');
 }
 
-/** Pi often has PUBLIC_BASE_URL=127.0.0.1 — rewrite share links to the booth's configured gallery host. */
+/** Rewrite Pi-local or wrong-port share links to the booth's configured gallery host. */
 function normalizeGalleryPublicUrl(url, apiBaseUrl) {
   if (!url || !apiBaseUrl) return url;
   try {
     const u = new URL(String(url));
-    const base = new URL(apiBaseUrl);
+    const base = new URL(
+      String(apiBaseUrl).endsWith('/') ? apiBaseUrl : `${apiBaseUrl}/`,
+    );
     const local = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
-    if (local) {
-      u.protocol = base.protocol;
-      u.host = base.host;
-      return u.toString();
-    }
+    const sameHost = u.hostname === base.hostname;
+    if (!local && !sameHost) return url;
+    const path = `${u.pathname}${u.search}${u.hash}`;
+    return new URL(path, `${base.protocol}//${base.host}`).toString();
   } catch (_) {
     /* keep original */
   }
@@ -2816,7 +2897,14 @@ function saveUploadQueue(q) {
 function notifyUploadQueueItem(item) {
   try {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('gallery:upload-queue-updated', item);
+      const payload =
+        item?.shareUrl && item?.apiBaseUrl
+          ? {
+              ...item,
+              shareUrl: normalizeGalleryPublicUrl(item.shareUrl, item.apiBaseUrl),
+            }
+          : item;
+      mainWindow.webContents.send('gallery:upload-queue-updated', payload);
     }
   } catch (_) {}
 }
@@ -3121,7 +3209,7 @@ ipcMain.handle('gallery:uploadPhoto', async (_e, payload) => {
         ok: true,
         slug: item.slug,
         photoId: item.photoId,
-        shareUrl: item.shareUrl,
+        shareUrl: normalizeGalleryPublicUrl(item.shareUrl, base),
         url: item.url,
         variant: item.variant,
         deduped: true,
@@ -3170,11 +3258,17 @@ ipcMain.handle('gallery:getUploadQueueItem', async (_e, filePath) => {
   try {
     const abs = path.resolve(String(filePath || ''));
     const items = loadUploadQueue().items.filter((i) => i.filePath === abs);
-    const item =
+    let item =
       items.find((i) => i.status === 'ok') ||
       items.find((i) => i.status === 'pending' || i.status === 'queued') ||
       items[items.length - 1] ||
       null;
+    if (item?.shareUrl && item?.apiBaseUrl) {
+      item = {
+        ...item,
+        shareUrl: normalizeGalleryPublicUrl(item.shareUrl, item.apiBaseUrl),
+      };
+    }
     return { ok: true, item };
   } catch (e) {
     return { ok: false, error: String(e) };

@@ -11,6 +11,7 @@ import type {
   PhotoboothPhysicalFrameConfig,
   PhotoboothGuestModesConfig,
   PhotoboothBoothModeId,
+  PhotoboothCaptureConfig,
   PhotoboothPrintConfig,
 } from '../models/photobooth-config.model';
 import {
@@ -18,6 +19,7 @@ import {
   PHOTOBOOTH_DEFAULT_AI_MODES,
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
+  PHOTOBOOTH_DEFAULT_CAPTURE,
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
@@ -34,6 +36,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     qr: { ...base.qr, ...patch.qr },
     capture: { ...base.capture, ...patch.capture },
     result: { ...base.result, ...patch.result },
+    history: { ...base.history, ...patch.history },
     aiMode: { ...base.aiMode, ...patch.aiMode },
     boothMode: { ...base.boothMode, ...patch.boothMode },
     frame: { ...base.frame, ...patch.frame },
@@ -324,6 +327,18 @@ function migratePhysicalFramePatch(
   if (out.borderEnabled == null) {
     out.borderEnabled = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.borderEnabled;
   }
+  if (out.safeInsetTopMm == null) {
+    out.safeInsetTopMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.safeInsetTopMm;
+  }
+  if (out.safeInsetBottomMm == null) {
+    out.safeInsetBottomMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.safeInsetBottomMm;
+  }
+  if (out.safeInsetLeftMm == null) {
+    out.safeInsetLeftMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.safeInsetLeftMm;
+  }
+  if (out.safeInsetRightMm == null) {
+    out.safeInsetRightMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.safeInsetRightMm;
+  }
   return out;
 }
 
@@ -338,11 +353,25 @@ function normalizePhysicalFrameConfig(
     cellWidthCm: clampRange(p.cellWidthCm, 3, 12, base.cellWidthCm),
     cellHeightCm: clampRange(p.cellHeightCm, 4, 15, base.cellHeightCm),
     innerPaddingMm: clampRange(p.innerPaddingMm, 0, 12, base.innerPaddingMm),
+    safeInsetTopMm: clampRange(p.safeInsetTopMm, 0, 20, base.safeInsetTopMm),
+    safeInsetBottomMm: clampRange(p.safeInsetBottomMm, 0, 25, base.safeInsetBottomMm),
+    safeInsetLeftMm: clampRange(p.safeInsetLeftMm, 0, 15, base.safeInsetLeftMm),
+    safeInsetRightMm: clampRange(p.safeInsetRightMm, 0, 15, base.safeInsetRightMm),
     gapMm: clampRange(p.gapMm, 0, 15, base.gapMm),
     marginMm: clampRange(p.marginMm, 0, 15, base.marginMm),
     dpi: Math.round(clampRange(p.dpi, 72, 600, base.dpi)),
     rotateDegrees: rot === -90 ? -90 : 90,
     borderEnabled: typeof p.borderEnabled === 'boolean' ? p.borderEnabled : base.borderEnabled,
+  };
+}
+
+function normalizeCaptureConfig(
+  patch?: Partial<PhotoboothCaptureConfig> | null,
+): PhotoboothCaptureConfig {
+  const base = PHOTOBOOTH_DEFAULT_CAPTURE;
+  const p = patch && typeof patch === 'object' ? patch : {};
+  return {
+    countdownSeconds: Math.round(clampRange(p.countdownSeconds, 1, 15, base.countdownSeconds)),
   };
 }
 
@@ -427,6 +456,9 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const physicalFrame = normalizePhysicalFrameConfig(
     (rest['physicalFrame'] as Partial<PhotoboothPhysicalFrameConfig> | undefined) ?? undefined,
   );
+  const capture = normalizeCaptureConfig(
+    (rest['capture'] as Partial<PhotoboothCaptureConfig> | undefined) ?? undefined,
+  );
   const requireQrUnlock =
     typeof rest['requireQrUnlock'] === 'boolean' ? rest['requireQrUnlock'] : false;
   const aiGenerationEnabled =
@@ -445,6 +477,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     print,
     debug,
     copy,
+    capture,
     guestModes,
     physicalFrame,
     requireQrUnlock,
@@ -466,6 +499,7 @@ export type BoothAdminSavePartial = Partial<
     | 'debug'
     | 'physicalFrame'
     | 'guestModes'
+    | 'capture'
   >
 > & {
   openAiApiKey?: string;
@@ -477,6 +511,7 @@ export type BoothAdminSavePartial = Partial<
   debug?: Partial<PhotoboothDebugConfig>;
   physicalFrame?: Partial<PhotoboothPhysicalFrameConfig>;
   guestModes?: Partial<PhotoboothGuestModesConfig>;
+  capture?: Partial<PhotoboothCaptureConfig>;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -485,6 +520,7 @@ export class BoothConfigService {
 
   readonly config = computed(() => this.state());
   readonly copy = computed(() => this.state()?.copy ?? PHOTOBOOTH_DEFAULT_COPY);
+  readonly capture = computed(() => this.state()?.capture ?? PHOTOBOOTH_DEFAULT_CAPTURE);
   readonly branding = computed(() => this.state()?.branding ?? PHOTOBOOTH_DEFAULT_BRANDING);
   readonly camera = computed(() => this.state()?.camera ?? PHOTOBOOTH_DEFAULT_CAMERA);
   readonly photoFrames = computed(
@@ -553,6 +589,7 @@ export class BoothConfigService {
         print: { ...PHOTOBOOTH_DEFAULT_PRINT },
         debug: { ...PHOTOBOOTH_DEFAULT_DEBUG },
         copy: PHOTOBOOTH_DEFAULT_COPY,
+        capture: { ...PHOTOBOOTH_DEFAULT_CAPTURE },
         guestModes: { ...PHOTOBOOTH_DEFAULT_GUEST_MODES },
         physicalFrame: { ...PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME },
         requireQrUnlock: false,

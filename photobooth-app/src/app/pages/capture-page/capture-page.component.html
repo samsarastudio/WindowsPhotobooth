@@ -14,7 +14,7 @@
         [class.pb-preview-wrap--empty]="showPreviewPlaceholder() || cameraFailed()"
         [style.--preview-ar]="previewAspectRatio() ?? 1.5"
       >
-        @if (showPreviewPlaceholder() || capturing()) {
+        @if (showPreviewPlaceholder() || (capturing() && !useWebcam())) {
           <div class="pb-preview pb-preview-placeholder">{{
             capturing() ? copy().capture.capturing : copy().capture.starting
           }}</div>

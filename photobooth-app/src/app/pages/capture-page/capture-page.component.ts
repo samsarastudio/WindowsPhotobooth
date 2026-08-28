@@ -370,15 +370,18 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   private startCountdown(): void {
     this.clearCountdown();
-    let n = 5;
+    let n = Math.round(this.booth.capture().countdownSeconds);
+    if (!Number.isFinite(n) || n < 1) n = 5;
     this.countdown.set(n);
     this.countdownTimer = setInterval(() => {
       n -= 1;
       if (n <= 0) {
         if (this.countdownTimer) clearInterval(this.countdownTimer);
         this.countdown.set(0);
-        this.capturing.set(true);
-        this.resetPreviewBuffers();
+        if (!this.useWebcam()) {
+          this.capturing.set(true);
+          this.resetPreviewBuffers();
+        }
         void this.captureShot();
       } else {
         this.countdown.set(n);
@@ -395,12 +398,14 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async captureShot(): Promise<void> {
-    this.capturing.set(true);
     this.clearCountdown();
-    this.resetPreviewBuffers();
-    if (this.previewTimer) {
-      clearInterval(this.previewTimer);
-      this.previewTimer = undefined;
+    if (!this.useWebcam()) {
+      this.capturing.set(true);
+      this.resetPreviewBuffers();
+      if (this.previewTimer) {
+        clearInterval(this.previewTimer);
+        this.previewTimer = undefined;
+      }
     }
 
     const paths = await this.camera.getPaths();
@@ -411,11 +416,17 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     if (this.useWebcam()) {
       const path = await this.captureWebcamFrame(outPath);
       if (path) {
+        this.capturing.set(true);
         this.mediaStream?.getTracks().forEach((t) => t.stop());
         this.mediaStream = undefined;
         await this.camera.closeSession();
         await this.navigateResult(path);
       } else {
+        void this.boothLog.warn('capture', 'webcam frame grab failed', {
+          hasStream: !!this.mediaStream,
+          hasVideoEl: !!this.videoRef?.nativeElement,
+          videoWidth: this.videoRef?.nativeElement?.videoWidth ?? 0,
+        });
         this.hint.set('Could not grab a frame — waiting for camera…');
         this.cameraReady.set(false);
         this.capturing.set(false);
@@ -439,8 +450,8 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async captureWebcamFrame(targetPath: string): Promise<string | null> {
-    const video = this.videoRef?.nativeElement;
-    if (!video || !video.videoWidth) {
+    const video = await this.resolveWebcamVideoElement();
+    if (!video?.videoWidth) {
       return null;
     }
     const canvas = document.createElement('canvas');
@@ -458,6 +469,37 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     const r = await window.pbApi.saveJpeg(targetPath.replace(/\\/g, '/'), base64);
     if (!r.ok || !r.path) return null;
     return r.path;
+  }
+
+  /** Keep webcam capture working even if Angular briefly unmounts the preview `<video>`. */
+  private async resolveWebcamVideoElement(): Promise<HTMLVideoElement | null> {
+    const mounted = this.videoRef?.nativeElement;
+    if (mounted && mounted.videoWidth > 0) {
+      return mounted;
+    }
+    const stream = this.mediaStream;
+    if (!stream) {
+      return mounted ?? null;
+    }
+    const temp = document.createElement('video');
+    temp.srcObject = stream;
+    temp.muted = true;
+    temp.playsInline = true;
+    try {
+      await temp.play();
+    } catch {
+      return mounted ?? null;
+    }
+    await new Promise<void>((resolve) => {
+      if (temp.videoWidth > 0) {
+        resolve();
+        return;
+      }
+      const done = () => resolve();
+      temp.addEventListener('loadeddata', done, { once: true });
+      setTimeout(done, 800);
+    });
+    return temp.videoWidth > 0 ? temp : mounted ?? null;
   }
 
   private async navigateResult(filePath: string): Promise<void> {

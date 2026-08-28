@@ -5,10 +5,17 @@
     "defaultEnabled": true,
     "physicalFrameEnabled": true
   },
+  "capture": {
+    "countdownSeconds": 5
+  },
   "physicalFrame": {
     "cellWidthCm": 5.5,
     "cellHeightCm": 7.6,
     "innerPaddingMm": 3,
+    "safeInsetTopMm": 4,
+    "safeInsetBottomMm": 14,
+    "safeInsetLeftMm": 1.5,
+    "safeInsetRightMm": 6,
     "gapMm": 2,
     "marginMm": 2,
     "dpi": 300,
@@ -143,6 +150,12 @@
       "printing": "Printing…",
       "printed": "Printed",
       "printFailed": "Print failed"
+    },
+    "history": {
+      "title": "Print history",
+      "empty": "No photos yet — take one to see it here.",
+      "back": "Back to start",
+      "ariaOpen": "Reprint previous photos"
     },
     "aiMode": {
       "title": "Choose a style",

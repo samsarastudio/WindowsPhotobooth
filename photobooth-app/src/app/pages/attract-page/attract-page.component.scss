@@ -22,3 +22,27 @@
   opacity: 0.95;
   text-decoration: underline;
 }
+
+.pb-attract-history {
+  position: absolute;
+  top: clamp(0.5rem, 2vmin, 1rem);
+  right: clamp(0.5rem, 2vmin, 1rem);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  font-size: 1.15rem;
+  opacity: 0.45;
+  color: var(--pb-kia-admin-ink, rgba(255, 255, 255, 0.5));
+  text-decoration: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pb-attract-history:hover {
+  opacity: 0.95;
+  background: rgba(255, 255, 255, 0.12);
+}

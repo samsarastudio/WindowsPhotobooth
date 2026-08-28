@@ -104,19 +104,19 @@ export class GalleryUploadService implements OnDestroy {
     this.revision.update((n) => n + 1);
   }
 
-  /** Rewrite Pi localhost share links using Admin → Gallery API base URL. */
+  /** Rewrite Pi-local or wrong-port share links using Admin → Gallery API base URL. */
   private normalizeShareUrl(shareUrl: string | undefined): string | undefined {
     if (!shareUrl) return shareUrl;
     const base = (this.booth.gallery().apiBaseUrl || '').replace(/\/$/, '');
     if (!base) return shareUrl;
     try {
       const u = new URL(shareUrl);
-      if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
-        const b = new URL(base);
-        u.protocol = b.protocol;
-        u.host = b.host;
-        return u.toString();
-      }
+      const b = new URL(base.endsWith('/') ? base : `${base}/`);
+      const local = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
+      const sameHost = u.hostname === b.hostname;
+      if (!local && !sameHost) return shareUrl;
+      const path = `${u.pathname}${u.search}${u.hash}`;
+      return new URL(path, `${b.protocol}//${b.host}`).toString();
     } catch {
       /* keep original */
     }

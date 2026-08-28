@@ -23,6 +23,15 @@ export interface PbCameraResult {
   readErr?: string;
 }
 
+export interface PbCaptureHistoryItem {
+  id: string;
+  capturedAt: string;
+  displayPath: string;
+  printPath: string;
+  layoutMode?: 'physicalFrame';
+  label: string;
+}
+
 export interface PhotoboothConfigPublic {
   activeThemeId: string;
   branding?: Record<string, unknown>;
@@ -85,6 +94,14 @@ export interface PbApi {
     }) => void,
   ): () => void;
   cameraInvoke(cmd: Record<string, unknown>): Promise<PbCameraResult>;
+  listCaptureHistory(options?: {
+    limit?: number;
+    maxAgeDays?: number;
+  }): Promise<{
+    ok: boolean;
+    photos?: PbCaptureHistoryItem[];
+    error?: string;
+  }>;
   readFileBase64(filePath: string): Promise<string>;
   saveJpeg(fullPath: string, base64Body: string): Promise<{ ok: boolean; path?: string }>;
   adminGetConfig(): Promise<{ ok: boolean; config?: PhotoboothConfigPublic; error?: string }>;
@@ -171,6 +188,10 @@ export interface PbApi {
     cellWidthCm?: number;
     cellHeightCm?: number;
     innerPaddingMm?: number;
+    safeInsetTopMm?: number;
+    safeInsetBottomMm?: number;
+    safeInsetLeftMm?: number;
+    safeInsetRightMm?: number;
     gapMm?: number;
     marginMm?: number;
     borderEnabled?: boolean;
