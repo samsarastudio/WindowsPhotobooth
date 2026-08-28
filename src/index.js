@@ -4,7 +4,7 @@ import https from 'node:https';
 import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
-import { config } from './config.js';
+import { config, isLocalPublicBaseUrl, allowLocalPublicBaseUrl } from './config.js';
 import { initDb, getDb, isSessionExpired, publicPhoto } from './db.js';
 import { getUploadToken } from './auth.js';
 import { sessionsRouter } from './routes/sessions.js';
@@ -38,7 +38,7 @@ app.get('/api/health', (_req, res) => {
     port: config.port,
     publicBaseUrl: config.publicBaseUrl,
     /** Bumped when share APIs change — use to confirm Pi restarted the right build. */
-    build: '20260827-share-qa',
+    build: '20260828-public-url',
     shareApi: true,
   });
 });
@@ -204,6 +204,11 @@ const onListen = () => {
   console.log(
     `[moments] listening on ${scheme}://${config.host}:${config.port} → ${config.publicBaseUrl}`,
   );
+  if (isLocalPublicBaseUrl(config.publicBaseUrl) && allowLocalPublicBaseUrl()) {
+    console.warn(
+      '[moments] PUBLIC_BASE_URL is localhost (ALLOW_LOCAL_PUBLIC_URL=1) — share links and event QR PDFs will only work on this machine.',
+    );
+  }
   if (config.https) {
     console.log(
       '[moments] Phone camera needs HTTPS. On first visit, accept the certificate warning, then tap Enable camera.',
