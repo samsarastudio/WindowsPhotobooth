@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
-import { config } from '../config.js';
+import { config, isLocalPublicBaseUrl, normalizePublicBaseUrl } from '../config.js';
 import {
   getDb,
   isSessionExpired,
@@ -18,6 +18,17 @@ export const adminRouter = Router();
 
 adminRouter.use(requireAdminPin);
 
+function publicBaseUrlSource() {
+  const envRaw = process.env.PUBLIC_BASE_URL || '';
+  if (envRaw.trim() && !isLocalPublicBaseUrl(normalizePublicBaseUrl(envRaw))) return 'env';
+  const settingsRaw = loadSettings().publicBaseUrl || '';
+  if (settingsRaw.trim() && !isLocalPublicBaseUrl(normalizePublicBaseUrl(settingsRaw))) {
+    return 'settings';
+  }
+  if (isLocalPublicBaseUrl(config.publicBaseUrl)) return 'local-dev';
+  return 'production-default';
+}
+
 function adminSettingsPayload() {
   const settings = loadSettings();
   const uploadToken = getUploadToken();
@@ -31,6 +42,7 @@ function adminSettingsPayload() {
         ? 'env'
         : 'none',
     publicBaseUrl: config.publicBaseUrl,
+    publicBaseUrlSource: publicBaseUrlSource(),
   };
 }
 

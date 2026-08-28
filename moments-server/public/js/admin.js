@@ -383,7 +383,17 @@ async function refreshPhotos() {
 
 function applyTokenSettings(settings) {
   if (uploadTokenEl) uploadTokenEl.value = settings.uploadToken || '';
-  if (publicBaseUrlEl) publicBaseUrlEl.textContent = settings.publicBaseUrl || '?';
+  if (publicBaseUrlEl) {
+    publicBaseUrlEl.textContent = settings.publicBaseUrl || '?';
+    const local = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/i.test(settings.publicBaseUrl || '');
+    publicBaseUrlEl.classList.toggle('warn', local);
+    const src = settings.publicBaseUrlSource || '';
+    publicBaseUrlEl.title = local
+      ? 'Local dev only. On the Pi, unset ALLOW_LOCAL_PUBLIC_URL and restart — URLs default to production.'
+      : src === 'production-default'
+        ? 'Using production default (moments.inmomentservices.com). Set PUBLIC_BASE_URL in .env to override.'
+        : '';
+  }
   if (tokenMetaEl) {
     const src =
       settings.uploadTokenSource === 'settings'
