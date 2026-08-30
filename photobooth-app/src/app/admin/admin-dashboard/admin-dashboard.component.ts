@@ -32,6 +32,8 @@ import {
 import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { BoothLogService } from '../../services/booth-log.service';
+import { CapturePhotoBrowserComponent } from '../../components/capture-photo-browser/capture-photo-browser.component';
+import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
 import { CameraService } from '../../services/camera.service';
 import { ThemeService } from '../../services/theme.service';
 import { setAdminSession } from '../admin.guard';
@@ -62,8 +64,10 @@ interface PrinterOption {
   driverName?: string;
   portName?: string;
   isIppClass?: boolean;
+  usesIppDriver?: boolean;
   isCanonDriver?: boolean;
   isUsb?: boolean;
+  isNetwork?: boolean;
 }
 
 interface AdminFrameItem {
@@ -85,7 +89,7 @@ interface UploadQueueSummary {
 
 @Component({
   selector: 'pb-admin-dashboard',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PrintTroubleDialogComponent, CapturePhotoBrowserComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.scss',
 })
@@ -98,6 +102,7 @@ export class AdminDashboardComponent implements OnInit {
     | 'frames'
     | 'modes'
     | 'gallery'
+    | 'photos'
     | 'print'
     | 'ai'
     | 'system'
@@ -154,6 +159,7 @@ export class AdminDashboardComponent implements OnInit {
   aiBackgrounds = signal<Record<string, AiBackgroundItem[]>>({});
   status = signal<string | null>(null);
   busy = signal(false);
+  printTroubleErr = signal<string | null>(null);
   uploadQueueSummary = signal<UploadQueueSummary | null>(null);
   galleryForceResync = false;
 
@@ -330,6 +336,7 @@ export class AdminDashboardComponent implements OnInit {
       | 'frames'
       | 'modes'
       | 'gallery'
+      | 'photos'
       | 'print'
       | 'ai'
       | 'system'
@@ -665,7 +672,9 @@ export class AdminDashboardComponent implements OnInit {
       this.status.set('Printer list requires Electron (packaged or electron:dev).');
       return;
     }
-    const r = await window.pbApi.listPrinters();
+    const r = await window.pbApi.listPrinters({
+      allowWifi: !!this.draftPrint.allowWifiPrinters,
+    });
     if (!r.ok || !r.printers) {
       this.printers.set([]);
       if (r.error) this.status.set(r.error);
@@ -679,23 +688,34 @@ export class AdminDashboardComponent implements OnInit {
         driverName: p.driverName || '',
         portName: p.portName || '',
         isIppClass: !!p.isIppClass,
+        usesIppDriver: !!p.usesIppDriver,
         isCanonDriver: !!p.isCanonDriver,
         isUsb: p.isUsb !== false,
+        isNetwork: !!p.isNetwork || !!p.isIppClass,
       })),
     );
+    const usbHint = r.selphyUsb?.code28
+      ? ' SELPHY USB print interface is Code 28 — tap Fix SELPHY USB driver (one Windows approval).'
+      : r.selphyUsb?.usesIppDriver
+        ? ' Queue is Microsoft IPP on USB — usable as a fallback; Fix SELPHY USB driver binds the real print interface.'
+        : '';
     if (
       this.draftPrint.printerName &&
       !r.printers.some((p) => p.name === this.draftPrint.printerName)
     ) {
       this.draftPrint.printerName = null;
       this.status.set(
-        `Saved printer was not a USB queue (or is offline). Switched to Auto — plug in SELPHY USB and Refresh if needed.`,
+        `Saved printer was not a USB${this.draftPrint.allowWifiPrinters ? ' or Wi‑Fi' : ''} queue (or is offline). Switched to Auto.${usbHint}`,
       );
     } else if (!r.printers.length) {
-      this.status.set('No USB printers found. Connect the SELPHY by USB, then Refresh.');
+      this.status.set(
+        this.draftPrint.allowWifiPrinters
+          ? `No printers found. Connect USB or add a Wi‑Fi queue, then Refresh.${usbHint}`
+          : `No USB printers found. Connect the SELPHY by USB, then Refresh.${usbHint}`,
+      );
     } else {
       this.status.set(
-        `${r.printers.length} USB printer${r.printers.length === 1 ? '' : 's'} available.`,
+        `${r.printers.length} USB printer${r.printers.length === 1 ? '' : 's'} available.${usbHint}`,
       );
     }
   }
@@ -703,7 +723,13 @@ export class AdminDashboardComponent implements OnInit {
   printerLabel(p: PrinterOption): string {
     const tags: string[] = [];
     if (p.isDefault) tags.push('Windows default');
-    if (p.isCanonDriver) tags.push('Canon');
+    if (p.isUsb) {
+      if (p.usesIppDriver) tags.push('USB IPP fallback');
+      else if (p.isCanonDriver) tags.push('Canon USB');
+    } else {
+      tags.push('Wi‑Fi');
+      if (p.isCanonDriver) tags.push('Canon');
+    }
     if (p.portName) tags.push(p.portName);
     const tag = tags.length ? ` [${tags.join(', ')}]` : '';
     return `${p.displayName}${tag}`;
@@ -715,6 +741,10 @@ export class AdminDashboardComponent implements OnInit {
     return this.printers().find((p) => p.name === name) ?? null;
   }
 
+  onAllowWifiChange(): void {
+    void this.refreshPrinters();
+  }
+
   async savePrint(): Promise<void> {
     this.status.set(null);
     this.busy.set(true);
@@ -724,6 +754,7 @@ export class AdminDashboardComponent implements OnInit {
           enabled: !!this.draftPrint.enabled,
           printerName: this.draftPrint.printerName?.trim() || null,
           bleedScale: this.draftPrint.bleedScale ?? 1.06,
+          allowWifiPrinters: !!this.draftPrint.allowWifiPrinters,
         },
       });
       if (ok) {
@@ -731,13 +762,64 @@ export class AdminDashboardComponent implements OnInit {
         this.status.set(
           this.draftPrint.enabled
             ? this.draftPrint.printerName
-              ? `Print enabled → ${this.draftPrint.printerName} (USB).`
-              : 'Print enabled → Auto USB Canon/SELPHY.'
+              ? `Print enabled → ${this.draftPrint.printerName}${this.selectedPrinter()?.isUsb === false ? ' (Wi‑Fi).' : ' (USB).'}`
+              : this.draftPrint.allowWifiPrinters
+                ? 'Print enabled → Auto (USB first, then Wi‑Fi).'
+                : 'Print enabled → Auto USB Canon/SELPHY.'
             : 'Print settings saved (printing disabled).',
         );
       } else {
         this.status.set('Save failed (run in Electron).');
       }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async repairSelphyUsb(): Promise<void> {
+    if (!window.pbApi?.repairSelphyUsb) {
+      this.status.set('SELPHY USB repair requires Electron.');
+      return;
+    }
+    this.busy.set(true);
+    this.status.set('Fixing SELPHY USB driver… approve the Windows prompt if it appears.');
+    try {
+      const r = await window.pbApi.repairSelphyUsb();
+      if (r.printers?.length) {
+        this.printers.set(
+          r.printers.map((p) => ({
+            name: p.name,
+            displayName: p.name,
+            isDefault: false,
+            driverName: p.driverName || '',
+            portName: p.portName || '',
+            isUsb: true,
+          })),
+        );
+      }
+      const reason = r.repair?.reason || '';
+      if (r.repair?.needsReboot) {
+        this.status.set(
+          'USB driver still shows Code 28. Leave the printer plugged in and restart Windows, then Refresh printers.',
+        );
+      } else if (reason === 'uac-declined') {
+        this.status.set('Windows approval was declined. The USB print driver cannot bind without it.');
+      } else if (reason === 'printer-not-present') {
+        this.status.set(
+          'Windows did not see a live SELPHY USB device. Leave it plugged in (Device Manager may show SELPHY under Other devices — that interface is not the printer). Tap Fix SELPHY USB driver again and approve the Windows prompt.',
+        );
+      } else if (r.ok) {
+        this.status.set(
+          reason === 'already-ok'
+            ? 'SELPHY USB print interface is already bound.'
+            : 'SELPHY USB driver repair finished. Refresh printers, then Test print.',
+        );
+        await this.refreshPrinters();
+      } else {
+        this.status.set(r.error || 'SELPHY USB repair did not complete.');
+      }
+    } catch (e) {
+      this.status.set(String(e));
     } finally {
       this.busy.set(false);
     }
@@ -757,20 +839,26 @@ export class AdminDashboardComponent implements OnInit {
           enabled: true,
           printerName: this.draftPrint.printerName?.trim() || null,
           bleedScale: this.draftPrint.bleedScale ?? 1.06,
+          allowWifiPrinters: !!this.draftPrint.allowWifiPrinters,
         },
       });
       this.draftPrint.enabled = true;
       this.syncFromService();
       const r = await window.pbApi.printTest();
       if (r.ok) {
+        this.printTroubleErr.set(null);
         this.status.set(
           `Test print sent${r.deviceName ? ` → ${r.deviceName}` : ''}${r.paper ? ` (${r.paper})` : ''}.`,
         );
       } else {
-        this.status.set(r.error || 'Test print failed.');
+        const err = r.error || 'Test print failed.';
+        this.printTroubleErr.set(err);
+        this.status.set(err);
       }
     } catch (e) {
-      this.status.set(String(e));
+      const err = String(e);
+      this.printTroubleErr.set(err);
+      this.status.set(err);
     } finally {
       this.busy.set(false);
     }

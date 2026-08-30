@@ -1,6 +1,6 @@
 {
   "name": "photobooth-app",
-  "version": "1.1.24",
+  "version": "1.1.28",
   "description": "PhotoBooth — Electron + Angular + Canon EDSDK",
   "main": "electron/main.cjs",
   "scripts": {
@@ -51,7 +51,8 @@
     "appId": "com.photobooth.app",
     "productName": "PhotoBooth",
     "asarUnpack": [
-      "**/node_modules/sharp/**/*"
+      "**/node_modules/sharp/**/*",
+      "electron/selphy-usb-repair.ps1"
     ],
     "directories": {
       "output": "release"
@@ -79,6 +80,10 @@
       {
         "from": "config",
         "to": "config"
+      },
+      {
+        "from": "electron/selphy-usb-repair.ps1",
+        "to": "selphy-usb-repair.ps1"
       },
       {
         "from": "theme-template",

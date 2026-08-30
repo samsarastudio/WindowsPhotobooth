@@ -520,7 +520,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     await this.router.navigate(['/result'], { state: { path: filePath } });
   }
 
-  /** Dual polaroid-size cut sheet (2 columns) for physical frames — local only, not wall/gallery. */
+  /** Dual polaroid-size cut sheet (2 columns) for physical frames. Sheet uploads for admin download only. */
   private async applyPhysicalFrameAndNavigate(filePath: string): Promise<void> {
     if (!window.pbApi?.applyPhysicalFrameLayout) {
       this.hint.set('Physical frame layout requires Electron.');
@@ -538,6 +538,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
         await this.router.navigate(['/result'], { state: { path: filePath } });
         return;
       }
+      this.galleryUpload.queueUpload(r.path, 'physical');
       await this.router.navigate(['/result'], { state: { path: r.path } });
     } catch (e) {
       this.hint.set(String(e));

@@ -16,7 +16,7 @@ import { requireUploadToken } from '../auth.js';
 import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
 import { notifyWallPhoto } from './wall.js';
 
-const VARIANTS = new Set(['original', 'framed', 'ai']);
+const VARIANTS = new Set(['original', 'framed', 'ai', 'physical']);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -188,7 +188,7 @@ sessionsRouter.post(
     }
     const variant = String(req.body?.variant || 'original').toLowerCase();
     if (!VARIANTS.has(variant)) {
-      return res.status(400).json({ ok: false, error: 'variant must be original|framed|ai' });
+      return res.status(400).json({ ok: false, error: 'variant must be original|framed|ai|physical' });
     }
 
     const width = req.body?.width ? Number(req.body.width) : null;
@@ -276,7 +276,7 @@ sessionsRouter.post(
 
     const photo = publicPhoto(session.slug, row);
     const showOriginals = loadSettings().showOriginalPhotos !== false;
-    const pushLive = variant !== 'original' || showOriginals;
+    const pushLive = variant !== 'physical' && (variant !== 'original' || showOriginals);
     if (pushLive) {
       broadcastPhotoAdded(session.slug, photo);
       notifyWallPhoto({

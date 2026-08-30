@@ -15,7 +15,10 @@ contextBridge.exposeInMainWorld('pbApi', {
   },
   cameraInvoke: (cmd) => ipcRenderer.invoke('camera:invoke', cmd),
   listCaptureHistory: (options) => ipcRenderer.invoke('capture:listHistory', options || {}),
+  deleteCaptureHistory: (id) => ipcRenderer.invoke('capture:deleteHistory', id),
   readFileBase64: (filePath) => ipcRenderer.invoke('file:readBase64', filePath),
+  readFileThumbBase64: (filePath, maxEdge) =>
+    ipcRenderer.invoke('file:readThumbBase64', filePath, maxEdge),
   saveJpeg: (fullPath, base64Body) => ipcRenderer.invoke('file:saveJpeg', fullPath, base64Body),
   adminGetConfig: () => ipcRenderer.invoke('admin:getConfig'),
   adminSaveConfig: (partial) => ipcRenderer.invoke('admin:saveConfig', partial),
@@ -64,7 +67,8 @@ contextBridge.exposeInMainWorld('pbApi', {
   gallerySyncFrames: (payload) => ipcRenderer.invoke('gallery:syncFrames', payload),
   galleryPublishFrame: (payload) => ipcRenderer.invoke('gallery:publishFrame', payload),
   galleryDeleteRemoteFrame: (payload) => ipcRenderer.invoke('gallery:deleteRemoteFrame', payload),
-  listPrinters: () => ipcRenderer.invoke('print:listPrinters'),
+  listPrinters: (payload) => ipcRenderer.invoke('print:listPrinters', payload || {}),
+  repairSelphyUsb: () => ipcRenderer.invoke('print:repairSelphyUsb'),
   printPhoto: (payload) => ipcRenderer.invoke('print:photo', payload),
   printTest: () => ipcRenderer.invoke('print:test'),
 });

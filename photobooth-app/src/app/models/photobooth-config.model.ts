@@ -109,6 +109,8 @@ export interface PhotoboothGalleryConfig {
   uploadOriginal: boolean;
   uploadFramed: boolean;
   uploadAi: boolean;
+  /** Dual-column cut sheets — stored for Moments admin download, not guest wall/gallery. */
+  uploadPhysical: boolean;
 }
 
 export const PHOTOBOOTH_DEFAULT_GALLERY: PhotoboothGalleryConfig = {
@@ -119,6 +121,7 @@ export const PHOTOBOOTH_DEFAULT_GALLERY: PhotoboothGalleryConfig = {
   uploadOriginal: true,
   uploadFramed: true,
   uploadAi: true,
+  uploadPhysical: true,
 };
 
 export interface PhotoboothCaptureConfig {
@@ -143,8 +146,8 @@ export interface PhotoboothPrintConfig {
   /** Show a one-shot Print button on the result / final gallery screen. */
   enabled: boolean;
   /**
-   * Windows USB printer queue name.
-   * Empty / null = auto-pick USB Canon/SELPHY (never Windows default / IPP / PDF).
+   * Windows printer queue name.
+   * Empty / null = auto-pick USB Canon/SELPHY first, then Wi‑Fi if allowWifiPrinters.
    */
   printerName: string | null;
   /**
@@ -152,12 +155,15 @@ export interface PhotoboothPrintConfig {
    * Removes thin white borders on USB Canon driver prints.
    */
   bleedScale: number;
+  /** Include Wi‑Fi / IPP / WSD queues in the printer list (USB is still preferred). */
+  allowWifiPrinters: boolean;
 }
 
 export const PHOTOBOOTH_DEFAULT_PRINT: PhotoboothPrintConfig = {
   enabled: false,
   printerName: null,
   bleedScale: 1.06,
+  allowWifiPrinters: false,
 };
 
 export interface PhotoboothCopyAiMode {
@@ -209,6 +215,18 @@ export interface PhotoboothCopyHistory {
   empty: string;
   back: string;
   ariaOpen: string;
+  filterAll: string;
+  filterPhysical: string;
+  filterDigital: string;
+  whenAll: string;
+  whenToday: string;
+  whenYesterday: string;
+  whenWeek: string;
+  whenMonth: string;
+  whenCustom: string;
+  deleteLabel: string;
+  deleteConfirm: string;
+  cancel: string;
 }
 
 export interface PhotoboothCopy {
@@ -529,6 +547,18 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     empty: 'No photos yet — take one to see it here.',
     back: 'Back to start',
     ariaOpen: 'Reprint previous photos',
+    filterAll: 'All',
+    filterPhysical: 'Physical',
+    filterDigital: 'Digital',
+    whenAll: 'All dates',
+    whenToday: 'Today',
+    whenYesterday: 'Yesterday',
+    whenWeek: 'Last 7 days',
+    whenMonth: 'This month',
+    whenCustom: 'Custom dates',
+    deleteLabel: 'Delete',
+    deleteConfirm: 'Delete this photo from this booth? This cannot be undone.',
+    cancel: 'Cancel',
   },
   aiMode: {
     title: 'Choose a style',

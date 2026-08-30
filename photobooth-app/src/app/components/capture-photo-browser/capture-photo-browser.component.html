@@ -1,0 +1,141 @@
+<div class="pb-cb-toolbar">
+  <div class="pb-cb-filters" role="group" aria-label="Photo type">
+    <button type="button" class="pb-cb-chip" [class.is-on]="kindFilter() === 'all'" (click)="setKind('all')">
+      {{ copy().history.filterAll }}
+    </button>
+    <button
+      type="button"
+      class="pb-cb-chip"
+      [class.is-on]="kindFilter() === 'physical'"
+      (click)="setKind('physical')"
+    >
+      {{ copy().history.filterPhysical }}
+    </button>
+    <button type="button" class="pb-cb-chip" [class.is-on]="kindFilter() === 'normal'" (click)="setKind('normal')">
+      {{ copy().history.filterDigital }}
+    </button>
+  </div>
+  <div class="pb-cb-filters" role="group" aria-label="Date">
+    <button type="button" class="pb-cb-chip" [class.is-on]="whenFilter() === 'all'" (click)="setWhen('all')">
+      {{ copy().history.whenAll }}
+    </button>
+    <button type="button" class="pb-cb-chip" [class.is-on]="whenFilter() === 'today'" (click)="setWhen('today')">
+      {{ copy().history.whenToday }}
+    </button>
+    <button
+      type="button"
+      class="pb-cb-chip"
+      [class.is-on]="whenFilter() === 'yesterday'"
+      (click)="setWhen('yesterday')"
+    >
+      {{ copy().history.whenYesterday }}
+    </button>
+    <button type="button" class="pb-cb-chip" [class.is-on]="whenFilter() === 'week'" (click)="setWhen('week')">
+      {{ copy().history.whenWeek }}
+    </button>
+    <button type="button" class="pb-cb-chip" [class.is-on]="whenFilter() === 'month'" (click)="setWhen('month')">
+      {{ copy().history.whenMonth }}
+    </button>
+    <button type="button" class="pb-cb-chip" [class.is-on]="whenFilter() === 'custom'" (click)="setWhen('custom')">
+      {{ copy().history.whenCustom }}
+    </button>
+  </div>
+  @if (whenFilter() === 'custom') {
+    <div class="pb-cb-dates">
+      <input class="pb-input pb-cb-date" type="date" [value]="customFrom()" (change)="onCustomFrom($event)" />
+      <input class="pb-input pb-cb-date" type="date" [value]="customTo()" (change)="onCustomTo($event)" />
+    </div>
+  }
+  <p class="pb-cb-count">{{ filtered().length }} photos</p>
+</div>
+
+@if (loading()) {
+  <p class="pb-cb-msg">{{ copy().result.loading }}</p>
+} @else if (err()) {
+  <p class="pb-cb-msg">{{ err() }}</p>
+} @else if (!filtered().length) {
+  <p class="pb-cb-msg">{{ copy().history.empty }}</p>
+} @else {
+  <div class="pb-cb-grid" role="list">
+    @for (photo of pageItems(); track photo.id) {
+      <button
+        type="button"
+        class="pb-cb-card"
+        role="listitem"
+        [class.is-on]="selectedId() === photo.id"
+        (click)="selectPhoto(photo)"
+      >
+        @if (thumbUrls()[photo.id]; as thumb) {
+          <img [src]="thumb" alt="" />
+        } @else {
+          <span class="pb-cb-ph" aria-hidden="true"></span>
+        }
+        <span class="pb-cb-meta">
+          <span class="pb-cb-kind" [class.is-physical]="photo.kind === 'physical'">{{ photo.label }}</span>
+          <span class="pb-cb-time">{{ photo.capturedAt | date: 'MMM d, h:mm a' }}</span>
+        </span>
+      </button>
+    }
+  </div>
+  <div class="pb-cb-pager">
+    <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="page() <= 1" (click)="goPage(-1)">
+      Prev
+    </button>
+    <span>Page {{ page() > pageCount() ? pageCount() : page() }} of {{ pageCount() }}</span>
+    <button
+      type="button"
+      class="pb-btn pb-btn-ghost pb-btn-sm"
+      [disabled]="page() >= pageCount()"
+      (click)="goPage(1)"
+    >
+      Next
+    </button>
+  </div>
+}
+
+<div class="pb-cb-actions">
+  @if (printEnabled() && photos().length) {
+    <button type="button" class="pb-btn pb-btn-primary" [disabled]="!canPrint()" (click)="printOnce()">
+      @if (printBusy()) {
+        {{ copy().result.printing }}
+      } @else if (printDone()) {
+        {{ copy().result.printed }}
+      } @else {
+        {{ copy().result.print }}
+      }
+    </button>
+  }
+  <button
+    type="button"
+    class="pb-btn pb-btn-ghost"
+    [disabled]="!selected() || deleteBusy()"
+    (click)="askDelete()"
+  >
+    {{ copy().history.deleteLabel }}
+  </button>
+</div>
+
+@if (confirmDelete()) {
+  <div class="pb-cb-modal" role="dialog" aria-modal="true" aria-labelledby="pb-cb-del-title">
+    <div class="pb-cb-modal-card">
+      <p id="pb-cb-del-title">{{ copy().history.deleteConfirm }}</p>
+      <div class="pb-row">
+        <button type="button" class="pb-btn pb-btn-ghost" (click)="confirmDelete.set(false)">
+          {{ copy().history.cancel }}
+        </button>
+        <button type="button" class="pb-btn pb-btn-primary" [disabled]="deleteBusy()" (click)="confirmDeleteNow()">
+          {{ copy().history.deleteLabel }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (printErr(); as pe) {
+  <pb-print-trouble-dialog
+    [error]="pe"
+    [retrying]="printBusy()"
+    (closed)="printErr.set(null)"
+    (retry)="printOnce()"
+  />
+}

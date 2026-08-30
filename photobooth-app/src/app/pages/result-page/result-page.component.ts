@@ -10,8 +10,11 @@ import { AiGallerySessionService } from '../../services/ai-gallery-session.servi
 import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
+import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
+
 @Component({
   selector: 'pb-result-page',
+  imports: [PrintTroubleDialogComponent],
   templateUrl: './result-page.component.html',
   styleUrl: './result-page.component.scss',
 })
@@ -287,7 +290,6 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.printBusy.set(true);
-    this.printErr.set(null);
     try {
       const deviceName = this.booth.print().printerName;
       const r = await window.pbApi.printPhoto({
@@ -299,6 +301,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         this.printErr.set(r.error ?? 'Print failed.');
         return;
       }
+      this.printErr.set(null);
       this.printDone.set(true);
     } catch (e) {
       this.printErr.set(String(e));

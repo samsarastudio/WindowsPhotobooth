@@ -29,6 +29,8 @@ export interface PbCaptureHistoryItem {
   displayPath: string;
   printPath: string;
   layoutMode?: 'physicalFrame';
+  /** Physical cut sheet vs digital/framed capture. */
+  kind: 'physical' | 'normal';
   label: string;
 }
 
@@ -102,7 +104,12 @@ export interface PbApi {
     photos?: PbCaptureHistoryItem[];
     error?: string;
   }>;
+  deleteCaptureHistory(id: string): Promise<{ ok: boolean; deleted?: string[]; error?: string }>;
   readFileBase64(filePath: string): Promise<string>;
+  readFileThumbBase64(
+    filePath: string,
+    maxEdge?: number,
+  ): Promise<string>;
   saveJpeg(fullPath: string, base64Body: string): Promise<{ ok: boolean; path?: string }>;
   adminGetConfig(): Promise<{ ok: boolean; config?: PhotoboothConfigPublic; error?: string }>;
   adminSaveConfig(
@@ -225,7 +232,7 @@ export interface PbApi {
     uploadToken: string;
     eventPrefix: string;
     filePath: string;
-    variant: 'original' | 'framed' | 'ai';
+    variant: 'original' | 'framed' | 'ai' | 'physical';
   }): Promise<{
     ok: boolean;
     queued?: boolean;
@@ -342,7 +349,7 @@ export interface PbApi {
     uploadToken: string;
     filename: string;
   }): Promise<{ ok: boolean; removed?: string; error?: string }>;
-  listPrinters(): Promise<{
+  listPrinters(payload?: { allowWifi?: boolean }): Promise<{
     ok: boolean;
     printers?: {
       name: string;
@@ -352,15 +359,41 @@ export interface PbApi {
       status: number;
       driverName?: string;
       portName?: string;
-      /** Microsoft IPP / WSD — filtered out of the USB-only list */
+      /** Wi‑Fi / network IPP / WSD */
       isIppClass?: boolean;
-      /** Real Canon / SELPHY driver */
+      /** Microsoft IPP Class Driver (USB or Wi‑Fi) */
+      usesIppDriver?: boolean;
+      /** Real Canon / SELPHY driver or Canon queue name */
       isCanonDriver?: boolean;
       /** Local USB port (USB001 / DOT4_*) */
       isUsb?: boolean;
+      /** Network / Wi‑Fi / WSD / IPP port */
+      isNetwork?: boolean;
     }[];
     usbCount?: number;
     totalCount?: number;
+    selphyUsb?: {
+      present?: boolean;
+      code28?: boolean;
+      usbPrintOk?: boolean;
+      needsRepair?: boolean;
+      queueName?: string | null;
+      queueDriver?: string | null;
+      queuePort?: string | null;
+      usesIppDriver?: boolean;
+    };
+    repair?: { ok?: boolean; reason?: string; needsReboot?: boolean };
+    error?: string;
+  }>;
+  repairSelphyUsb(): Promise<{
+    ok: boolean;
+    repair?: {
+      ok?: boolean;
+      reason?: string;
+      needsReboot?: boolean;
+      via?: string;
+    };
+    printers?: { name: string; driverName?: string; portName?: string }[];
     error?: string;
   }>;
   printPhoto(payload: {

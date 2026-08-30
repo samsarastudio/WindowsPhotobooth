@@ -5,9 +5,11 @@ import { AiGallerySessionService } from '../../services/ai-gallery-session.servi
 import { AiStyleService } from '../../services/ai-style.service';
 import { CameraService } from '../../services/camera.service';
 
+import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
+
 @Component({
   selector: 'pb-ai-gallery-page',
-  imports: [RouterLink],
+  imports: [RouterLink, PrintTroubleDialogComponent],
   templateUrl: './ai-gallery-page.component.html',
   styleUrl: './ai-gallery-page.component.scss',
 })
@@ -79,7 +81,6 @@ export class AiGalleryPageComponent implements OnInit {
       return;
     }
     this.printBusy.set(true);
-    this.printErr.set(null);
     try {
       const deviceName = this.booth.print().printerName;
       const r = await window.pbApi.printPhoto({
@@ -90,6 +91,7 @@ export class AiGalleryPageComponent implements OnInit {
         this.printErr.set(r.error ?? 'Print failed.');
         return;
       }
+      this.printErr.set(null);
       this.printDone.set(true);
     } catch (e) {
       this.printErr.set(String(e));

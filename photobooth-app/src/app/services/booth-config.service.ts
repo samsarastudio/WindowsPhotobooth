@@ -276,6 +276,8 @@ function normalizeGalleryConfig(
       typeof patch.uploadOriginal === 'boolean' ? patch.uploadOriginal : base.uploadOriginal,
     uploadFramed: typeof patch.uploadFramed === 'boolean' ? patch.uploadFramed : base.uploadFramed,
     uploadAi: typeof patch.uploadAi === 'boolean' ? patch.uploadAi : base.uploadAi,
+    uploadPhysical:
+      typeof patch.uploadPhysical === 'boolean' ? patch.uploadPhysical : base.uploadPhysical,
   };
 }
 
@@ -398,6 +400,8 @@ function normalizePrintConfig(
     enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
     printerName,
     bleedScale,
+    allowWifiPrinters:
+      typeof patch.allowWifiPrinters === 'boolean' ? patch.allowWifiPrinters : base.allowWifiPrinters,
   };
 }
 

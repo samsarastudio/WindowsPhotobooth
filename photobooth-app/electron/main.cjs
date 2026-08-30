@@ -12,6 +12,11 @@ const {
   canSelfUpdate,
   pollAndApply,
 } = require('./booth-update.cjs');
+const {
+  initSelphyUsb,
+  probeSelphyUsb,
+  repairSelphyUsb,
+} = require('./selphy-usb.cjs');
 
 const execFileAsync = promisify(execFile);
 
@@ -744,6 +749,7 @@ function isPhysicalFrameLayoutPath(filePath) {
 function inferGalleryVariantFromPath(filePath) {
   const base = path.basename(String(filePath || '')).toLowerCase();
   if (base.includes('_ai.') || base.endsWith('_ai.png')) return 'ai';
+  if (base.includes('_physical.') || base.includes('_physical_')) return 'physical';
   if (base.includes('_framed.') || base.includes('_framed_')) return 'framed';
   return 'original';
 }
@@ -821,8 +827,12 @@ function scanCaptureForQueue(payload = {}) {
   let discovered = 0;
   for (const name of fs.readdirSync(captureRoot)) {
     const abs = path.resolve(path.join(captureRoot, name));
-    if (isPhysicalFrameLayoutPath(abs)) continue;
     if (!/\.(jpe?g|png|webp)$/i.test(name)) continue;
+    const variant = inferGalleryVariantFromPath(abs);
+    if (variant === 'original') {
+      const physicalSibling = abs.replace(/\.(jpe?g|png|webp)$/i, '_physical.png');
+      if (fs.existsSync(physicalSibling)) continue;
+    }
     let st;
     try {
       st = fs.statSync(abs);
@@ -831,7 +841,6 @@ function scanCaptureForQueue(payload = {}) {
     }
     if (!st.isFile() || st.size <= 0 || st.mtimeMs < cutoff) continue;
 
-    const variant = inferGalleryVariantFromPath(abs);
     if (hasActive(loadUploadQueue().items, abs, variant)) continue;
     enqueueGalleryUpload({ ...payload, filePath: abs, variant });
     discovered += 1;
@@ -1779,6 +1788,7 @@ app.whenReady().then(() => {
     return permission === 'media' || permission === 'camera' || permission === 'microphone';
   });
   createWindow();
+  initSelphyUsb({ appendAppLog, getBundleRoot });
   // Frames + photo queue: never block window creation. Retry periodically so a
   // later network restore still drains the queue without guest interaction.
   void syncFramesOnStartup();
@@ -1943,7 +1953,7 @@ ipcMain.handle('camera:invoke', async (_e, cmd) => {
 });
 
 function listCaptureHistory(options = {}) {
-  const limit = Math.min(100, Math.max(1, Math.round(Number(options.limit) || 50)));
+  const limit = Math.min(5000, Math.max(1, Math.round(Number(options.limit) || 2000)));
   const maxAgeDays = Number(options.maxAgeDays);
   const cutoff =
     Number.isFinite(maxAgeDays) && maxAgeDays > 0
@@ -1975,10 +1985,12 @@ function listCaptureHistory(options = {}) {
     let displayPath = abs;
     let layoutMode;
     let label = 'Digital';
+    let kind = 'normal';
     if (hasPhysical) {
       displayPath = physicalPath;
       layoutMode = 'physicalFrame';
-      label = 'Physical frame';
+      label = 'Physical';
+      kind = 'physical';
     } else if (hasFramed) {
       displayPath = framedPath;
       label = 'Framed';
@@ -1990,12 +2002,39 @@ function listCaptureHistory(options = {}) {
       displayPath: displayPath.replace(/\\/g, '/'),
       printPath: displayPath.replace(/\\/g, '/'),
       layoutMode,
+      kind,
       label,
     });
   }
 
   items.sort((a, b) => (a.capturedAt < b.capturedAt ? 1 : -1));
   return items.slice(0, limit);
+}
+
+function isCaptureHistoryId(id) {
+  return /^capture_[0-9]+$/i.test(String(id || ''));
+}
+
+function deleteCaptureHistory(id) {
+  if (!isCaptureHistoryId(id)) {
+    throw new Error('Invalid capture id.');
+  }
+  const captureRoot = path.resolve(getCaptureDir());
+  if (!fs.existsSync(captureRoot)) return [];
+  const deleted = [];
+  for (const name of fs.readdirSync(captureRoot)) {
+    const match = name === `${id}.jpg` || name === `${id}.jpeg` || name.startsWith(`${id}_`);
+    if (!match) continue;
+    const abs = path.resolve(path.join(captureRoot, name));
+    if (!isPathUnder(abs, captureRoot)) continue;
+    try {
+      fs.unlinkSync(abs);
+      deleted.push(name);
+    } catch (e) {
+      appendAppLog('warn', 'capture', 'deleteHistory file failed', { name, error: String(e) });
+    }
+  }
+  return deleted;
 }
 
 ipcMain.handle('capture:listHistory', async (_e, options) => {
@@ -2008,12 +2047,39 @@ ipcMain.handle('capture:listHistory', async (_e, options) => {
   }
 });
 
+ipcMain.handle('capture:deleteHistory', async (_e, id) => {
+  try {
+    const deleted = deleteCaptureHistory(id);
+    appendAppLog('info', 'capture', 'deleteHistory', { id, deleted });
+    return { ok: true, deleted };
+  } catch (e) {
+    appendAppLog('error', 'capture', 'deleteHistory failed', String(e));
+    return { ok: false, error: String(e) };
+  }
+});
+
 ipcMain.handle('file:readBase64', async (_e, filePath) => {
   const buf = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
   const mime =
     ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
   return `data:${mime};base64,${buf.toString('base64')}`;
+});
+
+ipcMain.handle('file:readThumbBase64', async (_e, filePath, maxEdge) => {
+  const abs = path.resolve(String(filePath || ''));
+  const captureRoot = path.resolve(getCaptureDir());
+  if (!isPathUnder(abs, captureRoot)) {
+    throw new Error('Thumb path outside capture directory.');
+  }
+  const edge = Math.min(480, Math.max(80, Math.round(Number(maxEdge) || 240)));
+  const sharpMod = require('sharp');
+  const buf = await sharpMod(abs)
+    .rotate()
+    .resize(edge, edge, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 72, mozjpeg: true })
+    .toBuffer();
+  return `data:image/jpeg;base64,${buf.toString('base64')}`;
 });
 
 ipcMain.handle('file:saveJpeg', async (_e, fullPath, base64Body) => {
@@ -3548,7 +3614,7 @@ ipcMain.handle('gallery:deleteRemoteFrame', async (_e, payload) => {
   }
 });
 
-/** Classify Windows printer driver/port for SELPHY booth use (USB-only UI). */
+/** Classify Windows printer driver/port for SELPHY booth use. */
 function classifyPrinter(driverName, portName, printerName) {
   const d = String(driverName || '').trim();
   const p = String(portName || '').trim();
@@ -3562,30 +3628,40 @@ function classifyPrinter(driverName, portName, printerName) {
     /^(IP_|WSD-|WSD_|IPP|HTTP|HTTPS|TCP)/i.test(p) ||
     /^(WSD|IPP)/i.test(p) ||
     /https?:/i.test(p);
-  // Only Microsoft IPP / WSD class drivers — NOT Canon "… Class Driver" (real USB SELPHY).
+  const usesIppDriver = /microsoft\s+ipp|ipp\s+class\s+driver/i.test(d);
   const isIppClass =
-    /microsoft\s+ipp|ipp\s+class\s+driver/i.test(d) ||
-    (/class\s+driver/i.test(d) && /microsoft|ipp|wsd/i.test(d)) ||
+    usesIppDriver ||
+    (/class\s+driver/i.test(d) && /microsoft|ipp|wsd/i.test(d) && !/canon|selphy/i.test(d)) ||
     (/\bwsd\b/i.test(d) && !/canon|selphy/i.test(d)) ||
     isNetworkPort;
-  const isCanonDriver = /canon|selphy/i.test(d) && !/microsoft\s+ipp/i.test(d);
+  const isCanonDriver = /canon|selphy/i.test(d) && !usesIppDriver;
   const isCanonName = /canon|selphy/i.test(n);
-  // USB001, USB002, USB, DOT4_* — strongest signal the SELPHY is on a local cable.
   const isUsbPort =
     !!p &&
     !isNetworkPort &&
     (/^USB\d*$/i.test(p) ||
       /^DOT4_/i.test(p) ||
       (/USB/i.test(p) && !/^\\\\/.test(p)));
-  // USB port always wins over a misleading "class driver" label.
   const isUsb =
     !isVirtual && (isUsbPort || (!isIppClass && !isNetworkPort && (isCanonDriver || isCanonName)));
+  const isNetwork = !isVirtual && !isUsb && (isNetworkPort || (isIppClass && !isUsbPort));
   return {
     isIppClass: isIppClass && !isUsbPort,
-    isCanonDriver: isCanonDriver || (isCanonName && !(isIppClass && !isUsbPort)),
+    usesIppDriver,
+    isCanonDriver: isCanonDriver || isCanonName,
     isUsb,
+    isNetwork,
     isVirtual,
   };
+}
+
+function printAllowWifi(override) {
+  if (typeof override === 'boolean') return override;
+  try {
+    return loadMergedConfig()?.print?.allowWifiPrinters === true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function mapWinPrinter(w) {
@@ -3605,12 +3681,23 @@ function mapWinPrinter(w) {
   };
 }
 
-/** Prefer USB Canon/SELPHY; otherwise any USB / local Canon queue. */
-function pickBestUsbPrinter(printers) {
-  const usb = (printers || []).filter((p) => p && p.isUsb && !p.isVirtual && !p.isIppClass);
-  if (!usb.length) return null;
-  const canon = usb.find((p) => p.isCanonDriver) || usb.find((p) => /canon|selphy/i.test(p.name));
-  return canon || usb.find((p) => p.isDefault) || usb[0];
+/** Prefer USB Canon/usbprint; USB IPP next; Wi‑Fi Canon last if enabled. */
+function pickBestBoothPrinter(printers, allowWifi) {
+  const pool = boothPrintQueues(printers, allowWifi);
+  if (!pool.length) return null;
+  const usb = pool.filter((p) => p.isUsb);
+  const wifi = pool.filter((p) => !p.isUsb);
+  const usbCanon =
+    usb.find((p) => p.isCanonDriver && !p.usesIppDriver) ||
+    usb.find((p) => /canon|selphy/i.test(p.name) && !p.usesIppDriver);
+  if (usbCanon) return usbCanon;
+  const usbIpp = usb.find((p) => p.usesIppDriver && /canon|selphy/i.test(p.name));
+  if (usbIpp) return usbIpp;
+  if (usb.length) return usb.find((p) => p.isDefault) || usb[0];
+  if (!allowWifi) return null;
+  const wifiCanon =
+    wifi.find((p) => p.isCanonDriver) || wifi.find((p) => /canon|selphy/i.test(p.name));
+  return wifiCanon || wifi.find((p) => p.isDefault) || wifi[0] || null;
 }
 
 async function listWindowsPrintersDetailed() {
@@ -3674,19 +3761,33 @@ async function listWindowsPrintersDetailed() {
   return printers;
 }
 
-function boothPrintQueues(all) {
-  return (all || []).filter((p) => p && p.isUsb && !p.isVirtual && !p.isIppClass);
+function boothPrintQueues(all, allowWifi = false) {
+  return (all || []).filter((p) => {
+    if (!p || p.isVirtual) return false;
+    if (p.isUsb) return true;
+    return !!allowWifi && (p.isNetwork || p.isIppClass);
+  });
 }
 
-ipcMain.handle('print:listPrinters', async () => {
+function preferredPrinterIsAllowed(meta, allowWifi) {
+  if (!meta || meta.isVirtual) return false;
+  if (meta.isUsb) return true;
+  return !!allowWifi && (meta.isNetwork || meta.isIppClass);
+}
+
+ipcMain.handle('print:listPrinters', async (_e, payload) => {
   try {
+    const allowWifi = printAllowWifi(payload?.allowWifi);
+    const probe = await probeSelphyUsb();
     const all = await listWindowsPrintersDetailed();
-    const printers = boothPrintQueues(all);
+    const printers = boothPrintQueues(all, allowWifi);
     return {
       ok: true,
       printers,
-      usbCount: printers.length,
+      usbCount: printers.filter((p) => p.isUsb).length,
       totalCount: all.length,
+      allowWifi,
+      selphyUsb: probe,
       skipped: all
         .filter((p) => !printers.some((u) => u.name === p.name))
         .map((p) => ({ name: p.name, portName: p.portName, driverName: p.driverName })),
@@ -3697,9 +3798,22 @@ ipcMain.handle('print:listPrinters', async () => {
   }
 });
 
+ipcMain.handle('print:repairSelphyUsb', async () => {
+  try {
+    const allowWifi = printAllowWifi();
+    const repair = await repairSelphyUsb({ elevateIfNeeded: true, force: true });
+    const all = await listWindowsPrintersDetailed();
+    const printers = boothPrintQueues(all, allowWifi);
+    return { ok: !!repair?.ok || printers.length > 0, repair, printers, selphyUsb: repair?.probe };
+  } catch (e) {
+    appendAppLog('error', 'print', 'repairSelphyUsb failed', String(e));
+    return { ok: false, error: String(e) };
+  }
+});
+
 /**
  * Windows photo print for kiosk / Canon SELPHY CP1500 — postcard 6″×4″ landscape.
- * Prefer the USB (or Canon TCP/IP) queue — Microsoft IPP Wi‑Fi queues print wrong.
+ * Prefer USB Canon/usbprint. USB Microsoft IPP is last resort; Wi‑Fi IPP is skipped.
  */
 async function printPhotoViaWindowsSpooler(imagePath, printerName, bleedScale = 1.06, options = {}) {
   const abs = path.resolve(imagePath);
@@ -3854,18 +3968,24 @@ try {
  * One-shot photo print of the original capture file (DSLR → SELPHY postcard).
  */
 async function resolveBoothPrinter(preferredName) {
+  const allowWifi = printAllowWifi();
   const all = await listWindowsPrintersDetailed();
-  const usbList = boothPrintQueues(all);
+  const usbList = boothPrintQueues(all, allowWifi);
   if (!usbList.length) {
+    const probe = await probeSelphyUsb();
     const seen = all
       .slice(0, 8)
       .map((p) => `${p.name} [${p.portName || 'no-port'}]`)
       .join('; ');
+    const code28 = probe?.code28 ? ' Device Manager Code 28: USB print driver did not bind.' : '';
+    const wifiHint = allowWifi
+      ? ' Enable a USB or Wi‑Fi queue in Printers & scanners.'
+      : ' Plug SELPHY in by USB, or enable Show Wi‑Fi printers.';
     return {
       ok: false,
       error: seen
-        ? `No USB/Canon SELPHY queue found. Windows sees: ${seen}. Plug SELPHY in by USB and install the Canon driver.`
-        : 'No USB printer found. Plug in the Canon SELPHY by USB, wait for Windows to install it, then try again.',
+        ? `No usable printer queue found. Windows sees: ${seen}.${code28}${wifiHint}`
+        : `No printer found.${code28}${wifiHint}`,
       all,
       usbList,
     };
@@ -3875,27 +3995,22 @@ async function resolveBoothPrinter(preferredName) {
     typeof preferredName === 'string' && preferredName.trim() ? preferredName.trim() : null;
   let chosen = preferred;
   const preferredMeta = preferred ? all.find((p) => p.name === preferred) : null;
-  if (
-    !preferredMeta ||
-    !preferredMeta.isUsb ||
-    preferredMeta.isVirtual ||
-    preferredMeta.isIppClass
-  ) {
-    const auto = pickBestUsbPrinter(usbList);
+  if (!preferredPrinterIsAllowed(preferredMeta, allowWifi)) {
+    const auto = pickBestBoothPrinter(usbList, allowWifi);
     if (!auto) {
-      return { ok: false, error: 'No usable USB printer queue found.', all, usbList };
+      return { ok: false, error: 'No usable printer queue found.', all, usbList };
     }
     chosen = auto.name;
     if (preferred && preferred !== chosen) {
-      appendAppLog('warn', 'print', 'redirected print to USB printer', {
+      appendAppLog('warn', 'print', 'redirected print to booth printer', {
         requested: preferred,
         used: chosen,
         reason: preferredMeta
-          ? preferredMeta.isIppClass
-            ? 'ipp'
-            : preferredMeta.isVirtual
-              ? 'virtual'
-              : 'not-usb'
+          ? preferredMeta.isVirtual
+            ? 'virtual'
+            : preferredMeta.isIppClass && !allowWifi
+              ? 'wifi-disabled'
+              : 'not-allowed'
           : 'missing',
       });
     }

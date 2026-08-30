@@ -112,7 +112,12 @@
       <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
     </div>
     @if (printErr(); as pe) {
-      <p class="pb-msg">{{ copy().result.printFailed }}: {{ pe }}</p>
+      <pb-print-trouble-dialog
+        [error]="pe"
+        [retrying]="printBusy()"
+        (closed)="printErr.set(null)"
+        (retry)="printOnce()"
+      />
     }
   </div>
 

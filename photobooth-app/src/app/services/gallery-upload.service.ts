@@ -2,7 +2,7 @@ import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { BoothConfigService } from './booth-config.service';
 import { BoothLogService } from './booth-log.service';
 
-export type GalleryPhotoVariant = 'original' | 'framed' | 'ai';
+export type GalleryPhotoVariant = 'original' | 'framed' | 'ai' | 'physical';
 
 export interface GalleryUploadRecord {
   path: string;
@@ -238,6 +238,7 @@ export class GalleryUploadService implements OnDestroy {
     if (variant === 'original' && !g.uploadOriginal) return this.skip(filePath, variant);
     if (variant === 'framed' && !g.uploadFramed) return this.skip(filePath, variant);
     if (variant === 'ai' && !g.uploadAi) return this.skip(filePath, variant);
+    if (variant === 'physical' && !g.uploadPhysical) return this.skip(filePath, variant);
 
     const r = await window.pbApi.galleryUploadPhoto({
       apiBaseUrl: g.apiBaseUrl,
@@ -289,6 +290,7 @@ export class GalleryUploadService implements OnDestroy {
   inferVariant(filePath: string): GalleryPhotoVariant {
     const base = filePath.replace(/\\/g, '/').split('/').pop()?.toLowerCase() || '';
     if (base.includes('_ai.') || base.endsWith('_ai.png')) return 'ai';
+    if (base.includes('_physical.') || base.includes('_physical_')) return 'physical';
     if (base.includes('_framed.') || base.includes('_framed_')) return 'framed';
     return 'original';
   }

@@ -34,6 +34,9 @@
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'gallery'" (click)="setTab('gallery')">
             Gallery
           </button>
+          <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'photos'" (click)="setTab('photos')">
+            Photos
+          </button>
           <button type="button" class="pb-tab" [class.pb-tab-active]="tab === 'print'" (click)="setTab('print')">
             Print
           </button>
@@ -545,6 +548,10 @@
             <input type="checkbox" [(ngModel)]="draftGallery.uploadAi" />
             Upload AI variants
           </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGallery.uploadPhysical" />
+            Upload physical print sheets (admin download only — not guest wall/gallery)
+          </label>
           <div class="pb-row pb-row-wrap">
             <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveGallery()">
               Save gallery settings
@@ -557,7 +564,7 @@
           <p class="pb-hint">
             Photos upload in the background. If Moments was offline or uploads failed, use
             <strong>Re-sync queue</strong> to retry. Scans <code>capture/</code> (last 7 days) for
-            photos not yet queued.
+            Photos not yet queued.
           </p>
           @if (uploadQueueSummary()) {
             <p class="pb-hint pb-hint-tight">
@@ -800,6 +807,20 @@
       </div>
     }
 
+    @if (tab === 'photos') {
+      <div class="pb-admin-photos">
+        <section class="pb-admin-card pb-admin-card-wide">
+          <h2>Photos</h2>
+          <p class="pb-hint">
+            Local captures on this booth — same grid as Print history. Physical sheets also upload to
+            Moments so you can download them from Gallery admin on another device. Delete removes
+            files from this booth only.
+          </p>
+          <pb-capture-photo-browser [compact]="true" />
+        </section>
+      </div>
+    }
+
     @if (tab === 'print') {
       <div class="pb-admin-print">
         <section class="pb-admin-card pb-admin-card-wide">
@@ -811,24 +832,47 @@
             <input type="checkbox" [(ngModel)]="draftPrint.enabled" />
             Enable printing on the result / final page
           </label>
-          <label>USB printer</label>
+          <label class="pb-admin-check">
+            <input
+              type="checkbox"
+              [(ngModel)]="draftPrint.allowWifiPrinters"
+              (ngModelChange)="onAllowWifiChange()"
+            />
+            Show Wi‑Fi / network printers
+          </label>
+          <label>Printer</label>
           <select class="pb-input" [(ngModel)]="draftPrint.printerName">
-            <option [ngValue]="null">Auto (USB Canon / SELPHY)</option>
+            <option [ngValue]="null">
+              {{
+                draftPrint.allowWifiPrinters
+                  ? 'Auto (USB first, then Wi‑Fi)'
+                  : 'Auto (USB Canon / SELPHY)'
+              }}
+            </option>
             @for (p of printers(); track p.name) {
               <option [ngValue]="p.name">{{ printerLabel(p) }}</option>
             }
           </select>
           @if (!printers().length) {
             <p class="pb-hint pb-hint-tight">
-              No USB printers found. Plug the SELPHY in by USB, wait for Windows to finish installing the
-              driver, then tap <strong>Refresh printers</strong>.
+              @if (draftPrint.allowWifiPrinters) {
+                No printers found. Plug the SELPHY in by USB or add it in Windows Printers & scanners,
+                then tap <strong>Refresh printers</strong>.
+              } @else {
+                No USB printers found. Plug the SELPHY in by USB, wait for Windows to finish installing the
+                driver, then tap <strong>Refresh printers</strong>.
+              }
             </p>
           }
           @if (selectedPrinter(); as sp) {
             <p class="pb-hint pb-hint-tight">
               Driver: <code>{{ sp.driverName || 'unknown' }}</code>
               · Port: <code>{{ sp.portName || 'unknown' }}</code>
-              @if (sp.isCanonDriver) {
+              @if (sp.isUsb && sp.usesIppDriver) {
+                · <strong>USB IPP fallback</strong> — jobs can spool; postcard size may be ignored until the USB print driver binds
+              } @else if (!sp.isUsb) {
+                · <strong>Wi‑Fi / network</strong> — postcard size and color may be ignored; USB is more reliable
+              } @else if (sp.isCanonDriver) {
                 · <strong>Canon USB — ready</strong>
               }
             </p>
@@ -848,8 +892,12 @@
           </p>
 
           <p class="pb-hint pb-hint-tight">
-            Only <strong>USB</strong> printer queues are listed (ports like <code>USB001</code>). Wi‑Fi / IPP /
-            PDF printers are hidden — they often print grayscale or wrong size.
+            USB queues (ports like <code>USB001</code>) are always listed. Device Manager
+            <strong>Other devices → SELPHY CP1500</strong> is a vendor USB interface, not the printer —
+            printing uses USB Printing Support. <strong>Fix SELPHY USB driver</strong> uninstalls the
+            broken Canon/IPP queue, turns off Windows protected print mode, binds Microsoft
+            <code>usbprint.inf</code> to the real print interface, and installs a fresh USB queue.
+            Approve the Windows prompt once per PC. Leave the printer plugged in.
           </p>
 
           <div class="pb-row pb-row-wrap">
@@ -858,6 +906,9 @@
             </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="refreshPrinters()">
               Refresh printers
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="repairSelphyUsb()">
+              Fix SELPHY USB driver
             </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="testPrint()">
               Test print
@@ -1283,3 +1334,12 @@
     </div>
   </div>
 </div>
+@if (printTroubleErr(); as pe) {
+  <pb-print-trouble-dialog
+    [error]="pe"
+    retryLabel="Test print"
+    [retrying]="busy()"
+    (closed)="printTroubleErr.set(null)"
+    (retry)="testPrint()"
+  />
+}

@@ -50,7 +50,8 @@
     "sessionPrefix": "onam",
     "uploadOriginal": true,
     "uploadFramed": true,
-    "uploadAi": true
+    "uploadAi": true,
+    "uploadPhysical": true
   },
   "debug": {
     "enabled": false
@@ -58,7 +59,8 @@
   "print": {
     "enabled": false,
     "printerName": null,
-    "bleedScale": 1.06
+    "bleedScale": 1.06,
+    "allowWifiPrinters": false
   },
   "aiModes": [
     {
