@@ -58,6 +58,65 @@
   margin: 0.5rem 0;
 }
 
+.pb-cb-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.pb-cb-preview {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 7.5rem;
+  max-height: min(36vh, 20rem);
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 45%, #252525 0%, #0c0c0c 62%, #060606 100%);
+  border: 3px solid rgba(61, 48, 32, 0.2);
+  overflow: hidden;
+  padding: 0.45rem 0.55rem 0.4rem;
+}
+
+.pb-cb-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: min(32vh, 17.5rem);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.pb-cb-preview-cap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.75rem;
+  align-items: center;
+  justify-content: center;
+  margin: 0.35rem 0 0;
+  color: #f3ece3;
+  font-size: 0.78rem;
+}
+
+.pb-cb-preview .pb-cb-kind {
+  color: #f3ece3;
+}
+
+.pb-cb-preview .pb-cb-kind.is-physical {
+  color: #e8c47a;
+}
+
+.pb-cb-preview-ph {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+}
+
 .pb-cb-grid {
   flex: 1 1 auto;
   min-height: 0;
@@ -192,5 +251,15 @@
 
 :host.is-compact .pb-cb-grid {
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  max-height: min(62vh, 36rem);
+  max-height: min(42vh, 24rem);
+}
+
+:host.is-compact .pb-cb-preview {
+  max-height: min(28vh, 16rem);
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+:host.is-compact .pb-cb-preview img {
+  max-height: min(24vh, 14rem);
 }

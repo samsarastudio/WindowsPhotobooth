@@ -610,11 +610,11 @@ function resolvePhysicalFrameLayoutPx(opts, dpi) {
   const cellW =
     opts.cellWidthCm != null
       ? cmToPx(opts.cellWidthCm, dpi)
-      : Math.round((Number(opts.cellWidthIn) || 5.8) * dpi);
+      : Math.round((Number(opts.cellWidthIn) || 5.3 / 2.54) * dpi);
   const cellH =
     opts.cellHeightCm != null
       ? cmToPx(opts.cellHeightCm, dpi)
-      : Math.round((Number(opts.cellHeightIn) || 8.8) * dpi);
+      : Math.round((Number(opts.cellHeightIn) || 7 / 2.54) * dpi);
   const gap =
     opts.gapMm != null ? mmToPx(opts.gapMm, dpi) : Math.round((Number(opts.gapIn) || 0.25) * dpi);
   const margin =
@@ -623,10 +623,10 @@ function resolvePhysicalFrameLayoutPx(opts, dpi) {
       : Math.round((Number(opts.marginIn) || 0.25) * dpi);
   const innerPad =
     opts.innerPaddingMm != null ? mmToPx(opts.innerPaddingMm, dpi) : mmToPx(3, dpi);
-  const safeTop = mmToPx(opts.safeInsetTopMm ?? 4, dpi);
-  const safeBottom = mmToPx(opts.safeInsetBottomMm ?? 14, dpi);
-  const safeLeft = mmToPx(opts.safeInsetLeftMm ?? 1.5, dpi);
-  const safeRight = mmToPx(opts.safeInsetRightMm ?? 6, dpi);
+  const safeTop = mmToPx(opts.safeInsetTopMm ?? 0.2, dpi);
+  const safeBottom = mmToPx(opts.safeInsetBottomMm ?? 0.2, dpi);
+  const safeLeft = mmToPx(opts.safeInsetLeftMm ?? 3, dpi);
+  const safeRight = mmToPx(opts.safeInsetRightMm ?? 1, dpi);
   return { cellW, cellH, gap, margin, innerPad, safeTop, safeBottom, safeLeft, safeRight };
 }
 

@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260830-photos" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260830-physical" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -53,6 +53,7 @@
             <button type="button" class="admin-tab" data-tab="photos">Photos</button>
             <button type="button" class="admin-tab" data-tab="qr">QR events</button>
             <button type="button" class="admin-tab" data-tab="frames">Frames</button>
+            <button type="button" class="admin-tab" data-tab="physical">Physical frame</button>
             <button type="button" class="admin-tab" data-tab="wall">Mosaic wall</button>
             <button type="button" class="admin-tab" data-tab="booth">Booth updates</button>
             <button type="button" class="admin-tab" data-tab="settings">Settings</button>
@@ -85,42 +86,29 @@
           <section class="card admin-section" data-section="photos" hidden>
             <h2>Photos</h2>
             <p class="meta">
-              Thumbnail grid with filters. Physical print sheets are listed here for download —
-              they do not appear on the guest wall or gallery.
+              Same layout as booth Print history: preview on top, thumbnail grid below.
+              Physical sheets are here for download — they do not appear on the guest wall.
             </p>
             <label>Album</label>
             <select id="photoAlbum" class="input"></select>
-            <div class="photo-toolbar row wrap">
-              <label class="photo-filter">
-                Type
-                <select id="photoKind" class="input">
-                  <option value="all">All</option>
-                  <option value="physical">Physical</option>
-                  <option value="normal">Digital / framed</option>
-                  <option value="original">Original</option>
-                  <option value="framed">Framed</option>
-                  <option value="ai">AI</option>
-                </select>
-              </label>
-              <label class="photo-filter">
-                When
-                <select id="photoWhen" class="input">
-                  <option value="all">All dates</option>
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">This month</option>
-                  <option value="custom">Custom dates</option>
-                </select>
-              </label>
-              <label class="photo-filter">
-                From
-                <input id="photoFrom" class="input" type="date" />
-              </label>
-              <label class="photo-filter">
-                To
-                <input id="photoTo" class="input" type="date" />
-              </label>
+            <div id="photoKindChips" class="photo-chips" role="group" aria-label="Photo type">
+              <button type="button" class="photo-chip is-on" data-kind="all">All</button>
+              <button type="button" class="photo-chip" data-kind="physical">Physical</button>
+              <button type="button" class="photo-chip" data-kind="normal">Digital</button>
+              <button type="button" class="photo-chip" data-kind="framed">Framed</button>
+              <button type="button" class="photo-chip" data-kind="ai">AI</button>
+            </div>
+            <div id="photoWhenChips" class="photo-chips" role="group" aria-label="Date">
+              <button type="button" class="photo-chip is-on" data-when="all">All dates</button>
+              <button type="button" class="photo-chip" data-when="today">Today</button>
+              <button type="button" class="photo-chip" data-when="yesterday">Yesterday</button>
+              <button type="button" class="photo-chip" data-when="week">Last 7 days</button>
+              <button type="button" class="photo-chip" data-when="month">This month</button>
+              <button type="button" class="photo-chip" data-when="custom">Custom dates</button>
+            </div>
+            <div id="photoCustomDates" class="row wrap" hidden>
+              <label class="photo-filter">From <input id="photoFrom" class="input" type="date" /></label>
+              <label class="photo-filter">To <input id="photoTo" class="input" type="date" /></label>
             </div>
             <div class="row wrap">
               <button type="button" class="btn ghost" id="btnRefreshPhotos">Refresh</button>
@@ -130,9 +118,12 @@
               <button type="button" class="btn ghost" id="btnClearPhotoSelection">Clear selection</button>
               <button type="button" class="btn danger" id="btnBulkDeletePhotos" disabled>Delete selected</button>
             </div>
-            <p id="photoBrokenMeta" class="meta">Broken = DB record exists but image file is missing on disk (shows as black thumbnail).</p>
+            <p id="photoBrokenMeta" class="meta">Broken = DB record exists but image file is missing on disk.</p>
             <p id="photoSelectionMeta" class="meta">Select photos with the checkboxes to delete several at once.</p>
             <p id="photoPagerMeta" class="meta"></p>
+            <div id="photoPreview" class="photo-preview">
+              <p class="meta">Tap a thumbnail to preview.</p>
+            </div>
             <div id="photoPager" class="row wrap photo-pager"></div>
             <div id="photoGrid" class="photo-admin-grid"></div>
           </section>
@@ -224,6 +215,49 @@
               <button type="button" class="btn primary" id="btnUploadFrame">Upload frame</button>
             </div>
             <div id="frameList" class="frame-grid"></div>
+          </section>
+
+          <section class="card admin-section" data-section="physical" hidden>
+            <h2>Physical frame</h2>
+            <p class="meta">
+              Admin only — not the guest wall or gallery. Upload a landscape photo to generate the same
+              dual-cell cut sheet the booth prints (two identical portrait cells for cutting). Defaults
+              match the Windows booth layout.
+            </p>
+            <label>Photo</label>
+            <input id="pfPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+            <h3 class="admin-subhead">Cut-sheet layout</h3>
+            <div class="pf-grid">
+              <label>Cell width (cm) <input id="pfCellW" class="input" type="number" min="3" max="12" step="0.1" value="5.3" /></label>
+              <label>Cell height (cm) <input id="pfCellH" class="input" type="number" min="4" max="15" step="0.1" value="7" /></label>
+              <label>Photo inset (mm) <input id="pfInset" class="input" type="number" min="0" max="12" step="0.1" value="3" /></label>
+              <label>Safe top (mm) <input id="pfSafeTop" class="input" type="number" min="0" max="20" step="0.1" value="0.2" /></label>
+              <label>Safe bottom (mm) <input id="pfSafeBot" class="input" type="number" min="0" max="25" step="0.1" value="0.2" /></label>
+              <label>Safe left (mm) <input id="pfSafeLeft" class="input" type="number" min="0" max="15" step="0.1" value="3" /></label>
+              <label>Safe right (mm) <input id="pfSafeRight" class="input" type="number" min="0" max="15" step="0.1" value="1" /></label>
+              <label>Column gap (mm) <input id="pfGap" class="input" type="number" min="0" max="15" step="0.05" value="6.35" /></label>
+              <label>Sheet margin (mm) <input id="pfMargin" class="input" type="number" min="0" max="15" step="0.05" value="6.35" /></label>
+              <label>DPI <input id="pfDpi" class="input" type="number" min="72" max="600" step="1" value="300" /></label>
+              <label>Rotate
+                <select id="pfRotate" class="input">
+                  <option value="-90" selected>90° counter-clockwise</option>
+                  <option value="90">90° clockwise</option>
+                </select>
+              </label>
+            </div>
+            <label class="check-row">
+              <input id="pfBorder" type="checkbox" checked />
+              Thin gold border (double hairline)
+            </label>
+            <div class="row wrap">
+              <button type="button" class="btn primary" id="btnPfGenerate">Generate cut sheet</button>
+              <button type="button" class="btn ghost" id="btnPfDefaults">Reset to defaults</button>
+            </div>
+            <div id="pfPreview" class="photo-preview pf-preview">
+              <p class="meta">Generated sheet preview appears here.</p>
+            </div>
+            <h3 class="admin-subhead">Recent (this server, admin only)</h3>
+            <div id="pfList" class="session-list"></div>
           </section>
 
           <section class="card admin-section" data-section="wall" hidden>
@@ -368,6 +402,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260830-photos" type="module"></script>
+    <script src="/js/admin.js?v=20260830-share" type="module"></script>
   </body>
 </html>

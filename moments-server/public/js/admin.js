@@ -21,6 +21,7 @@ const wallShowOriginalPhotos = document.getElementById('wallShowOriginalPhotos')
 const wallModeStatus = document.getElementById('wallModeStatus');
 const photoAlbum = document.getElementById('photoAlbum');
 const photoGrid = document.getElementById('photoGrid');
+const photoPreview = document.getElementById('photoPreview');
 const photoSelectionMeta = document.getElementById('photoSelectionMeta');
 const btnBulkDeletePhotos = document.getElementById('btnBulkDeletePhotos');
 const btnOpenAlbum = document.getElementById('btnOpenAlbum');
@@ -34,6 +35,8 @@ let albumsCache = [];
 let photosCache = [];
 let photoPage = 1;
 const PHOTO_PAGE_SIZE = 24;
+/** @type {string | null} */
+let selectedPreviewId = null;
 /** @type {Set<string>} */
 const selectedPhotoIds = new Set();
 
@@ -88,6 +91,39 @@ function pin() {
   return pinEl.value.trim();
 }
 
+function isAppleTouchDevice() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** iPhone: native share tray (Save Image / AirDrop). Desktop: file download. */
+async function shareOrDownloadBlob(blob, filename, mimeFallback = 'image/png') {
+  const type = blob.type && blob.type !== 'application/octet-stream' ? blob.type : mimeFallback;
+  if (isAppleTouchDevice() && navigator.share && navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'inmoment' });
+        return 'shared';
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return 'aborted';
+    }
+  }
+  const obj = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = obj;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(obj), 1500);
+  return 'downloaded';
+}
+
 function setStatus(msg) {
   adminStatus.textContent = msg || '';
 }
@@ -116,6 +152,7 @@ function setTab(tab) {
   });
   if (name === 'photos') void refreshPhotos();
   if (name === 'frames') void refreshFrames();
+  if (name === 'physical') void refreshPhysicalFrames();
   if (name === 'albums') void refreshAlbums();
   if (name === 'qr') void refreshQrSection();
   if (name === 'booth') void refreshBoothUpdates();
@@ -246,24 +283,17 @@ async function downloadAdminPhoto(slug, photo) {
     photo.url?.match(/\.(jpe?g|png|webp)/i)?.[0] ||
     (photo.mime?.includes('png') ? '.png' : photo.mime?.includes('webp') ? '.webp' : '.jpg');
   const filename = `${photo.variant || 'photo'}-${photo.id}${ext}`;
-  const triggerBlob = (blob) => {
-    const obj = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = obj;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(obj), 1500);
-  };
+  const mime =
+    photo.mime ||
+    (ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg');
   try {
     const res = await fetch(
       `/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photo.id)}/file`,
       { headers: { 'X-Admin-Pin': pin() } },
     );
     if (res.ok) {
-      triggerBlob(await res.blob());
-      setStatus('Download started.');
+      const how = await shareOrDownloadBlob(await res.blob(), filename, mime);
+      if (how !== 'aborted') setStatus(how === 'shared' ? 'Share sheet opened.' : 'Download started.');
       return;
     }
   } catch {
@@ -273,8 +303,8 @@ async function downloadAdminPhoto(slug, photo) {
     if (!photo.url) throw new Error('No photo URL');
     const res = await fetch(photo.url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    triggerBlob(await res.blob());
-    setStatus('Download started.');
+    const how = await shareOrDownloadBlob(await res.blob(), filename, mime);
+    if (how !== 'aborted') setStatus(how === 'shared' ? 'Share sheet opened.' : 'Download started.');
   } catch (e) {
     setStatus(`Download failed: ${e.message || e}`);
   }
@@ -292,8 +322,16 @@ function startOfLocalDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+function currentPhotoKind() {
+  return document.querySelector('#photoKindChips .photo-chip.is-on')?.getAttribute('data-kind') || 'all';
+}
+
+function currentPhotoWhen() {
+  return document.querySelector('#photoWhenChips .photo-chip.is-on')?.getAttribute('data-when') || 'all';
+}
+
 function photoFilterRange() {
-  const when = document.getElementById('photoWhen')?.value || 'all';
+  const when = currentPhotoWhen();
   const now = new Date();
   if (when === 'today') return { from: startOfLocalDay(now), to: null };
   if (when === 'yesterday') {
@@ -313,7 +351,7 @@ function photoFilterRange() {
 }
 
 function filteredAdminPhotos() {
-  const kind = document.getElementById('photoKind')?.value || 'all';
+  const kind = currentPhotoKind();
   const { from, to } = photoFilterRange();
   return photosCache.filter((p) => {
     if (kind === 'physical' && p.variant !== 'physical') return false;
@@ -360,17 +398,63 @@ function renderPhotoPager(filteredLen, pageCount) {
   pager.append(prev, next);
 }
 
+function renderPhotoPreview(photo, slug) {
+  if (!photoPreview) return;
+  if (!photo) {
+    photoPreview.innerHTML = '<p class="meta">Tap a thumbnail to preview.</p>';
+    return;
+  }
+  const missing = photo.fileExists === false;
+  const shareHref = sharePageHref(slug, photo);
+  const when = photo.createdAt ? new Date(photo.createdAt).toLocaleString() : '';
+  photoPreview.innerHTML = `
+    ${
+      missing
+        ? `<div class="photo-preview-missing">File missing</div>`
+        : `<img src="${photo.url}" alt="" />`
+    }
+    <div class="photo-preview-bar">
+      <span class="badge">${photo.variant || ''}</span>
+      <span class="photo-when">${when}</span>
+      <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener" ${missing ? 'aria-disabled="true" tabindex="-1"' : ''}>Open</a>
+      <button type="button" class="btn ghost" id="btnPreviewDownload" ${missing ? 'disabled' : ''}>Download</button>
+      <button type="button" class="btn ghost" id="btnPreviewDelete">Delete</button>
+    </div>
+  `;
+  photoPreview.querySelector('#btnPreviewDownload')?.addEventListener('click', () => {
+    if (missing) return;
+    void downloadAdminPhoto(slug, photo);
+  });
+  photoPreview.querySelector('#btnPreviewDelete')?.addEventListener('click', async () => {
+    if (!confirm(missing ? 'Remove this broken DB entry (file already missing)?' : 'Delete this photo from the album?')) return;
+    await api(`/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(photo.id)}`, {
+      method: 'DELETE',
+    });
+    setStatus(`Deleted photo ${photo.id}`);
+    selectedPreviewId = null;
+    await refreshAll();
+    await refreshPhotos();
+  });
+}
+
 function renderPhotoGrid() {
   const slug = photoAlbum?.value;
+  if (photoGrid) {
+    photoGrid.style.display = 'grid';
+    photoGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(104px, 1fr))';
+    photoGrid.style.gap = '0.55rem';
+  }
   photoGrid.innerHTML = '';
   if (!slug) {
     photoGrid.innerHTML = '<p class="meta">No album selected.</p>';
+    renderPhotoPreview(null, slug);
     return;
   }
   const filtered = filteredAdminPhotos();
   if (!filtered.length) {
     photoGrid.innerHTML = '<p class="meta">No photos match these filters.</p>';
     renderPhotoPager(0, 1);
+    renderPhotoPreview(null, slug);
     return;
   }
   const pageCount = Math.max(1, Math.ceil(filtered.length / PHOTO_PAGE_SIZE));
@@ -379,12 +463,20 @@ function renderPhotoGrid() {
   const pageItems = filtered.slice(start, start + PHOTO_PAGE_SIZE);
   renderPhotoPager(filtered.length, pageCount);
 
+  if (!selectedPreviewId || !pageItems.some((p) => p.id === selectedPreviewId)) {
+    selectedPreviewId = pageItems[0]?.id || null;
+  }
+  renderPhotoPreview(
+    pageItems.find((p) => p.id === selectedPreviewId) || pageItems[0] || null,
+    slug,
+  );
+
   for (const p of pageItems) {
     const card = document.createElement('article');
     card.className = 'photo-admin-card';
     if (p.fileExists === false) card.classList.add('is-missing-file');
     if (selectedPhotoIds.has(p.id)) card.classList.add('is-selected');
-    const shareHref = sharePageHref(slug, p);
+    if (p.id === selectedPreviewId) card.classList.add('is-preview');
     const missing = p.fileExists === false;
     const when = p.createdAt ? new Date(p.createdAt).toLocaleString() : '';
     card.innerHTML = `
@@ -399,17 +491,15 @@ function renderPhotoGrid() {
       }
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
-        ${missing ? `<span class="badge badge-warn">missing on disk</span>` : ''}
+        ${missing ? `<span class="badge badge-warn">missing</span>` : ''}
         <span class="photo-when">${when}</span>
-        <div class="photo-admin-actions">
-          <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener" ${missing ? 'aria-disabled="true" tabindex="-1"' : ''}>Open</a>
-          <button type="button" class="btn ghost delete">Delete</button>
-          <button type="button" class="btn ghost download" ${missing ? 'disabled' : ''}>Download</button>
-        </div>
       </div>
     `;
     const thumb = card.querySelector('img[data-photo-id]');
     if (thumb) {
+      thumb.style.width = '100%';
+      thumb.style.height = '88px';
+      thumb.style.objectFit = 'cover';
       thumb.addEventListener('error', () => {
         card.classList.add('is-missing-file');
         const wrap = document.createElement('div');
@@ -417,20 +507,15 @@ function renderPhotoGrid() {
         wrap.title = 'Image failed to load — file missing or unreadable on disk';
         wrap.textContent = 'File missing';
         thumb.replaceWith(wrap);
-        const actions = card.querySelector('.photo-admin-actions');
-        const dl = actions?.querySelector('.download');
-        if (dl) dl.disabled = true;
-        const metaBlock = card.querySelector('.meta-block');
-        if (metaBlock && !metaBlock.querySelector('.badge-warn')) {
-          const warn = document.createElement('span');
-          warn.className = 'badge badge-warn';
-          warn.textContent = 'missing on disk';
-          const firstBadge = metaBlock.querySelector('.badge');
-          if (firstBadge) firstBadge.after(warn);
-          else metaBlock.prepend(warn);
-        }
       });
     }
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.photo-select')) return;
+      selectedPreviewId = p.id;
+      renderPhotoPreview(p, slug);
+      photoGrid.querySelectorAll('.photo-admin-card').forEach((el) => el.classList.remove('is-preview'));
+      card.classList.add('is-preview');
+    });
     const check = card.querySelector('.photo-check');
     check?.addEventListener('change', () => {
       if (check.checked) {
@@ -441,19 +526,6 @@ function renderPhotoGrid() {
         card.classList.remove('is-selected');
       }
       updatePhotoSelectionUi();
-    });
-    card.querySelector('.download')?.addEventListener('click', () => {
-      if (missing) return;
-      void downloadAdminPhoto(slug, p);
-    });
-    card.querySelector('.delete').addEventListener('click', async () => {
-      if (!confirm(missing ? 'Remove this broken DB entry (file already missing)?' : 'Delete this photo from the album?')) return;
-      await api(`/api/admin/sessions/${encodeURIComponent(slug)}/photos/${encodeURIComponent(p.id)}`, {
-        method: 'DELETE',
-      });
-      setStatus(`Deleted photo ${p.id}`);
-      await refreshAll();
-      await refreshPhotos();
     });
     photoGrid.appendChild(card);
   }
@@ -469,6 +541,7 @@ async function refreshPhotos() {
   updatePhotoSelectionUi();
   photosCache = [];
   photoPage = 1;
+  selectedPreviewId = null;
   photoGrid.innerHTML = '';
   if (!slug) {
     photoGrid.innerHTML = '<p class="meta">No album selected.</p>';
@@ -554,6 +627,7 @@ async function refreshAll() {
   applyWallForm(wall.wall);
   await refreshAlbums();
   await refreshFrames();
+  await loadPhysicalDefaults();
   await refreshQrOverviewStats();
 }
 
@@ -724,6 +798,201 @@ document.getElementById('btnClearMosaicTarget')?.addEventListener('click', async
   }
 });
 
+let pfDefaults = {
+  cellWidthCm: 5.3,
+  cellHeightCm: 7,
+  innerPaddingMm: 3,
+  safeInsetTopMm: 0.2,
+  safeInsetBottomMm: 0.2,
+  safeInsetLeftMm: 3,
+  safeInsetRightMm: 1,
+  gapMm: 6.35,
+  marginMm: 6.35,
+  dpi: 300,
+  rotateDegrees: -90,
+  borderEnabled: true,
+};
+
+function fillPhysicalForm(src = pfDefaults) {
+  document.getElementById('pfCellW').value = src.cellWidthCm;
+  document.getElementById('pfCellH').value = src.cellHeightCm;
+  document.getElementById('pfInset').value = src.innerPaddingMm;
+  document.getElementById('pfSafeTop').value = src.safeInsetTopMm;
+  document.getElementById('pfSafeBot').value = src.safeInsetBottomMm;
+  document.getElementById('pfSafeLeft').value = src.safeInsetLeftMm;
+  document.getElementById('pfSafeRight').value = src.safeInsetRightMm;
+  document.getElementById('pfGap').value = src.gapMm;
+  document.getElementById('pfMargin').value = src.marginMm;
+  document.getElementById('pfDpi').value = src.dpi;
+  document.getElementById('pfRotate').value = String(src.rotateDegrees);
+  document.getElementById('pfBorder').checked = src.borderEnabled !== false;
+}
+
+async function loadPhysicalDefaults() {
+  try {
+    const d = await api('/api/admin/physical-frame/defaults');
+    if (d?.defaults) pfDefaults = { ...pfDefaults, ...d.defaults };
+  } catch {
+    /* keep local defaults */
+  }
+  fillPhysicalForm(pfDefaults);
+}
+
+function physicalSheetLabel(sheet) {
+  if (!sheet) return '';
+  const dpi = Number(sheet.settings?.dpi || sheet.dpi || 300) || 300;
+  const w = Number(sheet.width);
+  const h = Number(sheet.height);
+  if (!w || !h) return '';
+  const wCm = ((w / dpi) * 2.54).toFixed(2);
+  const hCm = ((h / dpi) * 2.54).toFixed(2);
+  return `Sheet size ≈ ${wCm} × ${hCm} cm · file = ${w}×${h} px at ${dpi} DPI`;
+}
+
+async function fetchPhysicalBlob(id) {
+  const r = await fetch(`/api/admin/physical-frame/${encodeURIComponent(id)}/file`, {
+    headers: { 'X-Admin-Pin': pin() },
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    throw new Error(data.error || r.statusText);
+  }
+  return r.blob();
+}
+
+function renderPhysicalPreview(id, sheet) {
+  const box = document.getElementById('pfPreview');
+  box.innerHTML = '';
+  const label = physicalSheetLabel(sheet);
+  if (label) {
+    const p = document.createElement('p');
+    p.className = 'meta';
+    p.textContent = label;
+    box.appendChild(p);
+  }
+  const img = document.createElement('img');
+  img.alt = 'Physical cut sheet';
+  img.className = 'photo-preview-img';
+  box.appendChild(img);
+  const actions = document.createElement('div');
+  actions.className = 'row wrap';
+  const dl = document.createElement('button');
+  dl.type = 'button';
+  dl.className = 'btn primary';
+  dl.textContent = 'Download PNG';
+  dl.addEventListener('click', () => void downloadPhysicalSheet(id));
+  actions.appendChild(dl);
+  box.appendChild(actions);
+  void fetchPhysicalBlob(id)
+    .then((blob) => {
+      img.src = URL.createObjectURL(blob);
+    })
+    .catch((e) => setStatus(String(e.message || e)));
+}
+
+async function downloadPhysicalSheet(id) {
+  try {
+    const blob = await fetchPhysicalBlob(id);
+    const how = await shareOrDownloadBlob(blob, `physical-frame-${id}.png`, 'image/png');
+    if (how === 'shared') setStatus('Share sheet opened.');
+    else if (how === 'downloaded') setStatus('Download started.');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+}
+
+async function refreshPhysicalFrames() {
+  const host = document.getElementById('pfList');
+  if (!host) return;
+  try {
+    const data = await api('/api/admin/physical-frame');
+    const rows = Array.isArray(data.sheets) ? data.sheets : [];
+    host.innerHTML = '';
+    if (!rows.length) {
+      host.innerHTML = '<p class="meta">No custom sheets yet.</p>';
+      return;
+    }
+    for (const row of rows) {
+      const item = document.createElement('div');
+      item.className = 'session-item';
+      const left = document.createElement('div');
+      const t = document.createElement('strong');
+      t.textContent = row.originalName || row.id;
+      left.appendChild(t);
+      const m = document.createElement('div');
+      m.className = 'meta';
+      m.textContent = new Date(row.createdAt).toLocaleString();
+      left.appendChild(m);
+      const actions = document.createElement('div');
+      actions.className = 'row wrap';
+      const prev = document.createElement('button');
+      prev.type = 'button';
+      prev.className = 'btn ghost';
+      prev.textContent = 'Preview';
+      prev.addEventListener('click', () => renderPhysicalPreview(row.id, row));
+      const dl = document.createElement('button');
+      dl.type = 'button';
+      dl.className = 'btn ghost';
+      dl.textContent = 'Download';
+      dl.addEventListener('click', () => void downloadPhysicalSheet(row.id));
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn danger';
+      del.textContent = 'Delete';
+      del.addEventListener('click', async () => {
+        if (!confirm('Delete this cut sheet?')) return;
+        try {
+          await api(`/api/admin/physical-frame/${encodeURIComponent(row.id)}`, { method: 'DELETE' });
+          await refreshPhysicalFrames();
+        } catch (e) {
+          setStatus(String(e.message || e));
+        }
+      });
+      actions.append(prev, dl, del);
+      item.append(left, actions);
+      host.appendChild(item);
+    }
+  } catch (e) {
+    host.innerHTML = `<p class="meta">${String(e.message || e).replace(/[<>&]/g, '')}</p>`;
+  }
+}
+
+document.getElementById('btnPfDefaults').addEventListener('click', () => fillPhysicalForm(pfDefaults));
+
+document.getElementById('btnPfGenerate').addEventListener('click', async () => {
+  const input = document.getElementById('pfPhoto');
+  const file = input.files?.[0];
+  if (!file) {
+    setStatus('Choose a landscape photo first');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('photo', file, file.name);
+  fd.append('cellWidthCm', document.getElementById('pfCellW').value);
+  fd.append('cellHeightCm', document.getElementById('pfCellH').value);
+  fd.append('innerPaddingMm', document.getElementById('pfInset').value);
+  fd.append('safeInsetTopMm', document.getElementById('pfSafeTop').value);
+  fd.append('safeInsetBottomMm', document.getElementById('pfSafeBot').value);
+  fd.append('safeInsetLeftMm', document.getElementById('pfSafeLeft').value);
+  fd.append('safeInsetRightMm', document.getElementById('pfSafeRight').value);
+  fd.append('gapMm', document.getElementById('pfGap').value);
+  fd.append('marginMm', document.getElementById('pfMargin').value);
+  fd.append('dpi', document.getElementById('pfDpi').value);
+  fd.append('rotateDegrees', document.getElementById('pfRotate').value);
+  fd.append('borderEnabled', document.getElementById('pfBorder').checked ? 'true' : 'false');
+  try {
+    setStatus('Generating cut sheet…');
+    const out = await api('/api/admin/physical-frame/generate', { method: 'POST', body: fd });
+    if (!out.sheet?.id) throw new Error('Generate failed');
+    input.value = '';
+    renderPhysicalPreview(out.sheet.id, out.sheet);
+    await refreshPhysicalFrames();
+    setStatus('Cut sheet ready — admin only (not on the wall)');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
 document.getElementById('btnUploadFrame').addEventListener('click', async () => {
   const input = document.getElementById('frameFile');
   const file = input.files?.[0];
@@ -814,8 +1083,19 @@ function onPhotoFilterChange() {
   if (photosCache.length) renderPhotoGrid();
 }
 
-document.getElementById('photoKind')?.addEventListener('change', onPhotoFilterChange);
-document.getElementById('photoWhen')?.addEventListener('change', onPhotoFilterChange);
+function bindPhotoChips(rootId, attr) {
+  document.getElementById(rootId)?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.photo-chip');
+    if (!btn) return;
+    document.querySelectorAll(`#${rootId} .photo-chip`).forEach((el) => el.classList.toggle('is-on', el === btn));
+    const custom = document.getElementById('photoCustomDates');
+    if (custom && attr === 'when') custom.hidden = btn.getAttribute('data-when') !== 'custom';
+    onPhotoFilterChange();
+  });
+}
+
+bindPhotoChips('photoKindChips', 'kind');
+bindPhotoChips('photoWhenChips', 'when');
 document.getElementById('photoFrom')?.addEventListener('change', onPhotoFilterChange);
 document.getElementById('photoTo')?.addEventListener('change', onPhotoFilterChange);
 

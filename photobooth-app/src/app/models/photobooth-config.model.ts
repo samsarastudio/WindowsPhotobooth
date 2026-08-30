@@ -225,8 +225,9 @@ export interface PhotoboothCopyHistory {
   whenMonth: string;
   whenCustom: string;
   deleteLabel: string;
-  deleteConfirm: string;
-  cancel: string;
+    deleteConfirm: string;
+    cancel: string;
+    previewHint: string;
 }
 
 export interface PhotoboothCopy {
@@ -397,17 +398,17 @@ export interface PhotoboothPhysicalFrameConfig {
 }
 
 export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = {
-  cellWidthCm: 5.5,
-  cellHeightCm: 7.6,
+  cellWidthCm: 5.3,
+  cellHeightCm: 7,
   innerPaddingMm: 3,
-  safeInsetTopMm: 4,
-  safeInsetBottomMm: 14,
-  safeInsetLeftMm: 1.5,
-  safeInsetRightMm: 6,
-  gapMm: 2,
-  marginMm: 2,
+  safeInsetTopMm: 0.2,
+  safeInsetBottomMm: 0.2,
+  safeInsetLeftMm: 3,
+  safeInsetRightMm: 1,
+  gapMm: 6.35,
+  marginMm: 6.35,
   dpi: 300,
-  rotateDegrees: 90,
+  rotateDegrees: -90,
   borderEnabled: true,
 };
 
@@ -559,6 +560,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     deleteLabel: 'Delete',
     deleteConfirm: 'Delete this photo from this booth? This cannot be undone.',
     cancel: 'Cancel',
+    previewHint: 'Tap a photo to preview',
   },
   aiMode: {
     title: 'Choose a style',

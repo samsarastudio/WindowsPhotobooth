@@ -56,7 +56,21 @@
 } @else if (!filtered().length) {
   <p class="pb-cb-msg">{{ copy().history.empty }}</p>
 } @else {
-  <div class="pb-cb-grid" role="list">
+  <div class="pb-cb-stage">
+    <div class="pb-cb-preview" [class.has-photo]="!!previewUrl()">
+      @if (previewUrl(); as src) {
+        <img [src]="src" alt="" />
+        @if (selected(); as sel) {
+          <p class="pb-cb-preview-cap">
+            <span class="pb-cb-kind" [class.is-physical]="sel.kind === 'physical'">{{ sel.label }}</span>
+            <span>{{ sel.capturedAt | date: 'MMM d, y, h:mm a' }}</span>
+          </p>
+        }
+      } @else {
+        <p class="pb-cb-preview-ph">{{ copy().history.previewHint }}</p>
+      }
+    </div>
+    <div class="pb-cb-grid" role="list">
     @for (photo of pageItems(); track photo.id) {
       <button
         type="button"
@@ -76,6 +90,7 @@
         </span>
       </button>
     }
+  </div>
   </div>
   <div class="pb-cb-pager">
     <button type="button" class="pb-btn pb-btn-ghost pb-btn-sm" [disabled]="page() <= 1" (click)="goPage(-1)">

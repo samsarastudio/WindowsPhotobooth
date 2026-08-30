@@ -28,6 +28,8 @@ export class CapturePhotoBrowserComponent implements OnInit {
   readonly photos = signal<PbCaptureHistoryItem[]>([]);
   readonly selectedId = signal<string | null>(null);
   readonly thumbUrls = signal<Record<string, string>>({});
+  readonly previewUrls = signal<Record<string, string>>({});
+  readonly previewUrl = signal<string | null>(null);
   readonly err = signal<string | null>(null);
   readonly loading = signal(true);
 
@@ -106,10 +108,18 @@ export class CapturePhotoBrowserComponent implements OnInit {
       }
       const list = r.photos ?? [];
       this.photos.set(list);
-      const still = list.find((p) => p.id === this.selectedId());
-      this.selectedId.set(still?.id ?? null);
       this.page.set(1);
       await this.ensureThumbs(this.pageItems());
+      const keep = list.find((p) => p.id === this.selectedId());
+      if (keep) {
+        this.selectedId.set(keep.id);
+        await this.ensurePreview(keep);
+      } else if (this.pageItems()[0]) {
+        await this.selectPhoto(this.pageItems()[0]);
+      } else {
+        this.selectedId.set(null);
+        this.previewUrl.set(null);
+      }
     } catch (e) {
       this.err.set(String(e));
     } finally {
@@ -120,20 +130,20 @@ export class CapturePhotoBrowserComponent implements OnInit {
   setKind(kind: CaptureKindFilter): void {
     this.kindFilter.set(kind);
     this.page.set(1);
-    void this.ensureThumbs(this.pageItems());
+    void this.afterFilterChange();
   }
 
   setWhen(when: CaptureWhenFilter): void {
     this.whenFilter.set(when);
     this.page.set(1);
-    void this.ensureThumbs(this.pageItems());
+    void this.afterFilterChange();
   }
 
   onCustomFrom(ev: Event): void {
     this.customFrom.set((ev.target as HTMLInputElement).value);
     if (this.whenFilter() === 'custom') {
       this.page.set(1);
-      void this.ensureThumbs(this.pageItems());
+      void this.afterFilterChange();
     }
   }
 
@@ -141,22 +151,41 @@ export class CapturePhotoBrowserComponent implements OnInit {
     this.customTo.set((ev.target as HTMLInputElement).value);
     if (this.whenFilter() === 'custom') {
       this.page.set(1);
-      void this.ensureThumbs(this.pageItems());
+      void this.afterFilterChange();
     }
   }
 
   goPage(delta: number): void {
     const next = Math.min(this.pageCount(), Math.max(1, this.page() + delta));
     this.page.set(next);
+    const first = this.pageItems()[0];
     void this.ensureThumbs(this.pageItems());
+    if (first) void this.selectPhoto(first);
   }
 
-  selectPhoto(photo: PbCaptureHistoryItem): void {
+  async selectPhoto(photo: PbCaptureHistoryItem): Promise<void> {
     this.selectedId.set(photo.id);
     this.printDone.set(false);
     this.printErr.set(null);
     this.confirmDelete.set(false);
     void this.ensureThumbs([photo]);
+    await this.ensurePreview(photo);
+  }
+
+  private async afterFilterChange(): Promise<void> {
+    await this.ensureThumbs(this.pageItems());
+    const items = this.pageItems();
+    const sel = this.selected();
+    if (sel && this.filtered().some((p) => p.id === sel.id)) {
+      await this.ensurePreview(sel);
+      return;
+    }
+    if (items[0]) {
+      await this.selectPhoto(items[0]);
+      return;
+    }
+    this.selectedId.set(null);
+    this.previewUrl.set(null);
   }
 
   async printOnce(): Promise<void> {
@@ -206,6 +235,7 @@ export class CapturePhotoBrowserComponent implements OnInit {
       }
       this.confirmDelete.set(false);
       this.selectedId.set(null);
+      this.previewUrl.set(null);
       await this.reload();
     } catch (e) {
       this.err.set(String(e));
@@ -230,6 +260,24 @@ export class CapturePhotoBrowserComponent implements OnInit {
       }
     }
     if (changed) this.thumbUrls.set(thumbs);
+  }
+
+  private async ensurePreview(photo: PbCaptureHistoryItem): Promise<void> {
+    const cached = this.previewUrls()[photo.id];
+    if (cached) {
+      this.previewUrl.set(cached);
+      return;
+    }
+    if (!window.pbApi) return;
+    try {
+      const url = window.pbApi.readFileThumbBase64
+        ? await window.pbApi.readFileThumbBase64(photo.displayPath, 1100)
+        : await window.pbApi.readFileBase64(photo.displayPath);
+      this.previewUrls.update((m) => ({ ...m, [photo.id]: url }));
+      if (this.selectedId() === photo.id) this.previewUrl.set(url);
+    } catch {
+      if (this.selectedId() === photo.id) this.previewUrl.set(this.thumbUrls()[photo.id] ?? null);
+    }
   }
 
   private rangeStartMs(when: CaptureWhenFilter): number | null {

@@ -13,6 +13,8 @@ import { framesRouter, adminFramesRouter, ensureFramesDir } from './routes/frame
 import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js';
 import { qrRouter, adminQrRouter } from './routes/qr.js';
 import { boothUpdateRouter, adminBoothUpdateRouter } from './routes/booth-update.js';
+import { adminPhysicalFrameRouter } from './routes/physical-frame.js';
+import { ensurePhysicalDir } from './physical-frame.js';
 import { ensureQrDirs } from './qr/store.js';
 import { purgeExpiredSessions } from './purge.js';
 import { ensureHttpsCerts } from './https-certs.js';
@@ -21,6 +23,7 @@ initDb();
 ensureFramesDir();
 ensureBrandingDir();
 ensureQrDirs();
+ensurePhysicalDir();
 
 const app = express();
 app.disable('x-powered-by');
@@ -97,6 +100,7 @@ app.use('/api/admin/frames', adminFramesRouter);
 app.use('/api/admin/wall', adminWallRouter);
 app.use('/api/admin/qr', adminQrRouter);
 app.use('/api/admin/booth-updates', adminBoothUpdateRouter);
+app.use('/api/admin/physical-frame', adminPhysicalFrameRouter);
 app.use('/api/admin', adminRouter);
 
 app.get('/media/frames/:filename', (req, res) => {
