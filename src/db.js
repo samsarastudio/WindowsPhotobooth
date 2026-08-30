@@ -259,7 +259,8 @@ export function selectDisplayPhotos(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const includeOriginals = opts.includeOriginals !== false;
   const created = (p) => String(p.created_at || p.createdAt || '');
-  const framedAi = list.filter((p) => p.variant && p.variant !== 'original');
+  const guest = list.filter((p) => p.variant !== 'physical');
+  const framedAi = guest.filter((p) => p.variant && p.variant !== 'original');
   if (!includeOriginals) {
     return framedAi.sort((a, b) => created(a).localeCompare(created(b)));
   }
@@ -268,7 +269,7 @@ export function selectDisplayPhotos(rows, opts = {}) {
       captureFamilyKey(p.source_local_name || p.sourceLocalName, p.filename),
     ),
   );
-  const orphanOriginals = list.filter((p) => {
+  const orphanOriginals = guest.filter((p) => {
     if (p.variant !== 'original') return false;
     const key = captureFamilyKey(p.source_local_name || p.sourceLocalName, p.filename);
     return key ? !covered.has(key) : true;

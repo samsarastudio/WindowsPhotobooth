@@ -30,6 +30,10 @@ const tokenMetaEl = document.getElementById('tokenMeta');
 
 /** @type {any[]} */
 let albumsCache = [];
+/** @type {any[]} */
+let photosCache = [];
+let photoPage = 1;
+const PHOTO_PAGE_SIZE = 24;
 /** @type {Set<string>} */
 const selectedPhotoIds = new Set();
 
@@ -284,34 +288,108 @@ function sharePageHref(slug, photo) {
   return photo?.sharePath || '#';
 }
 
-async function refreshPhotos() {
-  if (!photoAlbum.value) {
-    if (albumsCache[0]) photoAlbum.value = albumsCache[0].slug;
+function startOfLocalDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function photoFilterRange() {
+  const when = document.getElementById('photoWhen')?.value || 'all';
+  const now = new Date();
+  if (when === 'today') return { from: startOfLocalDay(now), to: null };
+  if (when === 'yesterday') {
+    const start = startOfLocalDay(now) - 86400000;
+    return { from: start, to: startOfLocalDay(now) - 1 };
   }
-  updateOpenAlbumLink();
-  const slug = photoAlbum.value;
-  selectedPhotoIds.clear();
-  updatePhotoSelectionUi();
+  if (when === 'week') return { from: startOfLocalDay(now) - 6 * 86400000, to: null };
+  if (when === 'month') return { from: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), to: null };
+  if (when === 'custom') {
+    const fromVal = document.getElementById('photoFrom')?.value;
+    const toVal = document.getElementById('photoTo')?.value;
+    const from = fromVal ? new Date(`${fromVal}T00:00:00`).getTime() : null;
+    const to = toVal ? new Date(`${toVal}T23:59:59.999`).getTime() : null;
+    return { from: Number.isFinite(from) ? from : null, to: Number.isFinite(to) ? to : null };
+  }
+  return { from: null, to: null };
+}
+
+function filteredAdminPhotos() {
+  const kind = document.getElementById('photoKind')?.value || 'all';
+  const { from, to } = photoFilterRange();
+  return photosCache.filter((p) => {
+    if (kind === 'physical' && p.variant !== 'physical') return false;
+    if (kind === 'normal' && p.variant === 'physical') return false;
+    if (kind === 'original' && p.variant !== 'original') return false;
+    if (kind === 'framed' && p.variant !== 'framed') return false;
+    if (kind === 'ai' && p.variant !== 'ai') return false;
+    const t = Date.parse(p.createdAt || '');
+    if (Number.isFinite(t)) {
+      if (from != null && t < from) return false;
+      if (to != null && t > to) return false;
+    }
+    return true;
+  });
+}
+
+function renderPhotoPager(filteredLen, pageCount) {
+  const pager = document.getElementById('photoPager');
+  const meta = document.getElementById('photoPagerMeta');
+  if (meta) {
+    meta.textContent = `${filteredLen} photo${filteredLen === 1 ? '' : 's'} · page ${photoPage} of ${pageCount}`;
+  }
+  if (!pager) return;
+  pager.innerHTML = '';
+  if (pageCount <= 1) return;
+  const prev = document.createElement('button');
+  prev.type = 'button';
+  prev.className = 'btn ghost';
+  prev.textContent = 'Prev';
+  prev.disabled = photoPage <= 1;
+  prev.addEventListener('click', () => {
+    photoPage = Math.max(1, photoPage - 1);
+    renderPhotoGrid();
+  });
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'btn ghost';
+  next.textContent = 'Next';
+  next.disabled = photoPage >= pageCount;
+  next.addEventListener('click', () => {
+    photoPage = Math.min(pageCount, photoPage + 1);
+    renderPhotoGrid();
+  });
+  pager.append(prev, next);
+}
+
+function renderPhotoGrid() {
+  const slug = photoAlbum?.value;
   photoGrid.innerHTML = '';
   if (!slug) {
     photoGrid.innerHTML = '<p class="meta">No album selected.</p>';
     return;
   }
-  const data = await api(`/api/admin/sessions/${encodeURIComponent(slug)}`);
-  const photos = data.session?.photos || [];
-  if (!photos.length) {
-    photoGrid.innerHTML = '<p class="meta">This album has no photos.</p>';
+  const filtered = filteredAdminPhotos();
+  if (!filtered.length) {
+    photoGrid.innerHTML = '<p class="meta">No photos match these filters.</p>';
+    renderPhotoPager(0, 1);
     return;
   }
-  for (const p of photos) {
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PHOTO_PAGE_SIZE));
+  if (photoPage > pageCount) photoPage = pageCount;
+  const start = (photoPage - 1) * PHOTO_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + PHOTO_PAGE_SIZE);
+  renderPhotoPager(filtered.length, pageCount);
+
+  for (const p of pageItems) {
     const card = document.createElement('article');
     card.className = 'photo-admin-card';
     if (p.fileExists === false) card.classList.add('is-missing-file');
+    if (selectedPhotoIds.has(p.id)) card.classList.add('is-selected');
     const shareHref = sharePageHref(slug, p);
     const missing = p.fileExists === false;
+    const when = p.createdAt ? new Date(p.createdAt).toLocaleString() : '';
     card.innerHTML = `
       <label class="photo-select">
-        <input type="checkbox" class="photo-check" data-id="${p.id}" />
+        <input type="checkbox" class="photo-check" data-id="${p.id}" ${selectedPhotoIds.has(p.id) ? 'checked' : ''} />
         <span class="sr-only">Select photo</span>
       </label>
       ${
@@ -322,7 +400,7 @@ async function refreshPhotos() {
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
         ${missing ? `<span class="badge badge-warn">missing on disk</span>` : ''}
-        <code style="font-size:0.68rem;word-break:break-all">${p.id}</code>
+        <span class="photo-when">${when}</span>
         <div class="photo-admin-actions">
           <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener" ${missing ? 'aria-disabled="true" tabindex="-1"' : ''}>Open</a>
           <button type="button" class="btn ghost delete">Delete</button>
@@ -342,14 +420,14 @@ async function refreshPhotos() {
         const actions = card.querySelector('.photo-admin-actions');
         const dl = actions?.querySelector('.download');
         if (dl) dl.disabled = true;
-        const meta = card.querySelector('.meta-block');
-        if (meta && !meta.querySelector('.badge-warn')) {
+        const metaBlock = card.querySelector('.meta-block');
+        if (metaBlock && !metaBlock.querySelector('.badge-warn')) {
           const warn = document.createElement('span');
           warn.className = 'badge badge-warn';
           warn.textContent = 'missing on disk';
-          const firstBadge = meta.querySelector('.badge');
+          const firstBadge = metaBlock.querySelector('.badge');
           if (firstBadge) firstBadge.after(warn);
-          else meta.prepend(warn);
+          else metaBlock.prepend(warn);
         }
       });
     }
@@ -379,6 +457,31 @@ async function refreshPhotos() {
     });
     photoGrid.appendChild(card);
   }
+}
+
+async function refreshPhotos() {
+  if (!photoAlbum.value) {
+    if (albumsCache[0]) photoAlbum.value = albumsCache[0].slug;
+  }
+  updateOpenAlbumLink();
+  const slug = photoAlbum.value;
+  selectedPhotoIds.clear();
+  updatePhotoSelectionUi();
+  photosCache = [];
+  photoPage = 1;
+  photoGrid.innerHTML = '';
+  if (!slug) {
+    photoGrid.innerHTML = '<p class="meta">No album selected.</p>';
+    return;
+  }
+  const data = await api(`/api/admin/sessions/${encodeURIComponent(slug)}`);
+  photosCache = data.session?.photos || [];
+  if (!photosCache.length) {
+    photoGrid.innerHTML = '<p class="meta">This album has no photos.</p>';
+    renderPhotoPager(0, 1);
+    return;
+  }
+  renderPhotoGrid();
 }
 
 function applyTokenSettings(settings) {
@@ -705,6 +808,16 @@ photoAlbum?.addEventListener('change', () => {
   updateOpenAlbumLink();
   void refreshPhotos();
 });
+
+function onPhotoFilterChange() {
+  photoPage = 1;
+  if (photosCache.length) renderPhotoGrid();
+}
+
+document.getElementById('photoKind')?.addEventListener('change', onPhotoFilterChange);
+document.getElementById('photoWhen')?.addEventListener('change', onPhotoFilterChange);
+document.getElementById('photoFrom')?.addEventListener('change', onPhotoFilterChange);
+document.getElementById('photoTo')?.addEventListener('change', onPhotoFilterChange);
 
 wallBackdropOpacity?.addEventListener('input', () => {
   syncBackdropOpacityLabel(wallBackdropOpacity.value);

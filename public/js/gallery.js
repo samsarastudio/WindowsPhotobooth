@@ -388,14 +388,15 @@ function captureFamilyKey(photo) {
 /** Keep framed/ai; keep originals only when enabled and no framed/ai sibling is present. */
 function selectDisplayPhotosClient(list, includeOriginals = wallCfg.showOriginalPhotos !== false) {
   const rows = Array.isArray(list) ? list : [];
-  const framedAi = rows.filter((p) => p.variant && p.variant !== 'original');
+  const guest = rows.filter((p) => p.variant !== 'physical');
+  const framedAi = guest.filter((p) => p.variant && p.variant !== 'original');
   if (!includeOriginals) {
     return framedAi.sort((a, b) =>
       String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
     );
   }
   const covered = new Set(framedAi.map((p) => captureFamilyKey(p)).filter(Boolean));
-  const orphans = rows.filter((p) => {
+  const orphans = guest.filter((p) => {
     if (p.variant !== 'original') return false;
     const key = captureFamilyKey(p);
     return key ? !covered.has(key) : true;
@@ -1503,6 +1504,7 @@ function stopMosaicLoops() {
 
 function upsertPhoto(photo) {
   if (!photo?.id) return;
+  if (photo.variant === 'physical') return;
   // Guest QR view stays locked to that one photo.
   if (route.kind === 'photo') {
     if (photo.id !== route.photoId) return;

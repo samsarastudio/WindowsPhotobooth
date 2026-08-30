@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260827-5" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260830-photos" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -84,18 +84,56 @@
 
           <section class="card admin-section" data-section="photos" hidden>
             <h2>Photos</h2>
+            <p class="meta">
+              Thumbnail grid with filters. Physical print sheets are listed here for download —
+              they do not appear on the guest wall or gallery.
+            </p>
             <label>Album</label>
             <select id="photoAlbum" class="input"></select>
+            <div class="photo-toolbar row wrap">
+              <label class="photo-filter">
+                Type
+                <select id="photoKind" class="input">
+                  <option value="all">All</option>
+                  <option value="physical">Physical</option>
+                  <option value="normal">Digital / framed</option>
+                  <option value="original">Original</option>
+                  <option value="framed">Framed</option>
+                  <option value="ai">AI</option>
+                </select>
+              </label>
+              <label class="photo-filter">
+                When
+                <select id="photoWhen" class="input">
+                  <option value="all">All dates</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">This month</option>
+                  <option value="custom">Custom dates</option>
+                </select>
+              </label>
+              <label class="photo-filter">
+                From
+                <input id="photoFrom" class="input" type="date" />
+              </label>
+              <label class="photo-filter">
+                To
+                <input id="photoTo" class="input" type="date" />
+              </label>
+            </div>
             <div class="row wrap">
               <button type="button" class="btn ghost" id="btnRefreshPhotos">Refresh</button>
               <a class="btn ghost" id="btnOpenAlbum" href="#" target="_blank" rel="noopener">Open gallery</a>
               <button type="button" class="btn ghost" id="btnResolveBrokenPhotos">Check &amp; fix broken photos</button>
-              <button type="button" class="btn ghost" id="btnSelectAllPhotos">Select all</button>
+              <button type="button" class="btn ghost" id="btnSelectAllPhotos">Select all on page</button>
               <button type="button" class="btn ghost" id="btnClearPhotoSelection">Clear selection</button>
               <button type="button" class="btn danger" id="btnBulkDeletePhotos" disabled>Delete selected</button>
             </div>
             <p id="photoBrokenMeta" class="meta">Broken = DB record exists but image file is missing on disk (shows as black thumbnail).</p>
             <p id="photoSelectionMeta" class="meta">Select photos with the checkboxes to delete several at once.</p>
+            <p id="photoPagerMeta" class="meta"></p>
+            <div id="photoPager" class="row wrap photo-pager"></div>
             <div id="photoGrid" class="photo-admin-grid"></div>
           </section>
 
@@ -210,8 +248,8 @@
             </label>
             <p class="meta">
               When on, plain captures (no frame overlay) appear on the mosaic wall and guest galleries.
-              Framed / AI versions still take priority when both exist for the same shot. Admin Photos
-              always lists every variant.
+              Framed / AI versions still take priority when both exist for the same shot. Physical print
+              sheets never appear on the wall — download those from Admin → Photos.
             </p>
             <label>Wall title</label>
             <input id="wallTitle" class="input" />
@@ -330,6 +368,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260827-qa3" type="module"></script>
+    <script src="/js/admin.js?v=20260830-photos" type="module"></script>
   </body>
 </html>
