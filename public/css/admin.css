@@ -290,10 +290,101 @@
 }
 
 .photo-admin-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.65rem;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)) !important;
+  gap: 0.55rem !important;
   margin-top: 0.75rem;
+}
+
+.photo-admin-grid .photo-admin-card {
+  max-width: 100%;
+}
+
+.photo-admin-grid .photo-admin-card img,
+.photo-admin-grid .photo-admin-card .photo-missing {
+  width: 100% !important;
+  height: 88px !important;
+  max-height: 88px !important;
+  aspect-ratio: 4 / 3 !important;
+  object-fit: cover !important;
+}
+
+.photo-admin-card.is-preview {
+  border-color: #2b2218;
+  box-shadow: 0 0 0 2px rgba(43, 34, 24, 0.35);
+}
+
+.photo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.55rem;
+}
+
+.photo-chip {
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 2.2rem;
+}
+
+.photo-chip.is-on {
+  background: #2b2218;
+  border-color: #2b2218;
+  color: #f7f1e8;
+}
+
+.photo-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 8rem;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.65rem;
+  border-radius: 16px;
+  background: #111;
+  border: 1px solid var(--line);
+}
+
+.photo-preview img {
+  display: block;
+  width: auto !important;
+  max-width: 100%;
+  max-height: min(38vh, 22rem);
+  height: auto !important;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #111;
+}
+
+.photo-preview-missing {
+  min-height: 8rem;
+  display: grid;
+  place-items: center;
+  color: #f0c0c0;
+  font-weight: 600;
+}
+
+.photo-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.photo-preview-bar .photo-when,
+.photo-preview-bar .badge {
+  color: #f3ece3;
 }
 
 .photo-toolbar {
@@ -315,11 +406,6 @@
 
 .photo-pager {
   margin-bottom: 0.35rem;
-}
-
-.photo-admin-card img,
-.photo-admin-card .photo-missing {
-  aspect-ratio: 4 / 3;
 }
 
 @media (max-width: 800px) {
@@ -393,4 +479,34 @@ code.warn {
   background: #fef3f2;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
+}
+
+.pf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 0.65rem 0.85rem;
+  margin: 0.35rem 0 0.85rem;
+}
+
+.pf-grid label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+#pfPhoto {
+  display: block;
+  margin: 0.35rem 0 0.75rem;
+  max-width: 100%;
+}
+
+.pf-preview {
+  min-height: 12rem;
+}
+
+.pf-preview .photo-preview-img {
+  max-height: min(42vh, 26rem);
 }

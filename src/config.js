@@ -117,6 +117,9 @@ export const config = {
   get boothUpdatesDir() {
     return path.join(this.dataDir, 'booth-updates');
   },
+  get physicalDir() {
+    return path.join(this.dataDir, 'physical-frames');
+  },
   /** Minutes unused — kept for future; attach is guest-driven. */
   qrMatchWindowMinutes: intEnv('QR_MATCH_WINDOW_MINUTES', 10),
   publicDir: path.join(root, 'public'),
