@@ -8,8 +8,8 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Outfit:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/gallery.css" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260830-physical" />
+    <link rel="stylesheet" href="/css/gallery.css?v=20260831-32" />
+    <link rel="stylesheet" href="/css/admin.css?v=20260831-32" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -205,11 +205,15 @@
             <h2>Photo frames</h2>
             <p class="meta">
               Booth overlays on this server. Windows photobooth auto-publishes uploads and Sync pushes
-              local frames here; Sync / guest frame picker pulls changes back to the booth. Prefer
-              landscape PNG overlays with a transparent (or black) photo hole and no caption text bar.
-              A starter file ships in <code>seed-frames/botanical-landscape.png</code> — upload it here
-              (or Publish from the booth) so all booths Sync the same matte.
+              local frames here; Sync / guest frame picker pulls changes back to the booth.
+              Export a landscape PNG at <strong>3:2 (6×4)</strong> — e.g. <strong>1800×1200</strong> or
+              <strong>2400×1600</strong> — with a transparent (or black) photo hole and no caption bar.
+              That ratio fills the guest gallery, live wall, and 6×4 print with no gap at the top.
+              A 16:9 frame is wider than the gallery tile and leaves empty space above the photo.
+              A starter file ships in <code>seed-frames/botanical-landscape.png</code> (already 3:2) —
+              upload it here (or Publish from the booth) so all booths Sync the same matte.
             </p>
+            <p class="meta" id="frameRatioHint"></p>
             <div class="row wrap">
               <input id="frameFile" type="file" accept="image/png,image/jpeg,image/webp" />
               <button type="button" class="btn primary" id="btnUploadFrame">Upload frame</button>
@@ -221,23 +225,25 @@
             <h2>Physical frame</h2>
             <p class="meta">
               Admin only — not the guest wall or gallery. Upload a landscape photo to generate the same
-              dual-cell cut sheet the booth prints (two identical portrait cells for cutting). Defaults
-              match the Windows booth layout.
+              dual-cell cut sheet the booth prints (two identical portrait cells for cutting). Output is
+              a Canon SELPHY postcard (148 × 100 mm) at true size so frame edges are not cropped.
             </p>
             <label>Photo</label>
             <input id="pfPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
             <h3 class="admin-subhead">Cut-sheet layout</h3>
+            <p class="meta">
+              Each cell prints at the centimetre size (ruler-accurate on SELPHY 14.8 × 10.0 cm paper).
+              Gap and margins are automatic. Safe insets only move the photo inside the frame.
+              After you pick a photo, zoom and drag to crop, then generate.
+            </p>
             <div class="pf-grid">
-              <label>Cell width (cm) <input id="pfCellW" class="input" type="number" min="3" max="12" step="0.1" value="5.3" /></label>
-              <label>Cell height (cm) <input id="pfCellH" class="input" type="number" min="4" max="15" step="0.1" value="7" /></label>
+              <label>Cell width (cm) <input id="pfCellW" class="input" type="number" min="3" max="7.4" step="0.1" value="5.3" /></label>
+              <label>Cell height (cm) <input id="pfCellH" class="input" type="number" min="4" max="9.8" step="0.1" value="7.8" /></label>
               <label>Photo inset (mm) <input id="pfInset" class="input" type="number" min="0" max="12" step="0.1" value="3" /></label>
               <label>Safe top (mm) <input id="pfSafeTop" class="input" type="number" min="0" max="20" step="0.1" value="0.2" /></label>
               <label>Safe bottom (mm) <input id="pfSafeBot" class="input" type="number" min="0" max="25" step="0.1" value="0.2" /></label>
               <label>Safe left (mm) <input id="pfSafeLeft" class="input" type="number" min="0" max="15" step="0.1" value="3" /></label>
               <label>Safe right (mm) <input id="pfSafeRight" class="input" type="number" min="0" max="15" step="0.1" value="1" /></label>
-              <label>Column gap (mm) <input id="pfGap" class="input" type="number" min="0" max="15" step="0.05" value="6.35" /></label>
-              <label>Sheet margin (mm) <input id="pfMargin" class="input" type="number" min="0" max="15" step="0.05" value="6.35" /></label>
-              <label>DPI <input id="pfDpi" class="input" type="number" min="72" max="600" step="1" value="300" /></label>
               <label>Rotate
                 <select id="pfRotate" class="input">
                   <option value="-90" selected>90° counter-clockwise</option>
@@ -249,6 +255,11 @@
               <input id="pfBorder" type="checkbox" checked />
               Thin gold border (double hairline)
             </label>
+            <div id="pfAdjustBox" class="pf-adjust" hidden>
+              <p class="meta">Drag the preview to move. Use zoom to crop extra background. Both cells stay identical.</p>
+              <canvas id="pfAdjustCanvas" class="pf-adjust-canvas"></canvas>
+              <label>Zoom <input id="pfZoom" class="input" type="range" min="1" max="3" step="0.05" value="1" /></label>
+            </div>
             <div class="row wrap">
               <button type="button" class="btn primary" id="btnPfGenerate">Generate cut sheet</button>
               <button type="button" class="btn ghost" id="btnPfDefaults">Reset to defaults</button>
@@ -402,6 +413,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260830-share" type="module"></script>
+    <script src="/js/admin.js?v=20260831-frames" type="module"></script>
   </body>
 </html>

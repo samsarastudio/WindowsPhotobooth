@@ -187,10 +187,12 @@ async function refreshFrames() {
   for (const f of list.frames || []) {
     const div = document.createElement('div');
     div.className = 'frame-card';
+    const ratio = frameRatioNote(f);
     div.innerHTML = `
       <img src="${f.url}?v=${Date.now()}" alt="" />
       <strong>${f.label}</strong>
       <code>${f.filename}</code>
+      ${ratio ? `<p class="meta ${f.fitsGallery ? '' : 'frame-ratio-warn'}">${ratio}</p>` : ''}
       <button type="button" class="btn ghost delete">Delete</button>
     `;
     div.querySelector('.delete').addEventListener('click', async () => {
@@ -202,8 +204,18 @@ async function refreshFrames() {
     frameList.appendChild(div);
   }
   if (!(list.frames || []).length) {
-    frameList.innerHTML = '<p class="meta">No frames on the server yet ? upload a PNG overlay.</p>';
+    frameList.innerHTML = '<p class="meta">No frames on the server yet — upload a PNG overlay.</p>';
   }
+}
+
+function frameRatioNote(f) {
+  if (!f.width || !f.height) return '';
+  if (f.fitsGallery) return `${f.width}×${f.height} · 3:2 (fills gallery)`;
+  const ar = Number(f.aspectRatio) || f.width / f.height;
+  if (ar > 1.65) {
+    return `${f.width}×${f.height} · ~16:9 — gallery needs 3:2 (6×4, e.g. 1800×1200)`;
+  }
+  return `${f.width}×${f.height} · ${ar.toFixed(2)}:1 — gallery needs 3:2 (6×4)`;
 }
 
 function fillAlbumSelect() {
@@ -800,14 +812,15 @@ document.getElementById('btnClearMosaicTarget')?.addEventListener('click', async
 
 let pfDefaults = {
   cellWidthCm: 5.3,
-  cellHeightCm: 7,
+  cellHeightCm: 7.8,
   innerPaddingMm: 3,
   safeInsetTopMm: 0.2,
   safeInsetBottomMm: 0.2,
   safeInsetLeftMm: 3,
   safeInsetRightMm: 1,
-  gapMm: 6.35,
-  marginMm: 6.35,
+  gapMm: 4,
+  marginMm: 0,
+  printerCropInsetMm: 0,
   dpi: 300,
   rotateDegrees: -90,
   borderEnabled: true,
@@ -821,12 +834,138 @@ function fillPhysicalForm(src = pfDefaults) {
   document.getElementById('pfSafeBot').value = src.safeInsetBottomMm;
   document.getElementById('pfSafeLeft').value = src.safeInsetLeftMm;
   document.getElementById('pfSafeRight').value = src.safeInsetRightMm;
-  document.getElementById('pfGap').value = src.gapMm;
-  document.getElementById('pfMargin').value = src.marginMm;
-  document.getElementById('pfDpi').value = src.dpi;
   document.getElementById('pfRotate').value = String(src.rotateDegrees);
   document.getElementById('pfBorder').checked = src.borderEnabled !== false;
 }
+
+const pfCrop = { zoom: 1, panX: 0, panY: 0 };
+let pfAdjustImg = null;
+let pfDragging = false;
+let pfLastX = 0;
+let pfLastY = 0;
+
+function pfNum(id, fallback) {
+  const n = Number(document.getElementById(id)?.value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function drawPhysicalAdjust() {
+  const canvas = document.getElementById('pfAdjustCanvas');
+  const img = pfAdjustImg;
+  if (!canvas || !img) return;
+  const cellWcm = pfNum('pfCellW', 5.3);
+  const cellHcm = pfNum('pfCellH', 7.8);
+  const pageW = 148;
+  const pageH = 100;
+  const leftoverW = pageW - cellWcm * 10 * 2;
+  const leftoverH = pageH - cellHcm * 10;
+  const gap = leftoverW >= 8 ? 4 : Math.max(0, leftoverW * 0.2);
+  const mx = Math.max(0, (leftoverW - gap) / 2);
+  const my = Math.max(0, leftoverH / 2);
+  const cssW = Math.min(640, canvas.parentElement?.clientWidth || 640);
+  const scale = cssW / pageW;
+  canvas.width = Math.round(cssW);
+  canvas.height = Math.round(pageH * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const rot = Number(document.getElementById('pfRotate').value) === 90 ? 90 : -90;
+  const off = document.createElement('canvas');
+  off.width = img.naturalHeight;
+  off.height = img.naturalWidth;
+  const octx = off.getContext('2d');
+  octx.translate(off.width / 2, off.height / 2);
+  octx.rotate((rot * Math.PI) / 180);
+  octx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  const cellW = cellWcm * 10 * scale;
+  const cellH = cellHcm * 10 * scale;
+  const pad = (pfNum('pfInset', 3) / 10) * scale;
+  const sL = (pfNum('pfSafeLeft', 3) / 10) * scale;
+  const sR = (pfNum('pfSafeRight', 1) / 10) * scale;
+  const sT = (pfNum('pfSafeTop', 0.2) / 10) * scale;
+  const sB = (pfNum('pfSafeBot', 0.2) / 10) * scale;
+  const safeW = Math.max(8, cellW - pad * 2 - sL - sR);
+  const safeH = Math.max(8, cellH - pad * 2 - sT - sB);
+  const cover = Math.max(safeW / off.width, safeH / off.height);
+  const visW = Math.min(off.width, safeW / (cover * pfCrop.zoom));
+  const visH = Math.min(off.height, visW / (safeW / safeH));
+  const maxL = Math.max(0, off.width - visW);
+  const maxT = Math.max(0, off.height - visH);
+  const sx = Math.round(maxL / 2 + pfCrop.panX * (maxL / 2));
+  const sy = Math.round(maxT / 2 + pfCrop.panY * (maxT / 2));
+  const drawOne = (x) => {
+    ctx.drawImage(
+      off,
+      sx,
+      sy,
+      visW,
+      visH,
+      x + pad + sL,
+      my * scale + pad + sT,
+      safeW,
+      safeH,
+    );
+    ctx.strokeStyle = 'rgba(139,115,72,0.9)';
+    ctx.strokeRect(x + pad, my * scale + pad, cellW - pad * 2, cellH - pad * 2);
+  };
+  drawOne(mx * scale);
+  drawOne(mx * scale + cellW + gap * scale);
+}
+
+function bindPhysicalAdjust() {
+  const input = document.getElementById('pfPhoto');
+  const box = document.getElementById('pfAdjustBox');
+  const canvas = document.getElementById('pfAdjustCanvas');
+  const zoom = document.getElementById('pfZoom');
+  if (!input || !box || !canvas || !zoom) return;
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    pfCrop.zoom = 1;
+    pfCrop.panX = 0;
+    pfCrop.panY = 0;
+    zoom.value = '1';
+    if (!file) {
+      pfAdjustImg = null;
+      box.hidden = true;
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      pfAdjustImg = img;
+      box.hidden = false;
+      drawPhysicalAdjust();
+    };
+    img.src = url;
+  });
+  zoom.addEventListener('input', () => {
+    pfCrop.zoom = Math.min(4, Math.max(1, Number(zoom.value) || 1));
+    drawPhysicalAdjust();
+  });
+  canvas.addEventListener('pointerdown', (ev) => {
+    pfDragging = true;
+    pfLastX = ev.clientX;
+    pfLastY = ev.clientY;
+    canvas.setPointerCapture(ev.pointerId);
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    if (!pfDragging) return;
+    const dx = ev.clientX - pfLastX;
+    const dy = ev.clientY - pfLastY;
+    pfLastX = ev.clientX;
+    pfLastY = ev.clientY;
+    const span = Math.max(80, canvas.clientWidth * 0.35 * pfCrop.zoom);
+    pfCrop.panX = Math.min(1, Math.max(-1, pfCrop.panX - dx / span));
+    pfCrop.panY = Math.min(1, Math.max(-1, pfCrop.panY - dy / span));
+    drawPhysicalAdjust();
+  });
+  canvas.addEventListener('pointerup', (ev) => {
+    pfDragging = false;
+    if (canvas.hasPointerCapture(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+  });
+}
+
+bindPhysicalAdjust();
 
 async function loadPhysicalDefaults() {
   try {
@@ -975,11 +1114,11 @@ document.getElementById('btnPfGenerate').addEventListener('click', async () => {
   fd.append('safeInsetBottomMm', document.getElementById('pfSafeBot').value);
   fd.append('safeInsetLeftMm', document.getElementById('pfSafeLeft').value);
   fd.append('safeInsetRightMm', document.getElementById('pfSafeRight').value);
-  fd.append('gapMm', document.getElementById('pfGap').value);
-  fd.append('marginMm', document.getElementById('pfMargin').value);
-  fd.append('dpi', document.getElementById('pfDpi').value);
   fd.append('rotateDegrees', document.getElementById('pfRotate').value);
   fd.append('borderEnabled', document.getElementById('pfBorder').checked ? 'true' : 'false');
+  fd.append('cropZoom', String(pfCrop.zoom));
+  fd.append('cropPanX', String(pfCrop.panX));
+  fd.append('cropPanY', String(pfCrop.panY));
   try {
     setStatus('Generating cut sheet…');
     const out = await api('/api/admin/physical-frame/generate', { method: 'POST', body: fd });
@@ -1003,13 +1142,47 @@ document.getElementById('btnUploadFrame').addEventListener('click', async () => 
   try {
     const fd = new FormData();
     fd.append('frame', file, file.name);
-    await api('/api/admin/frames', { method: 'POST', body: fd });
+    const out = await api('/api/admin/frames', { method: 'POST', body: fd });
     input.value = '';
-    setStatus(`Uploaded ${file.name}`);
+    const hint = document.getElementById('frameRatioHint');
+    if (hint) hint.textContent = '';
+    const note = out.frame ? frameRatioNote(out.frame) : '';
+    setStatus(
+      out.frame?.fitsGallery === false
+        ? `Uploaded ${file.name}. ${note}`
+        : `Uploaded ${file.name}${note ? ` — ${note}` : ''}`,
+    );
     await refreshFrames();
   } catch (e) {
     setStatus(String(e.message || e));
   }
+});
+
+document.getElementById('frameFile')?.addEventListener('change', () => {
+  const input = document.getElementById('frameFile');
+  const hint = document.getElementById('frameRatioHint');
+  const file = input?.files?.[0];
+  if (!hint) return;
+  if (!file) {
+    hint.textContent = '';
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const ar = img.naturalWidth / img.naturalHeight;
+    const fits = Math.abs(ar - 1.5) / 1.5 <= 0.04;
+    hint.textContent = fits
+      ? `${img.naturalWidth}×${img.naturalHeight} · 3:2 — this will fill the gallery.`
+      : `${img.naturalWidth}×${img.naturalHeight} · ${ar.toFixed(2)}:1 — gallery tiles are 3:2 (6×4). Use 1800×1200 (or 2400×1600) to fill with no gap at the top.`;
+    hint.classList.toggle('frame-ratio-warn', !fits);
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    hint.textContent = '';
+  };
+  img.src = url;
 });
 
 document.getElementById('btnPurge').addEventListener('click', async () => {

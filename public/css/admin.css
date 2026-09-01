@@ -70,6 +70,8 @@
 .admin-sidebar {
   position: sticky;
   top: 0.75rem;
+  max-height: calc(100vh - 1.5rem);
+  overflow-y: auto;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -231,14 +233,14 @@
 
 .photo-admin-card img {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
   background: #111;
 }
 
 .photo-admin-card .photo-missing {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 3 / 2;
   display: grid;
   place-items: center;
   background: #1a1a1a;
@@ -305,7 +307,7 @@
   width: 100% !important;
   height: 88px !important;
   max-height: 88px !important;
-  aspect-ratio: 4 / 3 !important;
+  aspect-ratio: 3 / 2 !important;
   object-fit: cover !important;
 }
 
@@ -501,6 +503,25 @@ code.warn {
   display: block;
   margin: 0.35rem 0 0.75rem;
   max-width: 100%;
+}
+
+.pf-adjust {
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(43, 34, 24, 0.16);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.pf-adjust-canvas {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0.4rem 0 0.65rem;
+  touch-action: none;
+  cursor: grab;
+  border-radius: 8px;
+  background: #111;
 }
 
 .pf-preview {

@@ -4,6 +4,7 @@ import multer from 'multer';
 import { Router } from 'express';
 import { config } from '../config.js';
 import { requireAdminPin, requireUploadToken } from '../auth.js';
+import { readFrameAspect } from '../frame-aspect.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 
@@ -47,15 +48,25 @@ function listFrames() {
   return files;
 }
 
+async function withFrameAspect(frames) {
+  return Promise.all(
+    frames.map(async (f) => {
+      const full = path.join(config.framesDir, f.filename);
+      const size = await readFrameAspect(full);
+      return { ...f, ...size };
+    }),
+  );
+}
+
 export const framesRouter = Router();
 
 /** Public list — booths sync from this. */
-framesRouter.get('/', (_req, res) => {
-  res.json({ ok: true, frames: listFrames() });
+framesRouter.get('/', async (_req, res) => {
+  res.json({ ok: true, frames: await withFrameAspect(listFrames()) });
 });
 
 /** Booth or admin may upload with upload token. */
-framesRouter.post('/', requireUploadToken, upload.single('frame'), (req, res) => {
+framesRouter.post('/', requireUploadToken, upload.single('frame'), async (req, res) => {
   if (!req.file?.buffer?.length) {
     return res.status(400).json({ ok: false, error: 'Missing frame file (field: frame)' });
   }
@@ -78,29 +89,29 @@ framesRouter.post('/', requireUploadToken, upload.single('frame'), (req, res) =>
   const filename = `${base}${ext}`;
   const dest = path.join(config.framesDir, filename);
   fs.writeFileSync(dest, req.file.buffer);
-  const frames = listFrames();
+  const frames = await withFrameAspect(listFrames());
   const frame = frames.find((f) => f.filename === filename);
   return res.status(201).json({ ok: true, frame, frames });
 });
 
-framesRouter.delete('/:filename', requireUploadToken, (req, res) => {
+framesRouter.delete('/:filename', requireUploadToken, async (req, res) => {
   const safe = safeFrameName(req.params.filename);
   if (!safe) return res.status(400).json({ ok: false, error: 'Invalid filename' });
   const full = path.join(ensureFramesDir(), safe);
   if (!fs.existsSync(full)) return res.status(404).json({ ok: false, error: 'Not found' });
   fs.unlinkSync(full);
-  return res.json({ ok: true, removed: safe, frames: listFrames() });
+  return res.json({ ok: true, removed: safe, frames: await withFrameAspect(listFrames()) });
 });
 
 /** Admin PIN variants (same operations). */
 export const adminFramesRouter = Router();
 adminFramesRouter.use(requireAdminPin);
 
-adminFramesRouter.get('/', (_req, res) => {
-  res.json({ ok: true, frames: listFrames() });
+adminFramesRouter.get('/', async (_req, res) => {
+  res.json({ ok: true, frames: await withFrameAspect(listFrames()) });
 });
 
-adminFramesRouter.post('/', upload.single('frame'), (req, res) => {
+adminFramesRouter.post('/', upload.single('frame'), async (req, res) => {
   if (!req.file?.buffer?.length) {
     return res.status(400).json({ ok: false, error: 'Missing frame file (field: frame)' });
   }
@@ -122,20 +133,21 @@ adminFramesRouter.post('/', upload.single('frame'), (req, res) => {
       .replace(/^-+|-+$/g, '') || `frame-${Date.now()}`;
   const filename = `${base}${ext}`;
   fs.writeFileSync(path.join(config.framesDir, filename), req.file.buffer);
+  const frames = await withFrameAspect(listFrames());
   return res.status(201).json({
     ok: true,
-    frame: listFrames().find((f) => f.filename === filename),
-    frames: listFrames(),
+    frame: frames.find((f) => f.filename === filename),
+    frames,
   });
 });
 
-adminFramesRouter.delete('/:filename', (req, res) => {
+adminFramesRouter.delete('/:filename', async (req, res) => {
   const safe = safeFrameName(req.params.filename);
   if (!safe) return res.status(400).json({ ok: false, error: 'Invalid filename' });
   const full = path.join(ensureFramesDir(), safe);
   if (!fs.existsSync(full)) return res.status(404).json({ ok: false, error: 'Not found' });
   fs.unlinkSync(full);
-  return res.json({ ok: true, removed: safe, frames: listFrames() });
+  return res.json({ ok: true, removed: safe, frames: await withFrameAspect(listFrames()) });
 });
 
 export { listFrames, ensureFramesDir };
