@@ -41,6 +41,8 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     boothMode: { ...base.boothMode, ...patch.boothMode },
     frame: { ...base.frame, ...patch.frame },
     caption: { ...base.caption, ...patch.caption },
+    frameAdjust: { ...base.frameAdjust, ...patch.frameAdjust },
+    physicalAdjust: { ...base.physicalAdjust, ...patch.physicalAdjust },
   };
 }
 
@@ -180,6 +182,8 @@ function normalizePhotoFramesConfig(
     defaultFrameFile,
     guestFrameFiles,
     autoApplyFrame: typeof patch.autoApplyFrame === 'boolean' ? patch.autoApplyFrame : base.autoApplyFrame,
+    guestAdjustPhoto:
+      typeof patch.guestAdjustPhoto === 'boolean' ? patch.guestAdjustPhoto : base.guestAdjustPhoto,
     guestTextEnabled:
       typeof patch.guestTextEnabled === 'boolean' ? patch.guestTextEnabled : base.guestTextEnabled,
     guestTextOptional:
@@ -323,6 +327,12 @@ function migratePhysicalFramePatch(
   if (out.marginMm == null && legacy['marginIn'] != null) {
     out.marginMm = Number(legacy['marginIn']) * 25.4;
   }
+  if (Number(out.cellHeightCm) === 7) {
+    out.cellHeightCm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.cellHeightCm;
+  }
+  if (out.printerCropInsetMm == null) {
+    out.printerCropInsetMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.printerCropInsetMm;
+  }
   if (out.innerPaddingMm == null) {
     out.innerPaddingMm = PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME.innerPaddingMm;
   }
@@ -352,8 +362,8 @@ function normalizePhysicalFrameConfig(
   const p = migratePhysicalFramePatch(patch as Partial<PhotoboothPhysicalFrameConfig> & Record<string, unknown>);
   const rot = Number(p.rotateDegrees);
   return {
-    cellWidthCm: clampRange(p.cellWidthCm, 3, 12, base.cellWidthCm),
-    cellHeightCm: clampRange(p.cellHeightCm, 4, 15, base.cellHeightCm),
+    cellWidthCm: clampRange(p.cellWidthCm, 3, 7.4, base.cellWidthCm),
+    cellHeightCm: clampRange(p.cellHeightCm, 4, 9.8, base.cellHeightCm),
     innerPaddingMm: clampRange(p.innerPaddingMm, 0, 12, base.innerPaddingMm),
     safeInsetTopMm: clampRange(p.safeInsetTopMm, 0, 20, base.safeInsetTopMm),
     safeInsetBottomMm: clampRange(p.safeInsetBottomMm, 0, 25, base.safeInsetBottomMm),
@@ -361,6 +371,7 @@ function normalizePhysicalFrameConfig(
     safeInsetRightMm: clampRange(p.safeInsetRightMm, 0, 15, base.safeInsetRightMm),
     gapMm: clampRange(p.gapMm, 0, 15, base.gapMm),
     marginMm: clampRange(p.marginMm, 0, 15, base.marginMm),
+    printerCropInsetMm: clampRange(p.printerCropInsetMm, 0, 12, base.printerCropInsetMm),
     dpi: Math.round(clampRange(p.dpi, 72, 600, base.dpi)),
     rotateDegrees: rot === -90 ? -90 : 90,
     borderEnabled: typeof p.borderEnabled === 'boolean' ? p.borderEnabled : base.borderEnabled,
@@ -400,6 +411,7 @@ function normalizePrintConfig(
     enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
     printerName,
     bleedScale,
+    framedEdgeInsetMm: clampRange(patch.framedEdgeInsetMm, 0, 12, base.framedEdgeInsetMm),
     allowWifiPrinters:
       typeof patch.allowWifiPrinters === 'boolean' ? patch.allowWifiPrinters : base.allowWifiPrinters,
   };

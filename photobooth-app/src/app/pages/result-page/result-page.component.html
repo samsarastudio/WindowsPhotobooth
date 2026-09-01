@@ -1,4 +1,4 @@
-<div class="pb-page pb-result" [class.is-share-open]="shareOpen()">
+<div class="pb-page pb-result" [class.is-share-open]="shareOpen()" [class.is-preview]="isPreview()">
   <div class="pb-kiosk-surface pb-result-inner">
     <h1 class="pb-result-title">{{ copy().result.title }}</h1>
 
@@ -66,50 +66,97 @@
       </div>
     }
 
+    @if (showMakeFramed()) {
+      <div class="pb-result-physical">
+        <button
+          type="button"
+          class="pb-btn pb-btn-ghost pb-result-physical-btn"
+          [disabled]="makeFramedBusy()"
+          (click)="openMakeFramed()"
+        >
+          @if (makeFramedBusy()) {
+            {{ copy().result.makingFramed }}
+          } @else if (viewingFramedPhoto()) {
+            {{ copy().result.remakeFramed }}
+          } @else {
+            {{ copy().result.makeFramed }}
+          }
+        </button>
+      </div>
+    }
+
+    @if (showMakePhysical()) {
+      <div class="pb-result-physical">
+        @if (makePhysicalErr(); as pe) {
+          <p class="pb-msg">{{ copy().result.physicalErrorPrefix }} {{ pe }}</p>
+        }
+        <button
+          type="button"
+          class="pb-btn pb-btn-ghost pb-result-physical-btn"
+          [disabled]="makePhysicalBusy()"
+          (click)="openPhysicalAdjust()"
+        >
+          @if (makePhysicalBusy()) {
+            {{ copy().result.makingPhysical }}
+          } @else if (viewingPhysicalSheet()) {
+            {{ copy().result.remakePhysical }}
+          } @else {
+            {{ copy().result.makePhysical }}
+          }
+        </button>
+      </div>
+    }
+
     <div class="pb-row pb-result-actions">
       <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ copy().result.retake }}</button>
-      @if (showGalleryShare()) {
-        @if (canShare()) {
+      @if (isPreview()) {
+        <button type="button" class="pb-btn pb-btn-primary" (click)="confirmPreview()">
+          {{ copy().result.confirmPhoto || copy().result.submit }}
+        </button>
+      } @else {
+        @if (showGalleryShare()) {
+          @if (canShare()) {
+            <button
+              type="button"
+              class="pb-btn pb-btn-primary"
+              [disabled]="shareBusy()"
+              (click)="openShare()"
+            >
+              {{ copy().result.share }}
+            </button>
+          } @else if (shareUploading()) {
+            <button type="button" class="pb-btn pb-btn-ghost" disabled>
+              {{ copy().result.sharing }}
+            </button>
+          } @else if (shareFailed()) {
+            <button
+              type="button"
+              class="pb-btn pb-btn-ghost"
+              [disabled]="shareBusy()"
+              (click)="retryShareUpload()"
+            >
+              {{ copy().result.uploadFailed }}
+            </button>
+          }
+        }
+        @if (showPrint()) {
           <button
             type="button"
             class="pb-btn pb-btn-primary"
-            [disabled]="shareBusy()"
-            (click)="openShare()"
+            [disabled]="!canPrint()"
+            (click)="printOnce()"
           >
-            {{ copy().result.share }}
-          </button>
-        } @else if (shareUploading()) {
-          <button type="button" class="pb-btn pb-btn-ghost" disabled>
-            {{ copy().result.sharing }}
-          </button>
-        } @else if (shareFailed()) {
-          <button
-            type="button"
-            class="pb-btn pb-btn-ghost"
-            [disabled]="shareBusy()"
-            (click)="retryShareUpload()"
-          >
-            {{ copy().result.uploadFailed }}
+            @if (printBusy()) {
+              {{ copy().result.printing }}
+            } @else if (printDone()) {
+              {{ copy().result.printed }}
+            } @else {
+              {{ copy().result.print }}
+            }
           </button>
         }
+        <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
       }
-      @if (showPrint()) {
-        <button
-          type="button"
-          class="pb-btn pb-btn-primary"
-          [disabled]="!canPrint()"
-          (click)="printOnce()"
-        >
-          @if (printBusy()) {
-            {{ copy().result.printing }}
-          } @else if (printDone()) {
-            {{ copy().result.printed }}
-          } @else {
-            {{ copy().result.print }}
-          }
-        </button>
-      }
-      <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
     </div>
     @if (printErr(); as pe) {
       <pb-print-trouble-dialog
@@ -143,3 +190,12 @@
     </div>
   }
 </div>
+
+@if (physicalAdjustOpen() && physicalAdjustSource()) {
+  <pb-physical-frame-adjust-dialog
+    [imagePath]="physicalAdjustSource()"
+    [busy]="makePhysicalBusy()"
+    (confirmed)="onPhysicalAdjustConfirm($event)"
+    (cancelled)="physicalAdjustOpen.set(false)"
+  />
+}

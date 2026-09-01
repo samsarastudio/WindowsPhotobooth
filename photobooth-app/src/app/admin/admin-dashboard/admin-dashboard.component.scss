@@ -425,7 +425,7 @@
 
 .pb-admin-frame-card img {
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
   border-radius: 8px;
   background: #111;
@@ -445,6 +445,10 @@
   font-size: 0.72rem;
   opacity: 0.75;
   word-break: break-all;
+}
+
+.pb-frame-ratio-warn {
+  color: #e8c47a;
 }
 
 .pb-brand-uses {

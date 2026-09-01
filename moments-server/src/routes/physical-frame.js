@@ -10,6 +10,7 @@ import {
   getGeneratedSheet,
   listGeneratedSheets,
   normalizePhysicalOpts,
+  padToSelphyPostcard,
   saveGeneratedSheet,
 } from '../physical-frame.js';
 
@@ -36,11 +37,12 @@ adminPhysicalFrameRouter.post('/generate', upload.single('photo'), async (req, r
   }
   try {
     const opts = normalizePhysicalOpts(req.body || {});
-    const { png, width, height } = await compositePhysicalFrameDual(req.file.buffer, opts);
-    const record = saveGeneratedSheet(png, {
+    const sheet = await compositePhysicalFrameDual(req.file.buffer, opts);
+    const padded = await padToSelphyPostcard(sheet.png, opts.dpi, opts.printerCropInsetMm);
+    const record = saveGeneratedSheet(padded.png, {
       originalName: req.file.originalname || null,
-      width,
-      height,
+      width: padded.width,
+      height: padded.height,
       settings: opts,
     });
     return res.status(201).json({

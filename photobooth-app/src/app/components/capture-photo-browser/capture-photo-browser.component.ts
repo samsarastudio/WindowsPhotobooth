@@ -1,15 +1,20 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { BoothConfigService } from '../../services/booth-config.service';
+import { GalleryUploadService } from '../../services/gallery-upload.service';
 import type { PbCaptureHistoryItem } from '../../../types/pb-api';
 import { PrintTroubleDialogComponent } from '../print-trouble-dialog/print-trouble-dialog.component';
+import { PhysicalFrameAdjustDialogComponent } from '../physical-frame-adjust-dialog/physical-frame-adjust-dialog.component';
+import { PhysicalFrameLayoutService } from '../../services/physical-frame-layout.service';
+import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
+import { FrameAdjustDialogComponent } from '../frame-adjust-dialog/frame-adjust-dialog.component';
 
-export type CaptureKindFilter = 'all' | 'physical' | 'normal';
+export type CaptureKindFilter = 'all' | 'physical' | 'normal' | 'original';
 export type CaptureWhenFilter = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
 
 @Component({
   selector: 'pb-capture-photo-browser',
-  imports: [DatePipe, PrintTroubleDialogComponent],
+  imports: [DatePipe, PrintTroubleDialogComponent, PhysicalFrameAdjustDialogComponent, FrameAdjustDialogComponent],
   templateUrl: './capture-photo-browser.component.html',
   styleUrl: './capture-photo-browser.component.scss',
   host: {
@@ -19,6 +24,8 @@ export type CaptureWhenFilter = 'all' | 'today' | 'yesterday' | 'week' | 'month'
 })
 export class CapturePhotoBrowserComponent implements OnInit {
   private readonly booth = inject(BoothConfigService);
+  private readonly galleryUpload = inject(GalleryUploadService);
+  private readonly physicalLayout = inject(PhysicalFrameLayoutService);
   readonly copy = this.booth.copy;
 
   readonly compact = input(false);
@@ -42,6 +49,15 @@ export class CapturePhotoBrowserComponent implements OnInit {
   readonly printBusy = signal(false);
   readonly printDone = signal(false);
   readonly printErr = signal<string | null>(null);
+  readonly makePhysicalBusy = signal(false);
+  readonly makePhysicalErr = signal<string | null>(null);
+  readonly physicalAdjustOpen = signal(false);
+  readonly makeFramedBusy = signal(false);
+  readonly makeFramedErr = signal<string | null>(null);
+  readonly framePickOpen = signal(false);
+  readonly framePickList = signal<{ filename: string; label: string; url: string }[]>([]);
+  readonly framePickSelected = signal<string | null>(null);
+  readonly frameAdjustOpen = signal(false);
   readonly deleteBusy = signal(false);
   readonly confirmDelete = signal(false);
 
@@ -60,7 +76,11 @@ export class CapturePhotoBrowserComponent implements OnInit {
     const fromMs = this.rangeStartMs(when);
     const toMs = this.rangeEndMs(when);
     return this.photos().filter((p) => {
-      if (kind !== 'all' && (p.kind || (p.layoutMode === 'physicalFrame' ? 'physical' : 'normal')) !== kind)
+      if (
+        kind !== 'all' &&
+        kind !== 'original' &&
+        (p.kind || (p.layoutMode === 'physicalFrame' ? 'physical' : 'normal')) !== kind
+      )
         return false;
       const t = Date.parse(p.capturedAt);
       if (!Number.isFinite(t)) return true;
@@ -86,6 +106,20 @@ export class CapturePhotoBrowserComponent implements OnInit {
   readonly canPrint = computed(
     () => this.printEnabled() && !!this.selected() && !this.printBusy() && !this.printDone(),
   );
+
+  readonly canMakePhysical = computed(
+    () => this.kindFilter() === 'original' && !!this.selected(),
+  );
+
+  readonly canMakeFramed = computed(
+    () => this.kindFilter() === 'original' && !!this.selected(),
+  );
+
+  readonly viewingOriginals = computed(() => this.kindFilter() === 'original');
+  readonly physicalAdjustSource = computed(() => {
+    const photo = this.selected();
+    return photo ? this.sourceOriginal(photo) : '';
+  });
 
   async ngOnInit(): Promise<void> {
     await this.reload();
@@ -167,15 +201,39 @@ export class CapturePhotoBrowserComponent implements OnInit {
     this.selectedId.set(photo.id);
     this.printDone.set(false);
     this.printErr.set(null);
+    this.makePhysicalErr.set(null);
+    this.makeFramedErr.set(null);
     this.confirmDelete.set(false);
     void this.ensureThumbs([photo]);
     await this.ensurePreview(photo);
   }
 
+  thumbKey(photo: PbCaptureHistoryItem): string {
+    return this.viewingOriginals() ? `${photo.id}:orig` : `${photo.id}:view`;
+  }
+
+  sourceOriginal(photo: PbCaptureHistoryItem): string {
+    if (photo.originalPath) return photo.originalPath;
+    const p = photo.displayPath || photo.printPath || '';
+    return p
+      .replace(/_physical\.png$/i, '.jpg')
+      .replace(/_ai\.png$/i, '.jpg')
+      .replace(/_framed\.png$/i, '.jpg');
+  }
+
+  viewPath(photo: PbCaptureHistoryItem): string {
+    return this.viewingOriginals() ? this.sourceOriginal(photo) : photo.displayPath;
+  }
+
   private async afterFilterChange(): Promise<void> {
+    const sel = this.selected();
+    if (sel && this.filtered().some((p) => p.id === sel.id)) {
+      const idx = this.filtered().findIndex((p) => p.id === sel.id);
+      const size = Math.max(1, this.pageSize());
+      this.page.set(Math.floor(idx / size) + 1);
+    }
     await this.ensureThumbs(this.pageItems());
     const items = this.pageItems();
-    const sel = this.selected();
     if (sel && this.filtered().some((p) => p.id === sel.id)) {
       await this.ensurePreview(sel);
       return;
@@ -196,10 +254,11 @@ export class CapturePhotoBrowserComponent implements OnInit {
     }
     this.printBusy.set(true);
     try {
+      const originals = this.viewingOriginals();
       const r = await window.pbApi.printPhoto({
-        filePath: photo.printPath,
+        filePath: originals ? this.sourceOriginal(photo) : photo.printPath,
         deviceName: this.booth.print().printerName || undefined,
-        layoutMode: photo.layoutMode,
+        layoutMode: originals ? undefined : photo.layoutMode,
       });
       if (!r.ok) {
         this.printErr.set(r.error ?? 'Print failed.');
@@ -211,6 +270,128 @@ export class CapturePhotoBrowserComponent implements OnInit {
       this.printErr.set(String(e));
     } finally {
       this.printBusy.set(false);
+    }
+  }
+
+  openPhysicalAdjust(): void {
+    if (!this.physicalAdjustSource()) {
+      this.makePhysicalErr.set('Physical layout requires Electron.');
+      return;
+    }
+    this.makePhysicalErr.set(null);
+    this.physicalAdjustOpen.set(true);
+  }
+
+  async onPhysicalAdjustConfirm(crop: PhysicalPhotoCrop): Promise<void> {
+    const src = this.physicalAdjustSource();
+    if (!src) {
+      this.makePhysicalErr.set('Physical layout requires Electron.');
+      return;
+    }
+    this.makePhysicalBusy.set(true);
+    this.makePhysicalErr.set(null);
+    try {
+      const r = await this.physicalLayout.generate(src, crop);
+      if (!r.ok || !r.path) {
+        this.makePhysicalErr.set(r.error || 'Could not create physical sheet.');
+        return;
+      }
+      this.physicalAdjustOpen.set(false);
+      await this.reload();
+      this.setKind('physical');
+    } catch (e) {
+      this.makePhysicalErr.set(String(e));
+    } finally {
+      this.makePhysicalBusy.set(false);
+    }
+  }
+
+  async openFramePick(): Promise<void> {
+    if (!this.physicalAdjustSource()) {
+      this.makeFramedErr.set('Framing requires Electron.');
+      return;
+    }
+    if (!window.pbApi?.listPhotoFrames) {
+      this.makeFramedErr.set('Frames require Electron.');
+      return;
+    }
+    this.makeFramedErr.set(null);
+    const r = await window.pbApi.listPhotoFrames();
+    if (!r.ok || !r.frames?.length) {
+      this.makeFramedErr.set(r.error || 'No frames on this booth. Upload one in Admin → Frames.');
+      return;
+    }
+    this.framePickList.set(
+      r.frames.map((f) => ({
+        filename: f.filename,
+        label: f.label || f.filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
+        url: f.url,
+      })),
+    );
+    const def = this.booth.photoFrames().defaultFrameFile;
+    const pick =
+      (def && r.frames.some((f) => f.filename === def) && def) || r.frames[0].filename;
+    this.framePickSelected.set(pick);
+    this.framePickOpen.set(true);
+  }
+
+  closeFramePick(): void {
+    if (this.makeFramedBusy()) return;
+    this.framePickOpen.set(false);
+  }
+
+  confirmMakeFramed(): void {
+    if (!this.physicalAdjustSource() || !this.framePickSelected()) {
+      this.makeFramedErr.set('Framing requires Electron.');
+      return;
+    }
+    this.makeFramedErr.set(null);
+    this.framePickOpen.set(false);
+    this.frameAdjustOpen.set(true);
+  }
+
+  closeFrameAdjust(): void {
+    if (this.makeFramedBusy()) return;
+    this.frameAdjustOpen.set(false);
+  }
+
+  async onFrameAdjustConfirm(crop: PhysicalPhotoCrop): Promise<void> {
+    const src = this.physicalAdjustSource();
+    const frame = this.framePickSelected();
+    if (!src || !frame || !window.pbApi?.applyPhotoFrame) {
+      this.makeFramedErr.set('Framing requires Electron.');
+      return;
+    }
+    this.makeFramedBusy.set(true);
+    this.makeFramedErr.set(null);
+    try {
+      const r = await window.pbApi.applyPhotoFrame({
+        imagePath: src,
+        frameFile: frame,
+        photoScale: this.booth.photoFrames().photoScale,
+        cropZoom: crop.zoom,
+        cropPanX: crop.panX,
+        cropPanY: crop.panY,
+      });
+      if (!r.ok || !r.path) {
+        this.makeFramedErr.set(r.error || 'Could not apply frame.');
+        return;
+      }
+      this.frameAdjustOpen.set(false);
+      this.galleryUpload.queueUpload(src, 'original');
+      this.galleryUpload.queueUpload(r.path, 'framed');
+      const id = this.selectedId();
+      await this.reload();
+      const item = this.photos().find((p) => p.id === id);
+      if (item?.kind === 'physical') {
+        this.setKind('original');
+      } else {
+        this.setKind('normal');
+      }
+    } catch (e) {
+      this.makeFramedErr.set(String(e));
+    } finally {
+      this.makeFramedBusy.set(false);
     }
   }
 
@@ -249,11 +430,13 @@ export class CapturePhotoBrowserComponent implements OnInit {
     const thumbs = { ...this.thumbUrls() };
     let changed = false;
     for (const photo of items) {
-      if (thumbs[photo.id]) continue;
+      const key = this.thumbKey(photo);
+      if (thumbs[key]) continue;
       try {
-        thumbs[photo.id] = window.pbApi.readFileThumbBase64
-          ? await window.pbApi.readFileThumbBase64(photo.displayPath, 240)
-          : await window.pbApi.readFileBase64(photo.displayPath);
+        const filePath = this.viewPath(photo);
+        thumbs[key] = window.pbApi.readFileThumbBase64
+          ? await window.pbApi.readFileThumbBase64(filePath, 240)
+          : await window.pbApi.readFileBase64(filePath);
         changed = true;
       } catch {
         /* thumb optional */
@@ -263,20 +446,22 @@ export class CapturePhotoBrowserComponent implements OnInit {
   }
 
   private async ensurePreview(photo: PbCaptureHistoryItem): Promise<void> {
-    const cached = this.previewUrls()[photo.id];
+    const key = this.thumbKey(photo);
+    const cached = this.previewUrls()[key];
     if (cached) {
       this.previewUrl.set(cached);
       return;
     }
     if (!window.pbApi) return;
     try {
+      const filePath = this.viewPath(photo);
       const url = window.pbApi.readFileThumbBase64
-        ? await window.pbApi.readFileThumbBase64(photo.displayPath, 1100)
-        : await window.pbApi.readFileBase64(photo.displayPath);
-      this.previewUrls.update((m) => ({ ...m, [photo.id]: url }));
+        ? await window.pbApi.readFileThumbBase64(filePath, 1100)
+        : await window.pbApi.readFileBase64(filePath);
+      this.previewUrls.update((m) => ({ ...m, [key]: url }));
       if (this.selectedId() === photo.id) this.previewUrl.set(url);
     } catch {
-      if (this.selectedId() === photo.id) this.previewUrl.set(this.thumbUrls()[photo.id] ?? null);
+      if (this.selectedId() === photo.id) this.previewUrl.set(this.thumbUrls()[key] ?? null);
     }
   }
 

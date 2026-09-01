@@ -64,6 +64,8 @@ export interface PhotoboothCopyResult {
   savedPrefix: string;
   retake: string;
   submit: string;
+  /** Preview screen: keep this photo — uploads, then shows share/print/finish. */
+  confirmPhoto: string;
   /** Button to run OpenAI image generation */
   generateAi: string;
   generatingAi: string;
@@ -95,6 +97,15 @@ export interface PhotoboothCopyResult {
   printing: string;
   printed: string;
   printFailed: string;
+  /** Dual-cell cut sheet from the original capture (normal result only). */
+  makePhysical: string;
+  remakePhysical: string;
+  makingPhysical: string;
+  physicalErrorPrefix: string;
+  makeFramed: string;
+  remakeFramed: string;
+  makingFramed: string;
+  framedErrorPrefix: string;
 }
 
 export interface PhotoboothGalleryConfig {
@@ -151,10 +162,15 @@ export interface PhotoboothPrintConfig {
    */
   printerName: string | null;
   /**
-   * Borderless overscan for SELPHY (1.0 = exact fit, 1.06 = ~6% bleed past edges).
-   * Removes thin white borders on USB Canon driver prints.
+   * Borderless overscan for regular photo prints (1.0 = exact fit, 1.06 = ~6% bleed).
+   * Physical-frame cut sheets ignore this and print 1:1 on 148×100 mm postcard stock.
    */
   bleedScale: number;
+  /**
+   * White margin around framed (digital frame) prints so SELPHY borderless overscan
+   * does not eat the decorative border. Ignored for unframed camera JPEGs.
+   */
+  framedEdgeInsetMm: number;
   /** Include Wi‑Fi / IPP / WSD queues in the printer list (USB is still preferred). */
   allowWifiPrinters: boolean;
 }
@@ -163,6 +179,7 @@ export const PHOTOBOOTH_DEFAULT_PRINT: PhotoboothPrintConfig = {
   enabled: false,
   printerName: null,
   bleedScale: 1.06,
+  framedEdgeInsetMm: 4,
   allowWifiPrinters: false,
 };
 
@@ -218,6 +235,7 @@ export interface PhotoboothCopyHistory {
   filterAll: string;
   filterPhysical: string;
   filterDigital: string;
+  filterOriginal: string;
   whenAll: string;
   whenToday: string;
   whenYesterday: string;
@@ -225,9 +243,20 @@ export interface PhotoboothCopyHistory {
   whenMonth: string;
   whenCustom: string;
   deleteLabel: string;
-    deleteConfirm: string;
-    cancel: string;
-    previewHint: string;
+  deleteConfirm: string;
+  cancel: string;
+  previewHint: string;
+  reprint: string;
+  makePhysical: string;
+  remakePhysical: string;
+  makingPhysical: string;
+  originalLabel: string;
+  makeFramed: string;
+  remakeFramed: string;
+  makingFramed: string;
+  pickFrameTitle: string;
+  pickFrameHint: string;
+  applyFrame: string;
 }
 
 export interface PhotoboothCopy {
@@ -240,6 +269,16 @@ export interface PhotoboothCopy {
   boothMode: PhotoboothCopyBoothMode;
   frame: PhotoboothCopyFrame;
   caption: PhotoboothCopyCaption;
+  frameAdjust: PhotoboothCopyPhysicalAdjust;
+  physicalAdjust: PhotoboothCopyPhysicalAdjust;
+}
+
+export interface PhotoboothCopyPhysicalAdjust {
+  title: string;
+  hint: string;
+  confirm: string;
+  cancel: string;
+  zoomLabel: string;
 }
 
 export interface PhotoboothAiMode {
@@ -306,6 +345,11 @@ export interface PhotoboothPhotoFramesConfig {
    */
   autoApplyFrame: boolean;
   /**
+   * After frame pick (or auto-apply), show zoom/pan so faces sit in the opening.
+   * Remake-from-original always shows this, even when this flag is off.
+   */
+  guestAdjustPhoto: boolean;
+  /**
    * After frame pick, prompt for custom text (names / message) with an in-app keyboard.
    * Placement, color, and size are set in Admin → Frames.
    */
@@ -339,6 +383,7 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   defaultFrameFile: 'botanical-landscape.png',
   guestFrameFiles: [],
   autoApplyFrame: false,
+  guestAdjustPhoto: true,
   guestTextEnabled: false,
   guestTextOptional: true,
   guestTextMaxLength: 36,
@@ -372,7 +417,9 @@ export const PHOTOBOOTH_DEFAULT_GUEST_MODES: PhotoboothGuestModesConfig = {
 /**
  * Dual cut-sheet for physical photo frames.
  * Landscape capture is rotated 90°, then placed twice in portrait cells (columns).
- * Cell size in cm; padding/gap/margin in mm; rasterized at `dpi` (default 300).
+ * Cell outer size in cm is the printed ruler size on SELPHY 148×100 mm paper.
+ * Gap/margins auto-fill leftover postcard space. Safe insets only move the photo
+ * inside each cell. Global print bleed is not applied.
  */
 export interface PhotoboothPhysicalFrameConfig {
   /** Width of each cut cell (cm). */
@@ -390,6 +437,11 @@ export interface PhotoboothPhysicalFrameConfig {
   gapMm: number;
   /** Outer margin around the sheet (mm). */
   marginMm: number;
+  /**
+   * Extra white around the cut sheet when sending to SELPHY.
+   * CP1500 borderless overscans ~3–5 mm; this keeps gold frames inside the paper.
+   */
+  printerCropInsetMm: number;
   dpi: number;
   /** Rotate landscape capture before fitting into each cell (90 or -90). */
   rotateDegrees: 90 | -90;
@@ -399,7 +451,7 @@ export interface PhotoboothPhysicalFrameConfig {
 
 export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = {
   cellWidthCm: 5.3,
-  cellHeightCm: 7,
+  cellHeightCm: 7.8,
   innerPaddingMm: 3,
   safeInsetTopMm: 0.2,
   safeInsetBottomMm: 0.2,
@@ -407,6 +459,7 @@ export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = 
   safeInsetRightMm: 1,
   gapMm: 6.35,
   marginMm: 6.35,
+  printerCropInsetMm: 4,
   dpi: 300,
   rotateDegrees: -90,
   borderEnabled: true,
@@ -516,6 +569,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     savedPrefix: 'Saved:',
     retake: 'Retake',
     submit: 'Done',
+    confirmPhoto: 'Done',
     generateAi: 'Create AI version',
     generatingAi: 'Creating your AI image…',
     aiPreviewTitle: 'AI version',
@@ -542,15 +596,24 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     printing: 'Printing…',
     printed: 'Printed',
     printFailed: 'Print failed',
+    makePhysical: 'Make physical sheet',
+    remakePhysical: 'Remake physical sheet',
+    makingPhysical: 'Creating sheet…',
+    physicalErrorPrefix: 'Physical sheet failed:',
+    makeFramed: 'Make framed',
+    remakeFramed: 'Remake framed',
+    makingFramed: 'Applying frame…',
+    framedErrorPrefix: 'Frame failed:',
   },
   history: {
-    title: 'Print history',
-    empty: 'No photos yet — take one to see it here.',
+    title: 'Photo history',
+    empty: 'No photos yet — every capture on this booth appears here so you can reprint.',
     back: 'Back to start',
-    ariaOpen: 'Reprint previous photos',
+    ariaOpen: 'Photo history — reprint any capture',
     filterAll: 'All',
     filterPhysical: 'Physical',
     filterDigital: 'Digital',
+    filterOriginal: 'Originals',
     whenAll: 'All dates',
     whenToday: 'Today',
     whenYesterday: 'Yesterday',
@@ -561,6 +624,17 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     deleteConfirm: 'Delete this photo from this booth? This cannot be undone.',
     cancel: 'Cancel',
     previewHint: 'Tap a photo to preview',
+    reprint: 'Reprint',
+    makePhysical: 'Make physical sheet',
+    remakePhysical: 'Remake physical sheet',
+    makingPhysical: 'Creating sheet…',
+    originalLabel: 'Original',
+    makeFramed: 'Make framed',
+    remakeFramed: 'Remake framed',
+    makingFramed: 'Applying frame…',
+    pickFrameTitle: 'Choose a frame',
+    pickFrameHint: 'Applied to this original. Same overlay guests get after capture.',
+    applyFrame: 'Apply frame',
   },
   aiMode: {
     title: 'Choose a style',
@@ -584,6 +658,13 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     skipLabel: 'Skip frame',
     applying: 'Applying frame…',
   },
+  frameAdjust: {
+    title: 'Align photo in the frame',
+    hint: 'Drag to move. Use + / − to zoom so faces sit in the opening.',
+    confirm: 'Use this crop',
+    cancel: 'Back',
+    zoomLabel: 'Zoom',
+  },
   caption: {
     title: 'Add your text',
     subtitle: 'Type a name or short message for the frame',
@@ -591,5 +672,12 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     continueLabel: 'Continue',
     skipLabel: 'Skip text',
     applying: 'Creating keepsake…',
+  },
+  physicalAdjust: {
+    title: 'Adjust photo in the frame',
+    hint: 'Drag to move. Use + / − to zoom and crop extra background. Both prints stay identical. Each cell prints at the centimetre size set in Admin.',
+    confirm: 'Create sheet',
+    cancel: 'Back',
+    zoomLabel: 'Zoom',
   },
 };

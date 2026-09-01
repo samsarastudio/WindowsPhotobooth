@@ -26,12 +26,15 @@ export interface PbCameraResult {
 export interface PbCaptureHistoryItem {
   id: string;
   capturedAt: string;
+  originalPath: string;
   displayPath: string;
   printPath: string;
   layoutMode?: 'physicalFrame';
   /** Physical cut sheet vs digital/framed capture. */
   kind: 'physical' | 'normal';
   label: string;
+  hasPhysical?: boolean;
+  hasFramed?: boolean;
 }
 
 export interface PhotoboothConfigPublic {
@@ -178,13 +181,24 @@ export interface PbApi {
   }>;
   listPhotoFrames(): Promise<{
     ok: boolean;
-    frames?: { filename: string; label: string; url: string }[];
+    frames?: {
+      filename: string;
+      label: string;
+      url: string;
+      width?: number;
+      height?: number;
+      aspectRatio?: number | null;
+      fitsGallery?: boolean;
+    }[];
     error?: string;
   }>;
   applyPhotoFrame(payload: {
     imagePath: string;
     frameFile: string;
     photoScale?: number;
+    cropZoom?: number;
+    cropPanX?: number;
+    cropPanY?: number;
     /** Guest caption drawn in the frame footer (after overlay). */
     guestText?: string;
     /** Optional credit under guest text. */
@@ -201,6 +215,7 @@ export interface PbApi {
     safeInsetRightMm?: number;
     gapMm?: number;
     marginMm?: number;
+    printerCropInsetMm?: number;
     borderEnabled?: boolean;
     cellWidthIn?: number;
     cellHeightIn?: number;
@@ -208,11 +223,23 @@ export interface PbApi {
     marginIn?: number;
     dpi?: number;
     rotateDegrees?: 90 | -90;
+    cropZoom?: number;
+    cropPanX?: number;
+    cropPanY?: number;
   }): Promise<{ ok: boolean; path?: string; error?: string }>;
   adminPickPhotoFrameImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
   adminInstallPhotoFrame(
     sourcePath: string,
-  ): Promise<{ ok: boolean; filename?: string; url?: string; error?: string }>;
+  ): Promise<{
+    ok: boolean;
+    filename?: string;
+    url?: string;
+    width?: number;
+    height?: number;
+    aspectRatio?: number | null;
+    fitsGallery?: boolean;
+    error?: string;
+  }>;
   adminDeletePhotoFrame(
     filename: string,
   ): Promise<{ ok: boolean; removed?: string; error?: string }>;

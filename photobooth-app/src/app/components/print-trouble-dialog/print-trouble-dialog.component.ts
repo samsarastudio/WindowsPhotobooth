@@ -36,6 +36,7 @@ export class PrintTroubleDialogComponent {
           enabled: print.enabled,
           printerName: print.printerName,
           bleedScale: print.bleedScale,
+          framedEdgeInsetMm: print.framedEdgeInsetMm,
           allowWifiPrinters: checked,
         },
       });

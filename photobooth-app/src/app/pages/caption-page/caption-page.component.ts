@@ -2,7 +2,6 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { VirtualKeyboardComponent } from '../../components/virtual-keyboard/virtual-keyboard.component';
 import { BoothConfigService } from '../../services/booth-config.service';
-import { GalleryUploadService } from '../../services/gallery-upload.service';
 
 @Component({
   selector: 'pb-caption-page',
@@ -12,12 +11,14 @@ import { GalleryUploadService } from '../../services/gallery-upload.service';
 })
 export class CaptionPageComponent implements OnInit {
   private readonly booth = inject(BoothConfigService);
-  private readonly galleryUpload = inject(GalleryUploadService);
   private readonly router = inject(Router);
   readonly copy = this.booth.copy;
 
   readonly photoPath = signal<string | null>(null);
   readonly frameFile = signal<string | null>(null);
+  readonly cropZoom = signal<number | undefined>(undefined);
+  readonly cropPanX = signal<number | undefined>(undefined);
+  readonly cropPanY = signal<number | undefined>(undefined);
   readonly text = signal('');
   readonly busy = signal(false);
   readonly err = signal<string | null>(null);
@@ -30,16 +31,30 @@ export class CaptionPageComponent implements OnInit {
 
   constructor() {
     const nav = this.router.getCurrentNavigation();
-    const st = nav?.extras?.state as { path?: string; frameFile?: string } | undefined;
+    const st = nav?.extras?.state as {
+      path?: string;
+      frameFile?: string;
+      cropZoom?: number;
+      cropPanX?: number;
+      cropPanY?: number;
+    } | undefined;
     if (st?.path) this.photoPath.set(st.path);
     if (st?.frameFile) this.frameFile.set(st.frameFile);
+    if (st) this.cropFromNav(st);
   }
 
   async ngOnInit(): Promise<void> {
     if (!this.photoPath() || !this.frameFile()) {
-      const st = history.state as { path?: string; frameFile?: string };
+      const st = history.state as {
+        path?: string;
+        frameFile?: string;
+        cropZoom?: number;
+        cropPanX?: number;
+        cropPanY?: number;
+      };
       if (st?.path) this.photoPath.set(st.path);
       if (st?.frameFile) this.frameFile.set(st.frameFile);
+      this.cropFromNav(st);
     }
     if (!this.photoPath() || !this.frameFile()) {
       this.err.set('Missing photo or frame — go back and try again.');
@@ -76,16 +91,28 @@ export class CaptionPageComponent implements OnInit {
         photoScale: this.framesCfg().photoScale,
         guestText: guestText || undefined,
         creditLine: guestText ? this.credit() || undefined : undefined,
+        cropZoom: this.cropZoom(),
+        cropPanX: this.cropPanX(),
+        cropPanY: this.cropPanY(),
       });
       if (r.ok && r.path) {
-        this.galleryUpload.queueUpload(photo, 'original');
-        this.galleryUpload.queueUpload(r.path, 'framed');
-        await this.router.navigate(['/result'], { state: { path: r.path } });
+        await this.router.navigate(['/result'], { state: { path: r.path, preview: true } });
       } else {
         this.err.set(r.error ?? 'Could not apply frame text.');
       }
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private cropFromNav(st: {
+    cropZoom?: number;
+    cropPanX?: number;
+    cropPanY?: number;
+  } | undefined): void {
+    if (!st) return;
+    if (typeof st.cropZoom === 'number') this.cropZoom.set(st.cropZoom);
+    if (typeof st.cropPanX === 'number') this.cropPanX.set(st.cropPanX);
+    if (typeof st.cropPanY === 'number') this.cropPanY.set(st.cropPanY);
   }
 }

@@ -97,4 +97,13 @@
 
     <p class="pb-kia-capture-footer">{{ copy().capture.footerHint }}</p>
   </div>
+
+  @if (physicalAdjustPath(); as src) {
+    <pb-physical-frame-adjust-dialog
+      [imagePath]="src"
+      [busy]="physicalAdjustBusy()"
+      (confirmed)="onPhysicalAdjustConfirm($event)"
+      (cancelled)="onPhysicalAdjustCancel()"
+    />
+  }
 </div>

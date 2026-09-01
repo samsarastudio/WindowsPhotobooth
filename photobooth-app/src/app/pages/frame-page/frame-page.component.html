@@ -37,3 +37,13 @@
     </div>
   </div>
 </div>
+
+@if (adjustOpen() && photoPath() && selected()) {
+  <pb-frame-adjust-dialog
+    [imagePath]="photoPath()!"
+    [frameFile]="selected()!"
+    [busy]="busy()"
+    (confirmed)="onAdjustConfirm($event)"
+    (cancelled)="onAdjustCancel()"
+  />
+}

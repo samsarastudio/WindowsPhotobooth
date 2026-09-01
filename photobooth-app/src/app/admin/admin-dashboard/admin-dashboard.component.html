@@ -173,6 +173,20 @@
           <input class="pb-input" [(ngModel)]="draft.result.printed" />
           <label>Print failed prefix</label>
           <input class="pb-input" [(ngModel)]="draft.result.printFailed" />
+          <label>Make physical sheet (button)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.makePhysical" />
+          <label>Remake physical sheet (button)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.remakePhysical" />
+          <label>Creating physical sheet (status)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.makingPhysical" />
+          <label>Physical sheet error prefix</label>
+          <input class="pb-input" [(ngModel)]="draft.result.physicalErrorPrefix" />
+          <label>Make framed (button)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.makeFramed" />
+          <label>Remake framed (button)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.remakeFramed" />
+          <label>Applying frame (status)</label>
+          <input class="pb-input" [(ngModel)]="draft.result.makingFramed" />
           <label>AI progress panel title</label>
           <input class="pb-input" [(ngModel)]="draft.result.thinkingSummary" />
           <label>Progress step 1</label>
@@ -614,9 +628,11 @@
           @if (draftGuestModes.physicalFrameEnabled) {
             <h3 class="pb-admin-subhead">Physical cut-sheet layout (cm / mm at DPI)</h3>
             <p class="pb-hint pb-hint-tight">
-              Landscape capture is rotated 90° into each portrait cell (two side-by-side on a 6×4
-              sheet). Photo uses <em>uniform scale only</em> inside the safe area — never stretched.
-              Adjust safe insets to match your physical frame window.
+              Each cell prints at the centimetre size below — measurable with a ruler on SELPHY
+              postcard paper (148 × 100 mm). Gap and margins are auto-filled around the two cells so
+              global print bleed is not applied. Safe insets only shift the photo
+              <em>inside</em> the frame (heads / ridges). Guests can zoom and drag before the sheet
+              is created.
             </p>
             <div class="pb-row pb-row-wrap">
               <label>
@@ -625,7 +641,7 @@
                   class="pb-input"
                   type="number"
                   min="3"
-                  max="12"
+                  max="7.4"
                   step="0.1"
                   [(ngModel)]="draftPhysicalFrame.cellWidthCm"
                 />
@@ -636,7 +652,7 @@
                   class="pb-input"
                   type="number"
                   min="4"
-                  max="15"
+                  max="9.8"
                   step="0.1"
                   [(ngModel)]="draftPhysicalFrame.cellHeightCm"
                 />
@@ -697,39 +713,6 @@
                 />
               </label>
               <label>
-                Column gap (mm)
-                <input
-                  class="pb-input"
-                  type="number"
-                  min="0"
-                  max="15"
-                  step="0.5"
-                  [(ngModel)]="draftPhysicalFrame.gapMm"
-                />
-              </label>
-              <label>
-                Sheet margin (mm)
-                <input
-                  class="pb-input"
-                  type="number"
-                  min="0"
-                  max="15"
-                  step="0.5"
-                  [(ngModel)]="draftPhysicalFrame.marginMm"
-                />
-              </label>
-              <label>
-                DPI
-                <input
-                  class="pb-input"
-                  type="number"
-                  min="72"
-                  max="600"
-                  step="1"
-                  [(ngModel)]="draftPhysicalFrame.dpi"
-                />
-              </label>
-              <label>
                 Rotate
                 <select class="pb-input" [(ngModel)]="draftPhysicalFrame.rotateDegrees">
                   <option [ngValue]="90">90° clockwise</option>
@@ -742,13 +725,14 @@
               Thin gold border (double hairline)
             </label>
             <p class="pb-hint pb-hint-tight">
-              Sheet size ≈
-              {{ physicalSheetWidthCm().toFixed(2) }}
-              ×
-              {{ physicalSheetHeightCm().toFixed(2) }}
-              cm · file ≈
-              {{ physicalSheetPixelW() }}×{{ physicalSheetPixelH() }} px at
-              {{ draftPhysicalFrame.dpi }} DPI. SELPHY 6×4 scales this to fit one print.
+              Each cell prints
+              <strong>
+                {{ draftPhysicalFrame.cellWidthCm }} × {{ draftPhysicalFrame.cellHeightCm }} cm
+              </strong>
+              (ruler size). Sheet is a Canon SELPHY postcard
+              <strong>14.8 × 10.0 cm</strong>
+              at {{ draftPhysicalFrame.dpi }} DPI ({{ physicalSheetPixelW() }}×{{ physicalSheetPixelH() }} px).
+              Gap and margins auto-fill. Global print bleed is not applied.
             </p>
           }
 
@@ -812,9 +796,9 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Photos</h2>
           <p class="pb-hint">
-            Local captures on this booth — same grid as Print history. Physical sheets also upload to
-            Moments so you can download them from Gallery admin on another device. Delete removes
-            files from this booth only.
+            Local captures on this booth — every photo taken, not only printed ones. Same grid as
+            Photo history. Physical sheets also upload to Moments so you can download them from
+            Gallery admin on another device. Delete removes files from this booth only.
           </p>
           <pb-capture-photo-browser [compact]="true" />
         </section>
@@ -826,7 +810,9 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Photo printing (Canon SELPHY)</h2>
           <p class="pb-hint">
-            Postcard <strong>6×4</strong> (6&quot; wide × 4&quot; high), color, borderless. Kiosk-safe (no Windows print dialog).
+            Canon SELPHY CP1500 postcard stock is <strong>100 × 148 mm</strong> (borderless).
+            Regular photos may overscan slightly to hide USB white edges. Digital frames and
+            physical-frame cut sheets print 1:1 on that postcard so borders are not cropped.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftPrint.enabled" />
@@ -881,14 +867,29 @@
           <input
             class="pb-input"
             type="number"
-            min="1"
+            min="1.00"
             max="1.12"
             step="0.01"
             [(ngModel)]="draftPrint.bleedScale"
           />
           <p class="pb-hint pb-hint-tight">
-            Default <code>1.06</code> overscans ~6% past the postcard edges so USB SELPHY prints don’t show a thin white border.
-            Use <code>1.03</code>–<code>1.08</code> if you still see white or too much crop.
+            Default <code>1.06</code> overscans ~6% on <em>unframed</em> camera photos so USB SELPHY prints
+            don’t show a thin white border. Framed and physical-frame prints ignore bleed and print
+            1:1 on 148×100 mm so the decorative border is not cropped.
+          </p>
+          <label>Framed print edge inset (mm)</label>
+          <input
+            class="pb-input"
+            type="number"
+            min="0"
+            max="12"
+            step="0.5"
+            [(ngModel)]="draftPrint.framedEdgeInsetMm"
+          />
+          <p class="pb-hint pb-hint-tight">
+            White margin around digital-frame prints so SELPHY borderless overscan does not eat the
+            left, right, or bottom of the frame. Default <code>4</code>. Raise to 5–6 if the frame
+            still clips; lower toward 0 if you see too much white.
           </p>
 
           <p class="pb-hint pb-hint-tight">
@@ -923,10 +924,13 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>Photo frame overlays</h2>
           <p class="pb-hint">
-            Choose which decorative frames guests see after capture (Digital frame mode). Prefer
-            landscape overlays with a transparent photo hole and no caption bar — e.g.
-            <code>botanical-landscape.png</code>. Moments Admin is the master library — this booth
-            pulls it on load and drops overlays that were deleted on the server. Offline, the last
+            Choose which decorative frames guests see after capture (Digital frame mode). Export a
+            landscape PNG at <strong>3:2 (6×4)</strong> — for example <strong>1800×1200</strong> or
+            <strong>2400×1600</strong> — with a transparent or black photo hole. That ratio fills the
+            Moments gallery, live wall, and SELPHY 6×4 print with no letterbox gap. A 16:9 frame
+            (wider) leaves empty space at the top of gallery tiles.
+            <code>botanical-landscape.png</code> is already 3:2. Moments Admin is the master library —
+            this booth pulls it on load and drops overlays deleted on the server. Offline, the last
             local copies keep working.
           </p>
           <label class="pb-admin-check">
@@ -938,6 +942,14 @@
             Auto-apply frame silently (skip the frame-selection screen for guests)
             <span class="pb-hint pb-hint-inline">
               Uses the default frame when set, otherwise picks randomly from the enabled frames.
+            </span>
+          </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGuestAdjustPhoto" [disabled]="!draftFramesEnabled" />
+            Zoom and pan after capture (align people in the frame)
+            <span class="pb-hint pb-hint-inline">
+              Same drag / zoom as physical sheets. Turn off for a faster kiosk flow. Make framed from
+              originals always includes this step.
             </span>
           </label>
           <label class="pb-admin-check">
@@ -1142,6 +1154,9 @@
                 <div class="pb-admin-frame-meta">
                   <strong>{{ f.label }}</strong>
                   <code>{{ f.filename }}</code>
+                  @if (frameSizeHint(f); as hint) {
+                    <p class="pb-hint pb-hint-tight" [class.pb-frame-ratio-warn]="f.fitsGallery === false">{{ hint }}</p>
+                  }
                   <label class="pb-admin-check">
                     <input
                       type="checkbox"

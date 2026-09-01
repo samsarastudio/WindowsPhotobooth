@@ -101,8 +101,14 @@ export function batchStats(batchId, sessionEpoch) {
   const voided = db
     .prepare(`SELECT COUNT(*) AS c FROM qr_codes WHERE batch_id = ? AND status = 'void'`)
     .get(batchId).c;
-  const total = batch.quantity;
-  const remaining = Math.max(0, total - scanned - voided);
+  const unused = db
+    .prepare(`SELECT COUNT(*) AS c FROM qr_codes WHERE batch_id = ? AND status = 'unused'`)
+    .get(batchId).c;
+  const codeCount = db
+    .prepare(`SELECT COUNT(*) AS c FROM qr_codes WHERE batch_id = ?`)
+    .get(batchId).c;
+  const total = codeCount || batch.quantity || 0;
+  const remaining = unused;
   return {
     scanned,
     total,

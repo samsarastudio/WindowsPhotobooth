@@ -29,6 +29,7 @@ import {
   PHOTOBOOTH_DEFAULT_PRINT,
   PLAIN_PHOTO_MODE_ID,
 } from '../../models/photobooth-config.model';
+import { autoPhysicalSheetMm } from '../../models/physical-frame-layout';
 import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { BoothLogService } from '../../services/booth-log.service';
@@ -76,6 +77,10 @@ interface AdminFrameItem {
   url: string;
   /** Shown on the guest frame picker. */
   guestEnabled: boolean;
+  width?: number;
+  height?: number;
+  aspectRatio?: number | null;
+  fitsGallery?: boolean;
 }
 
 interface UploadQueueSummary {
@@ -124,6 +129,7 @@ export class AdminDashboardComponent implements OnInit {
   draftRequireQrUnlock = false;
   draftFramesEnabled = true;
   draftAutoApplyFrame = false;
+  draftGuestAdjustPhoto = true;
   draftGuestTextEnabled = false;
   draftGuestTextOptional = true;
   draftGuestTextMaxLength = 36;
@@ -298,6 +304,7 @@ export class AdminDashboardComponent implements OnInit {
     this.draftRequireQrUnlock = cfg?.requireQrUnlock ?? false;
     this.draftFramesEnabled = cfg?.photoFrames?.enabled ?? true;
     this.draftAutoApplyFrame = cfg?.photoFrames?.autoApplyFrame ?? false;
+    this.draftGuestAdjustPhoto = cfg?.photoFrames?.guestAdjustPhoto ?? true;
     this.draftGuestTextEnabled = cfg?.photoFrames?.guestTextEnabled ?? false;
     this.draftGuestTextOptional = cfg?.photoFrames?.guestTextOptional ?? true;
     this.draftGuestTextMaxLength = cfg?.photoFrames?.guestTextMaxLength ?? 36;
@@ -417,6 +424,10 @@ export class AdminDashboardComponent implements OnInit {
         label: f.label || f.filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
         url: f.url,
         guestEnabled: showNone ? false : showAll || allow.includes(f.filename),
+        width: f.width,
+        height: f.height,
+        aspectRatio: f.aspectRatio,
+        fitsGallery: f.fitsGallery,
       })),
     );
     if (
@@ -425,6 +436,16 @@ export class AdminDashboardComponent implements OnInit {
     ) {
       this.draftDefaultFrameFile = this.photoFramesList()[0]?.filename ?? null;
     }
+  }
+
+  frameSizeHint(f: AdminFrameItem): string | null {
+    if (!f.width || !f.height) return null;
+    const ar = f.aspectRatio ?? f.width / f.height;
+    if (f.fitsGallery) return `${f.width}×${f.height} · 3:2 (fills gallery)`;
+    if (ar > 1.65) {
+      return `${f.width}×${f.height} · ~16:9 — gallery needs 3:2 (6×4, e.g. 1800×1200)`;
+    }
+    return `${f.width}×${f.height} · ${ar.toFixed(2)}:1 — gallery needs 3:2 (6×4)`;
   }
 
   toggleGuestFrame(filename: string, enabled: boolean): void {
@@ -517,6 +538,7 @@ export class AdminDashboardComponent implements OnInit {
         photoFrames: {
           enabled: this.draftFramesEnabled,
           autoApplyFrame: this.draftFramesEnabled && this.draftAutoApplyFrame,
+          guestAdjustPhoto: this.draftFramesEnabled && this.draftGuestAdjustPhoto,
           photoScale: this.draftPhotoScale,
           defaultFrameFile: defaultFrameFile || null,
           guestFrameFiles,
@@ -555,15 +577,19 @@ export class AdminDashboardComponent implements OnInit {
     return `${prefix}-${y}-${m}-${day}`;
   }
 
-  /** Cut-sheet width in cm (two cells + gap + margins). */
+  /** Postcard canvas is always 14.8 × 10.0 cm; cells sit at exact cm inside it. */
   physicalSheetWidthCm(): number {
-    const pf = this.draftPhysicalFrame;
-    return pf.cellWidthCm * 2 + pf.gapMm / 10 + (pf.marginMm * 2) / 10;
+    return autoPhysicalSheetMm(
+      this.draftPhysicalFrame.cellWidthCm,
+      this.draftPhysicalFrame.cellHeightCm,
+    ).pageWmm / 10;
   }
 
   physicalSheetHeightCm(): number {
-    const pf = this.draftPhysicalFrame;
-    return pf.cellHeightCm + (pf.marginMm * 2) / 10;
+    return autoPhysicalSheetMm(
+      this.draftPhysicalFrame.cellWidthCm,
+      this.draftPhysicalFrame.cellHeightCm,
+    ).pageHmm / 10;
   }
 
   physicalSheetPixelW(): number {
@@ -754,6 +780,7 @@ export class AdminDashboardComponent implements OnInit {
           enabled: !!this.draftPrint.enabled,
           printerName: this.draftPrint.printerName?.trim() || null,
           bleedScale: this.draftPrint.bleedScale ?? 1.06,
+          framedEdgeInsetMm: this.draftPrint.framedEdgeInsetMm ?? 4,
           allowWifiPrinters: !!this.draftPrint.allowWifiPrinters,
         },
       });
@@ -839,6 +866,7 @@ export class AdminDashboardComponent implements OnInit {
           enabled: true,
           printerName: this.draftPrint.printerName?.trim() || null,
           bleedScale: this.draftPrint.bleedScale ?? 1.06,
+          framedEdgeInsetMm: this.draftPrint.framedEdgeInsetMm ?? 4,
           allowWifiPrinters: !!this.draftPrint.allowWifiPrinters,
         },
       });
@@ -886,10 +914,16 @@ export class AdminDashboardComponent implements OnInit {
         }
         await this.refreshPhotoFrames();
         const published = await this.publishFrameQuiet(inst.filename);
+        const ratioNote =
+          inst.width && inst.height
+            ? inst.fitsGallery
+              ? ` ${inst.width}×${inst.height} (3:2 — fills gallery).`
+              : ` ${inst.width}×${inst.height} — gallery needs 3:2 (6×4, e.g. 1800×1200) to fill without a gap.`
+            : '';
         this.status.set(
           published
-            ? `Uploaded and published ${inst.filename} to Moments.`
-            : `Uploaded frame ${inst.filename}. Save frame settings to apply guest list.`,
+            ? `Uploaded and published ${inst.filename} to Moments.${ratioNote}`
+            : `Uploaded frame ${inst.filename}.${ratioNote} Save frame settings to apply guest list.`,
         );
       } else {
         this.status.set(inst.error ?? 'Upload failed.');

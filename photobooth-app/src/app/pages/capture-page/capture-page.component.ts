@@ -14,10 +14,12 @@ import { CameraService } from '../../services/camera.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { BoothLogService } from '../../services/booth-log.service';
 import { AiStyleService } from '../../services/ai-style.service';
-import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { BoothModeService } from '../../services/booth-mode.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 import type { PbCameraResult } from '../../../types/pb-api';
+import { PhysicalFrameAdjustDialogComponent } from '../../components/physical-frame-adjust-dialog/physical-frame-adjust-dialog.component';
+import { PhysicalFrameLayoutService } from '../../services/physical-frame-layout.service';
+import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
 
 function previewTargetFps(): number {
   if (typeof window === 'undefined' || !window.matchMedia) return 15;
@@ -35,6 +37,7 @@ function withPreviewDecodeKey(fileUrl: string, v: number): string {
 
 @Component({
   selector: 'pb-capture-page',
+  imports: [PhysicalFrameAdjustDialogComponent],
   templateUrl: './capture-page.component.html',
   styleUrl: './capture-page.component.scss',
 })
@@ -45,7 +48,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   private readonly boothMode = inject(BoothModeService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly boothLog = inject(BoothLogService);
-  private readonly galleryUpload = inject(GalleryUploadService);
+  private readonly physicalLayout = inject(PhysicalFrameLayoutService);
   readonly copy = this.booth.copy;
 
   /** Label for the style chosen on `/ai-mode`, if any. */
@@ -72,6 +75,8 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   readonly countdown = signal<number | null>(null);
   /** True from shutter through frame/layout processing — hides stale preview frames. */
   readonly capturing = signal(false);
+  readonly physicalAdjustPath = signal<string | null>(null);
+  readonly physicalAdjustBusy = signal(false);
   /** Width ÷ height — frame hugs preview pixels without letterboxing when known. */
   readonly previewAspectRatio = signal<number | null>(null);
   /** Placeholder while SDK boots or before webcam stream is attached. */
@@ -504,7 +509,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   private async navigateResult(filePath: string): Promise<void> {
     if (this.boothMode.isPhysicalFrameMode()) {
-      await this.applyPhysicalFrameAndNavigate(filePath);
+      this.physicalAdjustPath.set(filePath);
       return;
     }
     const framesCfg = this.booth.photoFrames();
@@ -516,34 +521,36 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       await this.router.navigate(['/frame'], { state: { path: filePath } });
       return;
     }
-    this.galleryUpload.queueUpload(filePath, 'original');
-    await this.router.navigate(['/result'], { state: { path: filePath } });
+    await this.router.navigate(['/result'], { state: { path: filePath, preview: true } });
   }
 
-  /** Dual polaroid-size cut sheet (2 columns) for physical frames. Sheet uploads for admin download only. */
-  private async applyPhysicalFrameAndNavigate(filePath: string): Promise<void> {
-    if (!window.pbApi?.applyPhysicalFrameLayout) {
-      this.hint.set('Physical frame layout requires Electron.');
-      await this.router.navigate(['/result'], { state: { path: filePath } });
-      return;
-    }
+  async onPhysicalAdjustConfirm(crop: PhysicalPhotoCrop): Promise<void> {
+    const filePath = this.physicalAdjustPath();
+    if (!filePath) return;
+    this.physicalAdjustBusy.set(true);
     try {
-      const pf = this.booth.physicalFrame();
-      const r = await window.pbApi.applyPhysicalFrameLayout({
-        imagePath: filePath,
-        ...pf,
-      });
+      const r = await this.physicalLayout.generate(filePath, crop, { upload: false });
       if (!r.ok || !r.path) {
         this.hint.set(r.error || 'Physical frame layout failed.');
-        await this.router.navigate(['/result'], { state: { path: filePath } });
+        this.physicalAdjustPath.set(null);
+        await this.router.navigate(['/result'], { state: { path: filePath, preview: true } });
         return;
       }
-      this.galleryUpload.queueUpload(r.path, 'physical');
-      await this.router.navigate(['/result'], { state: { path: r.path } });
+      this.physicalAdjustPath.set(null);
+      await this.router.navigate(['/result'], { state: { path: r.path, preview: true } });
     } catch (e) {
       this.hint.set(String(e));
-      await this.router.navigate(['/result'], { state: { path: filePath } });
+      this.physicalAdjustPath.set(null);
+      await this.router.navigate(['/result'], { state: { path: filePath, preview: true } });
+    } finally {
+      this.physicalAdjustBusy.set(false);
     }
+  }
+
+  async onPhysicalAdjustCancel(): Promise<void> {
+    this.physicalAdjustPath.set(null);
+    this.capturing.set(false);
+    await this.retryCamera();
   }
 
   /**
@@ -582,8 +589,12 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       (def && pool.some((f) => f.filename === def) ? def : null) ??
       pool[Math.floor(Math.random() * pool.length)].filename;
 
+    if (framesCfg.guestAdjustPhoto) {
+      await this.router.navigate(['/frame'], { state: { path: filePath } });
+      return;
+    }
+
     if (framesCfg.guestTextEnabled) {
-      // Caption step is enabled — navigate there so the guest can type their text.
       await this.router.navigate(['/caption'], { state: { path: filePath, frameFile } });
       return;
     }
@@ -595,9 +606,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
     });
 
     if (applyResult.ok && applyResult.path) {
-      this.galleryUpload.queueUpload(filePath, 'original');
-      this.galleryUpload.queueUpload(applyResult.path, 'framed');
-      await this.router.navigate(['/result'], { state: { path: applyResult.path } });
+      await this.router.navigate(['/result'], { state: { path: applyResult.path, preview: true } });
     } else {
       // Compositing failed — fall back to picker so the guest knows something went wrong.
       await this.router.navigate(['/frame'], { state: { path: filePath } });

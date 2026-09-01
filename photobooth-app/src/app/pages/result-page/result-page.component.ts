@@ -11,10 +11,13 @@ import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
 import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
+import { PhysicalFrameAdjustDialogComponent } from '../../components/physical-frame-adjust-dialog/physical-frame-adjust-dialog.component';
+import { PhysicalFrameLayoutService } from '../../services/physical-frame-layout.service';
+import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
 
 @Component({
   selector: 'pb-result-page',
-  imports: [PrintTroubleDialogComponent],
+  imports: [PrintTroubleDialogComponent, PhysicalFrameAdjustDialogComponent],
   templateUrl: './result-page.component.html',
   styleUrl: './result-page.component.scss',
 })
@@ -24,7 +27,11 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   private readonly boothMode = inject(BoothModeService);
   private readonly gallerySession = inject(AiGallerySessionService);
   readonly galleryUpload = inject(GalleryUploadService);
+  private readonly physicalLayout = inject(PhysicalFrameLayoutService);
   readonly copy = this.booth.copy;
+
+  /** Guest has not tapped Done yet — photo stays local so retakes never hit the gallery. */
+  readonly isPreview = signal(false);
 
   readonly path = signal<string | null>(null);
   readonly imageDataUrl = signal<string | null>(null);
@@ -49,7 +56,16 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly printDone = signal(false);
   readonly printErr = signal<string | null>(null);
 
-  readonly uploadRecord = computed(() => this.galleryUpload.recordFor(this.path()));
+  readonly makePhysicalBusy = signal(false);
+  readonly makePhysicalErr = signal<string | null>(null);
+  readonly physicalAdjustOpen = signal(false);
+  readonly makeFramedBusy = signal(false);
+  /** Digital photo used for gallery share if the preview switches to a cut sheet. */
+  readonly digitalPath = signal<string | null>(null);
+
+  readonly viewingPhysicalSheet = computed(() => this.isPhysicalSheetPath(this.path()));
+  readonly sharePath = computed(() => this.digitalPath() || this.path());
+  readonly uploadRecord = computed(() => this.galleryUpload.recordFor(this.sharePath()));
   readonly canShare = computed(() => {
     if (this.boothMode.isPhysicalFrameMode()) return false;
     if (!this.galleryUpload.enabled()) return false;
@@ -69,11 +85,38 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     return r?.status === 'error';
   });
   readonly showGalleryShare = computed(
-    () => this.galleryUpload.enabled() && !this.boothMode.isPhysicalFrameMode(),
+    () =>
+      !this.isPreview() &&
+      this.galleryUpload.enabled() &&
+      !this.boothMode.isPhysicalFrameMode(),
   );
-  readonly showPrint = computed(() => this.booth.print().enabled === true);
+  readonly showPrint = computed(() => !this.isPreview() && this.booth.print().enabled === true);
   readonly canPrint = computed(
     () => this.showPrint() && !!this.path() && !this.printBusy() && !this.printDone(),
+  );
+  readonly showMakePhysical = computed(
+    () =>
+      !this.isPreview() &&
+      !!this.path() &&
+      !this.aiGenerating() &&
+      !this.boothMode.isPhysicalFrameMode(),
+  );
+  readonly viewingFramedPhoto = computed(() => !!this.path() && /_framed\.png$/i.test(this.path() || ''));
+  readonly showMakeFramed = computed(
+    () =>
+      !this.isPreview() &&
+      !!this.path() &&
+      !this.aiGenerating() &&
+      !this.boothMode.isPhysicalFrameMode() &&
+      !this.viewingPhysicalSheet() &&
+      this.booth.photoFrames().enabled,
+  );
+  readonly physicalAdjustSource = computed(() => {
+    const p = this.path();
+    return p ? this.originalCapturePath(p) : '';
+  });
+  readonly printUsesPhysicalLayout = computed(
+    () => this.boothMode.isPhysicalFrameMode() || this.viewingPhysicalSheet(),
   );
 
   private aiTimer?: ReturnType<typeof setInterval>;
@@ -81,6 +124,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   private navSub?: { unsubscribe(): void };
 
   readonly showAiSection = computed(() => {
+    if (this.isPreview()) return false;
     if (!this.booth.aiGenerationEnabled()) return false;
     const id = this.aiStyle.selectedModeId();
     if (!id || id === PLAIN_PHOTO_MODE_ID) return false;
@@ -104,9 +148,12 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     private readonly camera: CameraService,
   ) {
     const nav = this.router.getCurrentNavigation();
-    const p = (nav?.extras?.state as { path?: string } | undefined)?.path;
-    if (p) {
-      this.path.set(p);
+    const st = nav?.extras?.state as { path?: string; preview?: boolean } | undefined;
+    if (st?.path) {
+      this.path.set(st.path);
+    }
+    if (st?.preview === true) {
+      this.isPreview.set(true);
     }
   }
 
@@ -123,9 +170,12 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   private async loadPhotoFromRoute(): Promise<void> {
     const nav = this.router.getCurrentNavigation();
-    const fromNav = (nav?.extras?.state as { path?: string } | undefined)?.path;
-    const fromHistory = (history.state as { path?: string } | undefined)?.path;
-    const pp = fromNav || fromHistory || this.path();
+    const fromNav = nav?.extras?.state as { path?: string; preview?: boolean } | undefined;
+    const fromHistory = history.state as { path?: string; preview?: boolean } | undefined;
+    const pp = fromNav?.path || fromHistory?.path || this.path();
+    const preview = fromNav?.preview ?? fromHistory?.preview;
+    if (preview === true) this.isPreview.set(true);
+    else if (preview === false) this.isPreview.set(false);
     if (!pp) {
       this.err.set('No image path — go back and capture again.');
       this.imageDataUrl.set(null);
@@ -137,6 +187,13 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       this.resultAspectRatio.set(null);
       this.shareOpen.set(false);
       this.shareQrDataUrl.set(null);
+      this.makePhysicalErr.set(null);
+      this.printDone.set(false);
+    }
+    if (!this.isPhysicalSheetPath(pp)) {
+      this.digitalPath.set(pp);
+    } else if (!this.digitalPath()) {
+      this.digitalPath.set(this.originalCapturePath(pp));
     }
     if (!window.pbApi?.readFileBase64) {
       this.err.set('Preview needs Electron.');
@@ -151,29 +208,41 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       this.err.set(String(e));
     }
 
+    if (this.isPreview()) {
+      this.stopSharePoll();
+      return;
+    }
     this.startShareUploadIfNeeded(pp);
   }
 
-  private startShareUploadIfNeeded(pp: string): void {
+  private stopSharePoll(): void {
     if (this.sharePoll) {
       clearInterval(this.sharePoll);
       this.sharePoll = undefined;
     }
+  }
+
+  private startShareUploadIfNeeded(pp: string): void {
+    this.stopSharePoll();
+    if (this.isPreview()) return;
     if (!this.galleryUpload.enabled() || this.boothMode.isPhysicalFrameMode()) {
       return;
     }
-    void this.galleryUpload.ensureShareUpload(pp);
+    const sharePp = this.isPhysicalSheetPath(pp)
+      ? this.digitalPath() || this.originalCapturePath(pp)
+      : pp;
+    void this.galleryUpload.ensureShareUpload(sharePp);
     let ticks = 0;
     this.sharePoll = setInterval(() => {
       ticks += 1;
-      void this.galleryUpload.recordFor(this.path());
+      void this.galleryUpload.recordFor(this.sharePath());
       if (this.canShare() && this.sharePoll) {
         clearInterval(this.sharePoll);
         this.sharePoll = undefined;
         return;
       }
       if (ticks % 10 === 0) {
-        void this.galleryUpload.ensureShareUpload(this.path() || pp);
+        void this.galleryUpload.ensureShareUpload(this.sharePath() || pp);
       }
       if (ticks >= 60 && this.shareUploading()) {
         const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -182,9 +251,9 @@ export class ResultPageComponent implements OnInit, OnDestroy {
           void this.galleryUpload.flushQueue();
           return;
         }
-        const cur = this.galleryUpload.recordFor(this.path());
+        const cur = this.galleryUpload.recordFor(this.sharePath());
         if (!cur || cur.status === 'pending' || cur.status === 'queued') {
-          this.galleryUpload.markUploadTimedOut(this.path() || pp);
+          this.galleryUpload.markUploadTimedOut(this.sharePath() || pp);
         }
         if (this.sharePoll) {
           clearInterval(this.sharePoll);
@@ -203,6 +272,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     if (!pp || !mode || !window.pbApi?.openAiGenerateImage) {
       return;
     }
+    const source = this.isPhysicalSheetPath(pp) ? this.originalCapturePath(pp) : pp;
     this.aiGenerating.set(true);
     this.aiErr.set(null);
     this.aiModelUsed.set(null);
@@ -224,7 +294,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         this.thinkingStep.set(3);
       }
       const r = await window.pbApi.openAiGenerateImage({
-        imagePath: pp,
+        imagePath: source,
         prompt: mode.prompt,
         modeId: mode.id,
         useInpainting: mode.useInpainting === true,
@@ -237,7 +307,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       }
       this.aiModelUsed.set(r.model ?? null);
       this.galleryUpload.queueUpload(r.path, 'ai');
-      this.gallerySession.setPair(pp, r.path);
+      this.gallerySession.setPair(source, r.path);
       void this.router.navigate(['/ai-gallery']);
     } catch (e) {
       this.aiErr.set(String(e));
@@ -249,7 +319,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   async openShare(): Promise<void> {
-    const url = this.galleryUpload.shareUrlFor(this.path());
+    const url = this.galleryUpload.shareUrlFor(this.sharePath());
     if (!url) return;
     this.shareBusy.set(true);
     try {
@@ -268,7 +338,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   async retryShareUpload(): Promise<void> {
-    const pp = this.path();
+    const pp = this.sharePath();
     if (!pp) return;
     this.shareBusy.set(true);
     try {
@@ -295,7 +365,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       const r = await window.pbApi.printPhoto({
         filePath: pp,
         deviceName: deviceName || undefined,
-        layoutMode: this.boothMode.isPhysicalFrameMode() ? 'physicalFrame' : undefined,
+        layoutMode: this.printUsesPhysicalLayout() ? 'physicalFrame' : undefined,
       });
       if (!r.ok) {
         this.printErr.set(r.error ?? 'Print failed.');
@@ -308,6 +378,89 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     } finally {
       this.printBusy.set(false);
     }
+  }
+
+  openPhysicalAdjust(): void {
+    if (!this.physicalAdjustSource()) {
+      this.makePhysicalErr.set('Physical layout requires Electron.');
+      return;
+    }
+    this.makePhysicalErr.set(null);
+    this.physicalAdjustOpen.set(true);
+  }
+
+  async openMakeFramed(): Promise<void> {
+    const src = this.physicalAdjustSource();
+    if (!src) return;
+    this.makeFramedBusy.set(true);
+    try {
+      await this.router.navigate(['/frame'], { state: { path: src, pickFrame: true } });
+    } finally {
+      this.makeFramedBusy.set(false);
+    }
+  }
+
+  async onPhysicalAdjustConfirm(crop: PhysicalPhotoCrop): Promise<void> {
+    const pp = this.path();
+    const src = this.physicalAdjustSource();
+    if (!pp || !src) {
+      this.makePhysicalErr.set('Physical layout requires Electron.');
+      return;
+    }
+    this.makePhysicalBusy.set(true);
+    this.makePhysicalErr.set(null);
+    try {
+      const r = await this.physicalLayout.generate(src, crop);
+      if (!r.ok || !r.path) {
+        this.makePhysicalErr.set(r.error || 'Could not create physical sheet.');
+        return;
+      }
+      if (!this.digitalPath() && !this.isPhysicalSheetPath(pp)) {
+        this.digitalPath.set(pp);
+      }
+      this.path.set(r.path);
+      try {
+        history.replaceState({ ...(history.state || {}), path: r.path }, '');
+      } catch {
+        /* ignore */
+      }
+      this.printDone.set(false);
+      this.printErr.set(null);
+      this.imageDataUrl.set(null);
+      this.resultAspectRatio.set(null);
+      this.physicalAdjustOpen.set(false);
+      if (window.pbApi?.readFileBase64) {
+        this.imageDataUrl.set(await window.pbApi.readFileBase64(r.path));
+      }
+    } catch (e) {
+      this.makePhysicalErr.set(String(e));
+    } finally {
+      this.makePhysicalBusy.set(false);
+    }
+  }
+
+  isPhysicalSheetPath(p: string | null | undefined): boolean {
+    return !!p && /_physical\.png$/i.test(p);
+  }
+
+  originalCapturePath(p: string): string {
+    return p
+      .replace(/_physical\.png$/i, '.jpg')
+      .replace(/_ai\.png$/i, '.jpg')
+      .replace(/_framed\.png$/i, '.jpg');
+  }
+
+  confirmPreview(): void {
+    const pp = this.path();
+    if (!pp) return;
+    this.isPreview.set(false);
+    try {
+      history.replaceState({ ...(history.state || {}), path: pp, preview: false }, '');
+    } catch {
+      /* ignore */
+    }
+    this.galleryUpload.commitGuestCapture(pp);
+    this.startShareUploadIfNeeded(pp);
   }
 
   retake(): void {
@@ -338,10 +491,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopAiCountdown();
     this.navSub?.unsubscribe();
-    if (this.sharePoll) {
-      clearInterval(this.sharePoll);
-      this.sharePoll = undefined;
-    }
+    this.stopSharePoll();
   }
 
   private startAiCountdown(seconds: number): void {

@@ -81,7 +81,7 @@
 
 .counters {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.4rem;
   margin-top: 0.75rem;
 }
@@ -89,20 +89,33 @@
 .counters div {
   background: var(--panel);
   border-radius: 10px;
-  padding: 0.45rem 0.35rem;
+  padding: 0.45rem 0.25rem;
   text-align: center;
+  min-width: 0;
 }
 
 .counters strong {
   display: block;
   font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .counters span {
-  font-size: 0.65rem;
+  display: block;
+  font-size: 0.62rem;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 380px) {
+  .counters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .progress {

@@ -339,6 +339,23 @@ export class GalleryUploadService implements OnDestroy {
     void this.uploadPath(filePath, variant);
   }
 
+  /**
+   * Upload the guest's chosen photo (and its original, if this is a framed /
+   * physical / AI derivative) after they tap Done on the preview screen.
+   */
+  commitGuestCapture(displayPath: string): void {
+    if (!displayPath) return;
+    const variant = this.inferVariant(displayPath);
+    const original = displayPath
+      .replace(/_physical\.png$/i, '.jpg')
+      .replace(/_ai\.png$/i, '.jpg')
+      .replace(/_framed\.png$/i, '.jpg');
+    if (original !== displayPath) {
+      this.queueUpload(original, 'original');
+    }
+    this.queueUpload(displayPath, variant);
+  }
+
   private skip(filePath: string, variant: GalleryPhotoVariant): GalleryUploadRecord {
     const rec: GalleryUploadRecord = {
       path: filePath,

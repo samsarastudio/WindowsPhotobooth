@@ -14,6 +14,14 @@
     <button type="button" class="pb-cb-chip" [class.is-on]="kindFilter() === 'normal'" (click)="setKind('normal')">
       {{ copy().history.filterDigital }}
     </button>
+    <button
+      type="button"
+      class="pb-cb-chip"
+      [class.is-on]="kindFilter() === 'original'"
+      (click)="setKind('original')"
+    >
+      {{ copy().history.filterOriginal }}
+    </button>
   </div>
   <div class="pb-cb-filters" role="group" aria-label="Date">
     <button type="button" class="pb-cb-chip" [class.is-on]="whenFilter() === 'all'" (click)="setWhen('all')">
@@ -62,7 +70,15 @@
         <img [src]="src" alt="" />
         @if (selected(); as sel) {
           <p class="pb-cb-preview-cap">
-            <span class="pb-cb-kind" [class.is-physical]="sel.kind === 'physical'">{{ sel.label }}</span>
+            <span class="pb-cb-kind" [class.is-physical]="viewingOriginals() ? sel.hasPhysical : sel.kind === 'physical'">
+              {{ viewingOriginals() ? copy().history.originalLabel : sel.label }}
+            </span>
+            @if (viewingOriginals() && sel.hasPhysical) {
+              <span class="pb-cb-kind is-physical">{{ copy().history.filterPhysical }}</span>
+            }
+            @if (viewingOriginals() && sel.hasFramed) {
+              <span class="pb-cb-kind">Framed</span>
+            }
             <span>{{ sel.capturedAt | date: 'MMM d, y, h:mm a' }}</span>
           </p>
         }
@@ -79,13 +95,18 @@
         [class.is-on]="selectedId() === photo.id"
         (click)="selectPhoto(photo)"
       >
-        @if (thumbUrls()[photo.id]; as thumb) {
+        @if (thumbUrls()[thumbKey(photo)]; as thumb) {
           <img [src]="thumb" alt="" />
         } @else {
           <span class="pb-cb-ph" aria-hidden="true"></span>
         }
         <span class="pb-cb-meta">
-          <span class="pb-cb-kind" [class.is-physical]="photo.kind === 'physical'">{{ photo.label }}</span>
+          <span
+            class="pb-cb-kind"
+            [class.is-physical]="viewingOriginals() ? photo.hasPhysical : photo.kind === 'physical'"
+          >
+            {{ viewingOriginals() ? copy().history.originalLabel : photo.label }}
+          </span>
           <span class="pb-cb-time">{{ photo.capturedAt | date: 'MMM d, h:mm a' }}</span>
         </span>
       </button>
@@ -109,14 +130,55 @@
 }
 
 <div class="pb-cb-actions">
+  @if (canMakeFramed()) {
+    <button
+      type="button"
+      class="pb-btn pb-btn-primary"
+      [disabled]="makeFramedBusy()"
+      (click)="openFramePick()"
+    >
+      @if (makeFramedBusy()) {
+        {{ copy().history.makingFramed }}
+      } @else if (selected()?.hasFramed) {
+        {{ copy().history.remakeFramed }}
+      } @else {
+        {{ copy().history.makeFramed }}
+      }
+    </button>
+  }
+  @if (canMakePhysical()) {
+    <button
+      type="button"
+      class="pb-btn"
+      [class.pb-btn-primary]="!canMakeFramed()"
+      [class.pb-btn-ghost]="canMakeFramed()"
+      [disabled]="makePhysicalBusy()"
+      (click)="openPhysicalAdjust()"
+    >
+      @if (makePhysicalBusy()) {
+        {{ copy().history.makingPhysical }}
+      } @else if (selected()?.hasPhysical) {
+        {{ copy().history.remakePhysical }}
+      } @else {
+        {{ copy().history.makePhysical }}
+      }
+    </button>
+  }
   @if (printEnabled() && photos().length) {
-    <button type="button" class="pb-btn pb-btn-primary" [disabled]="!canPrint()" (click)="printOnce()">
+    <button
+      type="button"
+      class="pb-btn"
+      [class.pb-btn-primary]="!canMakePhysical() && !canMakeFramed()"
+      [class.pb-btn-ghost]="canMakePhysical() || canMakeFramed()"
+      [disabled]="!canPrint()"
+      (click)="printOnce()"
+    >
       @if (printBusy()) {
         {{ copy().result.printing }}
       } @else if (printDone()) {
         {{ copy().result.printed }}
       } @else {
-        {{ copy().result.print }}
+        {{ copy().history.reprint }}
       }
     </button>
   }
@@ -129,6 +191,14 @@
     {{ copy().history.deleteLabel }}
   </button>
 </div>
+
+@if (makePhysicalErr(); as me) {
+  <p class="pb-cb-msg">{{ me }}</p>
+}
+
+@if (makeFramedErr(); as fe) {
+  <p class="pb-cb-msg">{{ fe }}</p>
+}
 
 @if (confirmDelete()) {
   <div class="pb-cb-modal" role="dialog" aria-modal="true" aria-labelledby="pb-cb-del-title">
@@ -152,5 +222,61 @@
     [retrying]="printBusy()"
     (closed)="printErr.set(null)"
     (retry)="printOnce()"
+  />
+}
+
+@if (physicalAdjustOpen() && physicalAdjustSource()) {
+  <pb-physical-frame-adjust-dialog
+    [imagePath]="physicalAdjustSource()"
+    [busy]="makePhysicalBusy()"
+    (confirmed)="onPhysicalAdjustConfirm($event)"
+    (cancelled)="physicalAdjustOpen.set(false)"
+  />
+}
+
+@if (framePickOpen()) {
+  <div class="pb-cb-modal" role="dialog" aria-modal="true" aria-labelledby="pb-cb-frame-title">
+    <div class="pb-cb-modal-card pb-cb-frame-pick">
+      <p id="pb-cb-frame-title">{{ copy().history.pickFrameTitle }}</p>
+      <p class="pb-cb-frame-hint">{{ copy().history.pickFrameHint }}</p>
+      <div class="pb-cb-frame-grid">
+        @for (f of framePickList(); track f.filename) {
+          <button
+            type="button"
+            class="pb-cb-frame-opt"
+            [class.is-on]="framePickSelected() === f.filename"
+            [disabled]="makeFramedBusy()"
+            (click)="framePickSelected.set(f.filename)"
+          >
+            <img [src]="f.url" [alt]="f.label" />
+            <span>{{ f.label }}</span>
+          </button>
+        }
+      </div>
+      <div class="pb-row">
+        <button type="button" class="pb-btn pb-btn-ghost" [disabled]="makeFramedBusy()" (click)="closeFramePick()">
+          {{ copy().history.cancel }}
+        </button>
+        <button
+          type="button"
+          class="pb-btn pb-btn-primary"
+          [disabled]="makeFramedBusy() || !framePickSelected()"
+          (click)="confirmMakeFramed()"
+        >
+          {{ copy().history.applyFrame }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (frameAdjustOpen() && physicalAdjustSource() && framePickSelected()) {
+  <pb-frame-adjust-dialog
+    [imagePath]="physicalAdjustSource()"
+    [frameFile]="framePickSelected()!"
+    [busy]="makeFramedBusy()"
+    [confirmLabel]="copy().history.applyFrame"
+    (confirmed)="onFrameAdjustConfirm($event)"
+    (cancelled)="closeFrameAdjust()"
   />
 }

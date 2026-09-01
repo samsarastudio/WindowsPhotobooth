@@ -149,7 +149,7 @@
 .pb-cb-card img,
 .pb-cb-ph {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.08);
@@ -220,6 +220,57 @@
   margin: 0;
   font-size: 1.05rem;
   line-height: 1.35;
+}
+
+.pb-cb-frame-pick {
+  max-width: min(36rem, 94vw);
+}
+
+.pb-cb-frame-hint {
+  font-size: 0.88rem !important;
+  opacity: 0.78;
+}
+
+.pb-cb-frame-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.55rem;
+  max-height: min(42vh, 18rem);
+  overflow: auto;
+}
+
+.pb-cb-frame-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.35rem;
+  border: 2px solid rgba(61, 48, 32, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.pb-cb-frame-opt.is-on {
+  border-color: rgba(61, 48, 32, 0.85);
+  box-shadow: 0 4px 12px rgba(43, 34, 24, 0.14);
+}
+
+.pb-cb-frame-opt img {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+  background: #111;
+}
+
+.pb-cb-frame-opt span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
 }
 
 :host.is-compact .pb-cb-chip {

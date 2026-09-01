@@ -136,6 +136,19 @@
   opacity: 0.85;
 }
 
+.pb-result-physical {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pb-result-physical-btn {
+  min-height: var(--pb-touch-target, 3.25rem);
+  padding-inline: clamp(1.5rem, 4.5vmin, 2.75rem);
+}
+
 .pb-result-ai-model {
   margin-top: 0.35rem;
   font-size: clamp(0.8rem, 2.2vmin, 0.98rem);

@@ -23,6 +23,7 @@ let stream = null;
 let raf = 0;
 let mode = 'home'; // home | scanning | result
 let submitting = false;
+let syncingEventSelect = false;
 
 function beep(ok) {
   if (!soundToggle?.checked) return;
@@ -73,35 +74,53 @@ function applyLive(data) {
 
   const events = data.activeEvents || [];
   const prev = selectedBatchId;
-  eventSelect.innerHTML = '';
-  if (!events.length) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'No active event';
-    eventSelect.appendChild(opt);
-  } else {
-    for (const e of events) {
-      const opt = document.createElement('option');
-      opt.value = e.id;
-      opt.textContent = e.eventLabel ? `${e.name} · ${e.eventLabel}` : e.name;
-      eventSelect.appendChild(opt);
+  const nextIds = events.map((e) => e.id).join('\n');
+  const curIds = [...eventSelect.options].map((o) => o.value).filter(Boolean).join('\n');
+  syncingEventSelect = true;
+  try {
+    if (nextIds !== curIds) {
+      eventSelect.innerHTML = '';
+      if (!events.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No active event';
+        eventSelect.appendChild(opt);
+      } else {
+        for (const e of events) {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = e.eventLabel ? `${e.name} · ${e.eventLabel}` : e.name;
+          eventSelect.appendChild(opt);
+        }
+      }
     }
-    if (!prev || !events.some((e) => e.id === prev)) {
-      selectedBatchId = ev?.id || events[0].id;
+    if (events.length) {
+      if (!prev || !events.some((e) => e.id === prev)) {
+        selectedBatchId = ev?.id || events[0].id;
+      }
+      eventSelect.value = selectedBatchId;
+    } else {
+      selectedBatchId = '';
+      eventSelect.value = '';
     }
-    eventSelect.value = selectedBatchId;
+  } finally {
+    syncingEventSelect = false;
   }
 
-  document.getElementById('statScanned').textContent = String(data.scanned ?? 0);
-  document.getElementById('statRemaining').textContent = String(data.remaining ?? 0);
-  document.getElementById('statTotal').textContent = String(data.total ?? 0);
-  document.getElementById('statLinked').textContent = String(data.linked ?? 0);
-  const pct = data.total ? Math.min(100, Math.round((data.scanned / data.total) * 100)) : 0;
+  const scanned = Number(data.scanned ?? data.stats?.scanned ?? 0) || 0;
+  const remaining = Number(data.remaining ?? data.stats?.remaining ?? 0) || 0;
+  const total = Number(data.total ?? data.stats?.total ?? 0) || 0;
+  const linked = Number(data.linked ?? data.stats?.linked ?? 0) || 0;
+  document.getElementById('statScanned').textContent = String(scanned);
+  document.getElementById('statRemaining').textContent = String(remaining);
+  document.getElementById('statTotal').textContent = String(total);
+  document.getElementById('statLinked').textContent = String(linked);
+  const pct = total ? Math.min(100, Math.round((scanned / total) * 100)) : 0;
   document.getElementById('progressFill').style.width = `${pct}%`;
 
   const list = document.getElementById('recentList');
   list.innerHTML = '';
-  const qty = data.total || data.quantity || null;
+  const qty = total || data.quantity || null;
   for (const r of data.recent || []) {
     const li = document.createElement('li');
     const when = r.scannedAt ? new Date(r.scannedAt).toLocaleTimeString() : '';
@@ -305,6 +324,7 @@ btnHome.addEventListener('click', () => {
 });
 
 eventSelect.addEventListener('change', () => {
+  if (syncingEventSelect) return;
   selectedBatchId = eventSelect.value;
   const url = new URL(location.href);
   if (selectedBatchId) url.searchParams.set('batch', selectedBatchId);

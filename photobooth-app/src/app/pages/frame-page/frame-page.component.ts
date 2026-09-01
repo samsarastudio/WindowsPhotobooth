@@ -2,6 +2,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { GalleryUploadService } from '../../services/gallery-upload.service';
+import { FrameAdjustDialogComponent } from '../../components/frame-adjust-dialog/frame-adjust-dialog.component';
+import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
 
 interface FrameItem {
   filename: string;
@@ -11,6 +13,7 @@ interface FrameItem {
 
 @Component({
   selector: 'pb-frame-page',
+  imports: [FrameAdjustDialogComponent],
   templateUrl: './frame-page.component.html',
   styleUrl: './frame-page.component.scss',
 })
@@ -25,34 +28,44 @@ export class FramePageComponent implements OnInit {
   readonly selected = signal<string | null>(null);
   readonly busy = signal(false);
   readonly err = signal<string | null>(null);
+  readonly pickFrameMode = signal(false);
+  readonly adjustOpen = signal(false);
+  readonly pendingCrop = signal<PhysicalPhotoCrop | null>(null);
 
   readonly selectedFrame = computed(() => {
     const id = this.selected();
     return this.frames().find((f) => f.filename === id) ?? null;
   });
 
+  readonly shouldAdjust = computed(
+    () => this.pickFrameMode() || this.booth.photoFrames().guestAdjustPhoto,
+  );
+
   constructor() {
     const nav = this.router.getCurrentNavigation();
-    const p = (nav?.extras?.state as { path?: string } | undefined)?.path;
-    if (p) this.photoPath.set(p);
+    const st = nav?.extras?.state as { path?: string; pickFrame?: boolean } | undefined;
+    if (st?.path) this.photoPath.set(st.path);
+    if (st?.pickFrame) this.pickFrameMode.set(true);
   }
 
   async ngOnInit(): Promise<void> {
     if (!this.photoPath()) {
-      const st = history.state as { path?: string };
+      const st = history.state as { path?: string; pickFrame?: boolean };
       if (st?.path) this.photoPath.set(st.path);
+      if (st?.pickFrame) this.pickFrameMode.set(true);
     }
     if (!this.photoPath()) {
       this.err.set('No photo — go back and capture again.');
       return;
     }
     const framesCfg = this.booth.photoFrames();
-    if (!framesCfg.enabled) {
-      await this.router.navigate(['/result'], { state: { path: this.photoPath() } });
+    const pickFrame = this.pickFrameMode();
+    if (!framesCfg.enabled && !pickFrame) {
+      await this.router.navigate(['/result'], { state: { path: this.photoPath(), preview: true } });
       return;
     }
-    // Auto-apply mode: load frames, pick one silently, and proceed without showing UI.
-    if (framesCfg.autoApplyFrame) {
+    // Auto-apply: pick a frame silently. Adjust (if on) still shows so faces can be aligned.
+    if (framesCfg.autoApplyFrame && !pickFrame) {
       await this.loadFrames();
       if (this.frames().length > 0) {
         await this.applySelected();
@@ -75,11 +88,11 @@ export class FramePageComponent implements OnInit {
     }
     const allow = this.booth.photoFrames().guestFrameFiles ?? [];
     let available = r.frames;
-    if (allow.includes('__none__')) {
+    if (allow.includes('__none__') && !this.pickFrameMode()) {
       this.err.set('No frames are enabled for guests. Ask an operator to enable frames in Admin → Frames.');
       return;
     }
-    if (allow.length > 0) {
+    if (allow.length > 0 && !allow.includes('__none__') && !this.pickFrameMode()) {
       available = r.frames.filter((f) => allow.includes(f.filename));
     }
     if (!available.length) {
@@ -110,24 +123,44 @@ export class FramePageComponent implements OnInit {
     const frame = this.selected();
     if (!photo || !frame || !window.pbApi?.applyPhotoFrame) return;
 
-    // Collect custom text before compositing when admin enabled the caption step.
-    if (this.booth.photoFrames().guestTextEnabled) {
-      await this.router.navigate(['/caption'], { state: { path: photo, frameFile: frame } });
+    if (this.shouldAdjust() && !this.pendingCrop()) {
+      this.adjustOpen.set(true);
+      return;
+    }
+
+    if (this.booth.photoFrames().guestTextEnabled && !this.pickFrameMode()) {
+      const crop = this.pendingCrop();
+      await this.router.navigate(['/caption'], {
+        state: {
+          path: photo,
+          frameFile: frame,
+          cropZoom: crop?.zoom,
+          cropPanX: crop?.panX,
+          cropPanY: crop?.panY,
+        },
+      });
       return;
     }
 
     this.busy.set(true);
     this.err.set(null);
     try {
+      const crop = this.pendingCrop();
       const r = await window.pbApi.applyPhotoFrame({
         imagePath: photo,
         frameFile: frame,
         photoScale: this.booth.photoFrames().photoScale,
+        cropZoom: crop?.zoom,
+        cropPanX: crop?.panX,
+        cropPanY: crop?.panY,
       });
       if (r.ok && r.path) {
-        this.galleryUpload.queueUpload(photo, 'original');
-        this.galleryUpload.queueUpload(r.path, 'framed');
-        await this.router.navigate(['/result'], { state: { path: r.path } });
+        const preview = !this.pickFrameMode();
+        if (!preview) {
+          this.galleryUpload.queueUpload(photo, 'original');
+          this.galleryUpload.queueUpload(r.path, 'framed');
+        }
+        await this.router.navigate(['/result'], { state: { path: r.path, preview } });
       } else {
         this.err.set(r.error ?? 'Could not apply frame.');
       }
@@ -136,10 +169,24 @@ export class FramePageComponent implements OnInit {
     }
   }
 
+  onAdjustConfirm(crop: PhysicalPhotoCrop): void {
+    this.pendingCrop.set(crop);
+    this.adjustOpen.set(false);
+    void this.applySelected();
+  }
+
+  onAdjustCancel(): void {
+    this.adjustOpen.set(false);
+    this.pendingCrop.set(null);
+  }
+
   async skipFrame(): Promise<void> {
     const photo = this.photoPath();
     if (!photo) return;
-    this.galleryUpload.queueUpload(photo, 'original');
-    await this.router.navigate(['/result'], { state: { path: photo } });
+    const preview = !this.pickFrameMode();
+    if (!preview) {
+      this.galleryUpload.queueUpload(photo, 'original');
+    }
+    await this.router.navigate(['/result'], { state: { path: photo, preview } });
   }
 }

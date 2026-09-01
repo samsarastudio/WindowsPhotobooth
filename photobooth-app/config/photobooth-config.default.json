@@ -10,7 +10,7 @@
   },
   "physicalFrame": {
     "cellWidthCm": 5.3,
-    "cellHeightCm": 7,
+    "cellHeightCm": 7.8,
     "innerPaddingMm": 3,
     "safeInsetTopMm": 0.2,
     "safeInsetBottomMm": 0.2,
@@ -18,6 +18,7 @@
     "safeInsetRightMm": 1,
     "gapMm": 6.35,
     "marginMm": 6.35,
+    "printerCropInsetMm": 4,
     "dpi": 300,
     "rotateDegrees": -90,
     "borderEnabled": true
@@ -30,6 +31,8 @@
     "photoScale": 1,
     "defaultFrameFile": "botanical-landscape.png",
     "guestFrameFiles": [],
+    "autoApplyFrame": false,
+    "guestAdjustPhoto": true,
     "guestTextEnabled": false,
     "guestTextOptional": true,
     "guestTextMaxLength": 36,
@@ -60,6 +63,7 @@
     "enabled": false,
     "printerName": null,
     "bleedScale": 1.06,
+    "framedEdgeInsetMm": 4,
     "allowWifiPrinters": false
   },
   "aiModes": [
@@ -128,6 +132,7 @@
       "savedPrefix": "Saved:",
       "retake": "Retake",
       "submit": "Done",
+      "confirmPhoto": "Done",
       "generateAi": "Create AI version",
       "generatingAi": "Creating your AI image…",
       "aiPreviewTitle": "AI version",

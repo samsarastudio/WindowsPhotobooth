@@ -386,6 +386,32 @@ function listPhotoFrameFiles() {
   return files;
 }
 
+/** Guest gallery, wall mosaic, and 6×4 print all use 3:2 (1.5). */
+const GALLERY_FRAME_ASPECT = 1.5;
+const GALLERY_FRAME_ASPECT_TOLERANCE = 0.04;
+
+function describeImageAspect(width, height) {
+  const w = Number(width) || 0;
+  const h = Number(height) || 0;
+  if (w < 1 || h < 1) {
+    return { width: w, height: h, aspectRatio: null, fitsGallery: false };
+  }
+  const aspectRatio = Math.round((w / h) * 10000) / 10000;
+  const fitsGallery =
+    Math.abs(aspectRatio - GALLERY_FRAME_ASPECT) / GALLERY_FRAME_ASPECT <= GALLERY_FRAME_ASPECT_TOLERANCE;
+  return { width: w, height: h, aspectRatio, fitsGallery };
+}
+
+async function readImageAspect(filePath) {
+  try {
+    const sharpMod = require('sharp');
+    const m = await sharpMod(filePath).metadata();
+    return describeImageAspect(m.width, m.height);
+  } catch {
+    return { width: 0, height: 0, aspectRatio: null, fitsGallery: false };
+  }
+}
+
 /** Pure-black (or JPEG-near-black) photo-hole key. Decorative navy/hair is darker than this but not all-channel-low. */
 const FRAME_HOLE_BLACK_MAX = 18;
 
@@ -541,6 +567,7 @@ async function compositePhotoIntoFrame(
   photoScale = 1,
   guestText = '',
   creditLine = '',
+  crop = null,
 ) {
   const scale = Math.min(1, Math.max(0.5, Number(photoScale) || 1));
   const meta = await sharpMod(framePath).metadata();
@@ -553,8 +580,18 @@ async function compositePhotoIntoFrame(
   const left = hole.left + Math.round((hole.width - targetW) / 2);
   const top = hole.top + Math.round((hole.height - targetH) / 2);
 
+  const photoMeta = await sharpMod(photoPath).metadata();
+  const pw = photoMeta.width || targetW;
+  const ph = photoMeta.height || targetH;
+  const box = computeRotatedCrop(pw, ph, targetW, targetH, crop);
   const photoBuf = await sharpMod(photoPath)
-    .resize(targetW, targetH, { fit: 'cover', position: 'centre' })
+    .extract({
+      left: box.left,
+      top: box.top,
+      width: box.width,
+      height: box.height,
+    })
+    .resize(targetW, targetH, { fit: 'fill' })
     .ensureAlpha()
     .png()
     .toBuffer();
@@ -614,20 +651,72 @@ function resolvePhysicalFrameLayoutPx(opts, dpi) {
   const cellH =
     opts.cellHeightCm != null
       ? cmToPx(opts.cellHeightCm, dpi)
-      : Math.round((Number(opts.cellHeightIn) || 7 / 2.54) * dpi);
+      : Math.round((Number(opts.cellHeightIn) || 7.8 / 2.54) * dpi);
+  const pageW = mmToPx(148, dpi);
+  const pageH = mmToPx(100, dpi);
+  const leftoverW = pageW - cellW * 2;
+  const leftoverH = pageH - cellH;
   const gap =
-    opts.gapMm != null ? mmToPx(opts.gapMm, dpi) : Math.round((Number(opts.gapIn) || 0.25) * dpi);
-  const margin =
-    opts.marginMm != null
-      ? mmToPx(opts.marginMm, dpi)
-      : Math.round((Number(opts.marginIn) || 0.25) * dpi);
+    leftoverW >= mmToPx(8, dpi)
+      ? mmToPx(4, dpi)
+      : Math.max(0, Math.round(leftoverW * 0.2));
+  const marginX = Math.max(0, Math.round((leftoverW - gap) / 2));
+  const marginY = Math.max(0, Math.round(leftoverH / 2));
   const innerPad =
     opts.innerPaddingMm != null ? mmToPx(opts.innerPaddingMm, dpi) : mmToPx(3, dpi);
   const safeTop = mmToPx(opts.safeInsetTopMm ?? 0.2, dpi);
   const safeBottom = mmToPx(opts.safeInsetBottomMm ?? 0.2, dpi);
   const safeLeft = mmToPx(opts.safeInsetLeftMm ?? 3, dpi);
   const safeRight = mmToPx(opts.safeInsetRightMm ?? 1, dpi);
-  return { cellW, cellH, gap, margin, innerPad, safeTop, safeBottom, safeLeft, safeRight };
+  return {
+    cellW,
+    cellH,
+    gap,
+    marginX,
+    marginY,
+    pageW,
+    pageH,
+    innerPad,
+    safeTop,
+    safeBottom,
+    safeLeft,
+    safeRight,
+  };
+}
+
+function clampPhysicalCrop(crop) {
+  const z = Number(crop?.zoom ?? crop?.cropZoom);
+  const x = Number(crop?.panX ?? crop?.cropPanX);
+  const y = Number(crop?.panY ?? crop?.cropPanY);
+  return {
+    zoom: Number.isFinite(z) ? Math.min(4, Math.max(1, z)) : 1,
+    panX: Number.isFinite(x) ? Math.min(1, Math.max(-1, x)) : 0,
+    panY: Number.isFinite(y) ? Math.min(1, Math.max(-1, y)) : 0,
+  };
+}
+
+function computeRotatedCrop(rw, rh, safeW, safeH, crop) {
+  const { zoom, panX, panY } = clampPhysicalCrop(crop);
+  const srcW = Math.max(1, rw);
+  const srcH = Math.max(1, rh);
+  const destW = Math.max(1, safeW);
+  const destH = Math.max(1, safeH);
+  const cover = Math.max(destW / srcW, destH / srcH);
+  const scale = cover * zoom;
+  const safeAr = destW / destH;
+  let visW = Math.min(srcW, destW / scale);
+  let visH = Math.min(srcH, destH / scale);
+  if (visW / visH > safeAr) visW = visH * safeAr;
+  else visH = visW / safeAr;
+  visW = Math.min(srcW, Math.max(1, visW));
+  visH = Math.min(srcH, Math.max(1, visH));
+  const maxL = Math.max(0, srcW - visW);
+  const maxT = Math.max(0, srcH - visH);
+  const left = Math.round(Math.min(maxL, Math.max(0, maxL / 2 + panX * (maxL / 2))));
+  const top = Math.round(Math.min(maxT, Math.max(0, maxT / 2 + panY * (maxT / 2))));
+  const width = Math.max(1, Math.min(Math.round(visW), srcW - left));
+  const height = Math.max(1, Math.min(Math.round(visH), srcH - top));
+  return { left, top, width, height };
 }
 
 /** Thin gold portrait border for physical-frame cells. */
@@ -646,22 +735,32 @@ function buildPhysicalCellBorderSvg(w, h, dpi) {
 </svg>`;
 }
 
-async function fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rotateDeg) {
+async function fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rotateDeg, crop) {
   const rot = Number(rotateDeg) === -90 ? -90 : 90;
   const inputBuf = fs.readFileSync(path.resolve(photoPath));
   const before = await sharpMod(inputBuf).metadata();
   // IMPORTANT: do NOT chain .rotate() (EXIF) before .rotate(angle) — Sharp ignores the angle.
-  const buf = await sharpMod(inputBuf)
+  const rotated = await sharpMod(inputBuf)
     .rotate(rot, { background: { r: 255, g: 255, b: 255 } })
-    .resize(safeW, safeH, { fit: 'inside', withoutEnlargement: false })
+    .toBuffer();
+  const rotMeta = await sharpMod(rotated).metadata();
+  const rw = rotMeta.width || safeW;
+  const rh = rotMeta.height || safeH;
+  const box = computeRotatedCrop(rw, rh, safeW, safeH, crop);
+  const buf = await sharpMod(rotated)
+    .extract(box)
+    .resize(safeW, safeH, { fit: 'fill' })
     .jpeg({ quality: 94, mozjpeg: true })
     .toBuffer();
   const after = await sharpMod(buf).metadata();
-  appendAppLog('info', 'layouts', 'physical photo rotate+fit', {
+  appendAppLog('info', 'layouts', 'physical photo rotate+crop', {
     source: `${before.width}x${before.height}`,
+    rotated: `${rw}x${rh}`,
+    extract: box,
     fitted: `${after.width}x${after.height}`,
     safe: `${safeW}x${safeH}`,
     rotateDegrees: rot,
+    crop: clampPhysicalCrop(crop),
   });
   return {
     buf,
@@ -670,14 +769,14 @@ async function fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rot
   };
 }
 
-async function buildPhysicalFrameCell(sharpMod, photoPath, layout, rotate, borderEnabled, dpi) {
+async function buildPhysicalFrameCell(sharpMod, photoPath, layout, rotate, borderEnabled, dpi, crop) {
   const { cellW, cellH, innerPad, safeTop, safeBottom, safeLeft, safeRight } = layout;
   const frameW = Math.max(8, cellW - innerPad * 2);
   const frameH = Math.max(8, cellH - innerPad * 2);
   const safeW = Math.max(8, frameW - safeLeft - safeRight);
   const safeH = Math.max(8, frameH - safeTop - safeBottom);
 
-  const photo = await fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rotate);
+  const photo = await fitPhotoInPhysicalSafeArea(sharpMod, photoPath, safeW, safeH, rotate, crop);
   const photoLeft = innerPad + safeLeft + Math.round((safeW - photo.width) / 2);
   const photoTop = innerPad + safeTop + Math.round((safeH - photo.height) / 2);
   const composites = [{ input: photo.buf, left: photoLeft, top: photoTop }];
@@ -707,10 +806,9 @@ async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
   const dpi = Math.max(72, Math.min(600, Math.round(Number(opts.dpi) || 300)));
   const rotate = Number(opts.rotateDegrees) === -90 ? -90 : 90;
   const borderEnabled = opts.borderEnabled !== false;
+  const crop = clampPhysicalCrop(opts);
   const layout = resolvePhysicalFrameLayoutPx(opts, dpi);
-  const { cellW, cellH, gap, margin } = layout;
-  const sheetW = margin * 2 + cellW * 2 + gap;
-  const sheetH = margin * 2 + cellH;
+  const { cellW, cellH, gap, marginX, marginY, pageW, pageH } = layout;
 
   const photoCell = await buildPhysicalFrameCell(
     sharpMod,
@@ -719,16 +817,26 @@ async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
     rotate,
     borderEnabled,
     dpi,
+    crop,
   );
 
-  const left0 = margin;
-  const left1 = margin + cellW + gap;
-  const top = margin;
+  const left0 = marginX;
+  const left1 = marginX + cellW + gap;
+  const top = marginY;
+
+  appendAppLog('info', 'layouts', 'physical sheet 1:1 postcard', {
+    page: `${pageW}x${pageH}`,
+    cell: `${cellW}x${cellH}`,
+    gap,
+    marginX,
+    marginY,
+    crop,
+  });
 
   return sharpMod({
     create: {
-      width: sheetW,
-      height: sheetH,
+      width: pageW,
+      height: pageH,
       channels: 4,
       background: { r: 255, g: 255, b: 255, alpha: 1 },
     },
@@ -744,6 +852,11 @@ async function compositePhysicalFrameDual(sharpMod, photoPath, opts = {}) {
 function isPhysicalFrameLayoutPath(filePath) {
   const base = path.basename(String(filePath || '')).toLowerCase();
   return /_physical\.(png|jpe?g|webp)$/.test(base);
+}
+
+function isFramedPrintPath(filePath) {
+  const base = path.basename(String(filePath || '')).toLowerCase();
+  return /_framed\.(png|jpe?g|webp)$/.test(base);
 }
 
 function inferGalleryVariantFromPath(filePath) {
@@ -866,20 +979,109 @@ async function resyncUploadQueue(payload = {}) {
 }
 
 /**
- * Flatten the dual-column cut sheet to one 6×4 landscape JPEG.
- * SELPHY drivers may split a wide PNG into separate prints per column; one postcard raster avoids that.
+ * Canon SELPHY CP1500 postcard stock (KP-36IP / KP-108IN): 100.0 × 148.0 mm.
+ * Marketing "6×4" is 152.4 × 101.6 mm — using that overscans the real paper and crops frames.
  */
-async function preparePhysicalFramePrintRaster(sharpMod, imagePath, dpi = 300) {
-  const pageW = Math.round(6 * dpi);
-  const pageH = Math.round(4 * dpi);
-  const buf = await sharpMod(imagePath)
-    .resize(pageW, pageH, {
-      fit: 'contain',
-      background: { r: 255, g: 255, b: 255 },
+const SELPHY_POSTCARD_W_MM = 148;
+const SELPHY_POSTCARD_H_MM = 100;
+
+function mmToPostcardPx(mm, dpi) {
+  return Math.max(1, Math.round((Number(mm) / 25.4) * dpi));
+}
+
+/**
+ * Physical sheets are already a 148×100 mm postcard at 1:1. Convert to JPEG
+ * without shrinking — global bleed / crop inset must not change cell centimetres.
+ */
+async function preparePhysicalFramePrintRaster(sharpMod, imagePath, dpi = 300, _cropInsetMm = 0) {
+  const pageW = mmToPostcardPx(SELPHY_POSTCARD_W_MM, dpi);
+  const pageH = mmToPostcardPx(SELPHY_POSTCARD_H_MM, dpi);
+  const meta = await sharpMod(imagePath).metadata();
+  const fw = meta.width || pageW;
+  const fh = meta.height || pageH;
+  let input = imagePath;
+  if (fw !== pageW || fh !== pageH) {
+    const src = await sharpMod(imagePath)
+      .resize(pageW, pageH, {
+        fit: 'inside',
+        withoutEnlargement: true,
+        background: { r: 255, g: 255, b: 255 },
+      })
+      .png()
+      .toBuffer();
+    const sm = await sharpMod(src).metadata();
+    const sw = sm.width || fw;
+    const sh = sm.height || fh;
+    const buf = await sharpMod({
+      create: {
+        width: pageW,
+        height: pageH,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
     })
+      .composite([
+        {
+          input: src,
+          left: Math.round((pageW - sw) / 2),
+          top: Math.round((pageH - sh) / 2),
+        },
+      ])
+      .jpeg({ quality: 95, mozjpeg: true })
+      .toBuffer();
+    const tmp = path.join(os.tmpdir(), `pb-physical-print-${Date.now()}.jpg`);
+    fs.writeFileSync(tmp, buf);
+    return tmp;
+  }
+  const buf = await sharpMod(input)
     .jpeg({ quality: 95, mozjpeg: true })
     .toBuffer();
   const tmp = path.join(os.tmpdir(), `pb-physical-print-${Date.now()}.jpg`);
+  fs.writeFileSync(tmp, buf);
+  return tmp;
+}
+
+/**
+ * Digital framed composites must print the full artwork (result-screen view).
+ * Cover + bleed was cropping left/right/bottom of the decorative frame.
+ * Contain the PNG on a 148×100 mm postcard and keep an inset for SELPHY overscan.
+ */
+async function prepareFramedPrintRaster(sharpMod, imagePath, dpi = 300, edgeInsetMm = 4) {
+  const pageW = mmToPostcardPx(SELPHY_POSTCARD_W_MM, dpi);
+  const pageH = mmToPostcardPx(SELPHY_POSTCARD_H_MM, dpi);
+  const inset = mmToPostcardPx(Math.max(0, Number(edgeInsetMm) || 0), dpi);
+  const innerW = Math.max(8, pageW - inset * 2);
+  const innerH = Math.max(8, pageH - inset * 2);
+  const fitted = await sharpMod(imagePath)
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .resize(innerW, innerH, {
+      fit: 'inside',
+      withoutEnlargement: false,
+      background: { r: 255, g: 255, b: 255 },
+    })
+    .png()
+    .toBuffer();
+  const meta = await sharpMod(fitted).metadata();
+  const fw = meta.width || innerW;
+  const fh = meta.height || innerH;
+  const buf = await sharpMod({
+    create: {
+      width: pageW,
+      height: pageH,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .composite([
+      {
+        input: fitted,
+        left: Math.round((pageW - fw) / 2),
+        top: Math.round((pageH - fh) / 2),
+      },
+    ])
+    .jpeg({ quality: 95, mozjpeg: true })
+    .toBuffer();
+  const tmp = path.join(os.tmpdir(), `pb-framed-print-${Date.now()}.jpg`);
   fs.writeFileSync(tmp, buf);
   return tmp;
 }
@@ -1979,18 +2181,23 @@ function listCaptureHistory(options = {}) {
     const base = name.replace(/\.jpe?g$/i, '');
     const framedPath = path.join(captureRoot, `${base}_framed.png`);
     const physicalPath = path.join(captureRoot, `${base}_physical.png`);
+    const aiPath = path.join(captureRoot, `${base}_ai.png`);
     const hasFramed = fs.existsSync(framedPath);
     const hasPhysical = fs.existsSync(physicalPath);
+    const hasAi = fs.existsSync(aiPath);
 
     let displayPath = abs;
     let layoutMode;
-    let label = 'Digital';
+    let label = 'Photo';
     let kind = 'normal';
     if (hasPhysical) {
       displayPath = physicalPath;
       layoutMode = 'physicalFrame';
       label = 'Physical';
       kind = 'physical';
+    } else if (hasAi) {
+      displayPath = aiPath;
+      label = 'AI';
     } else if (hasFramed) {
       displayPath = framedPath;
       label = 'Framed';
@@ -1999,11 +2206,14 @@ function listCaptureHistory(options = {}) {
     items.push({
       id: base,
       capturedAt: st.mtime.toISOString(),
+      originalPath: abs.replace(/\\/g, '/'),
       displayPath: displayPath.replace(/\\/g, '/'),
       printPath: displayPath.replace(/\\/g, '/'),
       layoutMode,
       kind,
       label,
+      hasPhysical,
+      hasFramed,
     });
   }
 
@@ -2599,18 +2809,23 @@ ipcMain.handle('admin:listAiBackgrounds', async (_e, modeId) => {
 ipcMain.handle('frames:list', async () => {
   try {
     const files = listPhotoFrameFiles();
-    const frames = files.map((filename) => {
-      const full = path.join(getPhotoFramesDir(), filename);
-      const label = filename
-        .replace(/\.[^.]+$/, '')
-        .replace(/[-_]+/g, ' ')
-        .trim();
-      return {
-        filename,
-        label,
-        url: `${pathToFileURL(full).href}?v=${Date.now()}`,
-      };
-    });
+    const dir = getPhotoFramesDir();
+    const frames = await Promise.all(
+      files.map(async (filename) => {
+        const full = path.join(dir, filename);
+        const label = filename
+          .replace(/\.[^.]+$/, '')
+          .replace(/[-_]+/g, ' ')
+          .trim();
+        const size = await readImageAspect(full);
+        return {
+          filename,
+          label,
+          url: `${pathToFileURL(full).href}?v=${Date.now()}`,
+          ...size,
+        };
+      }),
+    );
     return { ok: true, frames };
   } catch (e) {
     return { ok: false, error: String(e), frames: [] };
@@ -2635,6 +2850,11 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
       payload && typeof payload.guestText === 'string' ? payload.guestText : '';
     const creditLine =
       payload && typeof payload.creditLine === 'string' ? payload.creditLine : '';
+    const crop = {
+      zoom: payload?.cropZoom ?? payload?.zoom,
+      panX: payload?.cropPanX ?? payload?.panX,
+      panY: payload?.cropPanY ?? payload?.panY,
+    };
     if (!imagePath || !frameFile) {
       return { ok: false, error: 'Missing image or frame.' };
     }
@@ -2650,6 +2870,9 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
       frameFile,
       photoScale,
       hasGuestText: !!guestText.trim(),
+      cropZoom: crop.zoom,
+      cropPanX: crop.panX,
+      cropPanY: crop.panY,
     });
     const outBuf = await compositePhotoIntoFrame(
       sharpMod,
@@ -2658,6 +2881,7 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
       photoScale,
       guestText,
       creditLine,
+      crop,
     );
     const dir = path.dirname(imagePath);
     const base = path.basename(imagePath, path.extname(imagePath));
@@ -2702,6 +2926,12 @@ ipcMain.handle('layouts:physicalFrameDual', async (_e, payload) => {
       dpi: payload?.dpi ?? cfg.dpi,
       rotateDegrees: payload?.rotateDegrees ?? cfg.rotateDegrees,
       borderEnabled: payload?.borderEnabled ?? cfg.borderEnabled,
+      cropZoom: payload?.cropZoom ?? payload?.zoom,
+      cropPanX: payload?.cropPanX ?? payload?.panX,
+      cropPanY: payload?.cropPanY ?? payload?.panY,
+      zoom: payload?.cropZoom ?? payload?.zoom,
+      panX: payload?.cropPanX ?? payload?.panX,
+      panY: payload?.cropPanY ?? payload?.panY,
     };
     appendAppLog('info', 'layouts', 'physicalFrameDual start', { imagePath, ...opts });
     const outBuf = await compositePhysicalFrameDual(sharpMod, imagePath, opts);
@@ -2745,10 +2975,12 @@ ipcMain.handle('admin:installPhotoFrame', async (_e, sourcePath) => {
     const destName = `${base}${useExt}`;
     const dest = path.join(getPhotoFramesDir(), destName);
     fs.copyFileSync(sourcePath, dest);
+    const size = await readImageAspect(dest);
     return {
       ok: true,
       filename: destName,
       url: `${pathToFileURL(dest).href}?v=${Date.now()}`,
+      ...size,
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -3812,7 +4044,7 @@ ipcMain.handle('print:repairSelphyUsb', async () => {
 });
 
 /**
- * Windows photo print for kiosk / Canon SELPHY CP1500 — postcard 6″×4″ landscape.
+ * Windows photo print for kiosk / Canon SELPHY CP1500 — postcard 100×148 mm.
  * Prefer USB Canon/usbprint. USB Microsoft IPP is last resort; Wi‑Fi IPP is skipped.
  */
 async function printPhotoViaWindowsSpooler(imagePath, printerName, bleedScale = 1.06, options = {}) {
@@ -3820,8 +4052,15 @@ async function printPhotoViaWindowsSpooler(imagePath, printerName, bleedScale = 
   if (!fs.existsSync(abs)) {
     throw new Error('Photo file not found.');
   }
-  const bleed = Math.min(1.12, Math.max(1.0, Number(bleedScale) || 1.06));
-  const fitMode = options.fitMode === 'contain' ? 'contain' : 'cover';
+  const physicalPostcard = options.physicalPostcard === true;
+  const bleed = physicalPostcard
+    ? 1
+    : Math.min(1.12, Math.max(1.0, Number(bleedScale) || 1.06));
+  const fitMode = physicalPostcard
+    ? 'postcard'
+    : options.fitMode === 'contain'
+      ? 'contain'
+      : 'cover';
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pb-spool-'));
   const ps1 = path.join(tmpDir, 'photoprint.ps1');
   const script = `
@@ -3854,27 +4093,33 @@ try {
   try { $doc.PrinterSettings.DefaultPageSettings.Color = $true } catch {}
   $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
 
-  # Canon SELPHY postcard: 6" wide × 4" high (landscape)
+  # Canon SELPHY CP1500 postcard is 100.0 x 148.0 mm (not 6x4 inch).
+  $targetW = [int][Math]::Round(148.0 / 25.4 * 100)
+  $targetH = [int][Math]::Round(100.0 / 25.4 * 100)
   $chosenPaper = $null
   foreach ($ps in $doc.PrinterSettings.PaperSizes) {
     $n = [string]$ps.PaperName
-    if ($n -match '(?i)postcard|card\\s*size|4\\s*[x×]\\s*6|6\\s*[x×]\\s*4|100\\s*[x×]\\s*148|hagaki|kp-?108|l\\s*size') {
+    if ($n -match '(?i)postcard|hagaki|kp-?108|100\\s*[x×]\\s*148|148\\s*[x×]\\s*100') {
       $chosenPaper = $ps
       break
     }
   }
   if ($chosenPaper -eq $null) {
+    $best = $null
+    $bestDelta = 99999
     foreach ($ps in $doc.PrinterSettings.PaperSizes) {
       $a = [Math]::Min($ps.Width, $ps.Height)
       $b = [Math]::Max($ps.Width, $ps.Height)
-      if ($a -ge 390 -and $a -le 420 -and $b -ge 580 -and $b -le 620) {
-        $chosenPaper = $ps
-        break
+      $delta = [Math]::Abs($a - $targetH) + [Math]::Abs($b - $targetW)
+      if ($delta -lt $bestDelta -and $a -ge 370 -and $a -le 430 -and $b -ge 540 -and $b -le 630) {
+        $best = $ps
+        $bestDelta = $delta
       }
     }
+    $chosenPaper = $best
   }
   if ($chosenPaper -eq $null) {
-    $chosenPaper = New-Object System.Drawing.Printing.PaperSize('PhotoBooth 6x4', 600, 400)
+    $chosenPaper = New-Object System.Drawing.Printing.PaperSize('SELPHY Postcard 100x148mm', $targetW, $targetH)
     try { $doc.PrinterSettings.PaperSizes.Add($chosenPaper) } catch {}
   }
   $doc.DefaultPageSettings.PaperSize = $chosenPaper
@@ -3888,20 +4133,30 @@ try {
   $script:paperName = $chosenPaper.PaperName
   $script:bleed = $bleed
   $script:fitMode = $fitMode
+  $script:targetW = $targetW
+  $script:targetH = $targetH
   $doc.add_PrintPage({
     param($sender, $e)
-    # Use full physical page; overscan kills thin white borders on SELPHY USB
     $page = $e.PageBounds
     $iw = [double]$script:pbImg.Width
     $ih = [double]$script:pbImg.Height
     if ($iw -le 0 -or $ih -le 0) { throw 'Image has zero size' }
-    if ($script:fitMode -eq 'contain') {
+    if ($script:fitMode -eq 'postcard') {
+      $tw = [double]$script:targetW
+      $th = [double]$script:targetH
+      $fit = [Math]::Min(($page.Width / $tw), ($page.Height / $th))
+      if ($fit -gt 1) { $fit = 1 }
+      $w = [int][Math]::Round($tw * $fit)
+      $h = [int][Math]::Round($th * $fit)
+    } elseif ($script:fitMode -eq 'contain') {
       $scale = [Math]::Min(($page.Width / $iw), ($page.Height / $ih)) * [double]$script:bleed
+      $w = [int]([Math]::Ceiling($iw * $scale))
+      $h = [int]([Math]::Ceiling($ih * $scale))
     } else {
       $scale = [Math]::Max(($page.Width / $iw), ($page.Height / $ih)) * [double]$script:bleed
+      $w = [int]([Math]::Ceiling($iw * $scale))
+      $h = [int]([Math]::Ceiling($ih * $scale))
     }
-    $w = [int]([Math]::Ceiling($iw * $scale))
-    $h = [int]([Math]::Ceiling($ih * $scale))
     $x = $page.X + [int]([Math]::Floor(($page.Width - $w) / 2.0))
     $y = $page.Y + [int]([Math]::Floor(($page.Height - $h) / 2.0))
     $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
@@ -4053,39 +4308,61 @@ ipcMain.handle('print:photo', async (_e, payload) => {
 
     const physicalLayout =
       payload?.layoutMode === 'physicalFrame' || isPhysicalFrameLayoutPath(abs);
+    const framedLayout = !physicalLayout && isFramedPrintPath(abs);
     let printPath = abs;
     let printTmp = null;
-    if (physicalLayout) {
+    if (physicalLayout || framedLayout) {
       let sharpMod;
       try {
         sharpMod = require('sharp');
       } catch (_dep) {
-        return { ok: false, error: 'Physical frame print requires sharp.' };
+        return { ok: false, error: 'Frame print requires sharp.' };
       }
-      printTmp = await preparePhysicalFramePrintRaster(
-        sharpMod,
-        abs,
-        Math.round(Number(loadMergedConfig()?.physicalFrame?.dpi) || 300),
-      );
+      const dpi = Math.round(Number(loadMergedConfig()?.physicalFrame?.dpi) || 300);
+      if (physicalLayout) {
+        printTmp = await preparePhysicalFramePrintRaster(
+          sharpMod,
+          abs,
+          dpi,
+          Number(loadMergedConfig()?.physicalFrame?.printerCropInsetMm ?? 4),
+        );
+      } else {
+        printTmp = await prepareFramedPrintRaster(
+          sharpMod,
+          abs,
+          dpi,
+          Number(printCfg.framedEdgeInsetMm ?? 4),
+        );
+      }
       printPath = printTmp;
-      appendAppLog('info', 'print', 'physical layout flattened for single spool', {
+      appendAppLog('info', 'print', 'layout flattened for single spool', {
         source: abs,
         raster: printPath,
+        physicalLayout,
+        framedLayout,
       });
     }
 
     try {
-      const result = await printPhotoViaWindowsSpooler(printPath, resolved.chosen, bleedScale, {
-        fitMode: physicalLayout ? 'contain' : 'cover',
-      });
+      const keepEdges = physicalLayout || framedLayout;
+      const result = await printPhotoViaWindowsSpooler(
+        printPath,
+        resolved.chosen,
+        keepEdges ? 1 : bleedScale,
+        {
+          fitMode: keepEdges ? 'contain' : 'cover',
+          physicalPostcard: keepEdges,
+        },
+      );
       appendAppLog('info', 'print', 'photoprint spooled', {
         filePath: abs,
         printPath,
         physicalLayout,
+        framedLayout,
         bytes: fs.statSync(printPath).size,
         deviceName: result.printer || resolved.chosen || 'default',
         paper: result.paper || null,
-        bleed: result.bleed || bleedScale,
+        bleed: result.bleed || (keepEdges ? 1 : bleedScale),
       });
       return {
         ok: true,
