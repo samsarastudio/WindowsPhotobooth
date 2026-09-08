@@ -167,10 +167,15 @@ export interface PhotoboothPrintConfig {
    */
   bleedScale: number;
   /**
-   * White margin around framed (digital frame) prints so SELPHY borderless overscan
-   * does not eat the decorative border. Ignored for unframed camera JPEGs.
+   * White margin on the left and right of framed (digital frame) prints so SELPHY
+   * borderless overscan does not eat the decorative border. Ignored for unframed camera JPEGs.
    */
   framedEdgeInsetMm: number;
+  /**
+   * Extra white at the bottom only. 3:2 frames are slightly wider than 148×100 mm stock,
+   * and SELPHY overscans the trailing edge more than the sides.
+   */
+  framedBottomExtraMm: number;
   /** Include Wi‑Fi / IPP / WSD queues in the printer list (USB is still preferred). */
   allowWifiPrinters: boolean;
 }
@@ -180,6 +185,7 @@ export const PHOTOBOOTH_DEFAULT_PRINT: PhotoboothPrintConfig = {
   printerName: null,
   bleedScale: 1.06,
   framedEdgeInsetMm: 4,
+  framedBottomExtraMm: 2.5,
   allowWifiPrinters: false,
 };
 

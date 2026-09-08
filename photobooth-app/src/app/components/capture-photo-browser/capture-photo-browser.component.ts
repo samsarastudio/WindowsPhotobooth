@@ -76,12 +76,13 @@ export class CapturePhotoBrowserComponent implements OnInit {
     const fromMs = this.rangeStartMs(when);
     const toMs = this.rangeEndMs(when);
     return this.photos().filter((p) => {
-      if (
-        kind !== 'all' &&
-        kind !== 'original' &&
-        (p.kind || (p.layoutMode === 'physicalFrame' ? 'physical' : 'normal')) !== kind
-      )
-        return false;
+      if (kind === 'physical') {
+        if ((p.kind || (p.layoutMode === 'physicalFrame' ? 'physical' : 'normal')) !== 'physical')
+          return false;
+      } else if (kind === 'normal') {
+        // Digital: framed / AI / unframed — including captures that also have a physical sheet.
+        if (!p.hasFramed && (p.kind || 'normal') === 'physical') return false;
+      }
       const t = Date.parse(p.capturedAt);
       if (!Number.isFinite(t)) return true;
       if (fromMs != null && t < fromMs) return false;
@@ -209,7 +210,7 @@ export class CapturePhotoBrowserComponent implements OnInit {
   }
 
   thumbKey(photo: PbCaptureHistoryItem): string {
-    return this.viewingOriginals() ? `${photo.id}:orig` : `${photo.id}:view`;
+    return `${this.viewPath(photo)}:${photo.capturedAt}`;
   }
 
   sourceOriginal(photo: PbCaptureHistoryItem): string {
@@ -222,7 +223,17 @@ export class CapturePhotoBrowserComponent implements OnInit {
   }
 
   viewPath(photo: PbCaptureHistoryItem): string {
-    return this.viewingOriginals() ? this.sourceOriginal(photo) : photo.displayPath;
+    if (this.viewingOriginals()) return this.sourceOriginal(photo);
+    if (this.kindFilter() === 'normal' && photo.hasFramed) {
+      return photo.framedPath || photo.displayPath.replace(/_physical\.png$/i, '_framed.png');
+    }
+    return photo.displayPath;
+  }
+
+  viewLabel(photo: PbCaptureHistoryItem): string {
+    if (this.viewingOriginals()) return this.copy().history.originalLabel;
+    if (this.kindFilter() === 'normal' && photo.hasFramed) return 'Framed';
+    return photo.label;
   }
 
   private async afterFilterChange(): Promise<void> {
@@ -255,10 +266,11 @@ export class CapturePhotoBrowserComponent implements OnInit {
     this.printBusy.set(true);
     try {
       const originals = this.viewingOriginals();
+      const viewingFramed = this.kindFilter() === 'normal' && !!photo.hasFramed;
       const r = await window.pbApi.printPhoto({
-        filePath: originals ? this.sourceOriginal(photo) : photo.printPath,
+        filePath: this.viewPath(photo),
         deviceName: this.booth.print().printerName || undefined,
-        layoutMode: originals ? undefined : photo.layoutMode,
+        layoutMode: originals || viewingFramed ? undefined : photo.layoutMode,
       });
       if (!r.ok) {
         this.printErr.set(r.error ?? 'Print failed.');
@@ -380,14 +392,13 @@ export class CapturePhotoBrowserComponent implements OnInit {
       this.frameAdjustOpen.set(false);
       this.galleryUpload.queueUpload(src, 'original');
       this.galleryUpload.queueUpload(r.path, 'framed');
+      this.thumbUrls.set({});
+      this.previewUrls.set({});
       const id = this.selectedId();
       await this.reload();
+      this.setKind('normal');
       const item = this.photos().find((p) => p.id === id);
-      if (item?.kind === 'physical') {
-        this.setKind('original');
-      } else {
-        this.setKind('normal');
-      }
+      if (item) await this.selectPhoto(item);
     } catch (e) {
       this.makeFramedErr.set(String(e));
     } finally {

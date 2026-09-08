@@ -64,6 +64,7 @@
     "printerName": null,
     "bleedScale": 1.06,
     "framedEdgeInsetMm": 4,
+    "framedBottomExtraMm": 2.5,
     "allowWifiPrinters": false
   },
   "aiModes": [

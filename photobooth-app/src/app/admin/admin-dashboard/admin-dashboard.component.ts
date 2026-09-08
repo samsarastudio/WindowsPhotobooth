@@ -781,6 +781,7 @@ export class AdminDashboardComponent implements OnInit {
           printerName: this.draftPrint.printerName?.trim() || null,
           bleedScale: this.draftPrint.bleedScale ?? 1.06,
           framedEdgeInsetMm: this.draftPrint.framedEdgeInsetMm ?? 4,
+          framedBottomExtraMm: this.draftPrint.framedBottomExtraMm ?? 2.5,
           allowWifiPrinters: !!this.draftPrint.allowWifiPrinters,
         },
       });
@@ -867,6 +868,7 @@ export class AdminDashboardComponent implements OnInit {
           printerName: this.draftPrint.printerName?.trim() || null,
           bleedScale: this.draftPrint.bleedScale ?? 1.06,
           framedEdgeInsetMm: this.draftPrint.framedEdgeInsetMm ?? 4,
+          framedBottomExtraMm: this.draftPrint.framedBottomExtraMm ?? 2.5,
           allowWifiPrinters: !!this.draftPrint.allowWifiPrinters,
         },
       });

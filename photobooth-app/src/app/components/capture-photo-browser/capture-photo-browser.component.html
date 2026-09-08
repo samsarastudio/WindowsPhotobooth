@@ -70,8 +70,8 @@
         <img [src]="src" alt="" />
         @if (selected(); as sel) {
           <p class="pb-cb-preview-cap">
-            <span class="pb-cb-kind" [class.is-physical]="viewingOriginals() ? sel.hasPhysical : sel.kind === 'physical'">
-              {{ viewingOriginals() ? copy().history.originalLabel : sel.label }}
+            <span class="pb-cb-kind" [class.is-physical]="viewingOriginals() ? sel.hasPhysical : sel.kind === 'physical' && kindFilter() !== 'normal'">
+              {{ viewLabel(sel) }}
             </span>
             @if (viewingOriginals() && sel.hasPhysical) {
               <span class="pb-cb-kind is-physical">{{ copy().history.filterPhysical }}</span>
@@ -103,9 +103,9 @@
         <span class="pb-cb-meta">
           <span
             class="pb-cb-kind"
-            [class.is-physical]="viewingOriginals() ? photo.hasPhysical : photo.kind === 'physical'"
+            [class.is-physical]="viewingOriginals() ? photo.hasPhysical : photo.kind === 'physical' && kindFilter() !== 'normal'"
           >
-            {{ viewingOriginals() ? copy().history.originalLabel : photo.label }}
+            {{ viewLabel(photo) }}
           </span>
           <span class="pb-cb-time">{{ photo.capturedAt | date: 'MMM d, h:mm a' }}</span>
         </span>

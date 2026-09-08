@@ -412,6 +412,7 @@ function normalizePrintConfig(
     printerName,
     bleedScale,
     framedEdgeInsetMm: clampRange(patch.framedEdgeInsetMm, 0, 12, base.framedEdgeInsetMm),
+    framedBottomExtraMm: clampRange(patch.framedBottomExtraMm, 0, 12, base.framedBottomExtraMm),
     allowWifiPrinters:
       typeof patch.allowWifiPrinters === 'boolean' ? patch.allowWifiPrinters : base.allowWifiPrinters,
   };

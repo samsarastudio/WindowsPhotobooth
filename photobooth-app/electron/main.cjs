@@ -1043,15 +1043,24 @@ async function preparePhysicalFramePrintRaster(sharpMod, imagePath, dpi = 300, _
 
 /**
  * Digital framed composites must print the full artwork (result-screen view).
- * Cover + bleed was cropping left/right/bottom of the decorative frame.
- * Contain the PNG on a 148×100 mm postcard and keep an inset for SELPHY overscan.
+ * 3:2 frames (e.g. 1800×1200) are slightly wider than SELPHY 148×100 mm stock (1.48:1).
+ * Uniform inset fills left/right but leaves the bottom short; borderless overscan then
+ * clips the frame. Keep L/R at the admin inset, reserve extra mm at the bottom, and
+ * top-align so leftover letterbox also sits on the trailing edge.
  */
-async function prepareFramedPrintRaster(sharpMod, imagePath, dpi = 300, edgeInsetMm = 4) {
+async function prepareFramedPrintRaster(
+  sharpMod,
+  imagePath,
+  dpi = 300,
+  edgeInsetMm = 4,
+  bottomExtraMm = 2.5,
+) {
   const pageW = mmToPostcardPx(SELPHY_POSTCARD_W_MM, dpi);
   const pageH = mmToPostcardPx(SELPHY_POSTCARD_H_MM, dpi);
-  const inset = mmToPostcardPx(Math.max(0, Number(edgeInsetMm) || 0), dpi);
-  const innerW = Math.max(8, pageW - inset * 2);
-  const innerH = Math.max(8, pageH - inset * 2);
+  const lr = mmToPostcardPx(Math.max(0, Number(edgeInsetMm) || 0), dpi);
+  const extraBottom = mmToPostcardPx(Math.max(0, Number(bottomExtraMm) || 0), dpi);
+  const innerW = Math.max(8, pageW - lr * 2);
+  const innerH = Math.max(8, pageH - extraBottom);
   const fitted = await sharpMod(imagePath)
     .flatten({ background: { r: 255, g: 255, b: 255 } })
     .resize(innerW, innerH, {
@@ -1075,8 +1084,8 @@ async function prepareFramedPrintRaster(sharpMod, imagePath, dpi = 300, edgeInse
     .composite([
       {
         input: fitted,
-        left: Math.round((pageW - fw) / 2),
-        top: Math.round((pageH - fh) / 2),
+        left: lr + Math.round((innerW - fw) / 2),
+        top: 0,
       },
     ])
     .jpeg({ quality: 95, mozjpeg: true })
@@ -2154,6 +2163,15 @@ ipcMain.handle('camera:invoke', async (_e, cmd) => {
   return res;
 });
 
+function fileMtimeMs(filePath) {
+  try {
+    const st = fs.statSync(filePath);
+    return st.isFile() ? st.mtimeMs : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function listCaptureHistory(options = {}) {
   const limit = Math.min(5000, Math.max(1, Math.round(Number(options.limit) || 2000)));
   const maxAgeDays = Number(options.maxAgeDays);
@@ -2176,15 +2194,19 @@ function listCaptureHistory(options = {}) {
       continue;
     }
     if (!st.isFile() || st.size <= 0) continue;
-    if (cutoff && st.mtimeMs < cutoff) continue;
 
     const base = name.replace(/\.jpe?g$/i, '');
     const framedPath = path.join(captureRoot, `${base}_framed.png`);
     const physicalPath = path.join(captureRoot, `${base}_physical.png`);
     const aiPath = path.join(captureRoot, `${base}_ai.png`);
-    const hasFramed = fs.existsSync(framedPath);
-    const hasPhysical = fs.existsSync(physicalPath);
-    const hasAi = fs.existsSync(aiPath);
+    const framedMtime = fileMtimeMs(framedPath);
+    const physicalMtime = fileMtimeMs(physicalPath);
+    const aiMtime = fileMtimeMs(aiPath);
+    const hasFramed = framedMtime > 0;
+    const hasPhysical = physicalMtime > 0;
+    const hasAi = aiMtime > 0;
+    const latestMs = Math.max(st.mtimeMs, framedMtime, physicalMtime, aiMtime);
+    if (cutoff && latestMs < cutoff) continue;
 
     let displayPath = abs;
     let layoutMode;
@@ -2205,8 +2227,9 @@ function listCaptureHistory(options = {}) {
 
     items.push({
       id: base,
-      capturedAt: st.mtime.toISOString(),
+      capturedAt: new Date(latestMs).toISOString(),
       originalPath: abs.replace(/\\/g, '/'),
+      framedPath: hasFramed ? framedPath.replace(/\\/g, '/') : undefined,
       displayPath: displayPath.replace(/\\/g, '/'),
       printPath: displayPath.replace(/\\/g, '/'),
       layoutMode,
@@ -2887,6 +2910,12 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
     const base = path.basename(imagePath, path.extname(imagePath));
     const outPath = path.join(dir, `${base}_framed.png`);
     fs.writeFileSync(outPath, outBuf);
+    const now = new Date();
+    try {
+      fs.utimesSync(outPath, now, now);
+    } catch {
+      /* mtime from writeFile is enough */
+    }
     appendAppLog('info', 'frames', 'apply ok', { outPath });
     return { ok: true, path: outPath, frameFile };
   } catch (e) {
@@ -4332,6 +4361,7 @@ ipcMain.handle('print:photo', async (_e, payload) => {
           abs,
           dpi,
           Number(printCfg.framedEdgeInsetMm ?? 4),
+          Number(printCfg.framedBottomExtraMm ?? 2.5),
         );
       }
       printPath = printTmp;

@@ -50,6 +50,7 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
   private lastX = 0;
   private lastY = 0;
   private loadGen = 0;
+  private resizeObs?: ResizeObserver;
 
   constructor() {
     effect(() => {
@@ -67,10 +68,16 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    const stage = this.sheetCanvas?.nativeElement?.parentElement;
+    if (stage && typeof ResizeObserver !== 'undefined') {
+      this.resizeObs = new ResizeObserver(() => this.draw());
+      this.resizeObs.observe(stage);
+    }
     this.draw();
   }
 
   ngOnDestroy(): void {
+    this.resizeObs?.disconnect();
     this.loadGen += 1;
     this.photo = null;
     this.frame = null;
@@ -173,86 +180,84 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
     });
   }
 
-  /** Bounding box of the transparent / keyed-black photo opening. */
+  /** Inner photo opening. Prefer a solid transparent band; do not flood through lacy art. */
   private findHole(img: HTMLImageElement): { left: number; top: number; width: number; height: number } {
     const maxW = 720;
     const scale = Math.min(1, maxW / Math.max(1, img.naturalWidth));
     const w = Math.max(1, Math.round(img.naturalWidth * scale));
     const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const fallback = {
+      left: img.naturalWidth * 0.08,
+      top: img.naturalHeight * 0.08,
+      width: img.naturalWidth * 0.84,
+      height: img.naturalHeight * 0.84,
+    };
     const c = document.createElement('canvas');
     c.width = w;
     c.height = h;
     const ctx = c.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
-      return {
-        left: img.naturalWidth * 0.08,
-        top: img.naturalHeight * 0.08,
-        width: img.naturalWidth * 0.84,
-        height: img.naturalHeight * 0.84,
-      };
-    }
+    if (!ctx) return fallback;
     ctx.drawImage(img, 0, 0, w, h);
     const data = ctx.getImageData(0, 0, w, h).data;
-    const isHole = (x: number, y: number) => {
-      const i = (y * w + x) * 4;
-      const a = data[i + 3];
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      return a < 16 || (r <= 18 && g <= 18 && b <= 18);
-    };
-    const seeds: [number, number][] = [
-      [Math.floor(w / 2), Math.floor(h / 2)],
-      [Math.floor(w / 2), Math.floor(h * 0.38)],
-      [Math.floor(w / 2), Math.floor(h * 0.28)],
-    ];
-    let best = { count: 0, minX: 0, minY: 0, maxX: 0, maxY: 0 };
-    const seenGlobal = new Uint8Array(w * h);
-    for (const [sx, sy] of seeds) {
-      if (!isHole(sx, sy) || seenGlobal[sy * w + sx]) continue;
-      const q = [sy * w + sx];
-      seenGlobal[q[0]] = 1;
-      let count = 0;
-      let minX = w;
-      let minY = h;
-      let maxX = 0;
-      let maxY = 0;
-      while (q.length) {
-        const p = q.pop()!;
-        const x = p % w;
-        const y = (p / w) | 0;
-        if (!isHole(x, y)) continue;
-        count += 1;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-        const nbs = [p - 1, p + 1, p - w, p + w];
-        for (const n of nbs) {
-          if (n < 0 || n >= w * h || seenGlobal[n]) continue;
-          const nx = n % w;
-          const ny = (n / w) | 0;
-          if (Math.abs(nx - x) + Math.abs(ny - y) !== 1) continue;
-          seenGlobal[n] = 1;
-          q.push(n);
-        }
+    const trans = (x: number, y: number) => data[(y * w + x) * 4 + 3] < 16;
+
+    const rowOpen = new Uint8Array(h);
+    for (let y = 0; y < h; y++) {
+      let n = 0;
+      for (let x = 0; x < w; x++) if (trans(x, y)) n += 1;
+      rowOpen[y] = n / w > 0.55 ? 1 : 0;
+    }
+    let bestY0 = 0;
+    let bestYLen = 0;
+    let run = 0;
+    let runStart = 0;
+    for (let y = 0; y <= h; y++) {
+      if (y < h && rowOpen[y]) {
+        if (run === 0) runStart = y;
+        run += 1;
+      } else if (run > bestYLen) {
+        bestY0 = runStart;
+        bestYLen = run;
+        run = 0;
+      } else {
+        run = 0;
       }
-      if (count > best.count) best = { count, minX, minY, maxX, maxY };
     }
+    if (bestYLen < h * 0.2) return fallback;
+
+    const y0 = bestY0;
+    const y1 = bestY0 + bestYLen - 1;
+    const span = y1 - y0 + 1;
+    const colOpen = new Uint8Array(w);
+    for (let x = 0; x < w; x++) {
+      let n = 0;
+      for (let y = y0; y <= y1; y++) if (trans(x, y)) n += 1;
+      colOpen[x] = n / span > 0.55 ? 1 : 0;
+    }
+    let bestX0 = 0;
+    let bestXLen = 0;
+    run = 0;
+    runStart = 0;
+    for (let x = 0; x <= w; x++) {
+      if (x < w && colOpen[x]) {
+        if (run === 0) runStart = x;
+        run += 1;
+      } else if (run > bestXLen) {
+        bestX0 = runStart;
+        bestXLen = run;
+        run = 0;
+      } else {
+        run = 0;
+      }
+    }
+    if (bestXLen < w * 0.25) return fallback;
+
     const inv = 1 / scale;
-    if (best.count < 80 || best.count / (w * h) < 0.08) {
-      return {
-        left: img.naturalWidth * 0.08,
-        top: img.naturalHeight * 0.08,
-        width: img.naturalWidth * 0.84,
-        height: img.naturalHeight * 0.84,
-      };
-    }
     return {
-      left: best.minX * inv,
-      top: best.minY * inv,
-      width: (best.maxX - best.minX + 1) * inv,
-      height: (best.maxY - best.minY + 1) * inv,
+      left: bestX0 * inv,
+      top: y0 * inv,
+      width: bestXLen * inv,
+      height: bestYLen * inv,
     };
   }
 
@@ -263,8 +268,18 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
     if (!canvas || !photo || !frame || !this.ready()) return;
     const fw = frame.naturalWidth;
     const fh = frame.naturalHeight;
-    const cssW = Math.min(720, canvas.parentElement?.clientWidth || 720);
-    const cssH = cssW * (fh / Math.max(1, fw));
+    const parent = canvas.parentElement;
+    const padX = 8;
+    const padY = 8;
+    const availW = Math.max(80, (parent?.clientWidth || 720) - padX);
+    const availH = Math.max(80, (parent?.clientHeight || 0) - padY);
+    const ar = fh / Math.max(1, fw);
+    let cssW = Math.min(720, availW);
+    let cssH = cssW * ar;
+    if (availH > 40 && cssH > availH) {
+      cssH = availH;
+      cssW = cssH / ar;
+    }
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
@@ -287,12 +302,7 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
     ctx.clip();
     ctx.drawImage(photo, box.left, box.top, box.width, box.height, sx, sy, sw, sh);
     ctx.restore();
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, cssW, cssH);
-    ctx.rect(sx, sy, sw, sh);
-    ctx.clip('evenodd');
+    // Same as apply: overlay PNG with its own alpha. Even-odd clip ate lacy frames.
     ctx.drawImage(frame, 0, 0, cssW, cssH);
-    ctx.restore();
   }
 }

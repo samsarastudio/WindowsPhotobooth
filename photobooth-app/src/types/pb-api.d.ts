@@ -27,6 +27,7 @@ export interface PbCaptureHistoryItem {
   id: string;
   capturedAt: string;
   originalPath: string;
+  framedPath?: string;
   displayPath: string;
   printPath: string;
   layoutMode?: 'physicalFrame';
