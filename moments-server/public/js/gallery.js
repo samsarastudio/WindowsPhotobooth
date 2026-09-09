@@ -74,7 +74,13 @@ const els = {
   ssImg: document.getElementById('ssImg'),
   ssToggle: document.getElementById('ssToggle'),
   topBar: document.getElementById('topBar'),
+  btnDownloadAlbum: document.getElementById('btnDownloadAlbum'),
 };
+
+/** Prefer cached thumb for tiles; fall back to full image. */
+function thumbSrc(photo) {
+  return photo?.thumbUrl || photo?.url || '';
+}
 
 /** @type {any[]} */
 let photos = [];
@@ -153,6 +159,9 @@ function setMode(mode, push = true) {
     els.empty.hidden = true;
     renderGuestPhoto();
   }
+  if (els.btnDownloadAlbum) {
+    els.btnDownloadAlbum.hidden = guestOnly || photos.length === 0 || route.kind === 'wall';
+  }
   if (mode === 'mosaic') {
     els.empty.hidden = true;
     const stageW = els.mosaicStage?.clientWidth || 0;
@@ -185,7 +194,7 @@ function renderGrid() {
     btn.type = 'button';
     btn.className = 'card-photo';
     btn.dataset.id = photo.id;
-    btn.innerHTML = `<img src="${photo.url}" alt="" loading="lazy" /><span class="badge">${photo.variant}</span>`;
+    btn.innerHTML = `<img src="${thumbSrc(photo)}" alt="" loading="lazy" decoding="async" /><span class="badge">${photo.variant}</span>`;
     btn.addEventListener('click', () => openLightbox(photos.findIndex((p) => p.id === photo.id)));
     els.grid.appendChild(btn);
   }
@@ -744,7 +753,7 @@ function buildMosaicCompleted() {
       '<span class="mosaic-slot-card"><img class="mosaic-slot-photo" alt="" decoding="async" loading="lazy" /><span class="mosaic-slot-shine" aria-hidden="true"></span></span>';
     const img = cell.querySelector('.mosaic-slot-photo');
     if (img) {
-      img.src = photo.url;
+      img.src = thumbSrc(photo);
       img.alt = '';
       img.draggable = false;
     }
@@ -1049,7 +1058,7 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
     slot.el.style.zIndex = slot.grids >= 4 || opts.focus ? '10' : slot.grids === 2 ? '9' : '8';
     const img = slot.el.querySelector('.mosaic-slot-photo');
     if (img) {
-      img.src = photo.url;
+      img.src = thumbSrc(photo);
       img.alt = '';
     }
     slot.el.classList.remove('is-swoosh', 'is-shine');
@@ -1087,7 +1096,7 @@ function placePhotoInMosaic(photo, opts = {}) {
   if (mosaicPhotoSlot.has(photo.id) && !opts.force) {
     const idx = mosaicPhotoSlot.get(photo.id);
     const img = mosaicSlots[idx]?.el?.querySelector('.mosaic-slot-photo');
-    if (img && photo.url) img.src = photo.url;
+    if (img && photo.url) img.src = thumbSrc(photo);
     return;
   }
   const empty = pickEmptySlot();
@@ -1536,7 +1545,7 @@ function upsertPhoto(photo) {
       else {
         const idx = mosaicPhotoSlot.get(photo.id);
         const img = mosaicSlots[idx]?.el?.querySelector?.('.mosaic-slot-photo');
-        if (img && photo.url) img.src = photo.url;
+        if (img && photo.url) img.src = thumbSrc(photo);
       }
     } else {
       // Layout stays put: fill blanks first, extras rotate in.
@@ -1688,6 +1697,10 @@ async function loadSession(slug) {
   }
 
   els.meta.textContent = `Expires ${new Date(data.session.expiresAt).toLocaleString()} · ${photos.length} photos`;
+  if (els.btnDownloadAlbum) {
+    els.btnDownloadAlbum.hidden = photos.length === 0;
+    els.btnDownloadAlbum.dataset.slug = slug;
+  }
   connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
   setMode(route.mode || 'grid', false);
 }
@@ -1767,6 +1780,37 @@ if (els.mosaicStage && typeof ResizeObserver !== 'undefined') {
   });
   ro.observe(els.mosaicStage);
 }
+
+els.btnDownloadAlbum?.addEventListener('click', async () => {
+  const slug = els.btnDownloadAlbum.dataset.slug || route.slug;
+  if (!slug || !photos.length) return;
+  const prev = els.btnDownloadAlbum.textContent;
+  els.btnDownloadAlbum.disabled = true;
+  els.btnDownloadAlbum.textContent = 'Preparing ZIP…';
+  setStatus('Building album ZIP — large albums may take a minute…');
+  try {
+    const res = await fetch(`/api/sessions/${encodeURIComponent(slug)}/zip`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Download failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const safe = String(els.title?.textContent || slug).replace(/[^\w.\-]+/g, '_').slice(0, 80);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safe || slug}-album.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
+    setStatus('Album ZIP download started.', false);
+  } catch (e) {
+    setStatus(e.message || String(e));
+  } finally {
+    els.btnDownloadAlbum.disabled = false;
+    els.btnDownloadAlbum.textContent = prev || 'Download album';
+  }
+});
 
 if (route.kind === 'home') {
   els.title.textContent = 'Moments';

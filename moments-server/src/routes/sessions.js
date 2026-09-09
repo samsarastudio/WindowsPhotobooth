@@ -15,6 +15,8 @@ import {
 import { requireUploadToken } from '../auth.js';
 import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
 import { notifyWallPhoto } from './wall.js';
+import { warmThumb, warmAlbumThumbs } from '../thumbs.js';
+import { streamAlbumZip } from '../album-zip.js';
 
 const VARIANTS = new Set(['original', 'framed', 'ai', 'physical']);
 
@@ -105,6 +107,24 @@ sessionsRouter.put('/day', requireUploadToken, (req, res) => {
   return res.status(201).json({ ok: true, session: publicSession(row, []) });
 });
 
+/** Download guest-visible album photos as a ZIP (excludes physical print sheets). */
+sessionsRouter.get('/:slug/zip', (req, res) => {
+  const session = getSessionBySlug(req.params.slug);
+  if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+  if (isSessionExpired(session)) {
+    return res.status(410).json({ ok: false, error: 'Session expired' });
+  }
+  const photos = listPublicPhotos(session.id);
+  if (!photos.length) {
+    return res.status(404).json({ ok: false, error: 'No photos in this album' });
+  }
+  return streamAlbumZip(res, {
+    slug: session.slug,
+    title: session.title || session.slug,
+    photos,
+  });
+});
+
 sessionsRouter.get('/:slug', (req, res) => {
   const session = getSessionBySlug(req.params.slug);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
@@ -128,6 +148,7 @@ sessionsRouter.get('/:slug', (req, res) => {
     }
     if (row) photos.push(row);
   }
+  warmAlbumThumbs(session.slug, photos);
   return res.json({ ok: true, session: publicSession(session, photos) });
 });
 
@@ -275,6 +296,7 @@ sessionsRouter.post(
     }
 
     const photo = publicPhoto(session.slug, row);
+    warmThumb(session.slug, filename);
     const showOriginals = loadSettings().showOriginalPhotos !== false;
     const pushLive = variant !== 'physical' && (variant !== 'original' || showOriginals);
     if (pushLive) {
