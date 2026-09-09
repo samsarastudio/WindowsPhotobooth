@@ -260,6 +260,7 @@ async function refreshAlbums() {
         <button type="button" class="btn ghost view-photos">Manage photos</button>
         <a class="btn ghost" href="/${encodeURIComponent(s.slug)}" target="_blank" rel="noopener">Grid</a>
         <a class="btn ghost" href="/${encodeURIComponent(s.slug)}/wall" target="_blank" rel="noopener">Wall</a>
+        <button type="button" class="btn ghost zip-album">Download ZIP</button>
         <button type="button" class="btn ghost delete">Delete album</button>
       </div>
     `;
@@ -278,6 +279,9 @@ async function refreshAlbums() {
       updateOpenAlbumLink();
       setTab('photos');
     });
+    div.querySelector('.zip-album')?.addEventListener('click', () => {
+      void downloadAlbumZip(s.slug, s.title || s.slug, 'all');
+    });
     div.querySelector('.delete').addEventListener('click', async () => {
       if (!confirm(`Delete album "${s.slug}" and all its photos?`)) return;
       await api(`/api/admin/sessions/${encodeURIComponent(s.slug)}`, { method: 'DELETE' });
@@ -285,6 +289,28 @@ async function refreshAlbums() {
       await refreshAll();
     });
     sessionList.appendChild(div);
+  }
+}
+
+async function downloadAlbumZip(slug, title = slug, scope = 'guest') {
+  if (!slug) return;
+  setStatus(`Preparing ZIP for ${slug}…`);
+  try {
+    const qs = scope === 'all' ? '?scope=all' : '?scope=guest';
+    const res = await fetch(
+      `/api/admin/sessions/${encodeURIComponent(slug)}/zip${qs}`,
+      { headers: { 'X-Admin-Pin': pin() } },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const safe = String(title || slug).replace(/[^\w.\-]+/g, '_').slice(0, 80) || slug;
+    const how = await shareOrDownloadBlob(blob, `${safe}-album.zip`, 'application/zip');
+    if (how !== 'aborted') setStatus(how === 'shared' ? 'Share sheet opened.' : 'Album ZIP download started.');
+  } catch (e) {
+    setStatus(e.message || String(e), true);
   }
 }
 
@@ -499,7 +525,7 @@ function renderPhotoGrid() {
       ${
         missing
           ? `<div class="photo-missing" title="DB row exists but file is gone from disk">File missing</div>`
-          : `<img src="${p.url}" alt="" loading="lazy" data-photo-id="${p.id}" />`
+          : `<img src="${p.thumbUrl || p.url}" alt="" loading="lazy" decoding="async" data-photo-id="${p.id}" />`
       }
       <div class="meta-block">
         <span class="badge">${p.variant}</span>
@@ -1212,6 +1238,12 @@ document.getElementById('btnSeed').addEventListener('click', async () => {
 });
 
 document.getElementById('btnRefreshPhotos')?.addEventListener('click', () => void refreshPhotos());
+document.getElementById('btnDownloadAlbumZip')?.addEventListener('click', () => {
+  const slug = photoAlbum?.value;
+  if (!slug) return;
+  const album = albumsCache.find((s) => s.slug === slug);
+  void downloadAlbumZip(slug, album?.title || slug, 'all');
+});
 
 document.getElementById('btnResolveBrokenPhotos')?.addEventListener('click', async () => {
   try {

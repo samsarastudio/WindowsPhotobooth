@@ -216,6 +216,7 @@ export function isSessionExpired(session, now = new Date()) {
 
 export function publicPhoto(sessionSlug, row) {
   const sharePath = `/${encodeURIComponent(sessionSlug)}/p/${encodeURIComponent(row.id)}`;
+  const media = `/media/${encodeURIComponent(sessionSlug)}/${encodeURIComponent(row.filename)}`;
   return {
     id: row.id,
     variant: row.variant,
@@ -225,7 +226,10 @@ export function publicPhoto(sessionSlug, row) {
     width: row.width,
     height: row.height,
     createdAt: row.created_at,
-    url: `/media/${encodeURIComponent(sessionSlug)}/${encodeURIComponent(row.filename)}`,
+    filename: row.filename,
+    url: media,
+    /** Cached ~480px JPEG for grids/mosaic — full `url` for lightbox/download. */
+    thumbUrl: `${media}?thumb=1`,
     sharePath,
     shareUrl: `${config.publicBaseUrl}${sharePath}`,
   };

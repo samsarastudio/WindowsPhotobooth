@@ -18,6 +18,7 @@ import { ensurePhysicalDir } from './physical-frame.js';
 import { ensureQrDirs } from './qr/store.js';
 import { purgeExpiredSessions } from './purge.js';
 import { ensureHttpsCerts } from './https-certs.js';
+import { ensureThumb } from './thumbs.js';
 
 initDb();
 ensureFramesDir();
@@ -41,7 +42,7 @@ app.get('/api/health', (_req, res) => {
     port: config.port,
     publicBaseUrl: config.publicBaseUrl,
     /** Bumped when share APIs change — use to confirm Pi restarted the right build. */
-    build: '20260828-public-url',
+    build: '20260909-thumbs-zip',
     shareApi: true,
   });
 });
@@ -130,7 +131,7 @@ app.get('/media/qr-frames/:filename', (req, res) => {
   return res.sendFile(filePath);
 });
 
-app.get('/media/:slug/:filename', (req, res) => {
+app.get('/media/:slug/:filename', async (req, res) => {
   const slug = path.basename(req.params.slug);
   const filename = path.basename(req.params.filename);
   if (filename.includes('..') || slug.includes('..')) {
@@ -138,9 +139,28 @@ app.get('/media/:slug/:filename', (req, res) => {
   }
   const session = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(slug);
   if (!session) return res.status(404).end();
-  // Serve while the file exists — share/download must work past album TTL.
   const filePath = path.join(config.photosDir, slug, filename);
   if (!fs.existsSync(filePath)) return res.status(404).end();
+
+  const wantThumb =
+    req.query.thumb === '1' ||
+    req.query.thumb === 'true' ||
+    String(req.query.w || '') === '480' ||
+    String(req.query.size || '') === 'thumb';
+
+  if (wantThumb) {
+    try {
+      const thumb = await ensureThumb(slug, filename);
+      if (thumb && fs.existsSync(thumb)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.sendFile(path.resolve(thumb));
+      }
+    } catch (e) {
+      console.warn('[media] thumb fallback', e.message || e);
+    }
+  }
+
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   return res.sendFile(filePath);
 });
