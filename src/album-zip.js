@@ -2,6 +2,62 @@ import fs from 'node:fs';
 import path from 'node:path';
 import archiver from 'archiver';
 import { config } from './config.js';
+import { loadSettings, selectDisplayPhotos } from './db.js';
+
+/** @typedef {'all'|'guest'|'framed'|'original'|'originals'|'ai'|'physical'} ZipScope */
+
+/**
+ * Normalize ZIP scope query values.
+ * @param {unknown} raw
+ * @returns {ZipScope}
+ */
+export function normalizeZipScope(raw) {
+  const s = String(raw || 'guest').trim().toLowerCase();
+  if (s === 'all' || s === 'everything') return 'all';
+  if (s === 'framed' || s === 'frame' || s === 'frames') return 'framed';
+  if (s === 'original' || s === 'originals' || s === 'raw') return 'original';
+  if (s === 'ai') return 'ai';
+  if (s === 'physical' || s === 'print' || s === 'prints') return 'physical';
+  return 'guest';
+}
+
+/**
+ * Filter album photo rows for ZIP download.
+ * @param {Array<Record<string, unknown>>} all
+ * @param {unknown} scopeRaw
+ */
+export function filterPhotosForZip(all, scopeRaw) {
+  const list = Array.isArray(all) ? all : [];
+  const scope = normalizeZipScope(scopeRaw);
+  if (scope === 'all') return { scope, photos: list };
+  if (scope === 'framed') {
+    return { scope, photos: list.filter((p) => p.variant === 'framed') };
+  }
+  if (scope === 'original') {
+    return { scope, photos: list.filter((p) => p.variant === 'original') };
+  }
+  if (scope === 'ai') {
+    return { scope, photos: list.filter((p) => p.variant === 'ai') };
+  }
+  if (scope === 'physical') {
+    return { scope, photos: list.filter((p) => p.variant === 'physical') };
+  }
+  return {
+    scope: 'guest',
+    photos: selectDisplayPhotos(list, {
+      includeOriginals: loadSettings().showOriginalPhotos !== false,
+    }),
+  };
+}
+
+function scopeSuffix(scope) {
+  if (scope === 'all') return 'all';
+  if (scope === 'framed') return 'framed';
+  if (scope === 'original') return 'originals';
+  if (scope === 'ai') return 'ai';
+  if (scope === 'physical') return 'physical';
+  return 'gallery';
+}
 
 /**
  * Stream a ZIP of album photos to the response.
@@ -10,17 +66,19 @@ import { config } from './config.js';
  *   slug: string,
  *   title?: string,
  *   photos: Array<{ filename: string, variant?: string, id?: string }>,
+ *   scope?: string,
  * }} opts
  */
 export function streamAlbumZip(res, opts) {
   const slug = path.basename(String(opts.slug || ''));
   const photos = Array.isArray(opts.photos) ? opts.photos : [];
   const dir = path.join(config.photosDir, slug);
+  const scope = normalizeZipScope(opts.scope || 'guest');
   const safeTitle = String(opts.title || slug)
     .replace(/[^\w.\- ]+/g, '_')
     .replace(/\s+/g, '_')
     .slice(0, 80) || slug;
-  const zipName = `${safeTitle}-album.zip`;
+  const zipName = `${safeTitle}-${scopeSuffix(scope)}.zip`;
 
   const entries = [];
   const usedNames = new Set();
@@ -39,7 +97,10 @@ export function streamAlbumZip(res, opts) {
   }
 
   if (!entries.length) {
-    return res.status(404).json({ ok: false, error: 'No photo files found to zip' });
+    return res.status(404).json({
+      ok: false,
+      error: `No ${scopeSuffix(scope)} photo files found to zip`,
+    });
   }
 
   const archive = archiver('zip', { zlib: { level: 5 } });

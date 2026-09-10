@@ -260,7 +260,9 @@ async function refreshAlbums() {
         <button type="button" class="btn ghost view-photos">Manage photos</button>
         <a class="btn ghost" href="/${encodeURIComponent(s.slug)}" target="_blank" rel="noopener">Grid</a>
         <a class="btn ghost" href="/${encodeURIComponent(s.slug)}/wall" target="_blank" rel="noopener">Wall</a>
-        <button type="button" class="btn ghost zip-album">Download ZIP</button>
+        <button type="button" class="btn ghost zip-all">ZIP all</button>
+        <button type="button" class="btn ghost zip-framed">ZIP framed</button>
+        <button type="button" class="btn ghost zip-originals">ZIP originals</button>
         <button type="button" class="btn ghost delete">Delete album</button>
       </div>
     `;
@@ -279,8 +281,14 @@ async function refreshAlbums() {
       updateOpenAlbumLink();
       setTab('photos');
     });
-    div.querySelector('.zip-album')?.addEventListener('click', () => {
+    div.querySelector('.zip-all')?.addEventListener('click', () => {
       void downloadAlbumZip(s.slug, s.title || s.slug, 'all');
+    });
+    div.querySelector('.zip-framed')?.addEventListener('click', () => {
+      void downloadAlbumZip(s.slug, s.title || s.slug, 'framed');
+    });
+    div.querySelector('.zip-originals')?.addEventListener('click', () => {
+      void downloadAlbumZip(s.slug, s.title || s.slug, 'original');
     });
     div.querySelector('.delete').addEventListener('click', async () => {
       if (!confirm(`Delete album "${s.slug}" and all its photos?`)) return;
@@ -294,9 +302,21 @@ async function refreshAlbums() {
 
 async function downloadAlbumZip(slug, title = slug, scope = 'guest') {
   if (!slug) return;
-  setStatus(`Preparing ZIP for ${slug}…`);
+  const scopeLabel =
+    scope === 'framed'
+      ? 'framed'
+      : scope === 'original' || scope === 'originals'
+        ? 'originals'
+        : scope === 'all'
+          ? 'all'
+          : scope === 'ai'
+            ? 'AI'
+            : scope === 'physical'
+              ? 'physical'
+              : 'gallery';
+  setStatus(`Preparing ${scopeLabel} ZIP for ${slug}…`);
   try {
-    const qs = scope === 'all' ? '?scope=all' : '?scope=guest';
+    const qs = `?scope=${encodeURIComponent(scope)}`;
     const res = await fetch(
       `/api/admin/sessions/${encodeURIComponent(slug)}/zip${qs}`,
       { headers: { 'X-Admin-Pin': pin() } },
@@ -307,8 +327,12 @@ async function downloadAlbumZip(slug, title = slug, scope = 'guest') {
     }
     const blob = await res.blob();
     const safe = String(title || slug).replace(/[^\w.\-]+/g, '_').slice(0, 80) || slug;
-    const how = await shareOrDownloadBlob(blob, `${safe}-album.zip`, 'application/zip');
-    if (how !== 'aborted') setStatus(how === 'shared' ? 'Share sheet opened.' : 'Album ZIP download started.');
+    const how = await shareOrDownloadBlob(
+      blob,
+      `${safe}-${scopeLabel}.zip`,
+      'application/zip',
+    );
+    if (how !== 'aborted') setStatus(how === 'shared' ? 'Share sheet opened.' : `${scopeLabel} ZIP download started.`);
   } catch (e) {
     setStatus(e.message || String(e), true);
   }
@@ -1242,7 +1266,8 @@ document.getElementById('btnDownloadAlbumZip')?.addEventListener('click', () => 
   const slug = photoAlbum?.value;
   if (!slug) return;
   const album = albumsCache.find((s) => s.slug === slug);
-  void downloadAlbumZip(slug, album?.title || slug, 'all');
+  const scope = document.getElementById('albumZipScope')?.value || 'all';
+  void downloadAlbumZip(slug, album?.title || slug, scope);
 });
 
 document.getElementById('btnResolveBrokenPhotos')?.addEventListener('click', async () => {

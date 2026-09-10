@@ -98,6 +98,18 @@ main {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.album-zip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+select.album-zip-scope {
+  max-width: 10.5rem;
+  padding-right: 1.6rem;
 }
 
 main {
