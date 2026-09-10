@@ -75,6 +75,8 @@ const els = {
   ssToggle: document.getElementById('ssToggle'),
   topBar: document.getElementById('topBar'),
   btnDownloadAlbum: document.getElementById('btnDownloadAlbum'),
+  albumZipWrap: document.getElementById('albumZipWrap'),
+  albumZipScope: document.getElementById('albumZipScope'),
 };
 
 /** Prefer cached thumb for tiles; fall back to full image. */
@@ -159,8 +161,10 @@ function setMode(mode, push = true) {
     els.empty.hidden = true;
     renderGuestPhoto();
   }
-  if (els.btnDownloadAlbum) {
-    els.btnDownloadAlbum.hidden = guestOnly || photos.length === 0 || route.kind === 'wall';
+  if (els.btnDownloadAlbum || els.albumZipWrap) {
+    const hideZip = guestOnly || photos.length === 0 || route.kind === 'wall';
+    if (els.albumZipWrap) els.albumZipWrap.hidden = hideZip;
+    if (els.btnDownloadAlbum) els.btnDownloadAlbum.hidden = hideZip;
   }
   if (mode === 'mosaic') {
     els.empty.hidden = true;
@@ -1697,9 +1701,11 @@ async function loadSession(slug) {
   }
 
   els.meta.textContent = `Expires ${new Date(data.session.expiresAt).toLocaleString()} · ${photos.length} photos`;
-  if (els.btnDownloadAlbum) {
-    els.btnDownloadAlbum.hidden = photos.length === 0;
-    els.btnDownloadAlbum.dataset.slug = slug;
+  if (els.btnDownloadAlbum || els.albumZipWrap) {
+    const hideZip = photos.length === 0;
+    if (els.albumZipWrap) els.albumZipWrap.hidden = hideZip;
+    if (els.btnDownloadAlbum) els.btnDownloadAlbum.hidden = hideZip;
+    if (els.btnDownloadAlbum) els.btnDownloadAlbum.dataset.slug = slug;
   }
   connectStream(`/api/sessions/${encodeURIComponent(slug)}/stream`);
   setMode(route.mode || 'grid', false);
@@ -1784,12 +1790,17 @@ if (els.mosaicStage && typeof ResizeObserver !== 'undefined') {
 els.btnDownloadAlbum?.addEventListener('click', async () => {
   const slug = els.btnDownloadAlbum.dataset.slug || route.slug;
   if (!slug || !photos.length) return;
+  const scope = els.albumZipScope?.value || 'guest';
+  const scopeLabel =
+    scope === 'framed' ? 'framed' : scope === 'original' ? 'originals' : 'gallery';
   const prev = els.btnDownloadAlbum.textContent;
   els.btnDownloadAlbum.disabled = true;
   els.btnDownloadAlbum.textContent = 'Preparing ZIP…';
-  setStatus('Building album ZIP — large albums may take a minute…');
+  setStatus(`Building ${scopeLabel} ZIP — large albums may take a minute…`);
   try {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(slug)}/zip`);
+    const res = await fetch(
+      `/api/sessions/${encodeURIComponent(slug)}/zip?scope=${encodeURIComponent(scope)}`,
+    );
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || `Download failed (${res.status})`);
@@ -1798,17 +1809,17 @@ els.btnDownloadAlbum?.addEventListener('click', async () => {
     const safe = String(els.title?.textContent || slug).replace(/[^\w.\-]+/g, '_').slice(0, 80);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${safe || slug}-album.zip`;
+    a.download = `${safe || slug}-${scopeLabel}.zip`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
-    setStatus('Album ZIP download started.', false);
+    setStatus(`${scopeLabel} ZIP download started.`, false);
   } catch (e) {
     setStatus(e.message || String(e));
   } finally {
     els.btnDownloadAlbum.disabled = false;
-    els.btnDownloadAlbum.textContent = prev || 'Download album';
+    els.btnDownloadAlbum.textContent = prev || 'Download';
   }
 });
 

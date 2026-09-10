@@ -113,7 +113,18 @@
             <div class="row wrap">
               <button type="button" class="btn ghost" id="btnRefreshPhotos">Refresh</button>
               <a class="btn ghost" id="btnOpenAlbum" href="#" target="_blank" rel="noopener">Open gallery</a>
-              <button type="button" class="btn ghost" id="btnDownloadAlbumZip">Download album ZIP</button>
+              <label class="photo-filter">
+                ZIP
+                <select id="albumZipScope" class="input" style="max-width: 11rem">
+                  <option value="all">All variants</option>
+                  <option value="framed">Framed only</option>
+                  <option value="original">Originals only</option>
+                  <option value="guest">Gallery (guest)</option>
+                  <option value="ai">AI only</option>
+                  <option value="physical">Physical only</option>
+                </select>
+              </label>
+              <button type="button" class="btn ghost" id="btnDownloadAlbumZip">Download ZIP</button>
               <button type="button" class="btn ghost" id="btnResolveBrokenPhotos">Check &amp; fix broken photos</button>
               <button type="button" class="btn ghost" id="btnSelectAllPhotos">Select all on page</button>
               <button type="button" class="btn ghost" id="btnClearPhotoSelection">Clear selection</button>
@@ -414,6 +425,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260909-zip" type="module"></script>
+    <script src="/js/admin.js?v=20260910-zip" type="module"></script>
   </body>
 </html>

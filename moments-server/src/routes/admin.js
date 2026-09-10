@@ -9,12 +9,11 @@ import {
   publicPhoto,
   publicSession,
   saveSettings,
-  selectDisplayPhotos,
 } from '../db.js';
 import { getUploadToken, requireAdminPin } from '../auth.js';
 import { purgeExpiredSessions, purgeMissingPhotoFiles, scanMissingPhotoFiles } from '../purge.js';
 import { seedSampleGallery } from '../seed-samples.js';
-import { streamAlbumZip } from '../album-zip.js';
+import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
 
 export const adminRouter = Router();
 
@@ -160,9 +159,8 @@ adminRouter.delete('/sessions/:slug', (req, res) => {
 });
 
 /**
- * Full album ZIP.
- * ?scope=guest (default) = same photos as the public gallery
- * ?scope=all = every variant including physical sheets
+ * Album ZIP.
+ * ?scope=all|guest|framed|original|ai|physical
  */
 adminRouter.get('/sessions/:slug/zip', (req, res) => {
   const row = getDb().prepare('SELECT * FROM sessions WHERE slug = ?').get(req.params.slug);
@@ -170,18 +168,18 @@ adminRouter.get('/sessions/:slug/zip', (req, res) => {
   const all = getDb()
     .prepare('SELECT * FROM photos WHERE session_id = ? ORDER BY created_at ASC')
     .all(row.id);
-  const scope = String(req.query.scope || 'guest').toLowerCase();
-  const photos =
-    scope === 'all'
-      ? all
-      : selectDisplayPhotos(all, { includeOriginals: loadSettings().showOriginalPhotos !== false });
+  const { scope, photos } = filterPhotosForZip(all, req.query.scope);
   if (!photos.length) {
-    return res.status(404).json({ ok: false, error: 'No photos in this album' });
+    return res.status(404).json({
+      ok: false,
+      error: `No ${scope === 'original' ? 'original' : scope} photos in this album`,
+    });
   }
   return streamAlbumZip(res, {
     slug: row.slug,
     title: row.title || row.slug,
     photos,
+    scope,
   });
 });
 

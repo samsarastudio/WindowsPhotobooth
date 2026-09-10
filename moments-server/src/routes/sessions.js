@@ -16,7 +16,7 @@ import { requireUploadToken } from '../auth.js';
 import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
 import { notifyWallPhoto } from './wall.js';
 import { warmThumb, warmAlbumThumbs } from '../thumbs.js';
-import { streamAlbumZip } from '../album-zip.js';
+import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
 
 const VARIANTS = new Set(['original', 'framed', 'ai', 'physical']);
 
@@ -107,21 +107,32 @@ sessionsRouter.put('/day', requireUploadToken, (req, res) => {
   return res.status(201).json({ ok: true, session: publicSession(row, []) });
 });
 
-/** Download guest-visible album photos as a ZIP (excludes physical print sheets). */
+/** Download album photos as a ZIP. ?scope=guest|framed|original|all (guest default). */
 sessionsRouter.get('/:slug/zip', (req, res) => {
   const session = getSessionBySlug(req.params.slug);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
   if (isSessionExpired(session)) {
     return res.status(410).json({ ok: false, error: 'Session expired' });
   }
-  const photos = listPublicPhotos(session.id);
+  const all = getDb()
+    .prepare('SELECT * FROM photos WHERE session_id = ? ORDER BY created_at ASC')
+    .all(session.id);
+  // Guests may not download physical print sheets via scope=all — map to guest.
+  const requested = String(req.query.scope || 'guest').toLowerCase();
+  const scopeRaw =
+    requested === 'all' || requested === 'physical' ? 'guest' : requested;
+  const { scope, photos } = filterPhotosForZip(all, scopeRaw);
   if (!photos.length) {
-    return res.status(404).json({ ok: false, error: 'No photos in this album' });
+    return res.status(404).json({
+      ok: false,
+      error: `No ${scope === 'original' ? 'original' : scope} photos in this album`,
+    });
   }
   return streamAlbumZip(res, {
     slug: session.slug,
     title: session.title || session.slug,
     photos,
+    scope,
   });
 });
 
