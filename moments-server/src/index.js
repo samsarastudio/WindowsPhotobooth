@@ -42,7 +42,7 @@ app.get('/api/health', (_req, res) => {
     port: config.port,
     publicBaseUrl: config.publicBaseUrl,
     /** Bumped when share APIs change — use to confirm Pi restarted the right build. */
-    build: '20260910-zip-scope',
+    build: '20260915-nameplate',
     shareApi: true,
   });
 });

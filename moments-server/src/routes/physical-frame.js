@@ -16,8 +16,28 @@ import {
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+    files: 2,
+    fields: 40,
+    parts: 42,
+    fieldSize: 64 * 1024,
+  },
 });
+
+const uploadImages = upload.fields([
+  { name: 'photo', maxCount: 1 },
+  { name: 'nameplate', maxCount: 1 },
+]);
+
+function runUpload(req, res) {
+  return new Promise((resolve, reject) => {
+    uploadImages(req, res, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
 
 export const adminPhysicalFrameRouter = Router();
 adminPhysicalFrameRouter.use(requireAdminPin);
@@ -31,19 +51,62 @@ adminPhysicalFrameRouter.get('/', (_req, res) => {
   res.json({ ok: true, sheets: listGeneratedSheets() });
 });
 
-adminPhysicalFrameRouter.post('/generate', upload.single('photo'), async (req, res) => {
-  if (!req.file?.buffer?.length) {
-    return res.status(400).json({ ok: false, error: 'Upload a photo (field: photo).' });
-  }
+adminPhysicalFrameRouter.post('/generate', async (req, res) => {
   try {
-    const opts = normalizePhysicalOpts(req.body || {});
-    const sheet = await compositePhysicalFrameDual(req.file.buffer, opts);
+    await runUpload(req, res);
+  } catch (err) {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ ok: false, error: 'File exceeds 25 MiB limit.' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ ok: false, error: `Unexpected file field: ${err.field || 'unknown'}.` });
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ ok: false, error: 'Too many files. Upload one main photo and optionally one nameplate.' });
+      }
+      return res.status(400).json({ ok: false, error: err.message || 'Upload failed' });
+    }
+    return res.status(400).json({ ok: false, error: err?.message || 'Upload failed' });
+  }
+
+  const photoFile = req.files?.photo?.[0];
+  const nameplateFile = req.files?.nameplate?.[0] ?? null;
+
+  if (!photoFile?.buffer?.length) {
+    return res.status(400).json({ ok: false, error: 'Upload a main photo (field: photo).' });
+  }
+
+  try {
+    const opts = normalizePhysicalOpts(req.body || {}, {
+      hasNameplateFile: !!nameplateFile?.buffer?.length,
+    });
+    if (opts.nameplateEnabled && !nameplateFile?.buffer?.length) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'Choose a nameplate image or disable the nameplate.' });
+    }
+    if (!opts.nameplateEnabled && nameplateFile?.buffer?.length) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Nameplate was uploaded but nameplateEnabled is false. Enable it or clear the file.',
+      });
+    }
+
+    const sheet = await compositePhysicalFrameDual(
+      photoFile.buffer,
+      opts,
+      opts.nameplateEnabled ? nameplateFile.buffer : null,
+    );
     const padded = await padToSelphyPostcard(sheet.png, opts.dpi, opts.printerCropInsetMm);
     const record = saveGeneratedSheet(padded.png, {
-      originalName: req.file.originalname || null,
+      originalName: photoFile.originalname || null,
+      nameplateOriginalName: nameplateFile?.originalname || null,
+      hasNameplate: !!opts.nameplateEnabled,
       width: padded.width,
       height: padded.height,
       settings: opts,
+      layout: sheet.layout,
     });
     return res.status(201).json({
       ok: true,
@@ -51,7 +114,12 @@ adminPhysicalFrameRouter.post('/generate', upload.single('photo'), async (req, r
       downloadPath: `/api/admin/physical-frame/${encodeURIComponent(record.id)}/file`,
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e?.message || 'Generate failed' });
+    const msg = e?.message || 'Generate failed';
+    const client =
+      /nameplate|photo|layout|insufficient|upload|boolean|fit|crop|unsupported|unreadable|megapixel/i.test(
+        msg,
+      );
+    return res.status(client ? 400 : 500).json({ ok: false, error: msg });
   }
 });
 

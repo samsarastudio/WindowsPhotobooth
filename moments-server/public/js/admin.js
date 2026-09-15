@@ -874,6 +874,12 @@ let pfDefaults = {
   dpi: 300,
   rotateDegrees: -90,
   borderEnabled: true,
+  nameplateWidthMm: 52,
+  nameplateHeightMm: 8.5,
+  nameplateSafeInsetMm: 0.75,
+  nameplateGapMm: 2,
+  nameplateFit: 'contain',
+  nameplateCutGuide: true,
 };
 
 function fillPhysicalForm(src = pfDefaults) {
@@ -886,36 +892,128 @@ function fillPhysicalForm(src = pfDefaults) {
   document.getElementById('pfSafeRight').value = src.safeInsetRightMm;
   document.getElementById('pfRotate').value = String(src.rotateDegrees);
   document.getElementById('pfBorder').checked = src.borderEnabled !== false;
+  const npFit = document.getElementById('pfNameplateFit');
+  if (npFit) npFit.value = src.nameplateFit === 'cover' ? 'cover' : 'contain';
+  const npW = document.getElementById('pfNameplateW');
+  if (npW) npW.value = src.nameplateWidthMm ?? 52;
+  const npH = document.getElementById('pfNameplateH');
+  if (npH) npH.value = src.nameplateHeightMm ?? 8.5;
+  const npS = document.getElementById('pfNameplateSafe');
+  if (npS) npS.value = src.nameplateSafeInsetMm ?? 0.75;
+  const npG = document.getElementById('pfNameplateGap');
+  if (npG) npG.value = src.nameplateGapMm ?? 2;
+  const npCut = document.getElementById('pfNameplateCutGuide');
+  if (npCut) npCut.checked = src.nameplateCutGuide !== false;
 }
 
 const pfCrop = { zoom: 1, panX: 0, panY: 0 };
+const pfNameplateCrop = { zoom: 1, panX: 0, panY: 0 };
 let pfAdjustImg = null;
+let pfNameplateImg = null;
+let pfPhotoObjectUrl = null;
+let pfNameplateObjectUrl = null;
 let pfDragging = false;
+let pfNpDragging = false;
 let pfLastX = 0;
 let pfLastY = 0;
+let pfNpLastX = 0;
+let pfNpLastY = 0;
+let pfPhotoLoadToken = 0;
+let pfNameplateLoadToken = 0;
 
 function pfNum(id, fallback) {
   const n = Number(document.getElementById(id)?.value);
   return Number.isFinite(n) ? n : fallback;
 }
 
+function pfMmToPx(mm, dpi) {
+  return Math.round((Number(mm) / 25.4) * dpi);
+}
+
+function pfCmToPx(cm, dpi) {
+  return Math.round((Number(cm) / 2.54) * dpi);
+}
+
+function pfResolveLayoutPx(dpi = 300) {
+  const cellW = pfCmToPx(pfNum('pfCellW', 5.3), dpi);
+  const cellH = pfCmToPx(pfNum('pfCellH', 7.8), dpi);
+  const pageW = pfMmToPx(148, dpi);
+  const pageH = pfMmToPx(100, dpi);
+  const leftoverW = pageW - cellW * 2;
+  const leftoverH = pageH - cellH;
+  const gap = leftoverW >= pfMmToPx(8, dpi) ? pfMmToPx(4, dpi) : Math.max(0, Math.round(leftoverW * 0.2));
+  const marginX = Math.max(0, Math.round((leftoverW - gap) / 2));
+  const marginY = Math.max(0, Math.round(leftoverH / 2));
+  return {
+    cellW,
+    cellH,
+    gap,
+    marginX,
+    marginY,
+    pageW,
+    pageH,
+    innerPad: pfMmToPx(pfNum('pfInset', 3), dpi),
+    safeTop: pfMmToPx(pfNum('pfSafeTop', 0.2), dpi),
+    safeBottom: pfMmToPx(pfNum('pfSafeBot', 0.2), dpi),
+    safeLeft: pfMmToPx(pfNum('pfSafeLeft', 3), dpi),
+    safeRight: pfMmToPx(pfNum('pfSafeRight', 1), dpi),
+  };
+}
+
+function pfNameplateRects(layout, dpi = 300) {
+  if (!pfNameplateImg) return [];
+  const nameW = pfMmToPx(pfNum('pfNameplateW', 52), dpi);
+  const nameH = pfMmToPx(pfNum('pfNameplateH', 8.5), dpi);
+  const stripW = nameH;
+  const stripH = nameW;
+  const stripGap = pfMmToPx(pfNum('pfNameplateGap', 2), dpi);
+  const photo2X = layout.marginX + layout.cellW + layout.gap;
+  const stripY = layout.marginY + Math.round((layout.cellH - stripH) / 2);
+  return [{ x: photo2X + layout.cellW + stripGap, y: stripY, width: stripW, height: stripH }];
+}
+
+function pfComputeNameplatePlacement(srcW, srcH, canvasW, canvasH) {
+  const dpi = 300;
+  const fit = document.getElementById('pfNameplateFit')?.value === 'cover' ? 'cover' : 'contain';
+  const Wmm = pfNum('pfNameplateW', 52);
+  const Hmm = pfNum('pfNameplateH', 8.5);
+  const Smm = pfNum('pfNameplateSafe', 0.75);
+  const S = pfMmToPx(Smm, dpi);
+  const R = canvasH / 2;
+  let viewX = 0;
+  let viewY = 0;
+  let viewW = canvasW;
+  let viewH = canvasH;
+  if (fit === 'contain') {
+    const safeWmm = Wmm - Hmm - 2 * Smm;
+    const safeHmm = Hmm - 2 * Smm;
+    viewW = Math.max(1, Math.min(pfMmToPx(safeWmm, dpi), canvasW - 2 * Math.round(R) - 2 * S));
+    viewH = Math.max(1, Math.min(pfMmToPx(safeHmm, dpi), canvasH - 2 * S));
+    viewX = Math.round((canvasW - viewW) / 2);
+    viewY = Math.round((canvasH - viewH) / 2);
+  }
+  const baseScale =
+    fit === 'contain' ? Math.min(viewW / srcW, viewH / srcH) : Math.max(viewW / srcW, viewH / srcH);
+  const scale = baseScale * pfNameplateCrop.zoom;
+  const renderedW = srcW * scale;
+  const renderedH = srcH * scale;
+  const travelX = Math.abs(viewW - renderedW) / 2;
+  const travelY = Math.abs(viewH - renderedH) / 2;
+  const imageX = (viewW - renderedW) / 2 - pfNameplateCrop.panX * travelX;
+  const imageY = (viewH - renderedH) / 2 - pfNameplateCrop.panY * travelY;
+  return { viewX, viewY, viewW, viewH, imageX: viewX + imageX, imageY: viewY + imageY, renderedW, renderedH, travelX, travelY };
+}
+
 function drawPhysicalAdjust() {
   const canvas = document.getElementById('pfAdjustCanvas');
   const img = pfAdjustImg;
   if (!canvas || !img) return;
-  const cellWcm = pfNum('pfCellW', 5.3);
-  const cellHcm = pfNum('pfCellH', 7.8);
-  const pageW = 148;
-  const pageH = 100;
-  const leftoverW = pageW - cellWcm * 10 * 2;
-  const leftoverH = pageH - cellHcm * 10;
-  const gap = leftoverW >= 8 ? 4 : Math.max(0, leftoverW * 0.2);
-  const mx = Math.max(0, (leftoverW - gap) / 2);
-  const my = Math.max(0, leftoverH / 2);
+  const dpi = 300;
+  const layout = pfResolveLayoutPx(dpi);
   const cssW = Math.min(640, canvas.parentElement?.clientWidth || 640);
-  const scale = cssW / pageW;
+  const scale = cssW / layout.pageW;
   canvas.width = Math.round(cssW);
-  canvas.height = Math.round(pageH * scale);
+  canvas.height = Math.round(layout.pageH * scale);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -927,13 +1025,13 @@ function drawPhysicalAdjust() {
   octx.translate(off.width / 2, off.height / 2);
   octx.rotate((rot * Math.PI) / 180);
   octx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-  const cellW = cellWcm * 10 * scale;
-  const cellH = cellHcm * 10 * scale;
-  const pad = (pfNum('pfInset', 3) / 10) * scale;
-  const sL = (pfNum('pfSafeLeft', 3) / 10) * scale;
-  const sR = (pfNum('pfSafeRight', 1) / 10) * scale;
-  const sT = (pfNum('pfSafeTop', 0.2) / 10) * scale;
-  const sB = (pfNum('pfSafeBot', 0.2) / 10) * scale;
+  const cellW = layout.cellW * scale;
+  const cellH = layout.cellH * scale;
+  const pad = layout.innerPad * scale;
+  const sL = layout.safeLeft * scale;
+  const sR = layout.safeRight * scale;
+  const sT = layout.safeTop * scale;
+  const sB = layout.safeBottom * scale;
   const safeW = Math.max(8, cellW - pad * 2 - sL - sR);
   const safeH = Math.max(8, cellH - pad * 2 - sT - sB);
   const cover = Math.max(safeW / off.width, safeH / off.height);
@@ -941,25 +1039,162 @@ function drawPhysicalAdjust() {
   const visH = Math.min(off.height, visW / (safeW / safeH));
   const maxL = Math.max(0, off.width - visW);
   const maxT = Math.max(0, off.height - visH);
-  const sx = Math.round(maxL / 2 + pfCrop.panX * (maxL / 2));
-  const sy = Math.round(maxT / 2 + pfCrop.panY * (maxT / 2));
-  const drawOne = (x) => {
-    ctx.drawImage(
-      off,
-      sx,
-      sy,
-      visW,
-      visH,
-      x + pad + sL,
-      my * scale + pad + sT,
-      safeW,
-      safeH,
-    );
-    ctx.strokeStyle = 'rgba(139,115,72,0.9)';
-    ctx.strokeRect(x + pad, my * scale + pad, cellW - pad * 2, cellH - pad * 2);
+  const sx = Math.round(Math.min(maxL, Math.max(0, maxL / 2 + pfCrop.panX * (maxL / 2))));
+  const sy = Math.round(Math.min(maxT, Math.max(0, maxT / 2 + pfCrop.panY * (maxT / 2))));
+  const borderOn = document.getElementById('pfBorder')?.checked !== false;
+  const drawOne = (xPx, yPx) => {
+    const x = xPx * scale;
+    const y = yPx * scale;
+    ctx.drawImage(off, sx, sy, visW, visH, x + pad + sL, y + pad + sT, safeW, safeH);
+    if (borderOn) {
+      ctx.strokeStyle = 'rgba(139,115,72,0.9)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + pad, y + pad, cellW - pad * 2, cellH - pad * 2);
+    }
   };
-  drawOne(mx * scale);
-  drawOne(mx * scale + cellW + gap * scale);
+  drawOne(layout.marginX, layout.marginY);
+  drawOne(layout.marginX + layout.cellW + layout.gap, layout.marginY);
+
+  // Nameplate strip preview on sheet (rotated placement)
+  for (const np of pfNameplateRects(layout, dpi)) {
+    ctx.save();
+    ctx.fillStyle = '#f7f3ea';
+    ctx.strokeStyle = 'rgba(47,93,58,0.55)';
+    const x = np.x * scale;
+    const y = np.y * scale;
+    const w = np.width * scale;
+    const h = np.height * scale;
+    const r = Math.min(w, h) / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    if (pfNameplateImg) {
+      ctx.clip();
+      // Draw horizontal artwork rotated into strip
+      const hzW = pfMmToPx(pfNum('pfNameplateW', 52), dpi);
+      const hzH = pfMmToPx(pfNum('pfNameplateH', 8.5), dpi);
+      const place = pfComputeNameplatePlacement(
+        pfNameplateImg.naturalWidth,
+        pfNameplateImg.naturalHeight,
+        hzW,
+        hzH,
+      );
+      const tmp = document.createElement('canvas');
+      tmp.width = hzW;
+      tmp.height = hzH;
+      const tctx = tmp.getContext('2d');
+      tctx.fillStyle = '#fff';
+      tctx.fillRect(0, 0, hzW, hzH);
+      tctx.drawImage(
+        pfNameplateImg,
+        0,
+        0,
+        pfNameplateImg.naturalWidth,
+        pfNameplateImg.naturalHeight,
+        place.imageX,
+        place.imageY,
+        place.renderedW,
+        place.renderedH,
+      );
+      ctx.translate(x + w / 2, y + h / 2);
+      const sheetRot = Number(document.getElementById('pfRotate').value) === 90 ? 90 : -90;
+      ctx.rotate((sheetRot * Math.PI) / 180);
+      ctx.drawImage(tmp, (-hzW * scale) / 2, (-hzH * scale) / 2, hzW * scale, hzH * scale);
+    }
+    ctx.restore();
+  }
+}
+
+function drawNameplateAdjust() {
+  const canvas = document.getElementById('pfNameplateAdjustCanvas');
+  const img = pfNameplateImg;
+  if (!canvas || !img) return;
+  const dpi = 300;
+  const hzW = pfMmToPx(pfNum('pfNameplateW', 52), dpi);
+  const hzH = pfMmToPx(pfNum('pfNameplateH', 8.5), dpi);
+  const cssW = Math.min(520, canvas.parentElement?.clientWidth || 520);
+  const scale = cssW / hzW;
+  canvas.width = Math.round(cssW);
+  canvas.height = Math.round(hzH * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f7f3ea';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const place = pfComputeNameplatePlacement(img.naturalWidth, img.naturalHeight, hzW, hzH);
+  const rx = (hzH * scale) / 2;
+  ctx.save();
+  ctx.beginPath();
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.moveTo(rx, 0);
+  ctx.arcTo(w, 0, w, h, rx);
+  ctx.arcTo(w, h, 0, h, rx);
+  ctx.arcTo(0, h, 0, 0, rx);
+  ctx.arcTo(0, 0, w, 0, rx);
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(
+    img,
+    0,
+    0,
+    img.naturalWidth,
+    img.naturalHeight,
+    place.imageX * scale,
+    place.imageY * scale,
+    place.renderedW * scale,
+    place.renderedH * scale,
+  );
+  ctx.restore();
+  // Safe box overlay (preview only)
+  ctx.strokeStyle = 'rgba(47,93,58,0.45)';
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(place.viewX * scale, place.viewY * scale, place.viewW * scale, place.viewH * scale);
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(139,115,72,0.7)';
+  ctx.beginPath();
+  ctx.moveTo(rx, 0);
+  ctx.arcTo(w, 0, w, h, rx);
+  ctx.arcTo(w, h, 0, h, rx);
+  ctx.arcTo(0, h, 0, 0, rx);
+  ctx.arcTo(0, 0, w, 0, rx);
+  ctx.closePath();
+  ctx.stroke();
+}
+
+function redrawPhysicalPreviews() {
+  drawPhysicalAdjust();
+  drawNameplateAdjust();
+}
+
+function resetNameplateCrop() {
+  pfNameplateCrop.zoom = 1;
+  pfNameplateCrop.panX = 0;
+  pfNameplateCrop.panY = 0;
+  const zoom = document.getElementById('pfNameplateZoom');
+  if (zoom) zoom.value = '1';
+  const label = document.getElementById('pfNameplateZoomLabel');
+  if (label) label.textContent = '100%';
+}
+
+function clearNameplateSelection() {
+  const input = document.getElementById('pfNameplate');
+  if (input) input.value = '';
+  if (pfNameplateObjectUrl) {
+    URL.revokeObjectURL(pfNameplateObjectUrl);
+    pfNameplateObjectUrl = null;
+  }
+  pfNameplateImg = null;
+  resetNameplateCrop();
+  const box = document.getElementById('pfNameplateBox');
+  if (box) box.hidden = true;
+  redrawPhysicalPreviews();
 }
 
 function bindPhysicalAdjust() {
@@ -974,23 +1209,37 @@ function bindPhysicalAdjust() {
     pfCrop.panX = 0;
     pfCrop.panY = 0;
     zoom.value = '1';
+    if (pfPhotoObjectUrl) {
+      URL.revokeObjectURL(pfPhotoObjectUrl);
+      pfPhotoObjectUrl = null;
+    }
     if (!file) {
       pfAdjustImg = null;
       box.hidden = true;
+      redrawPhysicalPreviews();
       return;
     }
+    const token = ++pfPhotoLoadToken;
     const url = URL.createObjectURL(file);
+    pfPhotoObjectUrl = url;
     const img = new Image();
     img.onload = () => {
+      if (token !== pfPhotoLoadToken) return;
       pfAdjustImg = img;
       box.hidden = false;
-      drawPhysicalAdjust();
+      redrawPhysicalPreviews();
+    };
+    img.onerror = () => {
+      if (token !== pfPhotoLoadToken) return;
+      setStatus('Could not load main photo preview.');
+      pfAdjustImg = null;
+      box.hidden = true;
     };
     img.src = url;
   });
   zoom.addEventListener('input', () => {
     pfCrop.zoom = Math.min(4, Math.max(1, Number(zoom.value) || 1));
-    drawPhysicalAdjust();
+    redrawPhysicalPreviews();
   });
   canvas.addEventListener('pointerdown', (ev) => {
     pfDragging = true;
@@ -1007,15 +1256,137 @@ function bindPhysicalAdjust() {
     const span = Math.max(80, canvas.clientWidth * 0.35 * pfCrop.zoom);
     pfCrop.panX = Math.min(1, Math.max(-1, pfCrop.panX - dx / span));
     pfCrop.panY = Math.min(1, Math.max(-1, pfCrop.panY - dy / span));
-    drawPhysicalAdjust();
+    redrawPhysicalPreviews();
   });
-  canvas.addEventListener('pointerup', (ev) => {
+  const endPhotoDrag = (ev) => {
     pfDragging = false;
-    if (canvas.hasPointerCapture(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+    if (canvas.hasPointerCapture?.(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+  };
+  canvas.addEventListener('pointerup', endPhotoDrag);
+  canvas.addEventListener('pointercancel', endPhotoDrag);
+
+  // Redraw when layout controls change
+  for (const id of [
+    'pfCellW',
+    'pfCellH',
+    'pfInset',
+    'pfSafeTop',
+    'pfSafeBot',
+    'pfSafeLeft',
+    'pfSafeRight',
+    'pfRotate',
+    'pfBorder',
+    'pfNameplateW',
+    'pfNameplateH',
+    'pfNameplateSafe',
+    'pfNameplateGap',
+    'pfNameplateCutGuide',
+  ]) {
+    document.getElementById(id)?.addEventListener('input', () => redrawPhysicalPreviews());
+    document.getElementById(id)?.addEventListener('change', () => redrawPhysicalPreviews());
+  }
+}
+
+function bindNameplateAdjust() {
+  const input = document.getElementById('pfNameplate');
+  const box = document.getElementById('pfNameplateBox');
+  const canvas = document.getElementById('pfNameplateAdjustCanvas');
+  const zoom = document.getElementById('pfNameplateZoom');
+  const fit = document.getElementById('pfNameplateFit');
+  if (!input || !box || !canvas || !zoom) return;
+
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (pfNameplateObjectUrl) {
+      URL.revokeObjectURL(pfNameplateObjectUrl);
+      pfNameplateObjectUrl = null;
+    }
+    if (!file) {
+      clearNameplateSelection();
+      return;
+    }
+    resetNameplateCrop();
+    const token = ++pfNameplateLoadToken;
+    const url = URL.createObjectURL(file);
+    pfNameplateObjectUrl = url;
+    const img = new Image();
+    img.onload = () => {
+      if (token !== pfNameplateLoadToken) return;
+      pfNameplateImg = img;
+      box.hidden = false;
+      redrawPhysicalPreviews();
+    };
+    img.onerror = () => {
+      if (token !== pfNameplateLoadToken) return;
+      setStatus('Could not load nameplate preview.');
+      clearNameplateSelection();
+    };
+    img.src = url;
   });
+
+  fit?.addEventListener('change', () => {
+    resetNameplateCrop();
+    redrawPhysicalPreviews();
+  });
+
+  zoom.addEventListener('input', () => {
+    pfNameplateCrop.zoom = Math.min(4, Math.max(0.25, Number(zoom.value) || 1));
+    const label = document.getElementById('pfNameplateZoomLabel');
+    if (label) label.textContent = `${Math.round(pfNameplateCrop.zoom * 100)}%`;
+    redrawPhysicalPreviews();
+  });
+
+  document.getElementById('pfNameplateReset')?.addEventListener('click', () => {
+    resetNameplateCrop();
+    redrawPhysicalPreviews();
+  });
+  document.getElementById('pfNameplateClear')?.addEventListener('click', () => {
+    clearNameplateSelection();
+  });
+
+  canvas.addEventListener('pointerdown', (ev) => {
+    if (!pfNameplateImg) return;
+    pfNpDragging = true;
+    pfNpLastX = ev.clientX;
+    pfNpLastY = ev.clientY;
+    canvas.setPointerCapture(ev.pointerId);
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    if (!pfNpDragging || !pfNameplateImg) return;
+    const dx = ev.clientX - pfNpLastX;
+    const dy = ev.clientY - pfNpLastY;
+    pfNpLastX = ev.clientX;
+    pfNpLastY = ev.clientY;
+    const dpi = 300;
+    const hzW = pfMmToPx(pfNum('pfNameplateW', 52), dpi);
+    const cssW = canvas.width || 1;
+    const dispScale = cssW / hzW;
+    const place = pfComputeNameplatePlacement(
+      pfNameplateImg.naturalWidth,
+      pfNameplateImg.naturalHeight,
+      hzW,
+      pfMmToPx(pfNum('pfNameplateH', 8.5), dpi),
+    );
+    const deltaX = dx / dispScale;
+    const deltaY = dy / dispScale;
+    if (place.travelX > 0.5) {
+      pfNameplateCrop.panX = Math.min(1, Math.max(-1, pfNameplateCrop.panX - deltaX / place.travelX));
+    }
+    if (place.travelY > 0.5) {
+      pfNameplateCrop.panY = Math.min(1, Math.max(-1, pfNameplateCrop.panY - deltaY / place.travelY));
+    }
+    redrawPhysicalPreviews();
+  });
+  const endNp = (ev) => {
+    pfNpDragging = false;
+    if (canvas.hasPointerCapture?.(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+  };
+  canvas.addEventListener('pointerup', endNp);
+  canvas.addEventListener('pointercancel', endNp);
 }
 
 bindPhysicalAdjust();
+bindNameplateAdjust();
 
 async function loadPhysicalDefaults() {
   try {
@@ -1025,6 +1396,8 @@ async function loadPhysicalDefaults() {
     /* keep local defaults */
   }
   fillPhysicalForm(pfDefaults);
+  resetNameplateCrop();
+  redrawPhysicalPreviews();
 }
 
 function physicalSheetLabel(sheet) {
@@ -1035,7 +1408,8 @@ function physicalSheetLabel(sheet) {
   if (!w || !h) return '';
   const wCm = ((w / dpi) * 2.54).toFixed(2);
   const hCm = ((h / dpi) * 2.54).toFixed(2);
-  return `Sheet size ≈ ${wCm} × ${hCm} cm · file = ${w}×${h} px at ${dpi} DPI`;
+  const np = sheet.hasNameplate ? ' · includes nameplate' : '';
+  return `Sheet size ≈ ${wCm} × ${hCm} cm · file = ${w}×${h} px at ${dpi} DPI${np}`;
 }
 
 async function fetchPhysicalBlob(id) {
@@ -1110,7 +1484,10 @@ async function refreshPhysicalFrames() {
       left.appendChild(t);
       const m = document.createElement('div');
       m.className = 'meta';
-      m.textContent = new Date(row.createdAt).toLocaleString();
+      const npNote = row.hasNameplate
+        ? ` · nameplate${row.nameplateOriginalName ? `: ${row.nameplateOriginalName}` : ''}`
+        : '';
+      m.textContent = `${new Date(row.createdAt).toLocaleString()}${npNote}`;
       left.appendChild(m);
       const actions = document.createElement('div');
       actions.className = 'row wrap';
@@ -1146,15 +1523,26 @@ async function refreshPhysicalFrames() {
   }
 }
 
-document.getElementById('btnPfDefaults').addEventListener('click', () => fillPhysicalForm(pfDefaults));
+document.getElementById('btnPfDefaults')?.addEventListener('click', () => {
+  fillPhysicalForm(pfDefaults);
+  pfCrop.zoom = 1;
+  pfCrop.panX = 0;
+  pfCrop.panY = 0;
+  const zoom = document.getElementById('pfZoom');
+  if (zoom) zoom.value = '1';
+  resetNameplateCrop();
+  redrawPhysicalPreviews();
+});
 
-document.getElementById('btnPfGenerate').addEventListener('click', async () => {
+document.getElementById('btnPfGenerate')?.addEventListener('click', async () => {
   const input = document.getElementById('pfPhoto');
-  const file = input.files?.[0];
+  const btn = document.getElementById('btnPfGenerate');
+  const file = input?.files?.[0];
   if (!file) {
-    setStatus('Choose a landscape photo first');
+    setStatus('Choose a main photo first');
     return;
   }
+  const nameplateFile = document.getElementById('pfNameplate')?.files?.[0];
   const fd = new FormData();
   fd.append('photo', file, file.name);
   fd.append('cellWidthCm', document.getElementById('pfCellW').value);
@@ -1169,16 +1557,42 @@ document.getElementById('btnPfGenerate').addEventListener('click', async () => {
   fd.append('cropZoom', String(pfCrop.zoom));
   fd.append('cropPanX', String(pfCrop.panX));
   fd.append('cropPanY', String(pfCrop.panY));
+  fd.append('nameplateEnabled', nameplateFile ? 'true' : 'false');
+  if (nameplateFile) {
+    fd.append('nameplate', nameplateFile, nameplateFile.name);
+    fd.append('nameplateFit', document.getElementById('pfNameplateFit')?.value || 'contain');
+    fd.append('nameplateCropZoom', String(pfNameplateCrop.zoom));
+    fd.append('nameplateCropPanX', String(pfNameplateCrop.panX));
+    fd.append('nameplateCropPanY', String(pfNameplateCrop.panY));
+    fd.append('nameplateWidthMm', document.getElementById('pfNameplateW')?.value || '52');
+    fd.append('nameplateHeightMm', document.getElementById('pfNameplateH')?.value || '8.5');
+    fd.append('nameplateSafeInsetMm', document.getElementById('pfNameplateSafe')?.value || '0.75');
+    fd.append('nameplateGapMm', document.getElementById('pfNameplateGap')?.value || '2');
+    fd.append(
+      'nameplateCutGuide',
+      document.getElementById('pfNameplateCutGuide')?.checked ? 'true' : 'false',
+    );
+  }
+  if (btn) btn.disabled = true;
   try {
     setStatus('Generating cut sheet…');
     const out = await api('/api/admin/physical-frame/generate', { method: 'POST', body: fd });
     if (!out.sheet?.id) throw new Error('Generate failed');
     input.value = '';
+    pfAdjustImg = null;
+    document.getElementById('pfAdjustBox').hidden = true;
+    clearNameplateSelection();
     renderPhysicalPreview(out.sheet.id, out.sheet);
     await refreshPhysicalFrames();
-    setStatus('Cut sheet ready — admin only (not on the wall)');
+    setStatus(
+      out.sheet.hasNameplate
+        ? 'Cut sheet ready — two photos and one nameplate.'
+        : 'Cut sheet ready — admin only (not on the wall)',
+    );
   } catch (e) {
     setStatus(String(e.message || e));
+  } finally {
+    if (btn) btn.disabled = false;
   }
 });
 

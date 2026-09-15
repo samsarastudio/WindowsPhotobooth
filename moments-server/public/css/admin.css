@@ -499,7 +499,8 @@ code.warn {
   font-weight: 600;
 }
 
-#pfPhoto {
+#pfPhoto,
+#pfNameplate {
   display: block;
   margin: 0.35rem 0 0.75rem;
   max-width: 100%;
@@ -522,6 +523,21 @@ code.warn {
   cursor: grab;
   border-radius: 8px;
   background: #111;
+}
+
+.pf-nameplate-canvas {
+  background: #f7f3ea;
+  max-width: 28rem;
+}
+
+.pf-advanced {
+  margin-top: 0.65rem;
+}
+
+.pf-advanced summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .pf-preview {
