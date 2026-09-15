@@ -236,12 +236,19 @@
           <section class="card admin-section" data-section="physical" hidden>
             <h2>Physical frame</h2>
             <p class="meta">
-              Admin only — not the guest wall or gallery. Upload a landscape photo to generate the same
-              dual-cell cut sheet the booth prints (two identical portrait cells for cutting). Output is
-              a Canon SELPHY postcard (148 × 100 mm) at true size so frame edges are not cropped.
+              Admin only — not the guest wall or gallery. Upload a landscape main photo to generate the
+              dual-cell cut sheet (two identical portrait cells). Optionally add a nameplate image for one
+              separately cut capsule label (default 52 × 8.5 mm) printed beside the photos on a Canon SELPHY
+              postcard (148 × 100 mm).
             </p>
-            <label>Photo</label>
+            <label for="pfPhoto">Main photo</label>
             <input id="pfPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+            <label for="pfNameplate">Nameplate image (optional)</label>
+            <input id="pfNameplate" type="file" accept="image/png,image/jpeg,image/webp" />
+            <p class="meta">
+              Add a nameplate image to print one label alongside your two photos. Default label size:
+              52 × 8.5 mm. Cut the label separately to fit the rounded recess on the frame.
+            </p>
             <h3 class="admin-subhead">Cut-sheet layout</h3>
             <p class="meta">
               Each cell prints at the centimetre size (ruler-accurate on SELPHY 14.8 × 10.0 cm paper).
@@ -268,9 +275,39 @@
               Thin gold border (double hairline)
             </label>
             <div id="pfAdjustBox" class="pf-adjust" hidden>
-              <p class="meta">Drag the preview to move. Use zoom to crop extra background. Both cells stay identical.</p>
+              <p class="meta">Main photo — drag to move, zoom to crop. Both cells stay identical.</p>
               <canvas id="pfAdjustCanvas" class="pf-adjust-canvas"></canvas>
               <label>Zoom <input id="pfZoom" class="input" type="range" min="1" max="3" step="0.05" value="1" /></label>
+            </div>
+            <div id="pfNameplateBox" class="pf-adjust" hidden>
+              <p class="meta">Nameplate — horizontal preview. Fit artwork keeps logos clear of rounded ends; Fill label crops to the capsule.</p>
+              <div class="row wrap">
+                <label>Fit
+                  <select id="pfNameplateFit" class="input">
+                    <option value="contain" selected>Fit artwork</option>
+                    <option value="cover">Fill label</option>
+                  </select>
+                </label>
+                <button type="button" class="btn ghost" id="pfNameplateReset">Reset nameplate position</button>
+                <button type="button" class="btn ghost" id="pfNameplateClear">Clear nameplate</button>
+              </div>
+              <canvas id="pfNameplateAdjustCanvas" class="pf-adjust-canvas pf-nameplate-canvas"></canvas>
+              <label>Scale / zoom <span id="pfNameplateZoomLabel">100%</span>
+                <input id="pfNameplateZoom" class="input" type="range" min="0.25" max="4" step="0.05" value="1" />
+              </label>
+              <details class="pf-advanced">
+                <summary>Nameplate size / advanced</summary>
+                <div class="pf-grid">
+                  <label>Width (mm) <input id="pfNameplateW" class="input" type="number" min="45" max="55" step="0.1" value="52" /></label>
+                  <label>Height (mm) <input id="pfNameplateH" class="input" type="number" min="6" max="11" step="0.1" value="8.5" /></label>
+                  <label>Safe inset (mm) <input id="pfNameplateSafe" class="input" type="number" min="0" max="2" step="0.05" value="0.75" /></label>
+                  <label>Gap to photo (mm) <input id="pfNameplateGap" class="input" type="number" min="1" max="5" step="0.1" value="2" /></label>
+                </div>
+                <label class="check-row">
+                  <input id="pfNameplateCutGuide" type="checkbox" checked />
+                  Light cut guide on label
+                </label>
+              </details>
             </div>
             <div class="row wrap">
               <button type="button" class="btn primary" id="btnPfGenerate">Generate cut sheet</button>
@@ -425,6 +462,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260910-zip" type="module"></script>
+    <script src="/js/admin.js?v=20260915-nameplate" type="module"></script>
   </body>
 </html>
