@@ -5,7 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import { config, isLocalPublicBaseUrl, allowLocalPublicBaseUrl } from './config.js';
-import { initDb, getDb, isSessionExpired, publicPhoto } from './db.js';
+import { initDb, getDb, closeDb, isSessionExpired, publicPhoto } from './db.js';
 import { getUploadToken } from './auth.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { adminRouter } from './routes/admin.js';
@@ -202,7 +202,7 @@ app.use((err, _req, res, _next) => {
 });
 
 const PURGE_MS = 6 * 60 * 60 * 1000;
-setInterval(() => {
+const purgeTimer = setInterval(() => {
   try {
     const r = purgeExpiredSessions();
     if (r.sessionsRemoved) {
@@ -224,6 +224,7 @@ function lanHostsFromPublicUrl() {
 }
 
 const onListen = () => {
+  listenRetries = 0;
   const scheme = config.https ? 'https' : 'http';
   console.log(
     `[moments] listening on ${scheme}://${config.host}:${config.port} → ${config.publicBaseUrl}`,
@@ -243,18 +244,74 @@ const onListen = () => {
   }
 };
 
+let server;
 if (config.https) {
   const { key, cert } = await ensureHttpsCerts(lanHostsFromPublicUrl());
-  const server = https.createServer({ key, cert }, app);
-  // Folder OTA zips are large — disable Node request timeouts.
-  server.requestTimeout = 0;
-  server.headersTimeout = 0;
-  server.timeout = 0;
-  server.listen(config.port, config.host, onListen);
+  server = https.createServer({ key, cert }, app);
 } else {
-  const server = http.createServer(app);
-  server.requestTimeout = 0;
-  server.headersTimeout = 0;
-  server.timeout = 0;
-  server.listen(config.port, config.host, onListen);
+  server = http.createServer(app);
 }
+// Folder OTA zips are large — disable Node request timeouts.
+server.requestTimeout = 0;
+server.headersTimeout = 0;
+server.timeout = 0;
+
+const LISTEN_RETRY_MAX = 20;
+const LISTEN_RETRY_BASE_MS = 500;
+let listenRetries = 0;
+let shuttingDown = false;
+
+function listenOpts() {
+  return {
+    port: config.port,
+    host: config.host,
+    exclusive: true,
+  };
+}
+
+function tryListen() {
+  if (shuttingDown) return;
+  server.listen(listenOpts(), onListen);
+}
+
+server.on('error', (err) => {
+  if (err?.code === 'EADDRINUSE' && !server.listening && listenRetries < LISTEN_RETRY_MAX) {
+    listenRetries += 1;
+    const delay = Math.min(8000, LISTEN_RETRY_BASE_MS * 2 ** Math.min(listenRetries - 1, 4));
+    console.error(
+      `[moments] ${config.host}:${config.port} in use (${err.code}); retry ${listenRetries}/${LISTEN_RETRY_MAX} in ${delay}ms`,
+    );
+    setTimeout(() => {
+      if (server.listening) {
+        server.close(() => tryListen());
+      } else {
+        tryListen();
+      }
+    }, delay);
+    return;
+  }
+  console.error('[moments] listen failed', err);
+  process.exit(1);
+});
+
+tryListen();
+
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[moments] ${signal}, closing port ${config.port}`);
+  clearInterval(purgeTimer);
+  const failSafe = setTimeout(() => {
+    closeDb();
+    process.exit(1);
+  }, 8000);
+  failSafe.unref();
+  server.close((closeErr) => {
+    if (closeErr) console.error('[moments] server close', closeErr);
+    closeDb();
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

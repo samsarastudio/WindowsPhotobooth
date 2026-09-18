@@ -10,6 +10,16 @@ export function getDb() {
   return db;
 }
 
+export function closeDb() {
+  if (!db) return;
+  try {
+    db.close();
+  } catch (err) {
+    console.error('[moments] sqlite close failed', err);
+  }
+  db = null;
+}
+
 export function initDb() {
   fs.mkdirSync(config.dataDir, { recursive: true });
   fs.mkdirSync(config.photosDir, { recursive: true });
