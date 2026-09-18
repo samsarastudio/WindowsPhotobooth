@@ -137,6 +137,24 @@ sudo systemctl enable --now moments-gallery
 sudo systemctl status moments-gallery
 ```
 
+**Do not run systemd and PM2 at the same time.** Two process managers both restarting `node src/index.js` on port 3020 is an immediate `EADDRINUSE` crash loop.
+
+### Stop an EADDRINUSE crash loop
+
+```bash
+# pick the supervisor you actually use, stop the other
+sudo systemctl stop moments-gallery
+pm2 stop moments 2>/dev/null || true
+
+# release a stuck 3020 socket, then start only one supervisor
+sudo fuser -k 3020/tcp || true
+sleep 1
+ss -ltnp | grep 3020 || echo "3020 is free"
+
+sudo systemctl start moments-gallery
+# or: pm2 start ecosystem.config.cjs
+```
+
 ## Booth OTA packages (Pi)
 
 Folder builds are ~150MB zips. **Cloudflare can reset or size-limit large single uploads**, so:

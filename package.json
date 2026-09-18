@@ -7,7 +7,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "dev": "node --watch-path=src --watch-path=public src/index.js",
     "purge": "node src/purge-cli.js",
     "qa:share": "node scripts/qa-share.mjs",
     "test:physical-frame": "node --test test/physical-frame.test.mjs",
