@@ -585,6 +585,13 @@ export class BoothConfigService {
     return this.aiModes().some((m) => m.id === id) ? id : null;
   });
   readonly skipAiModeSelection = computed(() => this.fixedAiModeId() !== null);
+  readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
+  /** Top-level AI cards (Scene Addition, etc.) — excludes portrait characters. */
+  readonly primaryAiModes = computed(() => this.aiModes().filter((m) => !m.portraitOnly));
+  /** AI Portrait character list (head-swap). */
+  readonly portraitAiModes = computed(() =>
+    this.aiModes().filter((m) => m.pipeline === 'head-swap' || m.portraitOnly === true),
+  );
   /**
    * AI style step only for digital (default) sessions — physical-frame skips it.
    * Callers should also check BoothModeService.isPhysicalFrameMode for the live session.
@@ -593,14 +600,7 @@ export class BoothConfigService {
     () =>
       this.aiGenerationEnabled() &&
       !this.skipAiModeSelection() &&
-      this.aiModes().length > 0,
-  );
-  readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
-  /** Top-level AI cards (Scene Addition, etc.) — excludes portrait characters. */
-  readonly primaryAiModes = computed(() => this.aiModes().filter((m) => !m.portraitOnly));
-  /** AI Portrait character list (head-swap). */
-  readonly portraitAiModes = computed(() =>
-    this.aiModes().filter((m) => m.pipeline === 'head-swap' || m.portraitOnly === true),
+      (this.primaryAiModes().length > 0 || this.portraitAiModes().length > 0),
   );
   readonly openAiConfigured = computed(() => this.state()?.openAiConfigured ?? false);
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
@@ -19,8 +19,10 @@ export class AiModePageComponent implements OnInit {
 
   readonly copy = this.booth.copy;
   readonly modes = this.booth.primaryAiModes;
-  readonly hasPortraits = () => this.booth.portraitAiModes().length > 0;
+  readonly hasPortraits = computed(() => this.booth.portraitAiModes().length > 0);
   readonly plainModeId = PLAIN_PHOTO_MODE_ID;
+  /** Prefer QR when unlock is required; otherwise return to booth-mode picker. */
+  readonly backLink = computed(() => (this.booth.requireQrUnlock() ? '/qr' : '/booth-mode'));
 
   ngOnInit(): void {
     const fixed = this.booth.fixedAiModeId();

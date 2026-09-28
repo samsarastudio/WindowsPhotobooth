@@ -268,8 +268,11 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>OpenAI image generation</h2>
           <p class="pb-hint">
-            Optional AI transform after capture. Frame overlays are managed in
-            <strong>Admin → Frames</strong>.
+            Optional AI transform after capture. Leave this <strong>off</strong> for a normal booth —
+            digital frames, caption, Make physical / Make framed, print, and share all keep working.
+            When enabled, guests always still see <strong>Photocapture</strong> (no AI) on the style
+            screen. Frame overlays stay in <strong>Admin → Frames</strong>; booth modes in
+            <strong>Admin → Modes</strong>.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftRequireQrUnlock" />
@@ -277,7 +280,7 @@
           </label>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftAiEnabled" />
-            Enable AI style step after unlock
+            Enable AI style step (Scene Addition / AI Portrait) after unlock — admin controlled
           </label>
           <label>Default mode</label>
           <select class="pb-input" [(ngModel)]="draftDefaultAiModeId">
@@ -335,13 +338,28 @@
         <section class="pb-admin-card pb-admin-card-wide">
           <h2>AI modes (after QR)</h2>
           <p class="pb-hint">
-            Each mode is a button for guests (unless a fixed default is set). Enable
-            <strong>inpainting</strong> to composite the guest photo onto pre-made branded backgrounds
-            — one background is picked at random per guest when randomize is on.
+            Each mode is a guest button (unless a fixed default is set).
+            <strong>Scene</strong> composites guests onto backgrounds under
+            <code>config/ai-backgrounds/&#123;id&#125;/</code>.
+            <strong>Head-swap (AI Portrait)</strong> uses plates under
+            <code>config/compositions/&#123;id&#125;/</code> and should be marked
+            <em>Portrait only</em> so they appear under the AI Portrait picker.
+            Photocapture is always offered separately and is not listed here.
           </p>
           <div class="pb-row pb-row-wrap">
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addAiMode()">
               Add mode
+            </button>
+            <button
+              type="button"
+              class="pb-btn pb-btn-primary"
+              [disabled]="busy()"
+              (click)="loadHalloweenAiPack()"
+            >
+              Load Halloween pack
+            </button>
+            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addSceneMode()">
+              Add Scene Addition
             </button>
             <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="addDjMode()">
               Add DJ template
@@ -354,11 +372,25 @@
               <input class="pb-input" [(ngModel)]="m.id" />
               <label>Button label</label>
               <input class="pb-input" [(ngModel)]="m.label" />
+              <label>Pipeline</label>
+              <select
+                class="pb-input"
+                [ngModel]="m.pipeline || (m.useInpainting ? 'scene' : 'prompt')"
+                (ngModelChange)="setModePipeline($index, $event)"
+              >
+                <option value="scene">Scene Addition (background inpaint, face lock)</option>
+                <option value="head-swap">AI Portrait / head-swap (composition plate)</option>
+                <option value="prompt">Prompt-only edit</option>
+              </select>
+              <label class="pb-admin-check">
+                <input type="checkbox" [(ngModel)]="m.portraitOnly" />
+                Portrait only — hide from top style list; show under AI Portrait picker
+              </label>
               <label class="pb-admin-check">
                 <input type="checkbox" [(ngModel)]="m.useInpainting" />
-                Use inpainting with background images
+                Use inpainting / composition assets
               </label>
-              @if (m.useInpainting) {
+              @if (m.useInpainting && m.pipeline !== 'head-swap') {
                 <label class="pb-admin-check">
                   <input type="checkbox" [(ngModel)]="m.randomizeBackground" />
                   Randomize background per guest
@@ -400,6 +432,15 @@
                   </button>
                 </div>
               }
+              @if (m.pipeline === 'head-swap') {
+                <label>Head-swap inpaint prompt</label>
+                <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.inpaintPrompt"></textarea>
+                <p class="pb-hint pb-hint-tight">
+                  Composition plate:
+                  <code>config/compositions/{{ m.id }}/composition.png</code>
+                  (+ <code>composition.json</code> face box).
+                </p>
+              }
               <label>Prompt @if (m.useInpainting) { (fallback if inpainting off) }</label>
               <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.prompt"></textarea>
               <div class="pb-row pb-row-wrap">
@@ -408,6 +449,9 @@
                 </button>
                 <button type="button" class="pb-btn pb-btn-ghost" (click)="applyDjInpaintPrompt($index)">
                   Insert DJ inpaint prompt
+                </button>
+                <button type="button" class="pb-btn pb-btn-ghost" (click)="applyHeadSwapPrompt($index)">
+                  Insert head-swap prompt
                 </button>
                 <button
                   type="button"

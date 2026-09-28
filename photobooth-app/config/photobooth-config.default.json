@@ -24,7 +24,7 @@
     "borderEnabled": true
   },
   "requireQrUnlock": false,
-  "aiGenerationEnabled": true,
+  "aiGenerationEnabled": false,
   "defaultAiModeId": null,
   "photoFrames": {
     "enabled": true,

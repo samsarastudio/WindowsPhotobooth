@@ -17,6 +17,10 @@ import {
   NEWSPAPER_AI_PROMPT,
   DJ_INPAINT_PROMPT,
   DJ_PROMPT_ONLY,
+  HALLOWEEN_SCENE_PROMPT,
+  HALLOWEEN_SCENE_INPAINT,
+  HEAD_SWAP_PROMPT,
+  HEAD_SWAP_INPAINT,
   PHOTOBOOTH_DEFAULT_AI_MODES,
   PHOTOBOOTH_DEFAULT_BRANDING,
   PHOTOBOOTH_DEFAULT_CAMERA,
@@ -28,6 +32,7 @@ import {
   PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   PHOTOBOOTH_DEFAULT_PRINT,
   PLAIN_PHOTO_MODE_ID,
+  type PhotoboothAiPipeline,
 } from '../../models/photobooth-config.model';
 import { autoPhysicalSheetMm } from '../../models/physical-frame-layout';
 import { BrandingLogoService } from '../../services/branding-logo.service';
@@ -1253,8 +1258,25 @@ export class AdminDashboardComponent implements OnInit {
     const id = `mode_${Date.now()}`;
     this.draftAiModes = [
       ...this.draftAiModes,
-      { id, label: 'New mode', prompt: '', useInpainting: false, randomizeBackground: true },
+      {
+        id,
+        label: 'New mode',
+        prompt: '',
+        useInpainting: false,
+        randomizeBackground: true,
+        pipeline: 'prompt',
+        portraitOnly: false,
+      },
     ];
+  }
+
+  /** Restore the Halloween Scene Addition + 5 AI Portrait characters (does not auto-enable AI). */
+  loadHalloweenAiPack(): void {
+    this.draftAiModes = structuredClone(PHOTOBOOTH_DEFAULT_AI_MODES);
+    this.draftDefaultAiModeId = null;
+    this.status.set(
+      'Halloween AI pack loaded (Scene Addition + 5 portraits). Enable AI above and Save to turn it on for guests. Photocapture stays available on the style screen.',
+    );
   }
 
   addDjMode(): void {
@@ -1270,11 +1292,31 @@ export class AdminDashboardComponent implements OnInit {
         useInpainting: true,
         randomizeBackground: true,
         inpaintPrompt: DJ_INPAINT_PROMPT,
+        pipeline: 'scene',
       },
       ...this.draftAiModes,
     ];
-    this.draftDefaultAiModeId = 'dj';
-    this.draftAiEnabled = true;
+    this.status.set('DJ template added. Enable AI and Save to use it.');
+  }
+
+  addSceneMode(): void {
+    if (this.draftAiModes.some((m) => m.id === 'scene')) {
+      this.status.set('Scene Addition mode already exists.');
+      return;
+    }
+    this.draftAiModes = [
+      {
+        id: 'scene',
+        label: 'Scene Addition',
+        prompt: HALLOWEEN_SCENE_PROMPT,
+        useInpainting: true,
+        randomizeBackground: true,
+        inpaintPrompt: HALLOWEEN_SCENE_INPAINT,
+        pipeline: 'scene',
+      },
+      ...this.draftAiModes,
+    ];
+    this.status.set('Scene Addition added. Upload backgrounds under config/ai-backgrounds/scene/.');
   }
 
   removeAiMode(index: number): void {
@@ -1286,7 +1328,7 @@ export class AdminDashboardComponent implements OnInit {
     const next = [...this.draftAiModes];
     const row = next[index];
     if (!row) return;
-    next[index] = { ...row, prompt: NEWSPAPER_AI_PROMPT };
+    next[index] = { ...row, prompt: NEWSPAPER_AI_PROMPT, pipeline: row.pipeline || 'prompt' };
     this.draftAiModes = next;
   }
 
@@ -1299,6 +1341,37 @@ export class AdminDashboardComponent implements OnInit {
       useInpainting: true,
       randomizeBackground: true,
       inpaintPrompt: DJ_INPAINT_PROMPT,
+      pipeline: 'scene',
+    };
+    this.draftAiModes = next;
+  }
+
+  applyHeadSwapPrompt(index: number): void {
+    const next = [...this.draftAiModes];
+    const row = next[index];
+    if (!row) return;
+    next[index] = {
+      ...row,
+      useInpainting: true,
+      randomizeBackground: false,
+      prompt: HEAD_SWAP_PROMPT,
+      inpaintPrompt: HEAD_SWAP_INPAINT,
+      pipeline: 'head-swap',
+      portraitOnly: true,
+    };
+    this.draftAiModes = next;
+  }
+
+  setModePipeline(index: number, pipeline: PhotoboothAiPipeline): void {
+    const next = [...this.draftAiModes];
+    const row = next[index];
+    if (!row) return;
+    next[index] = {
+      ...row,
+      pipeline,
+      useInpainting: pipeline === 'prompt' ? false : true,
+      randomizeBackground: pipeline === 'scene' ? row.randomizeBackground !== false : false,
+      portraitOnly: pipeline === 'head-swap' ? row.portraitOnly !== false : false,
     };
     this.draftAiModes = next;
   }
@@ -1313,7 +1386,7 @@ export class AdminDashboardComponent implements OnInit {
 
   async refreshAllAiBackgrounds(): Promise<void> {
     for (const m of this.draftAiModes) {
-      if (m.useInpainting) {
+      if (m.useInpainting && m.pipeline !== 'head-swap') {
         await this.refreshAiBackgrounds(m.id);
       }
     }
@@ -1367,14 +1440,26 @@ export class AdminDashboardComponent implements OnInit {
   async saveAi(): Promise<void> {
     this.status.set(null);
     const normalized = this.draftAiModes
-      .map((m) => ({
-        id: m.id.trim(),
-        label: m.label.trim(),
-        prompt: m.prompt.trim(),
-        useInpainting: m.useInpainting === true,
-        randomizeBackground: m.randomizeBackground !== false,
-        inpaintPrompt: m.inpaintPrompt?.trim() || undefined,
-      }))
+      .map((m) => {
+        const pipelineRaw = (m.pipeline || '').toString().trim().toLowerCase();
+        const pipeline: PhotoboothAiPipeline | undefined =
+          pipelineRaw === 'scene' || pipelineRaw === 'head-swap' || pipelineRaw === 'prompt'
+            ? pipelineRaw
+            : m.useInpainting
+              ? 'scene'
+              : 'prompt';
+        return {
+          id: m.id.trim(),
+          label: m.label.trim(),
+          prompt: m.prompt.trim(),
+          useInpainting: m.useInpainting === true || pipeline === 'scene' || pipeline === 'head-swap',
+          randomizeBackground:
+            pipeline === 'head-swap' ? false : m.randomizeBackground !== false,
+          inpaintPrompt: m.inpaintPrompt?.trim() || undefined,
+          pipeline,
+          portraitOnly: m.portraitOnly === true || pipeline === 'head-swap',
+        };
+      })
       .filter((m) => m.id.length > 0 && m.label.length > 0 && m.prompt.length > 0);
     if (normalized.length === 0) {
       this.status.set('Add at least one mode with id, label, and prompt.');
@@ -1391,23 +1476,29 @@ export class AdminDashboardComponent implements OnInit {
     if (defaultId && defaultId !== PLAIN_PHOTO_MODE_ID && !aiEnabled) {
       aiEnabled = true;
     }
-    const inpaintModes = normalized.filter((m) => m.useInpainting);
+    const sceneBgModes = normalized.filter(
+      (m) => m.useInpainting && m.pipeline !== 'head-swap',
+    );
     this.busy.set(true);
     try {
       const payload: Record<string, unknown> = {
         aiGenerationEnabled: aiEnabled,
         requireQrUnlock: this.draftRequireQrUnlock,
         defaultAiModeId: defaultId,
-        aiModes: normalized.map(({ inpaintPrompt, useInpainting, randomizeBackground, ...rest }) => ({
-          ...rest,
-          ...(useInpainting
-            ? {
-                useInpainting: true,
-                randomizeBackground,
-                ...(inpaintPrompt ? { inpaintPrompt } : {}),
-              }
-            : {}),
-        })),
+        aiModes: normalized.map(
+          ({ inpaintPrompt, useInpainting, randomizeBackground, pipeline, portraitOnly, ...rest }) => ({
+            ...rest,
+            pipeline,
+            ...(portraitOnly ? { portraitOnly: true } : {}),
+            ...(useInpainting
+              ? {
+                  useInpainting: true,
+                  randomizeBackground,
+                  ...(inpaintPrompt ? { inpaintPrompt } : {}),
+                }
+              : {}),
+          }),
+        ),
       };
       if (this.openAiKeyDraft.trim()) {
         payload['openAiApiKey'] = this.openAiKeyDraft.trim();
@@ -1416,14 +1507,21 @@ export class AdminDashboardComponent implements OnInit {
       if (ok) {
         this.openAiKeyDraft = '';
         this.draftAiEnabled = aiEnabled;
+        this.draftAiModes = structuredClone(normalized);
         await this.refreshAllAiBackgrounds();
-        const missingBg = inpaintModes.filter((m) => this.backgroundsForMode(m.id).length === 0);
-        if (missingBg.length) {
+        const missingBg = sceneBgModes.filter((m) => this.backgroundsForMode(m.id).length === 0);
+        if (!aiEnabled) {
           this.status.set(
-            `AI settings saved. Upload backgrounds for: ${missingBg.map((m) => m.id).join(', ')}.`,
+            'AI settings saved. AI is OFF for guests — enable the checkbox above and Save again to turn it on. Photocapture / frames / physical still work as usual.',
+          );
+        } else if (missingBg.length) {
+          this.status.set(
+            `AI settings saved and ENABLED. Upload backgrounds for: ${missingBg.map((m) => m.id).join(', ')}. Head-swap portraits use config/compositions/{id}/.`,
           );
         } else {
-          this.status.set('AI settings saved.');
+          this.status.set(
+            'AI settings saved and ENABLED. Guests still always see Photocapture on the style screen. Frames, overlays, and Make physical stay available.',
+          );
         }
       } else {
         this.status.set('Save failed (run in Electron).');
