@@ -1322,8 +1322,8 @@ const LANDSCAPE_SIZES = [
   [768, 512],
 ];
 
-async function pngBufferUnderLimit(sharpMod, buildAtSize) {
-  for (const [w, h] of LANDSCAPE_SIZES) {
+async function pngBufferUnderLimit(sharpMod, buildAtSize, sizes = LANDSCAPE_SIZES) {
+  for (const [w, h] of sizes) {
     const candidate = await buildAtSize(w, h);
     if (candidate && candidate.length <= MAX_IMAGE_BYTES) {
       return candidate;
@@ -1331,6 +1331,18 @@ async function pngBufferUnderLimit(sharpMod, buildAtSize) {
   }
   return null;
 }
+
+const {
+  createPipelineHelpers,
+} = require('./ai-pipelines.cjs');
+
+const aiPipelines = createPipelineHelpers({
+  getPortableRoot,
+  sanitizeModeId,
+  IMAGE_EXTENSIONS,
+  pngBufferUnderLimit,
+  LANDSCAPE_SIZES,
+});
 
 async function preparePersonPng(sharpMod, absImage) {
   return pngBufferUnderLimit(sharpMod, (w, h) =>
@@ -1489,18 +1501,34 @@ async function prepareLogoReferencePng(sharpMod, logoPath) {
 const BRAND_LOGO_AI_SNIPPET =
   'Use the brand logo from the reference image(s) exactly — reproduce it on booth signage, product boxes, DJ equipment, headphones, and clothing where natural. Do not invent a different logo or mascot.';
 
-function buildGptImageEditForm(FormData, sceneBuf, fullPrompt, logoBuf = null, model = 'gpt-image-1.5') {
+function buildGptImageEditForm(
+  FormData,
+  sceneBuf,
+  fullPrompt,
+  extraImages = [],
+  model = 'gpt-image-1.5',
+  size = '1536x1024',
+  maskBuf = null,
+) {
   const form = new FormData();
   form.append('model', model);
   form.append('image[]', sceneBuf, { filename: 'scene.png', contentType: 'image/png' });
-  if (logoBuf) {
-    form.append('image[]', logoBuf, { filename: 'brand-logo-ref.png', contentType: 'image/png' });
+  const extras = Array.isArray(extraImages) ? extraImages : extraImages ? [extraImages] : [];
+  for (const extra of extras) {
+    if (!extra?.buf) continue;
+    form.append('image[]', extra.buf, {
+      filename: extra.filename || 'ref.png',
+      contentType: extra.contentType || 'image/png',
+    });
+  }
+  if (maskBuf) {
+    form.append('mask', maskBuf, { filename: 'mask.png', contentType: 'image/png' });
   }
   form.append('prompt', fullPrompt);
   form.append('n', '1');
-  form.append('size', '1536x1024');
+  form.append('size', size);
   form.append('quality', 'high');
-  if (model !== 'gpt-image-2' && !model.startsWith('gpt-image-2')) {
+  if (model !== 'gpt-image-2' && !String(model).startsWith('gpt-image-2')) {
     form.append('input_fidelity', 'high');
   }
   return form;
@@ -1508,26 +1536,34 @@ function buildGptImageEditForm(FormData, sceneBuf, fullPrompt, logoBuf = null, m
 
 function buildEditPrompt(rawPrompt, options = {}) {
   const DALLE2_PROMPT_MAX = 1000;
-  const { inpainting = false, brandName = '', hasLogoRef = false } = options;
+  const {
+    inpainting = false,
+    brandName = '',
+    hasLogoRef = false,
+    pipeline = '',
+    forDalle2 = false,
+  } = options;
   let raw = applyBrandTokens(rawPrompt, brandName);
   const suffixParts = [];
-  if (inpainting) {
-    suffixParts.push('Blend the person naturally into the scene. Preserve their exact face and likeness.');
+  if (pipeline === 'head-swap') {
+    suffixParts.push(
+      'Image 1 is the Halloween character scene to edit (head region only, per mask). Image 2 (guest-face.png) is the guest IDENTITY reference — copy that person exactly. CRITICAL IDENTITY LOCK: preserve exact facial features, skin tone, eye shape/color, nose, lips, jawline, freckles, wrinkles, and all facial hair exactly as in image 2. Match hair from image 2. Match guest head size to the original character head — do not enlarge or float the head. Softly blend a short natural neck into the costume collar. Completely remove the old character head/hair with no oval outline, halo, or mask ring. Keep the costume body, pose, props, and scene identical to image 1. NEVER alter the guest face.',
+    );
+  } else if (inpainting || pipeline === 'scene') {
+    suffixParts.push(
+      'CRITICAL FACE LOCK: preserve every guest face exactly — features, skin tone, expression, hair, and identity must not change. Only invent or blend scenery around the people. Do not restyle faces, age them, or apply costume makeup to faces.',
+    );
   } else {
     suffixParts.push(
-      'Use the entire visible scene (letterboxed in the square). Transform the whole composition—do not output a tighter zoom or headshot crop unless the uploaded image already is.',
+      'Use the entire visible scene (letterboxed in the square). Transform the whole composition—do not output a tighter zoom or headshot crop unless the uploaded image already is. Preserve exact guest faces and likeness.',
     );
   }
   if (hasLogoRef) {
     suffixParts.push(BRAND_LOGO_AI_SNIPPET);
   }
   const suffix = ` ${suffixParts.join(' ')}`;
-  const newspaperHeadlineGuard =
-    raw.toLowerCase().includes('newspaper') && !raw.toUpperCase().includes('HAPPENING NOW!')
-      ? ' Ensure the primary newspaper masthead headline reads exactly: HAPPENING NOW!'
-      : '';
-  let fullPrompt = raw + newspaperHeadlineGuard + suffix;
-  if (fullPrompt.length > DALLE2_PROMPT_MAX) {
+  let fullPrompt = raw + suffix;
+  if (forDalle2 && fullPrompt.length > DALLE2_PROMPT_MAX) {
     fullPrompt = fullPrompt.slice(0, DALLE2_PROMPT_MAX);
   }
   return fullPrompt;
@@ -1539,7 +1575,9 @@ async function callOpenAiImageEdit(
   fullPrompt,
   httpsPostMultipart,
   FormData,
-  logoBuf = null,
+  extraImages = [],
+  size = '1536x1024',
+  maskBuf = null,
 ) {
   const parseJsonSafe = (text) => {
     try {
@@ -1556,9 +1594,22 @@ async function callOpenAiImageEdit(
   let json = null;
   let modelUsed = gptModels[0];
   let lastErr = 'GPT image edit failed.';
+  const extras = Array.isArray(extraImages)
+    ? extraImages
+    : extraImages
+      ? [{ buf: extraImages, filename: 'brand-logo-ref.png' }]
+      : [];
 
   for (const model of gptModels) {
-    const form = buildGptImageEditForm(FormData, pngBuf, fullPrompt, logoBuf, model);
+    const form = buildGptImageEditForm(
+      FormData,
+      pngBuf,
+      fullPrompt,
+      extras,
+      model,
+      size,
+      maskBuf,
+    );
     const gptRes = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, auth);
     const gptJson = parseJsonSafe(gptRes.body);
     if (gptRes.statusCode >= 200 && gptRes.statusCode < 300 && gptJson) {
@@ -1571,12 +1622,16 @@ async function callOpenAiImageEdit(
 
   if (!json) {
     // DALL·E 2 edits: single image only (no reference-image array). Logo is already composited locally.
+    const dallePrompt = fullPrompt.length > 1000 ? fullPrompt.slice(0, 1000) : fullPrompt;
     const form = new FormData();
     form.append('image', pngBuf, { filename: 'photo.png', contentType: 'image/png' });
-    form.append('prompt', fullPrompt);
+    if (maskBuf) {
+      form.append('mask', maskBuf, { filename: 'mask.png', contentType: 'image/png' });
+    }
+    form.append('prompt', dallePrompt);
     form.append('model', 'dall-e-2');
     form.append('n', '1');
-    form.append('size', '1536x1024');
+    form.append('size', '1024x1024');
     form.append('response_format', 'b64_json');
     const d2Res = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, auth);
     const d2Json = parseJsonSafe(d2Res.body);
@@ -2326,6 +2381,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
   appendAppLog('info', 'openai', 'generateImage start', {
     modeId: payload?.modeId,
     useInpainting: !!payload?.useInpainting,
+    pipeline: payload?.pipeline || null,
     hasPrompt: !!(payload && payload.prompt),
   });
   try {
@@ -2349,6 +2405,14 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     const randomizeBackground = payload?.randomizeBackground !== false;
     const inpaintPrompt =
       payload && typeof payload.inpaintPrompt === 'string' ? payload.inpaintPrompt.trim() : '';
+    const pipelineRaw =
+      payload && typeof payload.pipeline === 'string' ? payload.pipeline.trim().toLowerCase() : '';
+    let pipeline =
+      pipelineRaw === 'head-swap' || pipelineRaw === 'scene' ? pipelineRaw : '';
+    if (!pipeline && useInpainting && modeId) {
+      // Infer: composition plate → head-swap; otherwise scene backgrounds.
+      pipeline = aiPipelines.resolveComposition(modeId)?.imagePath ? 'head-swap' : 'scene';
+    }
     if (!imagePath.trim() || !prompt.trim()) {
       return { ok: false, error: 'Missing image path or prompt.' };
     }
@@ -2371,8 +2435,37 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     let pngBuf = null;
     let backgroundUsed = null;
     let effectivePrompt = prompt;
+    const extraImages = [];
+    let scenePathForLock = null;
+    let faceForLock = null;
+    let sceneCompositeForFaceLock = null;
+    let gptSize = '1536x1024';
 
-    if (useInpainting && modeId) {
+    if (pipeline === 'head-swap' && modeId) {
+      const resolved = aiPipelines.resolveComposition(modeId);
+      if (!resolved?.imagePath) {
+        return {
+          ok: false,
+          error: `No composition image for "${modeId}". Add config/compositions/${sanitizeModeId(modeId)}/composition.png.`,
+        };
+      }
+      backgroundUsed = `${resolved.canId}/${resolved.filename} (${resolved.source})`;
+      const face = aiPipelines.loadCompositionFace(modeId, payload?.face);
+      scenePathForLock = resolved.imagePath;
+      faceForLock = face;
+      pngBuf = await aiPipelines.buildHeadEraseScene(sharpMod, resolved.imagePath, face);
+      const faceRef = await aiPipelines.prepareGuestHeadPng(sharpMod, absImage, 1024, 1024);
+      extraImages.push({ buf: faceRef, filename: 'guest-face.png' });
+      effectivePrompt = inpaintPrompt || prompt;
+      const portrait = await aiPipelines.sceneIsPortrait(sharpMod, resolved.imagePath);
+      gptSize = portrait ? '1024x1536' : '1536x1024';
+      appendAppLog('info', 'openai', 'head-swap composition', {
+        canId: resolved.canId,
+        source: resolved.source,
+        file: resolved.filename,
+        face,
+      });
+    } else if (useInpainting && modeId) {
       const bgPath = pickBackgroundImage(modeId, randomizeBackground);
       if (!bgPath) {
         return {
@@ -2387,7 +2480,9 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         absImage,
         useBrandLogo ? brand.logoPath : null,
       );
+      sceneCompositeForFaceLock = pngBuf;
       effectivePrompt = inpaintPrompt || prompt;
+      pipeline = pipeline || 'scene';
     } else {
       pngBuf = await preparePersonPng(sharpMod, absImage);
     }
@@ -2396,36 +2491,88 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       return { ok: false, error: 'Prepared PNG is still above 4 MB.' };
     }
 
-    let logoRefBuf = null;
-    if (useBrandLogo && brand.logoPath) {
-      logoRefBuf = await prepareLogoReferencePng(sharpMod, brand.logoPath);
+    if (pipeline !== 'head-swap' && useBrandLogo && brand.logoPath) {
+      const logoRefBuf = await prepareLogoReferencePng(sharpMod, brand.logoPath);
+      if (logoRefBuf) {
+        extraImages.push({ buf: logoRefBuf, filename: 'brand-logo-ref.png' });
+      }
     }
 
     const fullPrompt = buildEditPrompt(effectivePrompt, {
-      inpainting: useInpainting,
+      inpainting: useInpainting || pipeline === 'scene' || pipeline === 'head-swap',
       brandName: brand.brandName,
-      hasLogoRef: !!logoRefBuf,
+      hasLogoRef: extraImages.some((x) => x.filename === 'brand-logo-ref.png'),
+      pipeline,
     });
+
+    let maskBuf = null;
+    if (pipeline === 'head-swap' && faceForLock) {
+      const pngMeta = await sharpMod(pngBuf).metadata();
+      maskBuf = await aiPipelines.buildHeadEditMaskPng(
+        sharpMod,
+        pngMeta.width || 1536,
+        pngMeta.height || 1024,
+        faceForLock,
+      );
+      if ((pngMeta.height || 0) > (pngMeta.width || 0)) {
+        gptSize = '1024x1536';
+      }
+    }
+
     const editRes = await callOpenAiImageEdit(
       apiKey,
       pngBuf,
       fullPrompt,
       httpsPostMultipart,
       FormData,
-      logoRefBuf,
+      extraImages,
+      gptSize,
+      maskBuf,
     );
     if (!editRes.ok) {
       appendAppLog('error', 'openai', 'image edit failed', editRes.error);
       return { ok: false, error: editRes.error };
     }
+
+    let outBuf = editRes.outBuf;
+    if (pipeline === 'head-swap' && scenePathForLock) {
+      const trustAiSeam = String(editRes.model || '').includes('2.5');
+      if (!trustAiSeam) {
+        outBuf = await aiPipelines.blendHeadOntoOriginalScene(
+          sharpMod,
+          scenePathForLock,
+          outBuf,
+          faceForLock,
+        );
+        appendAppLog('info', 'openai', 'head locked onto original scene', {
+          face: faceForLock,
+          model: editRes.model,
+        });
+      }
+    } else if (pipeline === 'scene' && sceneCompositeForFaceLock) {
+      try {
+        outBuf = await aiPipelines.lockGuestSubjectsOntoAi(
+          sharpMod,
+          sceneCompositeForFaceLock,
+          outBuf,
+        );
+        appendAppLog('info', 'openai', 'guest faces locked onto scene result', {
+          model: editRes.model,
+        });
+      } catch (lockErr) {
+        appendAppLog('warn', 'openai', 'face lock skipped', String(lockErr));
+      }
+    }
+
     const dir = path.dirname(absImage);
     const base = path.basename(absImage, path.extname(absImage));
     const outPath = path.join(dir, `${base}_ai.png`);
-    fs.writeFileSync(outPath, editRes.outBuf);
+    fs.writeFileSync(outPath, outBuf);
     appendAppLog('info', 'openai', 'generateImage ok', {
       model: editRes.model,
       outPath,
       inpainting: useInpainting,
+      pipeline,
     });
     return {
       ok: true,
@@ -2433,6 +2580,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       model: editRes.model,
       backgroundUsed,
       inpainting: useInpainting,
+      pipeline,
       brandApplied: useBrandLogo,
     };
   } catch (e) {

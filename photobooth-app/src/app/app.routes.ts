@@ -7,6 +7,7 @@ import { CapturePageComponent } from './pages/capture-page/capture-page.componen
 import { QrPageComponent } from './pages/qr-page/qr-page.component';
 import { ResultPageComponent } from './pages/result-page/result-page.component';
 import { AiModePageComponent } from './pages/ai-mode-page/ai-mode-page.component';
+import { PortraitSelectPageComponent } from './pages/portrait-select-page/portrait-select-page.component';
 import { BoothModePageComponent } from './pages/booth-mode-page/booth-mode-page.component';
 import { AiGalleryPageComponent } from './pages/ai-gallery-page/ai-gallery-page.component';
 import { FramePageComponent } from './pages/frame-page/frame-page.component';
@@ -19,6 +20,7 @@ export const routes: Routes = [
   { path: 'booth-mode', component: BoothModePageComponent },
   { path: 'qr', component: QrPageComponent },
   { path: 'ai-mode', component: AiModePageComponent },
+  { path: 'portrait-select', component: PortraitSelectPageComponent },
   { path: 'capture', component: CapturePageComponent },
   { path: 'frame', component: FramePageComponent },
   { path: 'caption', component: CaptionPageComponent },

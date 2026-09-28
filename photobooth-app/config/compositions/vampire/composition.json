@@ -1,0 +1,10 @@
+{
+  "id": "vampire",
+  "label": "Vampire",
+  "face": {
+    "xPercent": 33,
+    "yPercent": 5,
+    "widthPercent": 34,
+    "heightPercent": 28
+  }
+}

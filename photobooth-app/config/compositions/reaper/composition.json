@@ -1,0 +1,10 @@
+{
+  "id": "reaper",
+  "label": "Reaper",
+  "face": {
+    "xPercent": 34,
+    "yPercent": 8,
+    "widthPercent": 32,
+    "heightPercent": 28
+  }
+}

@@ -198,6 +198,16 @@ export interface PhotoboothCopyAiMode {
    * Use "Photocapture", "Default", etc. — not an admin `aiModes` row.
    */
   plainPhotoLabel: string;
+  /** Top-level card that opens the AI Portrait character picker. */
+  portraitEntryLabel: string;
+  portraitEntryHint: string;
+  sceneEntryHint: string;
+}
+
+export interface PhotoboothCopyPortraitSelect {
+  title: string;
+  subtitle: string;
+  back: string;
 }
 
 export interface PhotoboothCopyBoothMode {
@@ -272,6 +282,7 @@ export interface PhotoboothCopy {
   result: PhotoboothCopyResult;
   history: PhotoboothCopyHistory;
   aiMode: PhotoboothCopyAiMode;
+  portraitSelect: PhotoboothCopyPortraitSelect;
   boothMode: PhotoboothCopyBoothMode;
   frame: PhotoboothCopyFrame;
   caption: PhotoboothCopyCaption;
@@ -287,6 +298,9 @@ export interface PhotoboothCopyPhysicalAdjust {
   zoomLabel: string;
 }
 
+/** AI generation pipeline. */
+export type PhotoboothAiPipeline = 'scene' | 'head-swap' | 'prompt';
+
 export interface PhotoboothAiMode {
   id: string;
   label: string;
@@ -298,6 +312,14 @@ export interface PhotoboothAiMode {
   randomizeBackground?: boolean;
   /** Prompt sent after compositing guest onto background; overrides `prompt` when inpainting. */
   inpaintPrompt?: string;
+  /**
+   * `scene` — keep guests, inpaint Halloween scenery around them (face locked).
+   * `head-swap` — Zyn-style character plate + guest head (face locked).
+   * `prompt` — full-image edit (legacy).
+   */
+  pipeline?: PhotoboothAiPipeline;
+  /** Hide from the top-level AI mode list (e.g. portrait characters live under AI Portrait). */
+  portraitOnly?: boolean;
 }
 
 /** Token replaced with `branding.brandName` (or "the brand") in AI prompts. */
@@ -318,6 +340,28 @@ export const DJ_PROMPT_ONLY =
 /** Exact prompt for the default Newspaper style (admin may duplicate or edit in JSON). */
 export const NEWSPAPER_AI_PROMPT =
   'Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject\'s face remains recognizable but stylized to match the printed newspaper aesthetic.';
+
+/** Scene Addition — keep cropped guests, paint Halloween scenery around them. */
+export const HALLOWEEN_SCENE_PROMPT =
+  `Place the guests exactly as captured into this Halloween environment. Keep every face, skin tone, hair, and likeness 100% unchanged — never alter identity. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
+
+export const HALLOWEEN_SCENE_INPAINT =
+  `Seamlessly blend the cropped guest group into this Halloween scene. CRITICAL: do not change any faces — preserve exact facial features, expressions, skin tone, and hair. Keep bodies and clothing as captured; only replace or extend the surroundings with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup on faces, no identity change.`;
+
+/** Shared head-swap prompts for Halloween AI Portrait characters. */
+export const HEAD_SWAP_PROMPT =
+  'Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.';
+
+export const HEAD_SWAP_INPAINT =
+  'CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest\'s real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background.';
+
+export const HALLOWEEN_PORTRAIT_IDS = [
+  'vampire',
+  'witch',
+  'werewolf',
+  'reaper',
+  'phantom',
+] as const;
 
 export interface PhotoboothCameraConfig {
   /**
@@ -518,28 +562,74 @@ export const PHOTOBOOTH_DEFAULT_BRANDING: PhotoboothBranding = {
 
 export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   {
-    id: 'dj',
-    label: 'DJ',
-    prompt: DJ_PROMPT_ONLY,
+    id: 'scene',
+    label: 'Scene Addition',
+    prompt: HALLOWEEN_SCENE_PROMPT,
     useInpainting: true,
     randomizeBackground: true,
-    inpaintPrompt: DJ_INPAINT_PROMPT,
+    inpaintPrompt: HALLOWEEN_SCENE_INPAINT,
+    pipeline: 'scene',
   },
   {
-    id: 'newspaper',
-    label: 'Newspaper',
-    prompt: NEWSPAPER_AI_PROMPT,
+    id: 'vampire',
+    label: 'Vampire',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
+  },
+  {
+    id: 'witch',
+    label: 'Witch',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
+  },
+  {
+    id: 'werewolf',
+    label: 'Werewolf',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
+  },
+  {
+    id: 'reaper',
+    label: 'Reaper',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
+  },
+  {
+    id: 'phantom',
+    label: 'Phantom',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
   },
 ];
 
 export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
   attract: {
-    icon: '📷',
-    tagline: 'Capturing memories',
+    icon: '🎃',
+    tagline: 'Enter if you dare',
     mainScale: 1,
     topScale: 1,
-    title: 'inmoment',
-    subtitle: 'Tap to create your\npersonalized photo keepsake.',
+    title: 'HauntBooth',
+    subtitle: 'Tap to transform into a\nHalloween keepsake.',
     ctaLabel: 'Tap to Start',
     startAria: 'Tap to Start',
     adminLink: 'Admin',
@@ -643,10 +733,18 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     applyFrame: 'Apply frame',
   },
   aiMode: {
-    title: 'Choose a style',
-    subtitle: 'Pick how we transform your photo',
+    title: 'Pick your spell',
+    subtitle: 'Scene Addition keeps your faces — AI Portrait drops you into a costume',
     back: 'Back',
     plainPhotoLabel: 'Photocapture',
+    portraitEntryLabel: 'AI Portrait',
+    portraitEntryHint: 'Become one of five Halloween characters — your face stays yours',
+    sceneEntryHint: 'Keep your group as-is and paint haunted scenery around you',
+  },
+  portraitSelect: {
+    title: 'Choose your haunt',
+    subtitle: 'Pick a character — we keep your real face',
+    back: 'Back',
   },
   boothMode: {
     title: 'Choose a mode',

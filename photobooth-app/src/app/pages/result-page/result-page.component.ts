@@ -300,6 +300,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         useInpainting: mode.useInpainting === true,
         randomizeBackground: mode.randomizeBackground !== false,
         inpaintPrompt: mode.inpaintPrompt,
+        pipeline: mode.pipeline,
       });
       if (!r.ok || !r.path) {
         this.aiErr.set(r.error ?? 'Generation failed.');

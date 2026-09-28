@@ -171,12 +171,15 @@ export interface PbApi {
     useInpainting?: boolean;
     randomizeBackground?: boolean;
     inpaintPrompt?: string;
+    pipeline?: 'scene' | 'head-swap' | 'prompt';
+    face?: { xPercent: number; yPercent: number; widthPercent: number; heightPercent: number };
   }): Promise<{
     ok: boolean;
     path?: string;
     model?: string;
     backgroundUsed?: string | null;
     inpainting?: boolean;
+    pipeline?: string;
     brandApplied?: boolean;
     error?: string;
   }>;

@@ -1,0 +1,10 @@
+{
+  "id": "werewolf",
+  "label": "Werewolf",
+  "face": {
+    "xPercent": 32,
+    "yPercent": 6,
+    "widthPercent": 36,
+    "heightPercent": 30
+  }
+}

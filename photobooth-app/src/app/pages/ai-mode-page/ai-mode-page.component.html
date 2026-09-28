@@ -9,7 +9,7 @@
         decoding="async"
       />
     } @else {
-      <span class="pb-icon" aria-hidden="true">{{ copy().qr.icon }}</span>
+      <span class="pb-icon" aria-hidden="true">{{ copy().attract.icon }}</span>
     }
     <h1 class="pb-title">{{ copy().aiMode.title }}</h1>
     <p class="pb-sub">{{ copy().aiMode.subtitle }}</p>
@@ -24,13 +24,24 @@
         <li>
           <button type="button" class="pb-ai-mode-btn" (click)="choose(m.id)">
             <span class="pb-ai-mode-label">{{ m.label }}</span>
+            @if (m.pipeline === 'scene') {
+              <span class="pb-ai-mode-hint">{{ copy().aiMode.sceneEntryHint }}</span>
+            }
+          </button>
+        </li>
+      }
+      @if (hasPortraits()) {
+        <li>
+          <button type="button" class="pb-ai-mode-btn" (click)="openPortraits()">
+            <span class="pb-ai-mode-label">{{ copy().aiMode.portraitEntryLabel }}</span>
+            <span class="pb-ai-mode-hint">{{ copy().aiMode.portraitEntryHint }}</span>
           </button>
         </li>
       }
     </ul>
 
     <div class="pb-row">
-      <a routerLink="/qr" class="pb-btn pb-btn-ghost">{{ copy().aiMode.back }}</a>
+      <a routerLink="/booth-mode" class="pb-btn pb-btn-ghost">{{ copy().aiMode.back }}</a>
     </div>
   </div>
 </div>

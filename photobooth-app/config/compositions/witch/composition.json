@@ -1,0 +1,10 @@
+{
+  "id": "witch",
+  "label": "Witch",
+  "face": {
+    "xPercent": 34,
+    "yPercent": 10,
+    "widthPercent": 32,
+    "heightPercent": 26
+  }
+}

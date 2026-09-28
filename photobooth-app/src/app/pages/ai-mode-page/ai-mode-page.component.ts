@@ -18,7 +18,8 @@ export class AiModePageComponent implements OnInit {
   readonly branding = inject(BrandingLogoService);
 
   readonly copy = this.booth.copy;
-  readonly modes = this.booth.aiModes;
+  readonly modes = this.booth.primaryAiModes;
+  readonly hasPortraits = () => this.booth.portraitAiModes().length > 0;
   readonly plainModeId = PLAIN_PHOTO_MODE_ID;
 
   ngOnInit(): void {
@@ -36,5 +37,9 @@ export class AiModePageComponent implements OnInit {
   choose(id: string): void {
     this.aiStyle.selectMode(id);
     void this.router.navigate(['/capture']);
+  }
+
+  openPortraits(): void {
+    void this.router.navigate(['/portrait-select']);
   }
 }

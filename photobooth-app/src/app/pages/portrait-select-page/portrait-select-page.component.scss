@@ -1,0 +1,82 @@
+.pb-portrait-select {
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 3vh, 2rem);
+}
+
+.pb-portrait-select-inner {
+  width: min(1040px, 96vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.pb-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(0.65rem, 1.8vw, 1.1rem);
+  width: 100%;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 900px) {
+  .pb-portrait-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .pb-portrait-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.pb-portrait-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.45rem;
+  border-radius: 0.9rem;
+  border: 2px solid rgba(224, 140, 48, 0.28);
+  background: rgba(18, 10, 14, 0.72);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.pb-portrait-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 176, 72, 0.7);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+}
+
+.pb-portrait-card img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 0.55rem;
+  display: block;
+  background: #1a1014;
+}
+
+.pb-portrait-card-label {
+  font-size: clamp(0.78rem, 2vmin, 0.95rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-bottom: 0.25rem;
+}
+
+.pb-portrait-select .pb-row {
+  margin-top: 1.25rem;
+  justify-content: center;
+}

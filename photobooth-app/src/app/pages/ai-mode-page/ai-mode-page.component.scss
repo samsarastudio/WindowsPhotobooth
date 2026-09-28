@@ -54,6 +54,15 @@
   display: block;
 }
 
+.pb-ai-mode-hint {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: clamp(0.78rem, 2.2vmin, 0.95rem);
+  font-weight: 400;
+  opacity: 0.72;
+  line-height: 1.35;
+}
+
 .pb-ai-mode .pb-row {
   justify-content: center;
   margin-top: clamp(1.35rem, 4vmin, 2rem);

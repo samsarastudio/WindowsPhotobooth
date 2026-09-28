@@ -38,6 +38,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     result: { ...base.result, ...patch.result },
     history: { ...base.history, ...patch.history },
     aiMode: { ...base.aiMode, ...patch.aiMode },
+    portraitSelect: { ...base.portraitSelect, ...patch.portraitSelect },
     boothMode: { ...base.boothMode, ...patch.boothMode },
     frame: { ...base.frame, ...patch.frame },
     caption: { ...base.caption, ...patch.caption },
@@ -109,6 +110,14 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
     const randomizeBackground =
       o['randomizeBackground'] === false ? false : useInpainting ? true : o['randomizeBackground'] === true;
     const inpaintRaw = typeof o['inpaintPrompt'] === 'string' ? o['inpaintPrompt'].trim() : '';
+    const pipelineRaw = typeof o['pipeline'] === 'string' ? o['pipeline'].trim().toLowerCase() : '';
+    const pipeline =
+      pipelineRaw === 'scene' || pipelineRaw === 'head-swap' || pipelineRaw === 'prompt'
+        ? pipelineRaw
+        : useInpainting
+          ? 'scene'
+          : undefined;
+    const portraitOnly = o['portraitOnly'] === true;
     if (id && label && prompt && id !== PLAIN_PHOTO_MODE_ID) {
       out.push({
         id,
@@ -116,6 +125,8 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
         prompt,
         ...(useInpainting ? { useInpainting: true, randomizeBackground } : {}),
         ...(inpaintRaw ? { inpaintPrompt: inpaintRaw } : {}),
+        ...(pipeline ? { pipeline } : {}),
+        ...(portraitOnly ? { portraitOnly: true } : {}),
       });
     }
   }
@@ -585,6 +596,12 @@ export class BoothConfigService {
       this.aiModes().length > 0,
   );
   readonly aiModes = computed(() => this.state()?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
+  /** Top-level AI cards (Scene Addition, etc.) — excludes portrait characters. */
+  readonly primaryAiModes = computed(() => this.aiModes().filter((m) => !m.portraitOnly));
+  /** AI Portrait character list (head-swap). */
+  readonly portraitAiModes = computed(() =>
+    this.aiModes().filter((m) => m.pipeline === 'head-swap' || m.portraitOnly === true),
+  );
   readonly openAiConfigured = computed(() => this.state()?.openAiConfigured ?? false);
 
   async load(): Promise<void> {

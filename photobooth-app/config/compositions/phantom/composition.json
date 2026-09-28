@@ -1,0 +1,10 @@
+{
+  "id": "phantom",
+  "label": "Phantom",
+  "face": {
+    "xPercent": 33,
+    "yPercent": 7,
+    "widthPercent": 34,
+    "heightPercent": 28
+  }
+}

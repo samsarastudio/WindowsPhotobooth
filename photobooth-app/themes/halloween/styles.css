@@ -1,0 +1,230 @@
+/**
+ * Halloween Haunt — gothic ember kiosk theme.
+ * Backdrop: themes/halloween/assets/attract-backdrop.png
+ */
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Spectral:ital,wght@0,300;0,400;0,600;1,400&display=swap");
+
+:root {
+  --pb-font-sans: "Spectral", Georgia, serif;
+  --pb-font-display: "Cinzel", "Times New Roman", serif;
+  --pb-bg-base: #0d0a0c;
+  --pb-ink: #f3e6d4;
+  --pb-ink-muted: rgba(243, 230, 212, 0.62);
+  --pb-card-bg: rgba(22, 14, 18, 0.82);
+  --pb-card-border: rgba(232, 140, 48, 0.28);
+  --pb-msg: #ff6b4a;
+  --pb-btn-primary-top: #e07a22;
+  --pb-btn-primary-bottom: #a84a12;
+  --pb-btn-primary-text: #1a0c06;
+  --pb-leaf: #e08c30;
+  --pb-ember: #e08c30;
+  --pb-fog: #2a1c28;
+  --pb-attract-hero-fs: clamp(2.4rem, min(10vmin, 9.5vh), 5rem);
+  --pb-attract-sub-fs: clamp(0.95rem, min(2.8vmin, 2.6vh), 1.35rem);
+  --pb-attract-cta-fs: clamp(1.15rem, min(3.6vmin, 3.4vh), 1.65rem);
+  --pb-attract-cta-min-h: clamp(3.6rem, 9vmin, 4.8rem);
+  --pb-attract-cta-width: clamp(280px, 42vw, 520px);
+}
+
+html[data-pb-theme='halloween'] body {
+  color: var(--pb-ink);
+  background-color: var(--pb-bg-base);
+  background-image:
+    linear-gradient(180deg, rgba(8, 5, 8, 0.55) 0%, rgba(8, 5, 8, 0.72) 55%, rgba(8, 5, 8, 0.88) 100%),
+    url("./assets/attract-backdrop.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+html[data-pb-theme='halloween'] .pb-doodle-paper,
+html[data-pb-theme='halloween'] .pb-doodle-circuit,
+html[data-pb-theme='halloween'] .pb-backdrop-wash,
+html[data-pb-theme='halloween'] .pb-backdrop-el {
+  display: none !important;
+}
+
+html[data-pb-theme='halloween'] .pb-page {
+  color: var(--pb-ink);
+}
+
+html[data-pb-theme='halloween'] .pb-title,
+html[data-pb-theme='halloween'] .pb-kia-hero-title,
+html[data-pb-theme='halloween'] .pb-kia-qr-title,
+html[data-pb-theme='halloween'] .pb-kia-ready-title {
+  font-family: var(--pb-font-display);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f6ead8;
+  text-shadow: 0 0 28px rgba(224, 122, 34, 0.35);
+}
+
+html[data-pb-theme='halloween'] .pb-kia-hero-title {
+  font-size: calc(var(--pb-attract-hero-fs) * var(--pb-attract-main-scale, 1));
+  line-height: 1.12;
+  animation: pb-haunt-ember 4.8s ease-in-out infinite;
+}
+
+html[data-pb-theme='halloween'] .pb-sub,
+html[data-pb-theme='halloween'] .pb-kia-hero-sub,
+html[data-pb-theme='halloween'] .pb-kia-qr-lead,
+html[data-pb-theme='halloween'] .pb-kia-ready-lead,
+html[data-pb-theme='halloween'] .pb-kia-tagline {
+  font-family: var(--pb-font-sans);
+  font-weight: 300;
+  color: var(--pb-ink-muted);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+html[data-pb-theme='halloween'] .pb-kia-tagline {
+  text-transform: uppercase;
+  letter-spacing: 0.34em;
+  font-size: clamp(0.65rem, 1.6vmin, 0.8rem);
+  color: rgba(224, 140, 48, 0.78);
+}
+
+html[data-pb-theme='halloween'] .pb-page.pb-kia-attract-page {
+  align-items: center;
+  justify-content: center;
+}
+
+html[data-pb-theme='halloween'] .pb-kia-attract {
+  width: min(920px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.5rem, 4vh, 2.75rem);
+  text-align: center;
+}
+
+html[data-pb-theme='halloween'] .pb-kia-attract-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  transform: scale(var(--pb-attract-top-scale, 1));
+}
+
+html[data-pb-theme='halloween'] .pb-kia-logo {
+  max-height: clamp(3.5rem, 10vh, 5.5rem);
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(224, 122, 34, 0.35));
+}
+
+html[data-pb-theme='halloween'] .pb-kia-hero-streak {
+  width: clamp(3.5rem, 9vw, 6rem);
+  height: 2px;
+  margin: 0.35rem auto 0.15rem;
+  background: linear-gradient(90deg, transparent, var(--pb-ember), transparent);
+  opacity: 0.9;
+  animation: pb-haunt-pulse 2.8s ease-in-out infinite;
+}
+
+html[data-pb-theme='halloween'] .pb-btn-primary,
+html[data-pb-theme='halloween'] .pb-kia-cta {
+  font-family: var(--pb-font-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pb-btn-primary-text);
+  background: linear-gradient(180deg, var(--pb-btn-primary-top), var(--pb-btn-primary-bottom));
+  border: 1px solid rgba(255, 196, 120, 0.35);
+  box-shadow: 0 12px 36px rgba(168, 74, 18, 0.35);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+html[data-pb-theme='halloween'] .pb-btn-primary:hover,
+html[data-pb-theme='halloween'] .pb-kia-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(224, 122, 34, 0.45);
+}
+
+html[data-pb-theme='halloween'] .pb-card,
+html[data-pb-theme='halloween'] .pb-ai-mode-card {
+  background: var(--pb-card-bg);
+  border: 1px solid var(--pb-card-border);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+html[data-pb-theme='halloween'] .pb-ai-mode-btn {
+  background: rgba(32, 18, 24, 0.9);
+  border: 1px solid rgba(224, 140, 48, 0.28);
+  color: var(--pb-ink);
+  font-family: var(--pb-font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+html[data-pb-theme='halloween'] .pb-ai-mode-btn:hover {
+  border-color: rgba(224, 140, 48, 0.7);
+  background: rgba(56, 28, 24, 0.95);
+  transform: translateY(-2px);
+}
+
+html[data-pb-theme='halloween'] .pb-ai-mode-btn--plain {
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+html[data-pb-theme='halloween'] .pb-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: clamp(0.85rem, 2vw, 1.25rem);
+  width: min(980px, 94vw);
+  margin: 1.25rem auto 0;
+  list-style: none;
+  padding: 0;
+}
+
+html[data-pb-theme='halloween'] .pb-portrait-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+  padding: 0.55rem;
+  border-radius: 0.85rem;
+  background: rgba(18, 10, 14, 0.88);
+  border: 1px solid rgba(224, 140, 48, 0.3);
+  color: var(--pb-ink);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+html[data-pb-theme='halloween'] .pb-portrait-card:hover {
+  transform: translateY(-4px) scale(1.015);
+  border-color: rgba(255, 176, 72, 0.75);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(224, 122, 34, 0.25);
+}
+
+html[data-pb-theme='halloween'] .pb-portrait-card img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 0.55rem;
+  display: block;
+}
+
+html[data-pb-theme='halloween'] .pb-portrait-card-label {
+  font-family: var(--pb-font-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  text-align: center;
+  padding-bottom: 0.35rem;
+}
+
+@keyframes pb-haunt-ember {
+  0%, 100% { text-shadow: 0 0 22px rgba(224, 122, 34, 0.28); }
+  50% { text-shadow: 0 0 36px rgba(255, 150, 48, 0.5); }
+}
+
+@keyframes pb-haunt-pulse {
+  0%, 100% { opacity: 0.55; transform: scaleX(0.92); }
+  50% { opacity: 1; transform: scaleX(1); }
+}

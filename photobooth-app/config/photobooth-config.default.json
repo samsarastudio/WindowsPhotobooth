@@ -1,5 +1,5 @@
 {
-  "activeThemeId": "inmoment",
+  "activeThemeId": "halloween",
   "adminPin": "2727",
   "guestModes": {
     "defaultEnabled": true,
@@ -24,7 +24,7 @@
     "borderEnabled": true
   },
   "requireQrUnlock": false,
-  "aiGenerationEnabled": false,
+  "aiGenerationEnabled": true,
   "defaultAiModeId": null,
   "photoFrames": {
     "enabled": true,
@@ -36,11 +36,11 @@
     "guestTextEnabled": false,
     "guestTextOptional": true,
     "guestTextMaxLength": 36,
-    "guestTextCreditLine": "by inmoment photography",
+    "guestTextCreditLine": "by HauntBooth",
     "guestTextXPercent": 50,
     "guestTextYPercent": 78,
     "guestTextSizePercent": 3.4,
-    "guestTextColor": "#c9a36a",
+    "guestTextColor": "#e08c30",
     "guestTextCreditColor": "#d8c4a0",
     "guestTextAlign": "center",
     "guestTextBrush": false,
@@ -50,7 +50,7 @@
     "enabled": true,
     "apiBaseUrl": "https://moments.inmomentservices.com",
     "uploadToken": "26bdcbbb413c1063f472b95cc2f75ab5137f28a9cdd8c7d5",
-    "sessionPrefix": "onam",
+    "sessionPrefix": "halloween",
     "uploadOriginal": true,
     "uploadFramed": true,
     "uploadAi": true,
@@ -69,23 +69,69 @@
   },
   "aiModes": [
     {
-      "id": "dj",
-      "label": "DJ",
+      "id": "scene",
+      "label": "Scene Addition",
+      "pipeline": "scene",
       "useInpainting": true,
       "randomizeBackground": true,
-      "inpaintPrompt": "Seamlessly blend the person into this DJ booth environment as the featured DJ. Preserve their exact face, features, skin tone, and likeness — do not change identity. Match scene lighting, shadows, perspective, and color grade. Reproduce the brand logo on booth furniture, product boxes, and signage. Add subtle {brand} branding on DJ headphones or shirt where natural. Photorealistic exclusive event photo. No mascots.",
-      "prompt": "Transform the person into a professional DJ at an exclusive event with {brand} branding on the booth and products. Preserve their exact face and likeness. Photorealistic event lighting. No mascots."
+      "prompt": "Place the guests exactly as captured into this Halloween environment. Keep every face, skin tone, hair, and likeness 100% unchanged — never alter identity. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.",
+      "inpaintPrompt": "Seamlessly blend the cropped guest group into this Halloween scene. CRITICAL: do not change any faces — preserve exact facial features, expressions, skin tone, and hair. Keep bodies and clothing as captured; only replace or extend the surroundings with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup on faces, no identity change."
     },
     {
-      "id": "newspaper",
-      "label": "Newspaper",
-      "prompt": "Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject's face remains recognizable but stylized to match the printed newspaper aesthetic."
+      "id": "vampire",
+      "label": "Vampire",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+    },
+    {
+      "id": "witch",
+      "label": "Witch",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+    },
+    {
+      "id": "werewolf",
+      "label": "Werewolf",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+    },
+    {
+      "id": "reaper",
+      "label": "Reaper",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+    },
+    {
+      "id": "phantom",
+      "label": "Phantom",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
     }
   ],
   "branding": {
     "logoFile": null,
     "aiLogoFile": null,
-    "brandName": null,
+    "brandName": "HauntBooth",
     "applyBrandToAi": true
   },
   "camera": {
@@ -95,12 +141,12 @@
   },
   "copy": {
     "attract": {
-      "icon": "📷",
-      "tagline": "Capturing memories",
+      "icon": "🎃",
+      "tagline": "Enter if you dare",
       "mainScale": 1,
       "topScale": 1,
-      "title": "inmoment",
-      "subtitle": "Tap to create your\npersonalized photo keepsake.",
+      "title": "HauntBooth",
+      "subtitle": "Tap to transform into a\nHalloween keepsake.",
       "ctaLabel": "Tap to Start",
       "startAria": "Tap to Start",
       "adminLink": "Admin"
@@ -119,7 +165,7 @@
       "bypassCode": "1234"
     },
     "capture": {
-      "sideTitle": "How to pose",
+      "sideTitle": "Strike a pose",
       "instructions": "Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends",
       "starting": "Starting camera…",
       "readyTitle": "Get Ready",
@@ -135,7 +181,7 @@
       "submit": "Done",
       "confirmPhoto": "Done",
       "generateAi": "Create AI version",
-      "generatingAi": "Creating your AI image…",
+      "generatingAi": "Conjuring your AI image…",
       "aiPreviewTitle": "AI version",
       "aiErrorPrefix": "AI generation failed:",
       "aiGalleryTitle": "Your photos",
@@ -143,12 +189,12 @@
       "galleryThumbAi": "AI style",
       "galleryBackToResult": "Back to photo",
       "galleryFinish": "Finish",
-      "thinkingSummary": "Preparing your image",
+      "thinkingSummary": "Preparing your haunt",
       "thinkingStepAnalyze": "Analysing framing and composition",
-      "thinkingStepPlan": "Applying your chosen style directions",
-      "thinkingStepBackground": "Selecting branded environment and compositing your photo",
+      "thinkingStepPlan": "Applying your chosen Halloween style",
+      "thinkingStepBackground": "Building scenery and locking your faces",
       "thinkingStepImage": "Rendering with the image API",
-      "thinkingFootnote": "Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs.",
+      "thinkingFootnote": "Runs on OpenAI Images (edit). Faces are locked — the booth never rewrites your likeness.",
       "share": "Share",
       "sharing": "Uploading…",
       "shareQrTitle": "Scan to view your photo",
@@ -166,10 +212,18 @@
       "ariaOpen": "Reprint previous photos"
     },
     "aiMode": {
-      "title": "Choose a style",
-      "subtitle": "Pick how we transform your photo",
+      "title": "Pick your spell",
+      "subtitle": "Scene Addition keeps your faces — AI Portrait drops you into a costume",
       "back": "Back",
-      "plainPhotoLabel": "Photocapture"
+      "plainPhotoLabel": "Photocapture",
+      "portraitEntryLabel": "AI Portrait",
+      "portraitEntryHint": "Become one of five Halloween characters — your face stays yours",
+      "sceneEntryHint": "Keep your group as-is and paint haunted scenery around you"
+    },
+    "portraitSelect": {
+      "title": "Choose your haunt",
+      "subtitle": "Pick a character — we keep your real face",
+      "back": "Back"
     },
     "frame": {
       "title": "Choose a frame",

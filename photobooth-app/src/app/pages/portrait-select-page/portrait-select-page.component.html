@@ -1,0 +1,28 @@
+<div class="pb-page pb-portrait-select">
+  <div class="pb-portrait-select-inner">
+    @if (branding.logoSrc(); as logo) {
+      <img class="pb-icon pb-icon-logo" [src]="logo" [attr.alt]="copy().portraitSelect.title" />
+    } @else {
+      <span class="pb-icon" aria-hidden="true">{{ copy().attract.icon }}</span>
+    }
+    <h1 class="pb-title">{{ copy().portraitSelect.title }}</h1>
+    <p class="pb-sub">{{ copy().portraitSelect.subtitle }}</p>
+
+    <ul class="pb-portrait-grid" role="list">
+      @for (c of characters(); track c.id) {
+        <li>
+          <button type="button" class="pb-portrait-card" (click)="choose(c.id)">
+            @if (thumbFor(c.id); as src) {
+              <img [src]="src" [alt]="c.label" loading="lazy" decoding="async" />
+            }
+            <span class="pb-portrait-card-label">{{ c.label }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+
+    <div class="pb-row">
+      <a routerLink="/ai-mode" class="pb-btn pb-btn-ghost">{{ copy().portraitSelect.back }}</a>
+    </div>
+  </div>
+</div>
