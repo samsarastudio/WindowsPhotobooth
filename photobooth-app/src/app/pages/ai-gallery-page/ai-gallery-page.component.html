@@ -49,6 +49,26 @@
       }
     }
 
+    @if (showMakePhysical()) {
+      <div class="pb-result-physical pb-result-physical--last">
+        @if (makePhysicalErr(); as pe) {
+          <p class="pb-msg">{{ copy().result.physicalErrorPrefix }} {{ pe }}</p>
+        }
+        <button
+          type="button"
+          class="pb-btn pb-btn-ghost pb-result-physical-btn"
+          [disabled]="makePhysicalBusy()"
+          (click)="openPhysicalAdjust()"
+        >
+          @if (makePhysicalBusy()) {
+            {{ copy().result.makingPhysical }}
+          } @else {
+            {{ copy().result.makePhysical }}
+          }
+        </button>
+      </div>
+    }
+
     <div class="pb-row pb-ai-gallery-actions">
       <button type="button" class="pb-btn pb-btn-ghost" (click)="backToResult()">
         {{ copy().result.galleryBackToResult }}
@@ -73,6 +93,7 @@
         {{ copy().result.galleryFinish }}
       </button>
     </div>
+
     @if (printErr(); as pe) {
       <pb-print-trouble-dialog
         [error]="pe"
@@ -83,3 +104,12 @@
     }
   </div>
 </div>
+
+@if (physicalAdjustOpen() && physicalSourcePath()) {
+  <pb-physical-frame-adjust-dialog
+    [imagePath]="physicalSourcePath()"
+    [busy]="makePhysicalBusy()"
+    (confirmed)="onPhysicalAdjustConfirm($event)"
+    (cancelled)="physicalAdjustOpen.set(false)"
+  />
+}

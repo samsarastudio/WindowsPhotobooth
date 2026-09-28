@@ -85,8 +85,9 @@
       </div>
     }
 
+    <!-- Always last conversion option: available for photocapture, frames, Scene, and Portrait AI. -->
     @if (showMakePhysical()) {
-      <div class="pb-result-physical">
+      <div class="pb-result-physical pb-result-physical--last">
         @if (makePhysicalErr(); as pe) {
           <p class="pb-msg">{{ copy().result.physicalErrorPrefix }} {{ pe }}</p>
         }

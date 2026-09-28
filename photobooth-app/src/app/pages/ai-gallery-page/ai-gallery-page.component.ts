@@ -4,12 +4,15 @@ import { BoothConfigService } from '../../services/booth-config.service';
 import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { CameraService } from '../../services/camera.service';
+import { PhysicalFrameLayoutService } from '../../services/physical-frame-layout.service';
+import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
 
 import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
+import { PhysicalFrameAdjustDialogComponent } from '../../components/physical-frame-adjust-dialog/physical-frame-adjust-dialog.component';
 
 @Component({
   selector: 'pb-ai-gallery-page',
-  imports: [RouterLink, PrintTroubleDialogComponent],
+  imports: [RouterLink, PrintTroubleDialogComponent, PhysicalFrameAdjustDialogComponent],
   templateUrl: './ai-gallery-page.component.html',
   styleUrl: './ai-gallery-page.component.scss',
 })
@@ -19,6 +22,7 @@ export class AiGalleryPageComponent implements OnInit {
   private readonly session = inject(AiGallerySessionService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly camera = inject(CameraService);
+  private readonly physicalLayout = inject(PhysicalFrameLayoutService);
 
   readonly copy = this.booth.copy;
 
@@ -34,6 +38,10 @@ export class AiGalleryPageComponent implements OnInit {
   readonly printDone = signal(false);
   readonly printErr = signal<string | null>(null);
 
+  readonly makePhysicalBusy = signal(false);
+  readonly makePhysicalErr = signal<string | null>(null);
+  readonly physicalAdjustOpen = signal(false);
+
   readonly heroSrc = computed(() =>
     this.heroKind() === 'original' ? this.originalDataUrl() : this.aiDataUrl(),
   );
@@ -44,6 +52,10 @@ export class AiGalleryPageComponent implements OnInit {
   readonly canPrint = computed(
     () => this.showPrint() && !!this.printPath() && !this.printBusy() && !this.printDone(),
   );
+
+  /** Make physical from the image currently selected (AI or original). */
+  readonly physicalSourcePath = computed(() => this.printPath() || '');
+  readonly showMakePhysical = computed(() => !!this.physicalSourcePath());
 
   async ngOnInit(): Promise<void> {
     if (!this.session.hasPair()) {
@@ -71,6 +83,39 @@ export class AiGalleryPageComponent implements OnInit {
   pickHero(kind: 'original' | 'ai'): void {
     this.heroKind.set(kind);
     this.heroAspectRatio.set(null);
+  }
+
+  openPhysicalAdjust(): void {
+    if (!this.physicalSourcePath()) {
+      this.makePhysicalErr.set('Physical layout requires Electron.');
+      return;
+    }
+    this.makePhysicalErr.set(null);
+    this.physicalAdjustOpen.set(true);
+  }
+
+  async onPhysicalAdjustConfirm(crop: PhysicalPhotoCrop): Promise<void> {
+    const src = this.physicalSourcePath();
+    if (!src) {
+      this.makePhysicalErr.set('Physical layout requires Electron.');
+      return;
+    }
+    this.makePhysicalBusy.set(true);
+    this.makePhysicalErr.set(null);
+    try {
+      const r = await this.physicalLayout.generate(src, crop);
+      if (!r.ok || !r.path) {
+        this.makePhysicalErr.set(r.error || 'Could not create physical sheet.');
+        return;
+      }
+      this.physicalAdjustOpen.set(false);
+      // Land on result with the cut sheet so Remake physical / print stay available.
+      await this.router.navigate(['/result'], { state: { path: r.path, preview: false } });
+    } catch (e) {
+      this.makePhysicalErr.set(String(e));
+    } finally {
+      this.makePhysicalBusy.set(false);
+    }
   }
 
   async printOnce(): Promise<void> {
@@ -110,7 +155,7 @@ export class AiGalleryPageComponent implements OnInit {
   backToResult(): void {
     const p = this.session.originalPath();
     if (p) {
-      void this.router.navigate(['/result'], { state: { path: p } });
+      void this.router.navigate(['/result'], { state: { path: p, preview: false } });
     } else {
       void this.router.navigate(['/result']);
     }

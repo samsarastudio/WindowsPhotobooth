@@ -98,8 +98,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     () =>
       !this.isPreview() &&
       !!this.path() &&
-      !this.aiGenerating() &&
-      !this.boothMode.isPhysicalFrameMode(),
+      !this.aiGenerating(),
   );
   readonly viewingFramedPhoto = computed(() => !!this.path() && /_framed\.png$/i.test(this.path() || ''));
   readonly showMakeFramed = computed(
@@ -107,13 +106,19 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       !this.isPreview() &&
       !!this.path() &&
       !this.aiGenerating() &&
-      !this.boothMode.isPhysicalFrameMode() &&
       !this.viewingPhysicalSheet() &&
       this.booth.photoFrames().enabled,
   );
+  /**
+   * Source for Make physical / Make framed.
+   * Prefer the image currently on screen (AI / framed) so every option can print a sheet;
+   * fall back to the original capture when viewing an existing physical sheet.
+   */
   readonly physicalAdjustSource = computed(() => {
     const p = this.path();
-    return p ? this.originalCapturePath(p) : '';
+    if (!p) return '';
+    if (this.isPhysicalSheetPath(p)) return this.originalCapturePath(p);
+    return p;
   });
   readonly printUsesPhysicalLayout = computed(
     () => this.boothMode.isPhysicalFrameMode() || this.viewingPhysicalSheet(),
