@@ -19,23 +19,52 @@ export class PortraitSelectPageComponent implements OnInit {
   readonly copy = this.booth.copy;
   readonly characters = this.booth.portraitAiModes;
   readonly thumbUrls = signal<Record<string, string>>({});
+  readonly thumbsLoading = signal(false);
 
   readonly hasChars = computed(() => this.characters().length > 0);
+  readonly backLink = computed(() => {
+    // Experience picker is /booth-mode; skip ai-mode when portraits are the AI entry.
+    return '/booth-mode';
+  });
 
   ngOnInit(): void {
     if (!this.booth.aiGenerationEnabled() || !this.hasChars()) {
-      void this.router.navigate(['/ai-mode']);
+      void this.router.navigate(['/booth-mode']);
       return;
     }
     void this.loadThumbs();
   }
 
   async loadThumbs(): Promise<void> {
+    this.thumbsLoading.set(true);
     const next: Record<string, string> = {};
-    for (const c of this.characters()) {
-      next[c.id] = `/config/compositions/${c.id}/composition.png`;
+    try {
+      if (window.pbApi?.adminListCompositions) {
+        const r = await window.pbApi.adminListCompositions();
+        if (r.ok && Array.isArray(r.items)) {
+          for (const item of r.items) {
+            if (item?.modeId && item.url) next[item.modeId] = item.url;
+          }
+        }
+      }
+      // Per-character fallback (same Zyn file:// path).
+      if (window.pbApi?.adminGetComposition) {
+        for (const c of this.characters()) {
+          if (next[c.id]) continue;
+          try {
+            const one = await window.pbApi.adminGetComposition(c.id);
+            if (one.ok && one.url) next[c.id] = one.url;
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      this.thumbUrls.set(next);
+      this.thumbsLoading.set(false);
     }
-    this.thumbUrls.set(next);
   }
 
   choose(id: string): void {

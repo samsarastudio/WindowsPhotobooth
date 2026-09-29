@@ -55,7 +55,9 @@ export class AiGalleryPageComponent implements OnInit {
 
   /** Make physical from the image currently selected (AI or original). */
   readonly physicalSourcePath = computed(() => this.printPath() || '');
-  readonly showMakePhysical = computed(() => !!this.physicalSourcePath());
+  readonly showMakePhysical = computed(
+    () => !!this.physicalSourcePath() && this.booth.guestModes().physicalFrameEnabled !== false,
+  );
 
   async ngOnInit(): Promise<void> {
     if (!this.session.hasPair()) {

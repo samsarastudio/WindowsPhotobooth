@@ -9,29 +9,60 @@
         decoding="async"
       />
     } @else {
-      <span class="pb-icon" aria-hidden="true">📷</span>
+      <span class="pb-icon" aria-hidden="true">{{ copy().attract.icon }}</span>
     }
     <h1 class="pb-title">{{ copy().boothMode.title }}</h1>
     <p class="pb-sub">{{ copy().boothMode.subtitle }}</p>
 
-    <ul class="pb-booth-mode-list" role="list">
-      @if (showDefault()) {
+    <ul class="pb-booth-mode-grid" role="list">
+      @if (showPhotoPrint()) {
         <li>
-          <button type="button" class="pb-booth-mode-btn" (click)="choose('default')">
-            <span class="pb-booth-mode-label">{{ copy().boothMode.defaultLabel }}</span>
-            <span class="pb-booth-mode-hint">{{ copy().boothMode.defaultHint }}</span>
+          <button type="button" class="pb-exp-card" (click)="choose('photoPrint')">
+            <span class="pb-exp-card-media">
+              @if (thumbs().photo; as src) {
+                <img [src]="src" alt="" loading="lazy" decoding="async" />
+              } @else {
+                <span class="pb-exp-card-fallback" aria-hidden="true">📷</span>
+              }
+            </span>
+            <span class="pb-exp-card-label">{{ copy().boothMode.defaultLabel }}</span>
+            <span class="pb-exp-card-hint">{{ copy().boothMode.defaultHint }}</span>
           </button>
         </li>
       }
-      @if (showPhysical()) {
+      @if (showAiPortrait()) {
         <li>
-          <button type="button" class="pb-booth-mode-btn" (click)="choose('physicalFrame')">
-            <span class="pb-booth-mode-label">{{ copy().boothMode.physicalLabel }}</span>
-            <span class="pb-booth-mode-hint">{{ copy().boothMode.physicalHint }}</span>
+          <button type="button" class="pb-exp-card pb-exp-card--accent" (click)="choose('aiPortrait')">
+            <span class="pb-exp-card-media">
+              @if (thumbs().portrait; as src) {
+                <img [src]="src" alt="" loading="lazy" decoding="async" />
+              } @else {
+                <span class="pb-exp-card-fallback" aria-hidden="true">{{ copy().attract.icon }}</span>
+              }
+            </span>
+            <span class="pb-exp-card-label">{{ copy().boothMode.aiPortraitLabel }}</span>
+            <span class="pb-exp-card-hint">{{ copy().boothMode.aiPortraitHint }}</span>
+          </button>
+        </li>
+      }
+      @if (showScene()) {
+        <li>
+          <button type="button" class="pb-exp-card" (click)="choose('scene')">
+            <span class="pb-exp-card-media">
+              @if (thumbs().scene; as src) {
+                <img [src]="src" alt="" loading="lazy" decoding="async" />
+              } @else {
+                <span class="pb-exp-card-fallback" aria-hidden="true">🌫️</span>
+              }
+            </span>
+            <span class="pb-exp-card-label">{{ copy().boothMode.sceneLabel }}</span>
+            <span class="pb-exp-card-hint">{{ copy().boothMode.sceneHint }}</span>
           </button>
         </li>
       }
     </ul>
+
+    <p class="pb-hint pb-booth-mode-magnet-note">{{ copy().boothMode.magnetNote }}</p>
 
     <div class="pb-row">
       <a routerLink="/" class="pb-btn pb-btn-ghost">{{ copy().boothMode.back }}</a>

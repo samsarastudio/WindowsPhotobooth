@@ -37,18 +37,18 @@
 .pb-result-title {
   flex: 0 0 auto;
   font-family: var(--pb-font-display, 'Cormorant Garamond', Georgia, serif);
-  font-size: clamp(2.15rem, 7vmin, 4rem);
+  font-size: clamp(1.55rem, 5vmin, 2.75rem);
   font-weight: 600;
   letter-spacing: 0.03em;
-  margin: 0 0 clamp(0.45rem, 2vmin, 1rem);
+  margin: 0 0 clamp(0.35rem, 1.5vmin, 0.75rem);
   line-height: 1.06;
 }
 
-/* Frame hugs photo aspect ratio — width tracks height cap so no oversized pillarboxing */
+/* Frame hugs photo aspect ratio — shrinks further while AI is generating */
 .pb-result-frame {
   --result-ar: 1.5;
-  --frame-cap: min(58vh, calc(100dvh - 12rem));
-  flex: 0 1 auto;
+  --frame-cap: min(52vh, calc(100dvh - 14rem));
+  flex: 1 1 auto;
   position: relative;
   margin-inline: auto;
   margin-bottom: 0;
@@ -66,6 +66,10 @@
     0 16px 56px rgba(43, 34, 24, 0.14),
     0 8px 22px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.pb-page.pb-result:has(.pb-result-ai.is-generating) .pb-result-frame {
+  --frame-cap: min(42vh, calc(100dvh - 11rem));
 }
 
 .pb-result-img {
@@ -108,15 +112,45 @@
 }
 
 .pb-result-ai {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
-  margin-top: clamp(0.35rem, 2vmin, 0.75rem);
-  max-height: min(30vh, 240px);
+  margin-top: clamp(0.25rem, 1.2vmin, 0.55rem);
+  max-height: none;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.pb-result-ai.is-generating {
+  max-height: 3.5rem;
 }
 
 .pb-result-ai-status {
-  margin: 0 0 0.5rem;
+  margin: 0;
+  font-size: clamp(0.95rem, 2.6vmin, 1.15rem);
+  font-weight: 600;
+  color: var(--pb-ink, #f3e6d4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.pb-result-ai-eta {
+  font-weight: 500;
+  opacity: 0.78;
+}
+
+.pb-result-ai-err {
+  margin: 0;
+  max-width: 36ch;
+  font-size: clamp(0.85rem, 2.3vmin, 1rem);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .pb-result-ai-btn {

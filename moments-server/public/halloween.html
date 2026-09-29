@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HauntBooth — Halloween AI Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/halloween.css?v=20260929b" />
+  </head>
+  <body>
+    <div class="haze" aria-hidden="true"></div>
+    <header class="top">
+      <p class="eyebrow">InMoment · HauntBooth</p>
+      <h1>Halloween AI Demo</h1>
+      <p class="lede">
+        Two booth features — AI Portrait head-swap and Scene Addition — with sample
+        originals beside framed AI results. Try a sample, or upload / capture your own
+        waist-up photo.
+      </p>
+      <div class="quota" id="quotaBar">
+        <span id="quotaText">Loading…</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="samples" id="samples" aria-live="polite"></section>
+
+      <section class="try-section card-panel">
+        <h2>Try your photo</h2>
+        <p class="hint">
+          Stand like the booth: face the camera, head to waist in frame, arms visible.
+          Plain indoor background works best. One person for Portrait · group for Scene.
+        </p>
+        <div class="try-grid">
+          <div class="try-preview">
+            <img id="tryPreview" alt="Your photo preview" hidden />
+            <p class="try-placeholder" id="tryPlaceholder">No photo selected yet</p>
+          </div>
+          <div class="try-controls">
+            <label class="field-label" for="tryMode">Mode</label>
+            <select id="tryMode" class="select">
+              <option value="portrait">AI Portrait (vampire)</option>
+              <option value="scene">Scene Addition (pumpkin patch)</option>
+            </select>
+            <div class="actions try-actions">
+              <label class="btn ghost file-btn">
+                Upload from gallery
+                <input id="tryFile" type="file" accept="image/*" hidden />
+              </label>
+              <button type="button" class="btn ghost" id="btnCamera">Use camera</button>
+              <button type="button" class="btn primary" id="btnTryGenerate" disabled>
+                Generate with my photo
+              </button>
+            </div>
+            <p class="status" id="tryStatus"></p>
+            <video id="tryVideo" class="try-video" playsinline autoplay muted hidden></video>
+            <canvas id="tryCanvas" hidden></canvas>
+            <div class="actions" id="cameraActions" hidden>
+              <button type="button" class="btn primary" id="btnSnap">Capture</button>
+              <button type="button" class="btn ghost" id="btnCancelCam">Cancel camera</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="gallery-section">
+        <div class="gallery-head">
+          <h2>Generated gallery</h2>
+          <p>Live regenerations from this demo appear here (limit applies). All results are framed.</p>
+        </div>
+        <div class="gallery" id="gallery">
+          <p class="empty" id="galleryEmpty">No live generations yet — try a sample or your photo.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span>HauntBooth demo · live gens limited</span>
+    </footer>
+
+    <div class="toast" id="toast" hidden></div>
+    <script src="/js/halloween.js?v=20260929c" type="module"></script>
+  </body>
+</html>

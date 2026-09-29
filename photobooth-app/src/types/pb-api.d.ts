@@ -164,12 +164,44 @@ export interface PbApi {
     modeId: string,
     filename: string,
   ): Promise<{ ok: boolean; removed?: string; error?: string }>;
+  adminListCompositions(): Promise<{
+    ok: boolean;
+    items?: {
+      ok?: boolean;
+      modeId: string;
+      url: string | null;
+      source?: string | null;
+      filename?: string | null;
+      face?: { xPercent: number; yPercent: number; widthPercent: number; heightPercent: number };
+    }[];
+    error?: string;
+  }>;
+  adminGetComposition(modeId: string): Promise<{
+    ok: boolean;
+    modeId?: string;
+    url?: string | null;
+    source?: string | null;
+    filename?: string | null;
+    error?: string;
+  }>;
+  adminPickCompositionImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;
+  adminInstallComposition(
+    modeId: string,
+    sourcePath: string,
+  ): Promise<{
+    ok: boolean;
+    modeId?: string;
+    url?: string | null;
+    filename?: string | null;
+    error?: string;
+  }>;
   openAiGenerateImage(payload: {
     imagePath: string;
     prompt: string;
     modeId?: string;
     useInpainting?: boolean;
     randomizeBackground?: boolean;
+    backgroundFilename?: string;
     inpaintPrompt?: string;
     pipeline?: 'scene' | 'head-swap' | 'prompt';
     face?: { xPercent: number; yPercent: number; widthPercent: number; heightPercent: number };
@@ -391,15 +423,15 @@ export interface PbApi {
       status: number;
       driverName?: string;
       portName?: string;
-      /** Wi‑Fi / network IPP / WSD */
+      /** Wiâ€‘Fi / network IPP / WSD */
       isIppClass?: boolean;
-      /** Microsoft IPP Class Driver (USB or Wi‑Fi) */
+      /** Microsoft IPP Class Driver (USB or Wiâ€‘Fi) */
       usesIppDriver?: boolean;
       /** Real Canon / SELPHY driver or Canon queue name */
       isCanonDriver?: boolean;
       /** Local USB port (USB001 / DOT4_*) */
       isUsb?: boolean;
-      /** Network / Wi‑Fi / WSD / IPP port */
+      /** Network / Wiâ€‘Fi / WSD / IPP port */
       isNetwork?: boolean;
     }[];
     usbCount?: number;
@@ -431,7 +463,7 @@ export interface PbApi {
   printPhoto(payload: {
     filePath: string;
     deviceName?: string | null;
-    /** Dual-column physical frame cut sheet — one postcard with both photos. */
+    /** Dual-column physical frame cut sheet â€” one postcard with both photos. */
     layoutMode?: 'physicalFrame';
   }): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;
   printTest(): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;

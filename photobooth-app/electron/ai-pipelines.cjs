@@ -8,10 +8,11 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_HEAD_FACE = {
-  xPercent: 33,
-  yPercent: 6,
-  widthPercent: 34,
-  heightPercent: 28,
+  // Match Zyn Photobooth-AICore — small head box relative to full plate.
+  xPercent: 40,
+  yPercent: 1,
+  widthPercent: 17,
+  heightPercent: 19,
 };
 
 const PORTRAIT_SIZES = [
@@ -39,10 +40,11 @@ function clampFace(raw) {
   };
 }
 
+/** Mild expand so hair is covered without blowing up head size vs the costume body (Zyn). */
 function expandFaceForHair(face) {
   const f = clampFace(face);
-  const widthPercent = Math.min(42, Math.max(14, f.widthPercent * 1.12));
-  const heightPercent = Math.min(40, Math.max(16, f.heightPercent * 1.28));
+  const widthPercent = Math.min(28, Math.max(14, f.widthPercent * 1.12));
+  const heightPercent = Math.min(30, Math.max(16, f.heightPercent * 1.28));
   const xPercent = Math.max(0, f.xPercent - (widthPercent - f.widthPercent) / 2);
   const yPercent = Math.max(0, f.yPercent - (heightPercent - f.heightPercent) * 0.55);
   return clampFace({ xPercent, yPercent, widthPercent, heightPercent });
@@ -234,17 +236,76 @@ function createPipelineHelpers(ctx) {
       .toBuffer();
   }
 
+  function letterboxPlateLayout(canvasW, canvasH, plateW, plateH) {
+    const pw = Math.max(1, plateW);
+    const ph = Math.max(1, plateH);
+    const plateAr = pw / ph;
+    const canvasAr = canvasW / canvasH;
+    let contentW;
+    let contentH;
+    let left;
+    let top;
+    if (plateAr > canvasAr) {
+      contentW = canvasW;
+      contentH = Math.max(1, Math.round(canvasW / plateAr));
+      left = 0;
+      top = Math.round((canvasH - contentH) / 2);
+    } else {
+      contentH = canvasH;
+      contentW = Math.max(1, Math.round(canvasH * plateAr));
+      left = Math.round((canvasW - contentW) / 2);
+      top = 0;
+    }
+    return { contentW, contentH, left, top };
+  }
+
+  function remapFaceToLetterbox(faceIn, canvasW, canvasH, layout) {
+    const { contentW, contentH, left, top } = layout;
+    return clampFace({
+      xPercent: (left / canvasW) * 100 + faceIn.xPercent * (contentW / canvasW),
+      yPercent: (top / canvasH) * 100 + faceIn.yPercent * (contentH / canvasH),
+      widthPercent: faceIn.widthPercent * (contentW / canvasW),
+      heightPercent: faceIn.heightPercent * (contentH / canvasH),
+    });
+  }
+
+  async function letterboxPlateOntoCanvas(sharpMod, backgroundPath, w, h) {
+    const meta = await sharpMod(backgroundPath).metadata();
+    const layout = letterboxPlateLayout(w, h, meta.width || 1024, meta.height || 1536);
+    const plateBuf = await sharpMod(backgroundPath)
+      .resize(layout.contentW, layout.contentH, { fit: 'fill' })
+      .ensureAlpha()
+      .toBuffer();
+    let bgBuf = await sharpMod({
+      create: {
+        width: w,
+        height: h,
+        channels: 4,
+        background: { r: 12, g: 8, b: 14, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    bgBuf = await sharpMod(bgBuf)
+      .composite([{ input: plateBuf, left: layout.left, top: layout.top }])
+      .ensureAlpha()
+      .toBuffer();
+    return { bgBuf, layout };
+  }
+
   async function buildHeadEraseScene(sharpMod, backgroundPath, faceRegion) {
+    // Portrait character plates stay portrait (4×6). Landscape plates stay landscape (6×4).
+    const face = clampFace(faceRegion || DEFAULT_HEAD_FACE);
     const portrait = await sceneIsPortrait(sharpMod, backgroundPath);
     const sizes = portrait ? PORTRAIT_SIZES : LANDSCAPE_SIZES;
-    return pngBufferUnderLimit(
+    const buf = await pngBufferUnderLimit(
       sharpMod,
       async (w, h) => {
         let bgBuf = await sharpMod(backgroundPath)
-          .resize(w, h, { fit: 'cover', position: 'center' })
+          .resize(w, h, { fit: 'cover', position: 'centre' })
           .ensureAlpha()
           .toBuffer();
-        bgBuf = await eraseOriginalHead(sharpMod, bgBuf, w, h, faceRegion || DEFAULT_HEAD_FACE);
+        bgBuf = await eraseOriginalHead(sharpMod, bgBuf, w, h, face);
         return sharpMod(bgBuf)
           .ensureAlpha()
           .png({ compressionLevel: 9, effort: 10 })
@@ -252,6 +313,7 @@ function createPipelineHelpers(ctx) {
       },
       sizes,
     );
+    return { buf, face };
   }
 
   async function buildHeadEditMaskPng(sharpMod, w, h, faceRegion) {
@@ -284,30 +346,76 @@ function createPipelineHelpers(ctx) {
       .toBuffer();
   }
 
+  /**
+   * Scene Addition mask: protect the placed guest region (opaque) so the model
+   * only blends scenery around people — no regenerated legs/bodies.
+   * Convention matches head mask: alpha 0 = editable, alpha 255 = keep.
+   */
+  async function buildScenePreserveMask(sharpMod, w, h) {
+    const maskW = Math.round(w * 0.78);
+    const maskH = Math.round(h * 0.9);
+    const cx = w / 2;
+    const cy = h - maskH * 0.48 - h * 0.012;
+    const rx = maskW * 0.48;
+    const ry = maskH * 0.48;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+      <defs>
+        <radialGradient id="p" cx="50%" cy="48%" r="68%">
+          <stop offset="0%" stop-color="#000"/>
+          <stop offset="62%" stop-color="#000"/>
+          <stop offset="82%" stop-color="#666"/>
+          <stop offset="100%" stop-color="#fff"/>
+        </radialGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="white"/>
+      <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="url(#p)"/>
+    </svg>`;
+    const { data, info } = await sharpMod(Buffer.from(svg))
+      .resize(w, h)
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const rgba = Buffer.alloc(info.width * info.height * 4);
+    for (let i = 0; i < data.length; i++) {
+      const p = i * 4;
+      rgba[p] = 0;
+      rgba[p + 1] = 0;
+      rgba[p + 2] = 0;
+      // White (outer) → editable (alpha 0); dark (guest zone) → keep (alpha 255)
+      rgba[p + 3] = 255 - data[i];
+    }
+    return sharpMod(rgba, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .png()
+      .toBuffer();
+  }
+
   async function blendHeadOntoOriginalScene(sharpMod, scenePath, aiBuf, faceRegion) {
     const aiMeta = await sharpMod(aiBuf).metadata();
     const w = aiMeta.width || 1536;
     const h = aiMeta.height || 1024;
     let sceneBuf = await sharpMod(scenePath)
-      .resize(w, h, { fit: 'cover', position: 'center' })
+      .resize(w, h, { fit: 'cover', position: 'centre' })
       .ensureAlpha()
       .toBuffer();
-    const face = faceRegion || DEFAULT_HEAD_FACE;
+    const face = clampFace(faceRegion || DEFAULT_HEAD_FACE);
     sceneBuf = await eraseOriginalHead(sharpMod, sceneBuf, w, h, face);
     const boxW = Math.max(24, Math.round((Number(face.widthPercent) / 100) * w));
     const boxH = Math.max(24, Math.round((Number(face.heightPercent) / 100) * h));
-    const extractW = Math.max(48, Math.round(boxW * 1.05));
-    const extractH = Math.max(48, Math.round(boxH * 1.1));
-    const pasteW = Math.max(40, Math.round(boxW * 0.88));
-    const pasteH = Math.max(40, Math.round(boxH * 0.94));
+    const extractW = Math.max(48, Math.round(boxW * 1.0));
+    const extractH = Math.max(48, Math.round(boxH * 0.98));
+    const pasteW = Math.max(40, Math.round(boxW * 0.82));
+    const pasteH = Math.max(40, Math.round(boxH * 0.86));
     const cx = (Number(face.xPercent) / 100) * w + boxW / 2;
     const cy = (Number(face.yPercent) / 100) * h + boxH / 2;
     const extractLeft = Math.max(0, Math.min(w - extractW, Math.round(cx - extractW / 2)));
-    const extractTop = Math.max(0, Math.min(h - extractH, Math.round(cy - extractH / 2)));
+    const extractTop = Math.max(
+      0,
+      Math.min(h - extractH, Math.round(cy - extractH / 2 - boxH * 0.04)),
+    );
     const mask = await ovalMaskPng(sharpMod, pasteW, pasteH, true);
     const headCrop = await sharpMod(aiBuf)
       .extract({ left: extractLeft, top: extractTop, width: extractW, height: extractH })
-      .resize(pasteW, pasteH, { fit: 'cover', position: 'centre' })
+      .resize(pasteW, pasteH, { fit: 'cover', position: 'north' })
       .ensureAlpha()
       .toBuffer();
     const headBuf = await sharpMod(headCrop)
@@ -315,7 +423,7 @@ function createPipelineHelpers(ctx) {
       .png()
       .toBuffer();
     const pasteLeft = Math.max(0, Math.round(cx - pasteW / 2));
-    const pasteTop = Math.max(0, Math.round(cy - pasteH / 2 + pasteH * 0.03));
+    const pasteTop = Math.max(0, Math.round(cy - pasteH / 2 + pasteH * 0.1));
     return sharpMod(sceneBuf)
       .composite([{ input: headBuf, left: pasteLeft, top: pasteTop }])
       .png({ compressionLevel: 9, effort: 8 })
@@ -386,6 +494,7 @@ function createPipelineHelpers(ctx) {
     prepareGuestHeadPng,
     buildHeadEraseScene,
     buildHeadEditMaskPng,
+    buildScenePreserveMask,
     blendHeadOntoOriginalScene,
     lockGuestSubjectsOntoAi,
     sceneIsPortrait,

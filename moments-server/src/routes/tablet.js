@@ -70,8 +70,10 @@ function ensureProcessStatusColumn() {
   }
 }
 
-ensurePrintJobsTable();
-ensureProcessStatusColumn();
+export function ensureTabletSchema() {
+  ensurePrintJobsTable();
+  ensureProcessStatusColumn();
+}
 
 function tabletPhoto(sessionSlug, row, siblings = []) {
   const base = publicPhoto(sessionSlug, row);

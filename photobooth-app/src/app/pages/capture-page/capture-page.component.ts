@@ -583,11 +583,18 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Prefer landscape Halloween frame for booth captures (6×4).
+    const landscapePool = pool.filter((f) => {
+      const ar = Number(f.aspectRatio);
+      return !Number.isFinite(ar) || ar >= 1;
+    });
+    const pickPool = landscapePool.length ? landscapePool : pool;
+
     // Pick frame: prefer explicit default, otherwise random from pool.
     const def = framesCfg.defaultFrameFile;
     const frameFile =
-      (def && pool.some((f) => f.filename === def) ? def : null) ??
-      pool[Math.floor(Math.random() * pool.length)].filename;
+      (def && pickPool.some((f) => f.filename === def) ? def : null) ??
+      pickPool[Math.floor(Math.random() * pickPool.length)].filename;
 
     if (framesCfg.guestAdjustPhoto) {
       await this.router.navigate(['/frame'], { state: { path: filePath } });

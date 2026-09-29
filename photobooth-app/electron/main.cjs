@@ -1295,9 +1295,20 @@ function listBackgroundImageFiles(modeId) {
   return files;
 }
 
-function pickBackgroundImage(modeId, randomize) {
+function pickBackgroundImage(modeId, randomize, preferredFilename = null) {
   const files = listBackgroundImageFiles(modeId);
   if (!files.length) return null;
+  // Scene Addition: always use the single canonical plate (first sorted file).
+  if (String(modeId || '').toLowerCase() === 'scene') {
+    const preferred = files.includes('pumpkin-patch.png') ? 'pumpkin-patch.png' : files[0];
+    return path.join(getAiBackgroundsDir(modeId), preferred);
+  }
+  if (preferredFilename && typeof preferredFilename === 'string') {
+    const safe = path.basename(preferredFilename.trim());
+    if (safe && files.includes(safe)) {
+      return path.join(getAiBackgroundsDir(modeId), safe);
+    }
+  }
   const pick = randomize ? files[Math.floor(Math.random() * files.length)] : files[0];
   return path.join(getAiBackgroundsDir(modeId), pick);
 }
@@ -1358,10 +1369,74 @@ async function preparePersonPng(sharpMod, absImage) {
   );
 }
 
+async function softFeatherPersonPng(sharpMod, personBuf, w, h) {
+  const fx = Math.max(10, Math.round(w * 0.045));
+  const fy = Math.max(10, Math.round(h * 0.05));
+  // Horizontal + vertical edge fade → soft alpha so AI blends scenery, not hard room boxes.
+  const edgeSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <defs>
+      <linearGradient id="l" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#000"/>
+        <stop offset="${((fx / w) * 100).toFixed(2)}%" stop-color="#fff"/>
+        <stop offset="${(100 - (fx / w) * 100).toFixed(2)}%" stop-color="#fff"/>
+        <stop offset="100%" stop-color="#000"/>
+      </linearGradient>
+      <linearGradient id="t" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#000"/>
+        <stop offset="${((fy / h) * 100).toFixed(2)}%" stop-color="#fff"/>
+        <stop offset="100%" stop-color="#fff"/>
+      </linearGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="#fff"/>
+    <rect width="100%" height="100%" fill="url(#l)" opacity="1"/>
+  </svg>`;
+  // Build alpha from horizontal fade, then multiply by vertical fade in raw.
+  const horiz = await sharpMod(Buffer.from(edgeSvg))
+    .resize(w, h)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const vertSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <defs>
+      <linearGradient id="t" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#000"/>
+        <stop offset="${((fy / h) * 100).toFixed(2)}%" stop-color="#fff"/>
+        <stop offset="100%" stop-color="#fff"/>
+      </linearGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#t)"/>
+  </svg>`;
+  const vert = await sharpMod(Buffer.from(vertSvg))
+    .resize(w, h)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const rgba = Buffer.alloc(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const a = Math.round((horiz.data[i] * vert.data[i]) / 255);
+    const p = i * 4;
+    rgba[p] = 255;
+    rgba[p + 1] = 255;
+    rgba[p + 2] = 255;
+    rgba[p + 3] = a;
+  }
+  const softMask = await sharpMod(rgba, {
+    raw: { width: w, height: h, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+  return sharpMod(personBuf)
+    .ensureAlpha()
+    .composite([{ input: softMask, blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+}
+
 async function buildInpaintComposite(sharpMod, backgroundPath, personPath, logoPath = null) {
   return pngBufferUnderLimit(sharpMod, async (w, h) => {
-    const personMaxW = Math.round(w * 0.52);
-    const personMaxH = Math.round(h * 0.72);
+    // Large guest placement — keep people as captured; AI only blends scenery around them.
+    const personMaxW = Math.round(w * 0.86);
+    const personMaxH = Math.round(h * 0.96);
     let bgBuf = await sharpMod(backgroundPath)
       .resize(w, h, { fit: 'cover', position: 'center' })
       .ensureAlpha()
@@ -1369,7 +1444,7 @@ async function buildInpaintComposite(sharpMod, backgroundPath, personPath, logoP
     if (logoPath && fs.existsSync(logoPath)) {
       bgBuf = await overlayBrandLogosOnScene(sharpMod, bgBuf, w, h, logoPath);
     }
-    const personBuf = await sharpMod(personPath)
+    let personBuf = await sharpMod(personPath)
       .resize(personMaxW, personMaxH, {
         fit: 'contain',
         position: 'south',
@@ -1380,8 +1455,9 @@ async function buildInpaintComposite(sharpMod, backgroundPath, personPath, logoP
     const personMeta = await sharpMod(personBuf).metadata();
     const pw = personMeta.width || personMaxW;
     const ph = personMeta.height || personMaxH;
+    personBuf = await softFeatherPersonPng(sharpMod, personBuf, pw, ph);
     const left = Math.round((w - pw) / 2);
-    const top = Math.round(h - ph - h * 0.06);
+    const top = Math.round(h - ph - h * 0.012);
     const layers = [{ input: personBuf, left, top }];
     if (logoPath && fs.existsSync(logoPath)) {
       const accessoryLogo = await prepareBrandLogoPng(
@@ -1390,9 +1466,6 @@ async function buildInpaintComposite(sharpMod, backgroundPath, personPath, logoP
         Math.round(w * 0.09),
         Math.round(h * 0.07),
       );
-      const accessoryMeta = await sharpMod(accessoryLogo).metadata();
-      const aw = accessoryMeta.width || Math.round(w * 0.09);
-      const ah = accessoryMeta.height || Math.round(h * 0.07);
       layers.push({
         input: accessoryLogo,
         left: Math.round(left + pw * 0.62),
@@ -1501,14 +1574,27 @@ async function prepareLogoReferencePng(sharpMod, logoPath) {
 const BRAND_LOGO_AI_SNIPPET =
   'Use the brand logo from the reference image(s) exactly — reproduce it on booth signage, product boxes, DJ equipment, headphones, and clothing where natural. Do not invent a different logo or mascot.';
 
+/** Prefer Zyn's head-swap model order so trustAiSeam can skip oval re-paste. */
+const GPT_IMAGE_EDIT_MODELS = [
+  'gpt-image-2.5-sunburst',
+  'gpt-image-2',
+  'gpt-image-1.5',
+];
+
+function gptImageEditQuality(model, preferMax = false) {
+  if (String(model || '').includes('2.5')) return preferMax ? 'max' : 'xhigh';
+  return 'high';
+}
+
 function buildGptImageEditForm(
   FormData,
   sceneBuf,
   fullPrompt,
   extraImages = [],
-  model = 'gpt-image-1.5',
+  model = 'gpt-image-2.5-sunburst',
   size = '1536x1024',
   maskBuf = null,
+  quality = null,
 ) {
   const form = new FormData();
   form.append('model', model);
@@ -1527,8 +1613,9 @@ function buildGptImageEditForm(
   form.append('prompt', fullPrompt);
   form.append('n', '1');
   form.append('size', size);
-  form.append('quality', 'high');
-  if (model !== 'gpt-image-2' && !String(model).startsWith('gpt-image-2')) {
+  form.append('quality', quality || gptImageEditQuality(model));
+  // input_fidelity is for gpt-image-1 / 1.5 only — omit on gpt-image-2+.
+  if (!String(model || '').startsWith('gpt-image-2')) {
     form.append('input_fidelity', 'high');
   }
   return form;
@@ -1547,11 +1634,11 @@ function buildEditPrompt(rawPrompt, options = {}) {
   const suffixParts = [];
   if (pipeline === 'head-swap') {
     suffixParts.push(
-      'Image 1 is the Halloween character scene to edit (head region only, per mask). Image 2 (guest-face.png) is the guest IDENTITY reference — copy that person exactly. CRITICAL IDENTITY LOCK: preserve exact facial features, skin tone, eye shape/color, nose, lips, jawline, freckles, wrinkles, and all facial hair exactly as in image 2. Match hair from image 2. Match guest head size to the original character head — do not enlarge or float the head. Softly blend a short natural neck into the costume collar. Completely remove the old character head/hair with no oval outline, halo, or mask ring. Keep the costume body, pose, props, and scene identical to image 1. NEVER alter the guest face.',
+      "Image 1 is the Halloween character scene to edit (head region only, per mask). Image 2 (guest-face.png) is the guest IDENTITY reference — copy that person exactly. CRITICAL IDENTITY LOCK: preserve exact facial features, skin tone, eye shape/color, nose, lips, jawline, freckles, wrinkles, and all facial hair exactly as in image 2. Match hair from image 2. NATURAL HEAD SIZE: match the original character head size relative to the shoulders — do not enlarge, shrink oddly, or float the head higher. ANATOMY (portrait-critical): keep a natural short adult neck. Chin must sit immediately above / nestled into the costume collar with almost no visible throat gap — never elongate, stretch, or float the head. Softly blend only that short neck into the collar. Completely remove the old character head/hair with no oval outline, halo, or mask ring. Keep the costume body, pose, props, and scene identical to image 1. NEVER alter the guest face.",
     );
   } else if (inpainting || pipeline === 'scene') {
     suffixParts.push(
-      'CRITICAL FACE LOCK: preserve every guest face exactly — features, skin tone, expression, hair, and identity must not change. Only invent or blend scenery around the people. Do not restyle faces, age them, or apply costume makeup to faces.',
+      'BLEND ONLY — do not regenerate people. Preserve every guest exactly as placed: faces, bodies, arms, legs, feet, clothing, pose, and count. NEVER invent extra legs, limbs, torsos, or people. Only replace the indoor booth/room background around them with Halloween scenery. Softly match lighting on clothing edges. Photorealistic.',
     );
   } else {
     suffixParts.push(
@@ -1578,7 +1665,10 @@ async function callOpenAiImageEdit(
   extraImages = [],
   size = '1536x1024',
   maskBuf = null,
+  options = {},
 ) {
+  const preferMax = !!options.preferMax;
+  const allowDalle2Fallback = options.allowDalle2Fallback !== false;
   const parseJsonSafe = (text) => {
     try {
       return JSON.parse(text);
@@ -1590,7 +1680,7 @@ async function callOpenAiImageEdit(
     json?.error?.message || json?.message || text.slice(0, 400) || `HTTP ${statusCode}`;
 
   const auth = { Authorization: `Bearer ${apiKey.trim()}` };
-  const gptModels = ['gpt-image-1.5', 'gpt-image-2'];
+  const gptModels = GPT_IMAGE_EDIT_MODELS;
   let json = null;
   let modelUsed = gptModels[0];
   let lastErr = 'GPT image edit failed.';
@@ -1609,6 +1699,7 @@ async function callOpenAiImageEdit(
       model,
       size,
       maskBuf,
+      gptImageEditQuality(model, preferMax),
     );
     const gptRes = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, auth);
     const gptJson = parseJsonSafe(gptRes.body);
@@ -1621,7 +1712,10 @@ async function callOpenAiImageEdit(
   }
 
   if (!json) {
-    // DALL·E 2 edits: single image only (no reference-image array). Logo is already composited locally.
+    if (!allowDalle2Fallback) {
+      return { ok: false, error: lastErr };
+    }
+    // DALL·E 2 edits: single image only (no reference-image array). Avoid for head-swap portraits.
     const dallePrompt = fullPrompt.length > 1000 ? fullPrompt.slice(0, 1000) : fullPrompt;
     const form = new FormData();
     form.append('image', pngBuf, { filename: 'photo.png', contentType: 'image/png' });
@@ -2416,6 +2510,10 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     const modeId = payload && typeof payload.modeId === 'string' ? payload.modeId.trim() : '';
     const useInpainting = !!(payload && payload.useInpainting);
     const randomizeBackground = payload?.randomizeBackground !== false;
+    const backgroundFilename =
+      payload && typeof payload.backgroundFilename === 'string'
+        ? payload.backgroundFilename.trim()
+        : '';
     const inpaintPrompt =
       payload && typeof payload.inpaintPrompt === 'string' ? payload.inpaintPrompt.trim() : '';
     const pipelineRaw =
@@ -2452,6 +2550,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     let scenePathForLock = null;
     let faceForLock = null;
     let sceneCompositeForFaceLock = null;
+    // Scene Addition → 6×4 landscape. AI Portrait head-swap → 4×6 portrait.
     let gptSize = '1536x1024';
 
     if (pipeline === 'head-swap' && modeId) {
@@ -2465,8 +2564,9 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       backgroundUsed = `${resolved.canId}/${resolved.filename} (${resolved.source})`;
       const face = aiPipelines.loadCompositionFace(modeId, payload?.face);
       scenePathForLock = resolved.imagePath;
-      faceForLock = face;
-      pngBuf = await aiPipelines.buildHeadEraseScene(sharpMod, resolved.imagePath, face);
+      const erased = await aiPipelines.buildHeadEraseScene(sharpMod, resolved.imagePath, face);
+      pngBuf = erased?.buf || null;
+      faceForLock = erased?.face || face;
       const faceRef = await aiPipelines.prepareGuestHeadPng(sharpMod, absImage, 1024, 1024);
       extraImages.push({ buf: faceRef, filename: 'guest-face.png' });
       effectivePrompt = inpaintPrompt || prompt;
@@ -2476,10 +2576,11 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         canId: resolved.canId,
         source: resolved.source,
         file: resolved.filename,
-        face,
+        face: faceForLock,
+        gptSize,
       });
     } else if (useInpainting && modeId) {
-      const bgPath = pickBackgroundImage(modeId, randomizeBackground);
+      const bgPath = pickBackgroundImage(modeId, randomizeBackground, backgroundFilename || null);
       if (!bgPath) {
         return {
           ok: false,
@@ -2493,11 +2594,13 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         absImage,
         useBrandLogo ? brand.logoPath : null,
       );
-      sceneCompositeForFaceLock = pngBuf;
+      sceneCompositeForFaceLock = null;
       effectivePrompt = inpaintPrompt || prompt;
       pipeline = pipeline || 'scene';
+      gptSize = '1536x1024';
     } else {
       pngBuf = await preparePersonPng(sharpMod, absImage);
+      gptSize = '1536x1024';
     }
 
     if (!pngBuf) {
@@ -2523,13 +2626,24 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       const pngMeta = await sharpMod(pngBuf).metadata();
       maskBuf = await aiPipelines.buildHeadEditMaskPng(
         sharpMod,
-        pngMeta.width || 1536,
-        pngMeta.height || 1024,
+        pngMeta.width || 1024,
+        pngMeta.height || 1536,
         faceForLock,
       );
       if ((pngMeta.height || 0) > (pngMeta.width || 0)) {
         gptSize = '1024x1536';
       }
+    } else if (pipeline === 'scene' && pngBuf) {
+      const pngMeta = await sharpMod(pngBuf).metadata();
+      maskBuf = await aiPipelines.buildScenePreserveMask(
+        sharpMod,
+        pngMeta.width || 1536,
+        pngMeta.height || 1024,
+      );
+      appendAppLog('info', 'openai', 'scene preserve mask (protect guests, blend scenery)', {
+        w: pngMeta.width,
+        h: pngMeta.height,
+      });
     }
 
     const editRes = await callOpenAiImageEdit(
@@ -2541,6 +2655,10 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       extraImages,
       gptSize,
       maskBuf,
+      {
+        preferMax: pipeline === 'head-swap' || useInpainting,
+        allowDalle2Fallback: pipeline !== 'head-swap',
+      },
     );
     if (!editRes.ok) {
       appendAppLog('error', 'openai', 'image edit failed', editRes.error);
@@ -2549,8 +2667,14 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
 
     let outBuf = editRes.outBuf;
     if (pipeline === 'head-swap' && scenePathForLock) {
+      // Skip oval re-paste for gpt-image-2.5 — it caused double-face / floating forehead artifacts.
       const trustAiSeam = String(editRes.model || '').includes('2.5');
-      if (!trustAiSeam) {
+      if (trustAiSeam) {
+        appendAppLog('info', 'openai', 'trusting AI seam (skip oval re-paste)', {
+          model: editRes.model,
+          face: faceForLock,
+        });
+      } else {
         outBuf = await aiPipelines.blendHeadOntoOriginalScene(
           sharpMod,
           scenePathForLock,
@@ -2577,19 +2701,50 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       }
     }
 
+    // Final export: AI Portrait → 4×6 portrait (1200×1800); Scene → 6×4 landscape (1800×1200).
+    const outMeta = await sharpMod(outBuf).metadata();
+    const isPortraitOut =
+      pipeline === 'head-swap' || (outMeta.height || 0) > (outMeta.width || 0);
+    const outW = isPortraitOut ? 1200 : 1800;
+    const outH = isPortraitOut ? 1800 : 1200;
+    outBuf = await sharpMod(outBuf)
+      .resize(outW, outH, { fit: 'cover', position: 'centre' })
+      .png({ compressionLevel: 9, effort: 8 })
+      .toBuffer();
+
     const dir = path.dirname(absImage);
     const base = path.basename(absImage, path.extname(absImage));
+    const rawPath = path.join(dir, `${base}_ai_raw.png`);
     const outPath = path.join(dir, `${base}_ai.png`);
+    fs.writeFileSync(rawPath, outBuf);
+
+    // HauntBooth: wrap AI result in matching Halloween frame (portrait vs landscape).
+    const frameName = isPortraitOut ? 'halloween-haunt-portrait.png' : 'halloween-haunt.png';
+    const framePath = path.join(getPhotoFramesDir(), frameName);
+    if (fs.existsSync(framePath)) {
+      try {
+        outBuf = await compositePhotoIntoFrame(sharpMod, framePath, rawPath, 1, '', '');
+        appendAppLog('info', 'openai', 'ai framed', { frameName, pipeline });
+      } catch (frameErr) {
+        appendAppLog('warn', 'openai', 'ai frame skipped', String(frameErr));
+      }
+    } else {
+      appendAppLog('warn', 'openai', 'ai frame missing', { frameName });
+    }
+
     fs.writeFileSync(outPath, outBuf);
     appendAppLog('info', 'openai', 'generateImage ok', {
       model: editRes.model,
       outPath,
       inpainting: useInpainting,
       pipeline,
+      size: `${outW}x${outH}`,
+      framed: fs.existsSync(framePath),
     });
     return {
       ok: true,
       path: outPath,
+      rawPath,
       model: editRes.model,
       backgroundUsed,
       inpainting: useInpainting,
@@ -2987,6 +3142,104 @@ ipcMain.handle('admin:listAiBackgrounds', async (_e, modeId) => {
     return { ok: true, modeId: id, backgrounds: items };
   } catch (e) {
     return { ok: false, error: String(e), backgrounds: [] };
+  }
+});
+
+/** Zyn-style file:// composition plate for guest haunt grid + admin preview. */
+function compositionPublic(modeId) {
+  const id = sanitizeModeId(modeId);
+  const resolved = aiPipelines.resolveComposition(id);
+  const face = aiPipelines.loadCompositionFace(id);
+  if (!resolved?.imagePath || !fs.existsSync(resolved.imagePath)) {
+    return { ok: true, modeId: id, url: null, source: null, filename: null, face };
+  }
+  return {
+    ok: true,
+    modeId: id,
+    source: resolved.source || null,
+    filename: resolved.filename || null,
+    url: `${pathToFileURL(resolved.imagePath).href}?v=${Date.now()}`,
+    face,
+  };
+}
+
+ipcMain.handle('admin:listCompositions', async () => {
+  try {
+    const cfg = loadMergedConfig();
+    const fromModes = (Array.isArray(cfg.aiModes) ? cfg.aiModes : [])
+      .filter((m) => m && (m.pipeline === 'head-swap' || m.portraitOnly === true))
+      .map((m) => m.id)
+      .filter(Boolean);
+    const defaults = ['vampire', 'witch', 'werewolf', 'reaper', 'phantom', 'bride', 'morticia'];
+    const ids = [...new Set([...fromModes, ...defaults])];
+    return { ok: true, items: ids.map((id) => compositionPublic(id)) };
+  } catch (e) {
+    return { ok: false, error: String(e), items: [] };
+  }
+});
+
+ipcMain.handle('admin:getComposition', async (_e, modeId) => {
+  try {
+    return compositionPublic(modeId);
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+});
+
+ipcMain.handle('admin:pickCompositionImage', async () => {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Select character composition plate',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+  });
+  if (r.canceled || !r.filePaths?.length) return { ok: false, canceled: true };
+  return { ok: true, path: r.filePaths[0] };
+});
+
+ipcMain.handle('admin:installComposition', async (_e, modeId, sourcePath) => {
+  try {
+    if (!sourcePath || typeof sourcePath !== 'string' || !fs.existsSync(sourcePath)) {
+      return { ok: false, error: 'Invalid source file.' };
+    }
+    const id = sanitizeModeId(modeId);
+    const ext = path.extname(sourcePath).toLowerCase() || '.png';
+    const allowed = ['.png', '.jpg', '.jpeg', '.webp'];
+    const useExt = allowed.includes(ext) ? (ext === '.jpeg' ? '.jpg' : ext) : '.png';
+    const dir = path.join(getPortableRoot(), 'config', 'compositions', id);
+    fs.mkdirSync(dir, { recursive: true });
+    for (const name of fs.readdirSync(dir)) {
+      if (/^composition\./i.test(name)) {
+        try {
+          fs.unlinkSync(path.join(dir, name));
+        } catch (_) {}
+      }
+    }
+    const dest = path.join(dir, `composition${useExt}`);
+    fs.copyFileSync(sourcePath, dest);
+    const metaPath = path.join(dir, 'composition.json');
+    if (!fs.existsSync(metaPath)) {
+      fs.writeFileSync(
+        metaPath,
+        JSON.stringify(
+          {
+            face: aiPipelines.DEFAULT_HEAD_FACE || {
+              xPercent: 40,
+              yPercent: 1,
+              widthPercent: 17,
+              heightPercent: 19,
+            },
+          },
+          null,
+          2,
+        ),
+        'utf8',
+      );
+    }
+    appendAppLog('info', 'composition', 'installed character plate', { modeId: id, dest });
+    return compositionPublic(id);
+  } catch (e) {
+    return { ok: false, error: String(e) };
   }
 });
 
@@ -4546,14 +4799,24 @@ async function executePrintPhoto(payload) {
     }
 
     try {
-      const keepEdges = physicalLayout || framedLayout;
+      let isPortraitPhoto = false;
+      try {
+        const sharpMod = require('sharp');
+        const meta = await sharpMod(printPath).metadata();
+        isPortraitPhoto = (meta.height || 0) > (meta.width || 0);
+      } catch (_m) {
+        /* ignore */
+      }
+      // Portrait AI (4×6): contain so it does not stretch/crop to fill landscape postcard.
+      // Landscape scene (6×4): cover as before.
+      const keepEdges = physicalLayout || framedLayout || isPortraitPhoto;
       const result = await printPhotoViaWindowsSpooler(
         printPath,
         resolved.chosen,
-        keepEdges ? 1 : bleedScale,
+        keepEdges && !isPortraitPhoto ? 1 : isPortraitPhoto ? 1 : bleedScale,
         {
           fitMode: keepEdges ? 'contain' : 'cover',
-          physicalPostcard: keepEdges,
+          physicalPostcard: physicalLayout || framedLayout,
         },
       );
       appendAppLog('info', 'print', 'photoprint spooled', {

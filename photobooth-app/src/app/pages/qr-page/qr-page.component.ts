@@ -11,6 +11,7 @@ import { BrandingLogoService } from '../../services/branding-logo.service';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { BoothModeService } from '../../services/booth-mode.service';
 import { AiStyleService } from '../../services/ai-style.service';
+import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
 @Component({
   selector: 'pb-qr-page',
@@ -33,7 +34,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
   constructor(private readonly router: Router) {}
 
   ngOnInit(): void {
-    this.aiStyle.clear();
+    // Do not clear AI style — booth-mode may have set Photo Print / scene before QR.
   }
 
   ngOnDestroy(): void {
@@ -44,11 +45,35 @@ export class QrPageComponent implements OnInit, OnDestroy {
   }
 
   private nextAfterUnlock(): void {
-    if (this.boothMode.isPhysicalFrameMode()) {
-      this.aiStyle.clear();
+    let experience: string | null = null;
+    try {
+      experience = sessionStorage.getItem('pb-experience');
+      sessionStorage.removeItem('pb-experience');
+    } catch {
+      experience = null;
+    }
+
+    this.boothMode.selectMode('default');
+
+    if (experience === 'aiPortrait') {
+      void this.router.navigate(['/portrait-select']);
+      return;
+    }
+    if (experience === 'scene') {
+      const scene =
+        this.booth.primaryAiModes().find((m) => m.pipeline === 'scene') ||
+        this.booth.primaryAiModes()[0];
+      if (scene) this.aiStyle.selectMode(scene.id);
+      this.aiStyle.selectBackground(null);
       void this.router.navigate(['/capture']);
       return;
     }
+    if (experience === 'photoPrint') {
+      this.aiStyle.selectMode(PLAIN_PHOTO_MODE_ID);
+      void this.router.navigate(['/capture']);
+      return;
+    }
+
     const fixed = this.booth.fixedAiModeId();
     if (fixed) {
       this.aiStyle.selectMode(fixed);

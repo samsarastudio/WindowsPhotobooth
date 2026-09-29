@@ -41,6 +41,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     history: { ...base.history, ...patch.history },
     aiMode: { ...base.aiMode, ...patch.aiMode },
     portraitSelect: { ...base.portraitSelect, ...patch.portraitSelect },
+    sceneSelect: { ...base.sceneSelect, ...patch.sceneSelect },
     boothMode: { ...base.boothMode, ...patch.boothMode },
     frame: { ...base.frame, ...patch.frame },
     caption: { ...base.caption, ...patch.caption },
@@ -110,9 +111,6 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
     const label = typeof o['label'] === 'string' ? o['label'].trim() : '';
     const prompt = typeof o['prompt'] === 'string' ? o['prompt'].trim() : '';
     const useInpainting = o['useInpainting'] === true;
-    const randomizeBackground =
-      o['randomizeBackground'] === false ? false : useInpainting ? true : o['randomizeBackground'] === true;
-    const inpaintRaw = typeof o['inpaintPrompt'] === 'string' ? o['inpaintPrompt'].trim() : '';
     const pipelineRaw = typeof o['pipeline'] === 'string' ? o['pipeline'].trim().toLowerCase() : '';
     const pipeline =
       pipelineRaw === 'scene' || pipelineRaw === 'head-swap' || pipelineRaw === 'prompt'
@@ -120,6 +118,16 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
         : useInpainting
           ? 'scene'
           : undefined;
+    // Scene Addition: guest picks a plate — do not randomize unless explicitly true.
+    const randomizeBackground =
+      pipeline === 'scene'
+        ? o['randomizeBackground'] === true
+        : o['randomizeBackground'] === false
+          ? false
+          : useInpainting
+            ? true
+            : o['randomizeBackground'] === true;
+    const inpaintRaw = typeof o['inpaintPrompt'] === 'string' ? o['inpaintPrompt'].trim() : '';
     const portraitOnly = o['portraitOnly'] === true;
     if (id && label && prompt && id !== PLAIN_PHOTO_MODE_ID) {
       out.push({
@@ -133,7 +141,15 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
       });
     }
   }
-  return out.length > 0 ? out : [...PHOTOBOOTH_DEFAULT_AI_MODES];
+  if (out.length === 0) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
+  // Ensure new Halloween portrait characters appear even on older saved configs.
+  const have = new Set(out.map((m) => m.id));
+  for (const def of PHOTOBOOTH_DEFAULT_AI_MODES) {
+    if ((def.pipeline === 'head-swap' || def.portraitOnly) && !have.has(def.id)) {
+      out.push({ ...def });
+    }
+  }
+  return out;
 }
 
 function normalizeDefaultAiModeId(raw: unknown, aiModes: PhotoboothAiMode[]): string | null {

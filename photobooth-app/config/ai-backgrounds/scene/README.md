@@ -1,6 +1,5 @@
-# Scene Addition backgrounds
+# Scene Addition background
 
-Halloween plates used by the **Scene Addition** AI mode (`aiModes` id `scene`).
+Single Halloween plate used by **Scene Addition** (`aiModes` id `scene`).
 
-Guests are composited into a random plate, then scenery is inpainted around them.
-Faces are locked — never rewritten by the model.
+Guests are soft-composited onto `pumpkin-patch.png`, then scenery is blended around them with a preserve mask (bodies/legs stay as captured).

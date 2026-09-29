@@ -1,8 +1,14 @@
 .pb-admin-dash {
   align-items: flex-start;
-  justify-content: center;
-  overflow: auto;
+  justify-content: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: none;
+  height: auto;
+  min-height: 100vh;
+  min-height: 100dvh;
   padding: clamp(1rem, 2.8vmin, 1.6rem);
+  padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 .pb-admin-shell {
@@ -530,4 +536,22 @@
   opacity: 0.75;
   word-break: break-word;
   white-space: pre-wrap;
+}
+
+.pb-admin-composition {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.5rem 0 0.85rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pb-admin-composition-thumb {
+  width: min(180px, 40vw);
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 140, 48, 0.35);
 }

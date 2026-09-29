@@ -60,6 +60,13 @@ interface AiBackgroundItem {
   url: string;
 }
 
+interface CompositionPreview {
+  modeId: string;
+  url: string | null;
+  filename?: string | null;
+  source?: string | null;
+}
+
 interface WebcamDeviceOption {
   deviceId: string;
   label: string;
@@ -171,6 +178,7 @@ export class AdminDashboardComponent implements OnInit {
   themes = signal<ThemeListItem[]>([]);
   photoFramesList = signal<AdminFrameItem[]>([]);
   aiBackgrounds = signal<Record<string, AiBackgroundItem[]>>({});
+  compositions = signal<Record<string, CompositionPreview>>({});
   status = signal<string | null>(null);
   busy = signal(false);
   printTroubleErr = signal<string | null>(null);
@@ -382,6 +390,7 @@ export class AdminDashboardComponent implements OnInit {
     }
     if (t === 'ai') {
       void this.refreshAllAiBackgrounds();
+      void this.refreshCompositions();
     }
     if (t === 'debug') {
       void this.refreshDebugPanel();
@@ -400,11 +409,11 @@ export class AdminDashboardComponent implements OnInit {
         physicalFrame: { ...this.draftPhysicalFrame },
       });
       const parts: string[] = [];
-      if (this.draftGuestModes.defaultEnabled) parts.push('Digital frame');
-      if (this.draftGuestModes.physicalFrameEnabled) parts.push('Physical frame');
+      if (this.draftGuestModes.defaultEnabled) parts.push('Photo Print');
+      if (this.draftGuestModes.physicalFrameEnabled) parts.push('Glow magnet on result');
       this.status.set(
         ok
-          ? `Modes saved — guests can choose: ${parts.join(' · ')}.`
+          ? `Experiences saved — ${parts.join(' · ')}.`
           : 'Failed to save modes.',
       );
       this.syncFromService();
@@ -1406,6 +1415,52 @@ export class AdminDashboardComponent implements OnInit {
     return this.aiBackgrounds()[modeId] ?? [];
   }
 
+  compositionFor(modeId: string): CompositionPreview | null {
+    return this.compositions()[modeId] ?? null;
+  }
+
+  async refreshCompositions(): Promise<void> {
+    if (!window.pbApi?.adminListCompositions) return;
+    try {
+      const r = await window.pbApi.adminListCompositions();
+      if (!r.ok || !Array.isArray(r.items)) return;
+      const next: Record<string, CompositionPreview> = {};
+      for (const item of r.items) {
+        if (!item?.modeId) continue;
+        next[item.modeId] = {
+          modeId: item.modeId,
+          url: item.url ?? null,
+          filename: item.filename,
+          source: item.source,
+        };
+      }
+      this.compositions.set(next);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async uploadComposition(modeId: string): Promise<void> {
+    if (!window.pbApi?.adminPickCompositionImage || !window.pbApi.adminInstallComposition) {
+      this.status.set('Composition upload requires Electron.');
+      return;
+    }
+    const pick = await window.pbApi.adminPickCompositionImage();
+    if (!pick.ok || pick.canceled || !pick.path) return;
+    this.busy.set(true);
+    try {
+      const inst = await window.pbApi.adminInstallComposition(modeId, pick.path);
+      if (inst.ok) {
+        await this.refreshCompositions();
+        this.status.set(`Composition plate uploaded for ${modeId}.`);
+      } else {
+        this.status.set(inst.error ?? 'Upload failed.');
+      }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   async uploadAiBackground(modeId: string): Promise<void> {
     if (!window.pbApi?.adminPickAiBackgroundImage || !window.pbApi.adminInstallAiBackground) {
       this.status.set('Background upload requires Electron.');
@@ -1527,6 +1582,7 @@ export class AdminDashboardComponent implements OnInit {
         this.draftAiEnabled = aiEnabled;
         this.draftAiModes = structuredClone(normalized);
         await this.refreshAllAiBackgrounds();
+        await this.refreshCompositions();
         const missingBg = sceneBgModes.filter((m) => this.backgroundsForMode(m.id).length === 0);
         if (!aiEnabled) {
           this.status.set(

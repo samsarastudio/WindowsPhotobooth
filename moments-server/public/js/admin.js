@@ -28,6 +28,9 @@ const btnOpenAlbum = document.getElementById('btnOpenAlbum');
 const uploadTokenEl = document.getElementById('uploadToken');
 const publicBaseUrlEl = document.getElementById('publicBaseUrl');
 const tokenMetaEl = document.getElementById('tokenMeta');
+const halloweenOpenAiApiKeyEl = document.getElementById('halloweenOpenAiApiKey');
+const halloweenGenerationLimitEl = document.getElementById('halloweenGenerationLimit');
+const halloweenMetaEl = document.getElementById('halloweenMeta');
 
 /** @type {any[]} */
 let albumsCache = [];
@@ -643,6 +646,24 @@ function applyTokenSettings(settings) {
       ? `Token active (${src}). Paste into Photobooth Admin ? Gallery.`
       : 'No token set ? booth uploads will fail until you save one.';
   }
+  applyHalloweenSettings(settings);
+}
+
+function applyHalloweenSettings(settings) {
+  if (halloweenOpenAiApiKeyEl) {
+    halloweenOpenAiApiKeyEl.value = settings.halloweenOpenAiApiKey || '';
+    halloweenOpenAiApiKeyEl.placeholder = settings.halloweenApiKeyConfigured
+      ? 'Key saved — paste a new key to replace'
+      : 'sk-…';
+  }
+  if (halloweenGenerationLimitEl) {
+    halloweenGenerationLimitEl.value = String(settings.halloweenGenerationLimit ?? 5);
+  }
+  if (halloweenMetaEl) {
+    halloweenMetaEl.textContent = settings.halloweenApiKeyConfigured
+      ? `Key configured · used ${settings.halloweenGenerationUsed ?? 0} / ${settings.halloweenGenerationLimit ?? 5} · remaining ${settings.halloweenGenerationRemaining ?? 0} · public page /halloween`
+      : `No key yet · limit ${settings.halloweenGenerationLimit ?? 5} · public page /halloween`;
+  }
 }
 
 function generateUploadToken() {
@@ -730,6 +751,41 @@ document.getElementById('btnSaveToken')?.addEventListener('click', async () => {
     });
     applyTokenSettings(r.settings);
     setStatus(token ? 'Upload token saved' : 'Upload token cleared');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnSaveHalloween')?.addEventListener('click', async () => {
+  try {
+    const body = {
+      halloweenGenerationLimit: Number(halloweenGenerationLimitEl?.value || 5),
+    };
+    const key = halloweenOpenAiApiKeyEl?.value?.trim() || '';
+    if (key && !key.includes('…') && !key.includes('...')) {
+      body.halloweenOpenAiApiKey = key;
+    } else if (!key) {
+      body.halloweenOpenAiApiKey = '';
+    }
+    const r = await api('/api/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+    applyHalloweenSettings(r.settings);
+    setStatus('Halloween demo settings saved');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnResetHalloweenCount')?.addEventListener('click', async () => {
+  try {
+    const r = await api('/api/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ halloweenResetGenerationCount: true }),
+    });
+    applyHalloweenSettings(r.settings);
+    setStatus('Halloween generation counter reset');
   } catch (e) {
     setStatus(String(e.message || e));
   }

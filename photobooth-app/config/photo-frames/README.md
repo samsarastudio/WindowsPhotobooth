@@ -17,7 +17,8 @@ A **16:9** overlay (e.g. 1672×941) is wider than the gallery tile. The extra he
 Print paper is 148×100 mm (~1.48:1) — 3:2 is the design size; the booth contain-fits it on the postcard.
 
 Included:
-- `botanical-landscape.png` — subtle landscape botanical matte (no caption bar; default)
+- `halloween-haunt.png` — Halloween event frame (SCREAM / Happy Halloween, GRMA-style layout; default)
+- `botanical-landscape.png` — subtle landscape botanical matte
 - `botanical-blush.png` — soft botanical white/blush frame
 - `onam-grma-2026.png` — GRMA Onam 2026 event frame
 - `onam-floral.png` — Onam floral alternate

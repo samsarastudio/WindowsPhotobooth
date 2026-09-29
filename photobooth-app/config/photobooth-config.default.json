@@ -34,9 +34,12 @@
   "photoFrames": {
     "enabled": true,
     "photoScale": 1,
-    "defaultFrameFile": "botanical-landscape.png",
-    "guestFrameFiles": [],
-    "autoApplyFrame": false,
+    "defaultFrameFile": "halloween-haunt.png",
+    "guestFrameFiles": [
+      "halloween-haunt.png",
+      "halloween-haunt-portrait.png"
+    ],
+    "autoApplyFrame": true,
     "guestAdjustPhoto": true,
     "guestTextEnabled": false,
     "guestTextOptional": true,
@@ -78,9 +81,9 @@
       "label": "Scene Addition",
       "pipeline": "scene",
       "useInpainting": true,
-      "randomizeBackground": true,
-      "prompt": "Place the guests exactly as captured into this Halloween environment. Keep every face, skin tone, hair, and likeness 100% unchanged — never alter identity. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.",
-      "inpaintPrompt": "Seamlessly blend the cropped guest group into this Halloween scene. CRITICAL: do not change any faces — preserve exact facial features, expressions, skin tone, and hair. Keep bodies and clothing as captured; only replace or extend the surroundings with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup on faces, no identity change."
+      "randomizeBackground": false,
+      "prompt": "Place the guests exactly as captured into this Halloween environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged — never alter identity or invent extra limbs. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.",
+      "inpaintPrompt": "BLEND the guests into this Halloween scene — do not recreate them. CRITICAL: keep every person exactly as placed (faces, bodies, legs, feet, clothing, pose, count). NEVER invent extra legs, limbs, or people. Only replace the indoor room/booth background around them with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup, no identity change, no body regeneration."
     },
     {
       "id": "vampire",
@@ -89,8 +92,8 @@
       "portraitOnly": true,
       "useInpainting": true,
       "randomizeBackground": false,
-      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
-      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
     },
     {
       "id": "witch",
@@ -99,8 +102,8 @@
       "portraitOnly": true,
       "useInpainting": true,
       "randomizeBackground": false,
-      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
-      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
     },
     {
       "id": "werewolf",
@@ -109,8 +112,8 @@
       "portraitOnly": true,
       "useInpainting": true,
       "randomizeBackground": false,
-      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
-      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
     },
     {
       "id": "reaper",
@@ -119,8 +122,8 @@
       "portraitOnly": true,
       "useInpainting": true,
       "randomizeBackground": false,
-      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
-      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
     },
     {
       "id": "phantom",
@@ -129,8 +132,28 @@
       "portraitOnly": true,
       "useInpainting": true,
       "randomizeBackground": false,
-      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.",
-      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest's real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background."
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+    },
+    {
+      "id": "bride",
+      "label": "Bride",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+    },
+    {
+      "id": "morticia",
+      "label": "Morticia",
+      "pipeline": "head-swap",
+      "portraitOnly": true,
+      "useInpainting": true,
+      "randomizeBackground": false,
+      "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+      "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
     }
   ],
   "branding": {
@@ -236,6 +259,11 @@
       "continueLabel": "Use this frame",
       "skipLabel": "Skip frame",
       "applying": "Applying frame…"
+    },
+    "sceneSelect": {
+      "title": "Choose your scene",
+      "subtitle": "Pick the Halloween backdrop for your group",
+      "back": "Back"
     }
   }
 }

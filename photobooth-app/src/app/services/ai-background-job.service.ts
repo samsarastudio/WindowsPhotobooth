@@ -6,6 +6,7 @@ import { BoothLogService } from './booth-log.service';
 export interface AiBackgroundJobRequest {
   imagePath: string;
   mode: PhotoboothAiMode;
+  backgroundFilename?: string | null;
 }
 
 /**
@@ -47,12 +48,14 @@ export class AiBackgroundJobService {
     void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'processing' });
 
     try {
+      const bg = String(req.backgroundFilename || '').trim();
       const r = await window.pbApi.openAiGenerateImage({
         imagePath,
         prompt: mode.prompt,
         modeId: mode.id,
         useInpainting: mode.useInpainting === true,
-        randomizeBackground: mode.randomizeBackground !== false,
+        randomizeBackground: mode.pipeline === 'scene' ? !bg : mode.randomizeBackground !== false,
+        backgroundFilename: bg || undefined,
         inpaintPrompt: mode.inpaintPrompt,
         pipeline: mode.pipeline,
       });

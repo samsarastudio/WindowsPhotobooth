@@ -1,0 +1,10 @@
+{
+  "id": "bride",
+  "label": "Bride",
+  "face": {
+    "xPercent": 39,
+    "yPercent": 8,
+    "widthPercent": 17,
+    "heightPercent": 16
+  }
+}

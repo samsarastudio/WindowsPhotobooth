@@ -458,10 +458,39 @@
             </div>
             <p id="tokenMeta" class="meta"></p>
             <p class="meta">Admin PIN still lives in the server <code>.env</code> (<code>ADMIN_PIN</code>).</p>
+
+            <h3 class="admin-subhead">Halloween demo (/halloween)</h3>
+            <p class="meta">
+              OpenAI key for the public HauntBooth sample page. Live regenerations are capped
+              (default 5). Showcase samples are static; “Apply sample” runs the booth pipeline.
+            </p>
+            <label for="halloweenOpenAiApiKey">OpenAI API key</label>
+            <input
+              id="halloweenOpenAiApiKey"
+              class="input"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="sk-…"
+            />
+            <label for="halloweenGenerationLimit">Generation limit</label>
+            <div class="row">
+              <input
+                id="halloweenGenerationLimit"
+                class="input"
+                type="number"
+                min="1"
+                max="100"
+                value="5"
+              />
+              <button type="button" class="btn primary" id="btnSaveHalloween">Save Halloween</button>
+              <button type="button" class="btn ghost" id="btnResetHalloweenCount">Reset used count</button>
+            </div>
+            <p id="halloweenMeta" class="meta"></p>
           </section>
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260915-nameplate" type="module"></script>
+    <script src="/js/admin.js?v=20260929-halloween" type="module"></script>
   </body>
 </html>

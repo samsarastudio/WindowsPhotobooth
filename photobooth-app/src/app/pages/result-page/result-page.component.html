@@ -20,34 +20,20 @@
     }
 
     @if (showAiSection()) {
-      <div class="pb-result-ai">
+      <div class="pb-result-ai" [class.is-generating]="aiGenerating()">
         @if (aiGenerating()) {
-          <details class="pb-thinking" open>
-            <summary class="pb-thinking-sum">{{ copy().result.thinkingSummary }}</summary>
-            <p class="pb-thinking-timer">
-              Status:
+          <p class="pb-result-ai-status">
+            {{ copy().result.generatingAi }}
+            <span class="pb-result-ai-eta">
               @if (aiOvertime()) {
-                finalizing (elapsed {{ aiElapsedLabel() }})
+                · elapsed {{ aiElapsedLabel() }}
               } @else {
-                processing (ETA {{ aiEtaLabel() }}, elapsed {{ aiElapsedLabel() }})
+                · ETA {{ aiEtaLabel() }}
               }
-            </p>
-            <ol class="pb-thinking-steps">
-              <li [class.pb-thinking-done]="thinkingStep() >= 1">{{ copy().result.thinkingStepAnalyze }}</li>
-              @if (usesInpainting()) {
-                <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepBackground }}</li>
-                <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepPlan }}</li>
-                <li [class.pb-thinking-done]="thinkingStep() >= 4">{{ copy().result.thinkingStepImage }}</li>
-              } @else {
-                <li [class.pb-thinking-done]="thinkingStep() >= 2">{{ copy().result.thinkingStepPlan }}</li>
-                <li [class.pb-thinking-done]="thinkingStep() >= 3">{{ copy().result.thinkingStepImage }}</li>
-              }
-            </ol>
-            <p class="pb-thinking-foot">{{ copy().result.thinkingFootnote }}</p>
-          </details>
-          <p class="pb-loading pb-result-ai-status">{{ copy().result.generatingAi }}</p>
+            </span>
+          </p>
         } @else if (aiErr()) {
-          <p class="pb-msg">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
+          <p class="pb-msg pb-result-ai-err">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
         }
 
         @if (!aiGenerating()) {

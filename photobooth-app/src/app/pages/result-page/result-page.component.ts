@@ -100,7 +100,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     () =>
       !this.isPreview() &&
       !!this.path() &&
-      !this.aiGenerating(),
+      !this.aiGenerating() &&
+      this.booth.guestModes().physicalFrameEnabled !== false,
   );
   readonly viewingFramedPhoto = computed(() => !!this.path() && /_framed\.png$/i.test(this.path() || ''));
   readonly showMakeFramed = computed(
@@ -252,7 +253,11 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     // Always generate from the camera capture, never a framed/physical derivative.
     const source = this.originalCapturePath(pp);
     // Mark processing + kick off AI without awaiting — guest must not wait.
-    this.aiBg.start({ imagePath: source, mode });
+    this.aiBg.start({
+      imagePath: source,
+      mode,
+      backgroundFilename: this.aiStyle.selectedBackgroundFilename(),
+    });
     void this.router.navigate(['/thanks']);
   }
 
@@ -343,7 +348,11 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         prompt: mode.prompt,
         modeId: mode.id,
         useInpainting: mode.useInpainting === true,
-        randomizeBackground: mode.randomizeBackground !== false,
+        randomizeBackground:
+          mode.pipeline === 'scene'
+            ? !this.aiStyle.selectedBackgroundFilename()
+            : mode.randomizeBackground !== false,
+        backgroundFilename: this.aiStyle.selectedBackgroundFilename() || undefined,
         inpaintPrompt: mode.inpaintPrompt,
         pipeline: mode.pipeline,
       });

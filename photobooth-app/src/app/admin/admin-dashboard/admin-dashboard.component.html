@@ -456,11 +456,41 @@
               @if (m.pipeline === 'head-swap') {
                 <label>Head-swap inpaint prompt</label>
                 <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.inpaintPrompt"></textarea>
-                <p class="pb-hint pb-hint-tight">
-                  Composition plate:
-                  <code>config/compositions/{{ m.id }}/composition.png</code>
-                  (+ <code>composition.json</code> face box).
-                </p>
+                <div class="pb-admin-composition">
+                  @if (compositionFor(m.id)?.url; as curl) {
+                    <img class="pb-admin-composition-thumb" [src]="curl" [alt]="m.label + ' plate'" />
+                    <p class="pb-hint pb-hint-tight">
+                      {{ compositionFor(m.id)?.filename || 'composition plate' }}
+                      @if (compositionFor(m.id)?.source) {
+                        · {{ compositionFor(m.id)!.source }}
+                      }
+                    </p>
+                  } @else {
+                    <p class="pb-hint pb-hint-tight">
+                      No plate yet — place
+                      <code>config/compositions/{{ m.id }}/composition.png</code>
+                      or upload below.
+                    </p>
+                  }
+                  <div class="pb-row pb-row-wrap">
+                    <button
+                      type="button"
+                      class="pb-btn pb-btn-ghost"
+                      [disabled]="busy()"
+                      (click)="uploadComposition(m.id)"
+                    >
+                      Upload composition plate
+                    </button>
+                    <button
+                      type="button"
+                      class="pb-btn pb-btn-ghost"
+                      [disabled]="busy()"
+                      (click)="refreshCompositions()"
+                    >
+                      Refresh plates
+                    </button>
+                  </div>
+                </div>
               }
               <label>Prompt @if (m.useInpainting) { (fallback if inpainting off) }</label>
               <textarea class="pb-input pb-textarea" rows="5" [(ngModel)]="m.prompt"></textarea>
@@ -681,21 +711,20 @@
     @if (tab === 'modes') {
       <div class="pb-admin-modes">
         <section class="pb-admin-card pb-admin-card-wide">
-          <h2>Booth modes</h2>
+          <h2>Guest experiences</h2>
           <p class="pb-hint">
-            Guests pick a mode after <strong>Tap to start</strong>. Enable one or both options
-            below. If only one is enabled, that mode runs automatically (no picker).
-            Physical cut sheets upload to Moments for <strong>admin download only</strong> (not the
-            guest wall). Custom sheets can also be generated in Moments Admin → Physical frame.
+            After <strong>Tap to start</strong>, guests choose an experience. Every path can finish
+            with a <strong>digital framed copy</strong>. The glow magnet (physical cut sheet) is
+            offered on the result screen when enabled below — not as a separate start mode.
           </p>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftGuestModes.defaultEnabled" />
-            <strong>Digital frame</strong> — photo + digital frames / caption / AI as configured
+            <strong>Photo Print</strong> — original photo + digital frame / share
           </label>
           <label class="pb-admin-check">
             <input type="checkbox" [(ngModel)]="draftGuestModes.physicalFrameEnabled" />
-            <strong>Physical frame</strong> — landscape capture, rotate 90°, sheet with
-            <em>two identical</em> portrait cells for cutting into frames
+            <strong>Glow magnet on result</strong> — show “Make glow magnet” (dual cut sheet) after
+            Photo Print or AI Portrait
           </label>
 
           @if (draftGuestModes.physicalFrameEnabled) {

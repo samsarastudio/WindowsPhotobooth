@@ -1,0 +1,32 @@
+<div class="pb-page pb-scene-select">
+  <div class="pb-scene-select-inner">
+    @if (branding.logoSrc(); as logo) {
+      <img class="pb-icon pb-icon-logo" [src]="logo" [attr.alt]="copy().sceneSelect.title" />
+    } @else {
+      <span class="pb-icon" aria-hidden="true">{{ copy().attract.icon }}</span>
+    }
+    <h1 class="pb-title">{{ copy().sceneSelect.title }}</h1>
+    <p class="pb-sub">{{ copy().sceneSelect.subtitle }}</p>
+
+    @if (thumbsLoading()) {
+      <p class="pb-hint">Loading scenes…</p>
+    } @else if (!hasScenes()) {
+      <p class="pb-hint">No scenes available. Add plates under config/ai-backgrounds/scene.</p>
+    } @else {
+      <ul class="pb-scene-grid" role="list">
+        @for (s of scenes(); track s.filename) {
+          <li>
+            <button type="button" class="pb-scene-card" (click)="choose(s.filename)">
+              <img [src]="s.url" [alt]="s.label" loading="lazy" decoding="async" />
+              <span class="pb-scene-card-label">{{ s.label }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="pb-row">
+      <a [routerLink]="backLink()" class="pb-btn pb-btn-ghost">{{ copy().sceneSelect.back }}</a>
+    </div>
+  </div>
+</div>

@@ -45,6 +45,11 @@ contextBridge.exposeInMainWorld('pbApi', {
     ipcRenderer.invoke('admin:installAiBackground', modeId, sourcePath),
   adminDeleteAiBackground: (modeId, filename) =>
     ipcRenderer.invoke('admin:deleteAiBackground', modeId, filename),
+  adminListCompositions: () => ipcRenderer.invoke('admin:listCompositions'),
+  adminGetComposition: (modeId) => ipcRenderer.invoke('admin:getComposition', modeId),
+  adminPickCompositionImage: () => ipcRenderer.invoke('admin:pickCompositionImage'),
+  adminInstallComposition: (modeId, sourcePath) =>
+    ipcRenderer.invoke('admin:installComposition', modeId, sourcePath),
   openAiGenerateImage: (payload) => ipcRenderer.invoke('openai:generateImage', payload),
   listPhotoFrames: () => ipcRenderer.invoke('frames:list'),
   applyPhotoFrame: (payload) => ipcRenderer.invoke('frames:apply', payload),

@@ -2,9 +2,9 @@
   "id": "witch",
   "label": "Witch",
   "face": {
-    "xPercent": 34,
-    "yPercent": 10,
-    "widthPercent": 32,
-    "heightPercent": 26
+    "xPercent": 40,
+    "yPercent": 16,
+    "widthPercent": 17,
+    "heightPercent": 17
   }
 }

@@ -1,0 +1,10 @@
+{
+  "id": "morticia",
+  "label": "Morticia",
+  "face": {
+    "xPercent": 40,
+    "yPercent": 4,
+    "widthPercent": 17,
+    "heightPercent": 17
+  }
+}

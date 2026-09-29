@@ -95,6 +95,25 @@ export class FramePageComponent implements OnInit {
     if (allow.length > 0 && !allow.includes('__none__') && !this.pickFrameMode()) {
       available = r.frames.filter((f) => allow.includes(f.filename));
     }
+    // Prefer frames matching the photo orientation (portrait AI → portrait frame).
+    const photo = this.photoPath();
+    if (photo && available.some((f) => typeof f.aspectRatio === 'number')) {
+      try {
+        const preferPortrait = /portrait|4x6|_ai\.png$/i.test(photo) || /_ai_raw/i.test(photo);
+        // Heuristic from filename; also check frame aspect when photo path suggests portrait.
+        const oriented = available.filter((f) => {
+          const ar = Number(f.aspectRatio);
+          if (!Number.isFinite(ar)) return true;
+          const frameIsPortrait = ar < 0.95;
+          if (preferPortrait) return frameIsPortrait;
+          // Default capture is landscape 6×4 — show landscape frames first.
+          return !frameIsPortrait;
+        });
+        if (oriented.length) available = oriented;
+      } catch {
+        /* keep available */
+      }
+    }
     if (!available.length) {
       this.err.set('No enabled frames for guests. Enable at least one in Admin → Frames.');
       return;

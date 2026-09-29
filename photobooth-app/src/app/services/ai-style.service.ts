@@ -7,12 +7,19 @@ import { Injectable, signal } from '@angular/core';
 export class AiStyleService {
   /** Selected `PhotoboothAiMode.id`, or null before selection / after clear. */
   readonly selectedModeId = signal<string | null>(null);
+  /** Scene Addition background filename chosen by the guest (under config/ai-backgrounds/scene). */
+  readonly selectedBackgroundFilename = signal<string | null>(null);
 
   selectMode(id: string): void {
     this.selectedModeId.set(id);
   }
 
+  selectBackground(filename: string | null): void {
+    this.selectedBackgroundFilename.set(filename);
+  }
+
   clear(): void {
     this.selectedModeId.set(null);
+    this.selectedBackgroundFilename.set(null);
   }
 }

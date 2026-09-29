@@ -210,11 +210,27 @@ export interface PhotoboothCopyPortraitSelect {
   back: string;
 }
 
+export interface PhotoboothCopySceneSelect {
+  title: string;
+  subtitle: string;
+  back: string;
+}
+
 export interface PhotoboothCopyBoothMode {
   title: string;
   subtitle: string;
+  /** Photo Print experience */
   defaultLabel: string;
   defaultHint: string;
+  /** AI Halloween Portrait experience */
+  aiPortraitLabel: string;
+  aiPortraitHint: string;
+  /** Optional Scene Addition */
+  sceneLabel: string;
+  sceneHint: string;
+  /** Note that magnet/physical is offered at the end of every path */
+  magnetNote: string;
+  /** @deprecated kept for older configs — no longer shown as a start mode */
   physicalLabel: string;
   physicalHint: string;
   back: string;
@@ -291,6 +307,7 @@ export interface PhotoboothCopy {
   history: PhotoboothCopyHistory;
   aiMode: PhotoboothCopyAiMode;
   portraitSelect: PhotoboothCopyPortraitSelect;
+  sceneSelect: PhotoboothCopySceneSelect;
   boothMode: PhotoboothCopyBoothMode;
   frame: PhotoboothCopyFrame;
   caption: PhotoboothCopyCaption;
@@ -352,17 +369,17 @@ export const NEWSPAPER_AI_PROMPT =
 
 /** Scene Addition — keep cropped guests, paint Halloween scenery around them. */
 export const HALLOWEEN_SCENE_PROMPT =
-  `Place the guests exactly as captured into this Halloween environment. Keep every face, skin tone, hair, and likeness 100% unchanged — never alter identity. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
+  `Place the guests exactly as captured into this Halloween environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged — never alter identity or invent extra limbs. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
 
 export const HALLOWEEN_SCENE_INPAINT =
-  `Seamlessly blend the cropped guest group into this Halloween scene. CRITICAL: do not change any faces — preserve exact facial features, expressions, skin tone, and hair. Keep bodies and clothing as captured; only replace or extend the surroundings with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup on faces, no identity change.`;
+  `BLEND the guests into this Halloween scene — do not recreate them. CRITICAL: keep every person exactly as placed (faces, bodies, legs, feet, clothing, pose, count). NEVER invent extra legs, limbs, or people. Only replace the indoor room/booth background around them with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup, no identity change, no body regeneration.`;
 
-/** Shared head-swap prompts for Halloween AI Portrait characters. */
+/** Shared head-swap prompts for Halloween AI Portrait — aligned with Zyn Photobooth-AICore. */
 export const HEAD_SWAP_PROMPT =
-  'Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short neck. No oval outline. Keep the costume body and Halloween scene.';
+  'Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.';
 
 export const HEAD_SWAP_INPAINT =
-  'CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL ANATOMY. Image 1 is this Halloween character scene with the head region cleared. Image 2 is a tight crop of the guest\'s real head. Replace ONLY the character head with the guest at NATURAL PROPORTION matching the original head size. Exact guest likeness: eyes, nose, mouth, jaw, skin, hair — NEVER change the guest face. Keep a natural short adult neck nestled into the costume collar. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background.';
+  "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face.";
 
 export const HALLOWEEN_PORTRAIT_IDS = [
   'vampire',
@@ -370,6 +387,8 @@ export const HALLOWEEN_PORTRAIT_IDS = [
   'werewolf',
   'reaper',
   'phantom',
+  'bride',
+  'morticia',
 ] as const;
 
 export interface PhotoboothCameraConfig {
@@ -439,8 +458,8 @@ export interface PhotoboothPhotoFramesConfig {
 export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   enabled: true,
   photoScale: 1,
-  defaultFrameFile: 'botanical-landscape.png',
-  guestFrameFiles: [],
+  defaultFrameFile: 'halloween-haunt.png',
+  guestFrameFiles: ['halloween-haunt.png', 'halloween-haunt-portrait.png'],
   autoApplyFrame: false,
   guestAdjustPhoto: true,
   guestTextEnabled: false,
@@ -600,7 +619,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
     label: 'Scene Addition',
     prompt: HALLOWEEN_SCENE_PROMPT,
     useInpainting: true,
-    randomizeBackground: true,
+    randomizeBackground: false,
     inpaintPrompt: HALLOWEEN_SCENE_INPAINT,
     pipeline: 'scene',
   },
@@ -647,6 +666,26 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   {
     id: 'phantom',
     label: 'Phantom',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
+  },
+  {
+    id: 'bride',
+    label: 'Bride',
+    prompt: HEAD_SWAP_PROMPT,
+    useInpainting: true,
+    randomizeBackground: false,
+    inpaintPrompt: HEAD_SWAP_INPAINT,
+    pipeline: 'head-swap',
+    portraitOnly: true,
+  },
+  {
+    id: 'morticia',
+    label: 'Morticia',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -726,10 +765,10 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     printing: 'Printing…',
     printed: 'Printed',
     printFailed: 'Print failed',
-    makePhysical: 'Make physical sheet',
-    remakePhysical: 'Remake physical sheet',
-    makingPhysical: 'Creating sheet…',
-    physicalErrorPrefix: 'Physical sheet failed:',
+    makePhysical: 'Make glow magnet',
+    remakePhysical: 'Remake glow magnet',
+    makingPhysical: 'Creating magnet sheet…',
+    physicalErrorPrefix: 'Magnet failed:',
     makeFramed: 'Make framed',
     remakeFramed: 'Remake framed',
     makingFramed: 'Applying frame…',
@@ -780,13 +819,23 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     subtitle: 'Pick a character — we keep your real face',
     back: 'Back',
   },
+  sceneSelect: {
+    title: 'Choose your scene',
+    subtitle: 'Pick the Halloween backdrop for your group',
+    back: 'Back',
+  },
   boothMode: {
-    title: 'Choose a mode',
-    subtitle: 'How should we finish your photo?',
-    defaultLabel: 'Digital frame',
-    defaultHint: 'Photo with frames and styles',
-    physicalLabel: 'Physical frame',
-    physicalHint: 'One dual-photo sheet — print once, then cut for your frame',
+    title: 'Choose your experience',
+    subtitle: 'Every visit includes a digital framed copy. Add a glow magnet at the end if you like.',
+    defaultLabel: 'Photo Print',
+    defaultHint: 'Original photo with a custom Screampark frame and digital copy',
+    aiPortraitLabel: 'AI Halloween Portrait',
+    aiPortraitHint: 'Become a haunt character — your real face, costume look, framed digital copy',
+    sceneLabel: 'Scene Addition',
+    sceneHint: 'Keep your group as-is and paint Halloween scenery around you',
+    magnetNote: 'Glow-in-the-Dark Photo Magnet is available after your photo — for Photo Print or AI Portrait.',
+    physicalLabel: 'Glow magnet',
+    physicalHint: 'Dual cut sheet for glow-in-the-dark magnets',
     back: 'Back',
   },
   frame: {
