@@ -217,6 +217,7 @@ export class GalleryUploadService implements OnDestroy {
   async uploadPath(
     filePath: string,
     variant: GalleryPhotoVariant,
+    opts?: { processStatus?: 'processing' | 'ready' },
   ): Promise<GalleryUploadRecord> {
     const pending: GalleryUploadRecord = { path: filePath, variant, status: 'queued' };
     this.byPath.update((m) => ({ ...m, [filePath]: pending }));
@@ -234,7 +235,10 @@ export class GalleryUploadService implements OnDestroy {
     }
 
     const g = this.booth.gallery();
-    void this.log.info('gallery', `upload start (${variant})`, { filePath });
+    void this.log.info('gallery', `upload start (${variant})`, {
+      filePath,
+      processStatus: opts?.processStatus,
+    });
     if (variant === 'original' && !g.uploadOriginal) return this.skip(filePath, variant);
     if (variant === 'framed' && !g.uploadFramed) return this.skip(filePath, variant);
     if (variant === 'ai' && !g.uploadAi) return this.skip(filePath, variant);
@@ -246,6 +250,7 @@ export class GalleryUploadService implements OnDestroy {
       eventPrefix: g.sessionPrefix,
       filePath,
       variant,
+      processStatus: opts?.processStatus,
     });
 
     const next: GalleryUploadRecord = r.ok
@@ -335,15 +340,22 @@ export class GalleryUploadService implements OnDestroy {
   }
 
   /** Fire-and-forget helper for capture/frame/AI hooks. */
-  queueUpload(filePath: string, variant: GalleryPhotoVariant): void {
-    void this.uploadPath(filePath, variant);
+  queueUpload(
+    filePath: string,
+    variant: GalleryPhotoVariant,
+    opts?: { processStatus?: 'processing' | 'ready' },
+  ): void {
+    void this.uploadPath(filePath, variant, opts);
   }
 
   /**
    * Upload the guest's chosen photo (and its original, if this is a framed /
    * physical / AI derivative) after they tap Done on the preview screen.
    */
-  commitGuestCapture(displayPath: string): void {
+  commitGuestCapture(
+    displayPath: string,
+    opts?: { processStatus?: 'processing' | 'ready' },
+  ): void {
     if (!displayPath) return;
     const variant = this.inferVariant(displayPath);
     const original = displayPath
@@ -351,9 +363,9 @@ export class GalleryUploadService implements OnDestroy {
       .replace(/_ai\.png$/i, '.jpg')
       .replace(/_framed\.png$/i, '.jpg');
     if (original !== displayPath) {
-      this.queueUpload(original, 'original');
+      this.queueUpload(original, 'original', opts);
     }
-    this.queueUpload(displayPath, variant);
+    this.queueUpload(displayPath, variant, opts);
   }
 
   private skip(filePath: string, variant: GalleryPhotoVariant): GalleryUploadRecord {

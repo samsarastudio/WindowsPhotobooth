@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Moments Tablet — Today</title>
+    <link rel="stylesheet" href="/css/tablet.css" />
+  </head>
+  <body>
+    <header class="tb-header">
+      <div>
+        <p class="tb-eyebrow">Operator tablet</p>
+        <h1 id="tbTitle">Today’s captures</h1>
+        <p id="tbSub" class="tb-sub">Loading…</p>
+      </div>
+      <div class="tb-header-actions">
+        <label class="tb-pin">
+          Admin PIN
+          <input id="tbPin" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
+        </label>
+        <button type="button" class="tb-btn" id="tbRefresh">Refresh</button>
+      </div>
+    </header>
+
+    <p id="tbStatus" class="tb-status" hidden></p>
+
+    <main id="tbGrid" class="tb-grid" aria-live="polite"></main>
+
+    <template id="tbCardTpl">
+      <article class="tb-card">
+        <div class="tb-thumb-wrap">
+          <img class="tb-thumb" alt="" loading="lazy" />
+          <span class="tb-badge"></span>
+        </div>
+        <div class="tb-meta">
+          <p class="tb-variant"></p>
+          <p class="tb-time"></p>
+        </div>
+        <button type="button" class="tb-btn tb-print">Send print to kiosk</button>
+        <p class="tb-job" hidden></p>
+      </article>
+    </template>
+
+    <script src="/js/tablet.js" type="module"></script>
+  </body>
+</html>

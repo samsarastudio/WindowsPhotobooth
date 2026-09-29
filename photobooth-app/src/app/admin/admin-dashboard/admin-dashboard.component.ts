@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import type {
   PhotoboothAiMode,
   PhotoboothGuestModesConfig,
+  PhotoboothGuestFlowConfig,
   PhotoboothBranding,
   PhotoboothCameraConfig,
   PhotoboothCaptureConfig,
@@ -28,6 +29,7 @@ import {
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
+  PHOTOBOOTH_DEFAULT_GUEST_FLOW,
   PHOTOBOOTH_DEFAULT_GUEST_MODES,
   PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   PHOTOBOOTH_DEFAULT_PRINT,
@@ -125,6 +127,7 @@ export class AdminDashboardComponent implements OnInit {
   draftPrint: PhotoboothPrintConfig = structuredClone(PHOTOBOOTH_DEFAULT_PRINT);
   draftDebug: PhotoboothDebugConfig = structuredClone(PHOTOBOOTH_DEFAULT_DEBUG);
   draftGuestModes: PhotoboothGuestModesConfig = structuredClone(PHOTOBOOTH_DEFAULT_GUEST_MODES);
+  draftGuestFlow: PhotoboothGuestFlowConfig = structuredClone(PHOTOBOOTH_DEFAULT_GUEST_FLOW);
   draftPhysicalFrame: PhotoboothPhysicalFrameConfig = structuredClone(
     PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
   );
@@ -333,6 +336,7 @@ export class AdminDashboardComponent implements OnInit {
     this.draftPrint = structuredClone(cfg?.print ?? PHOTOBOOTH_DEFAULT_PRINT);
     this.draftDebug = structuredClone(cfg?.debug ?? PHOTOBOOTH_DEFAULT_DEBUG);
     this.draftGuestModes = structuredClone(cfg?.guestModes ?? PHOTOBOOTH_DEFAULT_GUEST_MODES);
+    this.draftGuestFlow = structuredClone(cfg?.guestFlow ?? PHOTOBOOTH_DEFAULT_GUEST_FLOW);
     this.draftPhysicalFrame = structuredClone(
       cfg?.physicalFrame ?? PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
     );
@@ -612,6 +616,12 @@ export class AdminDashboardComponent implements OnInit {
   todayGalleryUrl(): string {
     const base = (this.draftGallery.apiBaseUrl || '').replace(/\/$/, '');
     return base ? `${base}/${this.todayGallerySlug()}` : '';
+  }
+
+  todayTabletUrl(): string {
+    const base = (this.draftGallery.apiBaseUrl || '').replace(/\/$/, '');
+    const prefix = this.draftGallery.sessionPrefix || 'session';
+    return base ? `${base}/tablet/${encodeURIComponent(prefix)}` : '';
   }
 
   momentsWallUrl(): string {
@@ -1485,6 +1495,14 @@ export class AdminDashboardComponent implements OnInit {
         aiGenerationEnabled: aiEnabled,
         requireQrUnlock: this.draftRequireQrUnlock,
         defaultAiModeId: defaultId,
+        guestFlow: {
+          skipAiPreviewToThanks: this.draftGuestFlow.skipAiPreviewToThanks === true,
+          thanksAutoReturnSec: Math.max(
+            0,
+            Math.min(120, Math.floor(Number(this.draftGuestFlow.thanksAutoReturnSec) || 0)),
+          ),
+          boothId: (this.draftGuestFlow.boothId || 'booth-1').trim() || 'booth-1',
+        },
         aiModes: normalized.map(
           ({ inpaintPrompt, useInpainting, randomizeBackground, pipeline, portraitOnly, ...rest }) => ({
             ...rest,

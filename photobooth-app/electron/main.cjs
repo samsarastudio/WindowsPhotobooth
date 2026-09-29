@@ -2069,6 +2069,19 @@ app.whenReady().then(() => {
   setInterval(() => {
     void syncFramesOnStartup();
   }, 5 * 60 * 1000);
+  try {
+    const { createPrintJobPoller } = require('./print-job-poller.cjs');
+    const printJobPoller = createPrintJobPoller({
+      loadMergedConfig,
+      getPortableRoot,
+      appendAppLog,
+      printPhotoFn: (payload) => executePrintPhoto(payload),
+    });
+    printJobPoller.start();
+    appendAppLog('info', 'print-jobs', 'Moments print-job poller started');
+  } catch (e) {
+    appendAppLog('warn', 'print-jobs', 'poller not started', String(e));
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -3454,6 +3467,10 @@ async function uploadPhotoOnce(payload, signal) {
   });
   form.append('variant', variant);
   form.append('sourceLocalName', path.basename(abs));
+  const processStatus = String(payload?.processStatus || '').trim().toLowerCase();
+  if (processStatus === 'processing' || processStatus === 'ready') {
+    form.append('processStatus', processStatus);
+  }
 
   const uploadUrl = `${base}/api/sessions/${encodeURIComponent(slug)}/photos`;
   const bodyBuf = form.getBuffer();
@@ -3638,6 +3655,10 @@ function enqueueGalleryUpload(payload) {
       apiBaseUrl: galleryBaseUrl(payload?.apiBaseUrl),
       uploadToken: String(payload?.uploadToken || '').trim(),
       eventPrefix: String(payload?.eventPrefix || 'session').trim() || 'session',
+      processStatus:
+        String(payload?.processStatus || '').trim().toLowerCase() === 'processing'
+          ? 'processing'
+          : 'ready',
       status: 'queued',
       attempts: 0,
       createdAt: now,
@@ -3649,6 +3670,9 @@ function enqueueGalleryUpload(payload) {
     item.uploadToken = String(payload?.uploadToken || '').trim() || item.uploadToken;
     item.eventPrefix =
       String(payload?.eventPrefix || '').trim() || item.eventPrefix || 'session';
+    if (payload?.processStatus) {
+      item.processStatus = String(payload.processStatus).trim().toLowerCase();
+    }
     if (item.status !== 'ok') {
       item.status = 'queued';
       item.error = undefined;
@@ -4450,7 +4474,7 @@ async function resolveBoothPrinter(preferredName) {
   return { ok: true, chosen, all, usbList };
 }
 
-ipcMain.handle('print:photo', async (_e, payload) => {
+async function executePrintPhoto(payload) {
   try {
     const filePath = String(payload?.filePath || '').trim();
     const deviceName =
@@ -4559,7 +4583,9 @@ ipcMain.handle('print:photo', async (_e, payload) => {
     appendAppLog('error', 'print', 'print:photo failed', msg);
     return { ok: false, error: msg.replace(/\s+/g, ' ').trim().slice(0, 400) };
   }
-});
+}
+
+ipcMain.handle('print:photo', async (_e, payload) => executePrintPhoto(payload));
 
 /** Admin test print — solid 6×4 JPEG to verify SELPHY USB path. */
 ipcMain.handle('print:test', async () => {

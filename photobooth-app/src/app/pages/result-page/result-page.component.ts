@@ -8,6 +8,7 @@ import { AiStyleService } from '../../services/ai-style.service';
 import { BoothModeService } from '../../services/booth-mode.service';
 import { AiGallerySessionService } from '../../services/ai-gallery-session.service';
 import { GalleryUploadService } from '../../services/gallery-upload.service';
+import { AiBackgroundJobService } from '../../services/ai-background-job.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
 import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
@@ -27,6 +28,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   private readonly boothMode = inject(BoothModeService);
   private readonly gallerySession = inject(AiGallerySessionService);
   readonly galleryUpload = inject(GalleryUploadService);
+  private readonly aiBg = inject(AiBackgroundJobService);
   private readonly physicalLayout = inject(PhysicalFrameLayoutService);
   readonly copy = this.booth.copy;
 
@@ -130,6 +132,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   readonly showAiSection = computed(() => {
     if (this.isPreview()) return false;
+    // Skip mode: never show the Generate / waiting UI on the kiosk.
+    if (this.booth.guestFlow().skipAiPreviewToThanks) return false;
     if (!this.booth.aiGenerationEnabled()) return false;
     const id = this.aiStyle.selectedModeId();
     if (!id || id === PLAIN_PHOTO_MODE_ID) return false;
@@ -218,6 +222,38 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.startShareUploadIfNeeded(pp);
+    this.maybeAutoSkipAiWait();
+  }
+
+  /** When admin enabled skip-to-thanks, never show the AI waiting UI. */
+  private shouldSkipAiWait(): boolean {
+    if (!this.booth.guestFlow().skipAiPreviewToThanks) return false;
+    if (!this.booth.aiGenerationEnabled()) return false;
+    if (!this.booth.openAiConfigured()) return false;
+    const id = this.aiStyle.selectedModeId();
+    if (!id || id === PLAIN_PHOTO_MODE_ID) return false;
+    return !!this.selectedMode();
+  }
+
+  private maybeAutoSkipAiWait(): void {
+    if (this.isPreview()) return;
+    if (!this.shouldSkipAiWait()) return;
+    void this.beginSkipAiFlow();
+  }
+
+  /**
+   * Leave the kiosk immediately: Thank you screen while AI + Moments upload run
+   * in the background. Tablet shows processing → ready and can approve print.
+   */
+  private beginSkipAiFlow(): void {
+    const pp = this.path();
+    const mode = this.selectedMode();
+    if (!pp || !mode) return;
+    // Always generate from the camera capture, never a framed/physical derivative.
+    const source = this.originalCapturePath(pp);
+    // Mark processing + kick off AI without awaiting — guest must not wait.
+    this.aiBg.start({ imagePath: source, mode });
+    void this.router.navigate(['/thanks']);
   }
 
   private stopSharePoll(): void {
@@ -275,6 +311,10 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     const pp = this.path();
     const mode = this.selectedMode();
     if (!pp || !mode || !window.pbApi?.openAiGenerateImage) {
+      return;
+    }
+    if (this.shouldSkipAiWait()) {
+      this.beginSkipAiFlow();
       return;
     }
     const source = this.isPhysicalSheetPath(pp) ? this.originalCapturePath(pp) : pp;
@@ -464,6 +504,11 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       history.replaceState({ ...(history.state || {}), path: pp, preview: false }, '');
     } catch {
       /* ignore */
+    }
+    // AI skip path: leave immediately — no share/print wait on the kiosk.
+    if (this.shouldSkipAiWait()) {
+      this.beginSkipAiFlow();
+      return;
     }
     this.galleryUpload.commitGuestCapture(pp);
     this.startShareUploadIfNeeded(pp);

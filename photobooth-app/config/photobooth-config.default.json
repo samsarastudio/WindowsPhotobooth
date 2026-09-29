@@ -26,6 +26,11 @@
   "requireQrUnlock": false,
   "aiGenerationEnabled": false,
   "defaultAiModeId": null,
+  "guestFlow": {
+    "skipAiPreviewToThanks": false,
+    "thanksAutoReturnSec": 8,
+    "boothId": "booth-1"
+  },
   "photoFrames": {
     "enabled": true,
     "photoScale": 1,

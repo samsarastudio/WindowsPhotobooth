@@ -226,6 +226,10 @@ sessionsRouter.post(
     const width = req.body?.width ? Number(req.body.width) : null;
     const height = req.body?.height ? Number(req.body.height) : null;
     const sourceLocalName = String(req.body?.sourceLocalName || req.file.originalname || '').trim() || null;
+    const processStatusRaw = String(req.body?.processStatus || req.body?.process_status || '')
+      .trim()
+      .toLowerCase();
+    const processStatus = processStatusRaw === 'processing' ? 'processing' : 'ready';
 
     // Dedupe: same local capture filename + variant in this session → return existing.
     // If the DB row exists but the file was deleted, rewrite the file so thumbnails aren't black.
@@ -243,10 +247,16 @@ sessionsRouter.post(
           fs.mkdirSync(path.dirname(existingPath), { recursive: true });
           fs.writeFileSync(existingPath, req.file.buffer);
           getDb()
-            .prepare('UPDATE photos SET bytes = ?, mime = ? WHERE id = ?')
-            .run(req.file.buffer.length, req.file.mimetype || existing.mime, existing.id);
+            .prepare('UPDATE photos SET bytes = ?, mime = ?, process_status = ? WHERE id = ?')
+            .run(req.file.buffer.length, req.file.mimetype || existing.mime, processStatus, existing.id);
           existing.bytes = req.file.buffer.length;
           existing.mime = req.file.mimetype || existing.mime;
+          existing.process_status = processStatus;
+        } else if (processStatus === 'ready' && existing.process_status === 'processing') {
+          getDb()
+            .prepare('UPDATE photos SET process_status = ? WHERE id = ?')
+            .run('ready', existing.id);
+          existing.process_status = 'ready';
         }
         const photo = publicPhoto(session.slug, existing);
         return res.json({ ok: true, photo, deduped: true });
@@ -287,14 +297,15 @@ sessionsRouter.post(
       width: Number.isFinite(width) ? width : null,
       height: Number.isFinite(height) ? height : null,
       created_at: new Date().toISOString(),
+      process_status: processStatus,
     };
     try {
       getDb()
         .prepare(
           `INSERT INTO photos
-           (id, session_id, variant, filename, mime, bytes, source_local_name, width, height, created_at)
+           (id, session_id, variant, filename, mime, bytes, source_local_name, width, height, created_at, process_status)
            VALUES
-           (@id, @session_id, @variant, @filename, @mime, @bytes, @source_local_name, @width, @height, @created_at)`,
+           (@id, @session_id, @variant, @filename, @mime, @bytes, @source_local_name, @width, @height, @created_at, @process_status)`,
         )
         .run(row);
     } catch (e) {
@@ -306,10 +317,37 @@ sessionsRouter.post(
       return res.status(500).json({ ok: false, error: `Failed to record photo: ${e.message || e}` });
     }
 
+    // When AI/framed lands, mark sibling originals ready.
+    if ((variant === 'ai' || variant === 'framed') && sourceLocalName) {
+      try {
+        getDb()
+          .prepare(
+            `UPDATE photos SET process_status = 'ready'
+             WHERE session_id = ? AND variant = 'original' AND process_status = 'processing'
+               AND source_local_name = ?`,
+          )
+          .run(session.id, sourceLocalName.replace(/_ai(\.|$)/i, '$1').replace(/_framed(\.|$)/i, '$1'));
+        // Also match family by stripping suffix from source names loosely.
+        const familyBase = sourceLocalName
+          .replace(/_ai(?=\.|$)/i, '')
+          .replace(/_framed(?=\.|$)/i, '')
+          .replace(/_physical(?=\.|$)/i, '');
+        getDb()
+          .prepare(
+            `UPDATE photos SET process_status = 'ready'
+             WHERE session_id = ? AND variant = 'original' AND process_status = 'processing'
+               AND (source_local_name = ? OR source_local_name LIKE ?)`,
+          )
+          .run(session.id, familyBase, `${familyBase.split('.')[0]}%`);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
     const photo = publicPhoto(session.slug, row);
     warmThumb(session.slug, filename);
     const showOriginals = loadSettings().showOriginalPhotos !== false;
-    const pushLive = variant !== 'physical' && (variant !== 'original' || showOriginals);
+    const pushLive = variant !== 'physical' && (variant !== 'original' || showOriginals || processStatus === 'processing');
     if (pushLive) {
       broadcastPhotoAdded(session.slug, photo);
       notifyWallPhoto({

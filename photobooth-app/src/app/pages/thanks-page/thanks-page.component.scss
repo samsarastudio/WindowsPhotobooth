@@ -1,0 +1,45 @@
+.pb-page.pb-thanks {
+  min-height: 100vh;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: clamp(1rem, 4vmin, 2rem);
+}
+
+.pb-thanks-inner {
+  width: min(100%, 720px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.65rem, 2.2vmin, 1.25rem);
+  padding: clamp(1.5rem, 5vmin, 2.75rem);
+}
+
+.pb-thanks-title {
+  margin: 0;
+  font-family: var(--pb-font-display, 'Cormorant Garamond', Georgia, serif);
+  font-size: clamp(2.6rem, 9vmin, 4.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--pb-ink, #1c1a17);
+}
+
+.pb-thanks-sub {
+  margin: 0;
+  font-size: clamp(1.05rem, 3.2vmin, 1.45rem);
+  line-height: 1.35;
+  color: var(--pb-ink-muted, rgba(28, 26, 23, 0.78));
+  max-width: 28ch;
+}
+
+.pb-thanks-foot {
+  margin: 0;
+  max-width: 34ch;
+}
+
+.pb-thanks-done {
+  margin-top: clamp(0.5rem, 2vmin, 1rem);
+  min-width: min(100%, 220px);
+}

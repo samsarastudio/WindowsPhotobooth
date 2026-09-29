@@ -13,6 +13,7 @@ import { AiGalleryPageComponent } from './pages/ai-gallery-page/ai-gallery-page.
 import { FramePageComponent } from './pages/frame-page/frame-page.component';
 import { CaptionPageComponent } from './pages/caption-page/caption-page.component';
 import { HistoryPageComponent } from './pages/history-page/history-page.component';
+import { ThanksPageComponent } from './pages/thanks-page/thanks-page.component';
 
 export const routes: Routes = [
   { path: '', component: AttractPageComponent },
@@ -26,6 +27,7 @@ export const routes: Routes = [
   { path: 'caption', component: CaptionPageComponent },
   { path: 'result', component: ResultPageComponent },
   { path: 'ai-gallery', component: AiGalleryPageComponent },
+  { path: 'thanks', component: ThanksPageComponent },
   { path: 'admin/login', component: AdminLoginComponent },
   { path: 'admin', canActivate: [adminGuard], component: AdminDashboardComponent },
   { path: '**', redirectTo: '' },

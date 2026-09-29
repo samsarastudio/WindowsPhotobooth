@@ -10,6 +10,7 @@ import type {
   PhotoboothPhotoFramesConfig,
   PhotoboothPhysicalFrameConfig,
   PhotoboothGuestModesConfig,
+  PhotoboothGuestFlowConfig,
   PhotoboothBoothModeId,
   PhotoboothCaptureConfig,
   PhotoboothPrintConfig,
@@ -23,6 +24,7 @@ import {
   PHOTOBOOTH_DEFAULT_COPY,
   PHOTOBOOTH_DEFAULT_DEBUG,
   PHOTOBOOTH_DEFAULT_GALLERY,
+  PHOTOBOOTH_DEFAULT_GUEST_FLOW,
   PHOTOBOOTH_DEFAULT_GUEST_MODES,
   PHOTOBOOTH_DEFAULT_PHOTO_FRAMES,
   PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
@@ -44,6 +46,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     caption: { ...base.caption, ...patch.caption },
     frameAdjust: { ...base.frameAdjust, ...patch.frameAdjust },
     physicalAdjust: { ...base.physicalAdjust, ...patch.physicalAdjust },
+    thanks: { ...base.thanks, ...patch.thanks },
   };
 }
 
@@ -445,6 +448,20 @@ function pathBasenameSafe(name: string): string {
   return base;
 }
 
+function normalizeGuestFlowConfig(
+  raw?: Partial<PhotoboothGuestFlowConfig> | null,
+): PhotoboothGuestFlowConfig {
+  const base = PHOTOBOOTH_DEFAULT_GUEST_FLOW;
+  const o = raw && typeof raw === 'object' ? raw : {};
+  const thanksSec = Number(o.thanksAutoReturnSec);
+  return {
+    skipAiPreviewToThanks: o.skipAiPreviewToThanks === true,
+    thanksAutoReturnSec:
+      Number.isFinite(thanksSec) && thanksSec >= 0 ? Math.min(120, Math.floor(thanksSec)) : base.thanksAutoReturnSec,
+    boothId: typeof o.boothId === 'string' && o.boothId.trim() ? o.boothId.trim() : base.boothId,
+  };
+}
+
 function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const { adminPin: _a, openAiApiKey: _k, ...rest } = o;
@@ -481,6 +498,9 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     (rest['guestModes'] as Partial<PhotoboothGuestModesConfig> | undefined) ?? undefined,
     boothModeLegacy,
   );
+  const guestFlow = normalizeGuestFlowConfig(
+    (rest['guestFlow'] as Partial<PhotoboothGuestFlowConfig> | undefined) ?? undefined,
+  );
   const physicalFrame = normalizePhysicalFrameConfig(
     (rest['physicalFrame'] as Partial<PhotoboothPhysicalFrameConfig> | undefined) ?? undefined,
   );
@@ -507,6 +527,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     copy,
     capture,
     guestModes,
+    guestFlow,
     physicalFrame,
     requireQrUnlock,
     aiGenerationEnabled,
@@ -527,6 +548,7 @@ export type BoothAdminSavePartial = Partial<
     | 'debug'
     | 'physicalFrame'
     | 'guestModes'
+    | 'guestFlow'
     | 'capture'
   >
 > & {
@@ -539,6 +561,7 @@ export type BoothAdminSavePartial = Partial<
   debug?: Partial<PhotoboothDebugConfig>;
   physicalFrame?: Partial<PhotoboothPhysicalFrameConfig>;
   guestModes?: Partial<PhotoboothGuestModesConfig>;
+  guestFlow?: Partial<PhotoboothGuestFlowConfig>;
   capture?: Partial<PhotoboothCaptureConfig>;
 };
 
@@ -560,6 +583,9 @@ export class BoothConfigService {
   readonly debugEnabled = computed(() => this.debug().enabled === true);
   readonly guestModes = computed(
     () => this.state()?.guestModes ?? PHOTOBOOTH_DEFAULT_GUEST_MODES,
+  );
+  readonly guestFlow = computed(
+    () => this.state()?.guestFlow ?? PHOTOBOOTH_DEFAULT_GUEST_FLOW,
   );
   readonly physicalFrame = computed(
     () => this.state()?.physicalFrame ?? PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME,
@@ -625,6 +651,7 @@ export class BoothConfigService {
         copy: PHOTOBOOTH_DEFAULT_COPY,
         capture: { ...PHOTOBOOTH_DEFAULT_CAPTURE },
         guestModes: { ...PHOTOBOOTH_DEFAULT_GUEST_MODES },
+        guestFlow: { ...PHOTOBOOTH_DEFAULT_GUEST_FLOW },
         physicalFrame: { ...PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME },
         requireQrUnlock: false,
         aiGenerationEnabled: false,

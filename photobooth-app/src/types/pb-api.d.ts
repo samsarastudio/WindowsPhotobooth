@@ -264,6 +264,7 @@ export interface PbApi {
     eventPrefix: string;
     filePath: string;
     variant: 'original' | 'framed' | 'ai' | 'physical';
+    processStatus?: 'processing' | 'ready';
   }): Promise<{
     ok: boolean;
     queued?: boolean;

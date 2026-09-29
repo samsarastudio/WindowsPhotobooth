@@ -282,6 +282,27 @@
             <input type="checkbox" [(ngModel)]="draftAiEnabled" />
             Enable AI style step (Scene Addition / AI Portrait) after unlock — admin controlled
           </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGuestFlow.skipAiPreviewToThanks" />
+            Skip AI wait on kiosk — show Thank you; result + print on Moments tablet
+          </label>
+          <p class="pb-hint pb-hint-tight">
+            When enabled, guests confirm their photo and leave immediately. AI generates in the
+            background and appears on the tablet URL for that day. Staff approve print there; the
+            booth polls Moments and prints on the kiosk.
+          </p>
+          @if (draftGuestFlow.skipAiPreviewToThanks) {
+            <label>Thank you auto-return (seconds, 0 = stay until Done)</label>
+            <input
+              class="pb-input"
+              type="number"
+              min="0"
+              max="120"
+              [(ngModel)]="draftGuestFlow.thanksAutoReturnSec"
+            />
+            <label>Booth id (for tablet → kiosk print jobs)</label>
+            <input class="pb-input" [(ngModel)]="draftGuestFlow.boothId" placeholder="booth-1" />
+          }
           <label>Default mode</label>
           <select class="pb-input" [(ngModel)]="draftDefaultAiModeId">
             <option [ngValue]="null">Guest chooses (show style screen)</option>
@@ -582,6 +603,14 @@
               <a [href]="todayGalleryUrl() + '/wall'" target="_blank" rel="noopener">mosaic wall</a>
               ·
               <a [href]="todayGalleryUrl() + '/slideshow'" target="_blank" rel="noopener">slideshow</a>
+            } @else {
+              set a base URL first
+            }
+          </p>
+          <p class="pb-hint pb-hint-tight">
+            Operator tablet (today’s grid + print approval):
+            @if (todayTabletUrl()) {
+              <a [href]="todayTabletUrl()" target="_blank" rel="noopener">{{ todayTabletUrl() }}</a>
             } @else {
               set a base URL first
             }

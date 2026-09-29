@@ -275,6 +275,14 @@ export interface PhotoboothCopyHistory {
   applyFrame: string;
 }
 
+export interface PhotoboothCopyThanks {
+  title: string;
+  subtitle: string;
+  /** Small line under subtitle (e.g. photo will be ready shortly). */
+  footnote: string;
+  done: string;
+}
+
 export interface PhotoboothCopy {
   attract: PhotoboothCopyAttract;
   qr: PhotoboothCopyQr;
@@ -288,6 +296,7 @@ export interface PhotoboothCopy {
   caption: PhotoboothCopyCaption;
   frameAdjust: PhotoboothCopyPhysicalAdjust;
   physicalAdjust: PhotoboothCopyPhysicalAdjust;
+  thanks: PhotoboothCopyThanks;
 }
 
 export interface PhotoboothCopyPhysicalAdjust {
@@ -465,6 +474,30 @@ export const PHOTOBOOTH_DEFAULT_GUEST_MODES: PhotoboothGuestModesConfig = {
 };
 
 /**
+ * Guest post-capture flow. When skipAiPreviewToThanks is on, AI guests never wait
+ * on the generating / preview screens — they see Thank you while AI + Moments upload
+ * finish in the background; operators approve print on the tablet.
+ */
+export interface PhotoboothGuestFlowConfig {
+  /**
+   * After the guest confirms their photo with an AI mode selected, skip the AI
+   * wait + result gallery and go straight to Thank you. AI runs in the background
+   * and lands on Moments for tablet review / print.
+   */
+  skipAiPreviewToThanks: boolean;
+  /** Seconds on Thank you before returning to attract (0 = stay until tap). */
+  thanksAutoReturnSec: number;
+  /** Booth id claimed by Moments print jobs (tablet → kiosk). */
+  boothId: string;
+}
+
+export const PHOTOBOOTH_DEFAULT_GUEST_FLOW: PhotoboothGuestFlowConfig = {
+  skipAiPreviewToThanks: false,
+  thanksAutoReturnSec: 8,
+  boothId: 'booth-1',
+};
+
+/**
  * Dual cut-sheet for physical photo frames.
  * Landscape capture is rotated 90°, then placed twice in portrait cells (columns).
  * Cell outer size in cm is the printed ruler size on SELPHY 148×100 mm paper.
@@ -531,6 +564,7 @@ export interface PhotoboothConfig {
    * When more than one is enabled, guests pick on `/booth-mode`.
    */
   guestModes: PhotoboothGuestModesConfig;
+  guestFlow: PhotoboothGuestFlowConfig;
   physicalFrame: PhotoboothPhysicalFrameConfig;
   /** When true, guests must pass the QR / code unlock screen. */
   requireQrUnlock: boolean;
@@ -776,6 +810,12 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     continueLabel: 'Continue',
     skipLabel: 'Skip text',
     applying: 'Creating keepsake…',
+  },
+  thanks: {
+    title: 'Thank you!',
+    subtitle: 'Your photo is being prepared.',
+    footnote: 'Pick it up at the Moments station when ready.',
+    done: 'Done',
   },
   physicalAdjust: {
     title: 'Adjust photo in the frame',
