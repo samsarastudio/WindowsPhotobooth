@@ -464,35 +464,54 @@
             <h3 class="admin-subhead">Halloween demo (/halloween)</h3>
             <p class="meta">
               OpenAI key for the public HauntBooth sample page. Live regenerations are capped
-              (default 5). Showcase samples are static; “Apply sample” runs the booth pipeline.
+              (default 5). Showcase samples are static.
             </p>
-            <label for="halloweenOpenAiApiKey">OpenAI API key</label>
-            <input
-              id="halloweenOpenAiApiKey"
-              class="input"
-              type="password"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="sk-…"
-            />
-            <label for="halloweenGenerationLimit">Generation limit</label>
-            <div class="row">
+            <form id="halloweenSettingsForm" autocomplete="off" onsubmit="return false;">
+              <label for="halloweenOpenAiApiKey">OpenAI API key</label>
               <input
-                id="halloweenGenerationLimit"
+                id="halloweenOpenAiApiKey"
                 class="input"
-                type="number"
-                min="1"
-                max="100"
-                value="5"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="sk-…"
               />
-              <button type="button" class="btn primary" id="btnSaveHalloween">Save Halloween</button>
-              <button type="button" class="btn ghost" id="btnResetHalloweenCount">Reset used count</button>
-            </div>
+              <label for="halloweenGenerationLimit">Generation limit</label>
+              <div class="row">
+                <input
+                  id="halloweenGenerationLimit"
+                  class="input"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value="5"
+                />
+                <button type="button" class="btn primary" id="btnSaveHalloween">Save Halloween</button>
+                <button type="button" class="btn ghost" id="btnResetHalloweenCount">Reset used count</button>
+              </div>
+            </form>
             <p id="halloweenMeta" class="meta"></p>
+
+            <h3 class="admin-subhead">Halloween analytics (/halloween)</h3>
+            <p class="meta">
+              Page visits and traffic source (UTM <code>utm_source</code>, or referrer host, or
+              <code>direct</code>). Same browser within 30 minutes counts once.
+            </p>
+            <div class="row wrap">
+              <button type="button" class="btn ghost" id="btnRefreshHalloweenAnalytics">
+                Refresh analytics
+              </button>
+              <button type="button" class="btn ghost" id="btnResetHalloweenAnalytics">
+                Reset analytics
+              </button>
+            </div>
+            <div id="halloweenAnalytics" class="halloween-analytics">
+              <p class="meta">Unlock admin to load visit stats.</p>
+            </div>
           </section>
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260929-halloween" type="module"></script>
+    <script src="/js/admin.js?v=20260929-halloween-analytics" type="module"></script>
   </body>
 </html>

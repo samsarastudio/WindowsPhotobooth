@@ -18,21 +18,33 @@ const upload = multer({
 
 function ensureFramesDir() {
   fs.mkdirSync(config.framesDir, { recursive: true });
-  seedFramesIfMissing();
   return config.framesDir;
 }
 
-/** Copy bundled landscape + portrait starters into data/frames when absent. */
-function seedFramesIfMissing() {
+function framesDirImageCount() {
+  ensureFramesDir();
+  try {
+    return fs
+      .readdirSync(config.framesDir, { withFileTypes: true })
+      .filter((ent) => ent.isFile() && IMAGE_EXT.has(path.extname(ent.name).toLowerCase())).length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * First-run only: copy seed-frames into data/frames when the library is empty.
+ * Do not re-copy after an admin deletes a seed frame.
+ */
+function seedFramesIfEmpty() {
   if (!fs.existsSync(SEED_FRAMES_DIR)) return;
+  if (framesDirImageCount() > 0) return;
   try {
     for (const ent of fs.readdirSync(SEED_FRAMES_DIR, { withFileTypes: true })) {
       if (!ent.isFile()) continue;
       const ext = path.extname(ent.name).toLowerCase();
       if (!IMAGE_EXT.has(ext)) continue;
-      const dest = path.join(config.framesDir, ent.name);
-      if (fs.existsSync(dest)) continue;
-      fs.copyFileSync(path.join(SEED_FRAMES_DIR, ent.name), dest);
+      fs.copyFileSync(path.join(SEED_FRAMES_DIR, ent.name), path.join(config.framesDir, ent.name));
     }
   } catch {
     /* ignore seed errors */
@@ -171,4 +183,4 @@ adminFramesRouter.delete('/:filename', async (req, res) => {
   return res.json({ ok: true, removed: safe, frames: await withFrameAspect(listFrames()) });
 });
 
-export { listFrames, ensureFramesDir };
+export { listFrames, ensureFramesDir, seedFramesIfEmpty };

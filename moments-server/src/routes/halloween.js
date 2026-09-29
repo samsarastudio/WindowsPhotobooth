@@ -9,6 +9,7 @@ import {
   SAMPLE_DEFS,
 } from '../halloween/paths.js';
 import { publicHalloweenMeta } from '../halloween/store.js';
+import { recordHalloweenVisit } from '../halloween/analytics.js';
 
 export const halloweenRouter = Router();
 
@@ -23,6 +24,23 @@ const upload = multer({
 
 halloweenRouter.get('/meta', (_req, res) => {
   return res.json(publicHalloweenMeta());
+});
+
+/** Public page-view beacon (source + unique visitor). */
+halloweenRouter.post('/visit', (req, res) => {
+  try {
+    const result = recordHalloweenVisit({
+      visitorId: req.body?.visitorId,
+      utmSource: req.body?.utmSource,
+      utmMedium: req.body?.utmMedium,
+      utmCampaign: req.body?.utmCampaign,
+      referrer: req.body?.referrer || req.get('referer') || '',
+      landing: req.body?.landing || '/halloween',
+    });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
 });
 
 halloweenRouter.post('/generate', async (req, res) => {
