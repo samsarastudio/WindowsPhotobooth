@@ -14,6 +14,7 @@ import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js
 import { qrRouter, adminQrRouter } from './routes/qr.js';
 import { boothUpdateRouter, adminBoothUpdateRouter } from './routes/booth-update.js';
 import { adminPhysicalFrameRouter } from './routes/physical-frame.js';
+import { tabletRouter, boothJobsRouter } from './routes/tablet.js';
 import { ensurePhysicalDir } from './physical-frame.js';
 import { ensureQrDirs } from './qr/store.js';
 import { purgeExpiredSessions } from './purge.js';
@@ -97,6 +98,8 @@ app.use('/api/frames', framesRouter);
 app.use('/api/wall', wallRouter);
 app.use('/api/qr', qrRouter);
 app.use('/api/booth-update', boothUpdateRouter);
+app.use('/api/tablet', tabletRouter);
+app.use('/api/booth', boothJobsRouter);
 app.use('/api/admin/frames', adminFramesRouter);
 app.use('/api/admin/wall', adminWallRouter);
 app.use('/api/admin/qr', adminQrRouter);
@@ -183,6 +186,11 @@ app.get(['/admin', '/admin/*'], (_req, res) => {
 app.get(['/qr-scan', '/qr-scan/*'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(config.publicDir, 'qr-scan.html'));
+});
+
+app.get(['/tablet', '/tablet/:prefix'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(config.publicDir, 'tablet.html'));
 });
 
 app.get(['/q', '/q/:code'], (_req, res) => {

@@ -132,6 +132,7 @@ export function initDb() {
   `);
 
   ensureColumn(db, 'qr_batches', 'linked_session_id', 'TEXT');
+  ensureColumn(db, 'photos', 'process_status', "TEXT NOT NULL DEFAULT 'ready'");
   fs.mkdirSync(config.boothUpdatesDir, { recursive: true });
   ensureBuiltinQrTemplate(db);
   return db;
@@ -237,6 +238,7 @@ export function publicPhoto(sessionSlug, row) {
     height: row.height,
     createdAt: row.created_at,
     filename: row.filename,
+    processStatus: row.process_status === 'processing' ? 'processing' : 'ready',
     url: media,
     /** Cached ~480px JPEG for grids/mosaic — full `url` for lightbox/download. */
     thumbUrl: `${media}?thumb=1`,
