@@ -237,3 +237,43 @@ loadMeta().catch((err) => {
   if (quotaText) quotaText.textContent = String(err.message || err);
   toast(String(err.message || err));
 });
+
+function halloweenVisitorId() {
+  const key = 'hauntbooth_visitor_id';
+  try {
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `v-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return `anon-${Date.now()}`;
+  }
+}
+
+async function reportHalloweenVisit() {
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    await fetch('/api/halloween/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        visitorId: halloweenVisitorId(),
+        utmSource: params.get('utm_source') || '',
+        utmMedium: params.get('utm_medium') || '',
+        utmCampaign: params.get('utm_campaign') || '',
+        referrer: document.referrer || '',
+        landing: `${window.location.pathname}${window.location.search || ''}`,
+      }),
+      keepalive: true,
+    });
+  } catch {
+    /* analytics must never block the demo */
+  }
+}
+
+void reportHalloweenVisit();

@@ -241,9 +241,13 @@ function appendFrameGroup(title, frames, orient) {
     `;
     div.querySelector('.delete').addEventListener('click', async () => {
       if (!confirm(`Delete frame ${f.filename}?`)) return;
-      await api(`/api/admin/frames/${encodeURIComponent(f.filename)}`, { method: 'DELETE' });
-      setStatus(`Deleted frame ${f.filename}`);
-      await refreshFrames();
+      try {
+        await api(`/api/admin/frames/${encodeURIComponent(f.filename)}`, { method: 'DELETE' });
+        setStatus(`Deleted frame ${f.filename}`);
+        await refreshFrames();
+      } catch (e) {
+        setStatus(`Could not delete ${f.filename}: ${e.message || e}`);
+      }
     });
     grid.appendChild(div);
   }
@@ -708,6 +712,68 @@ function applyHalloweenSettings(settings) {
       ? `Key configured · used ${settings.halloweenGenerationUsed ?? 0} / ${settings.halloweenGenerationLimit ?? 5} · remaining ${settings.halloweenGenerationRemaining ?? 0} · public page /halloween`
       : `No key yet · limit ${settings.halloweenGenerationLimit ?? 5} · public page /halloween`;
   }
+  void refreshHalloweenAnalytics();
+}
+
+function renderHalloweenAnalytics(analytics) {
+  const el = document.getElementById('halloweenAnalytics');
+  if (!el) return;
+  if (!analytics) {
+    el.innerHTML = '<p class="meta">No analytics yet.</p>';
+    return;
+  }
+  const sources = analytics.bySource || [];
+  const recent = analytics.recent || [];
+  const sourceRows = sources.length
+    ? sources
+        .map(
+          (s) =>
+            `<tr><td><code>${escapeHtml(s.source)}</code></td><td>${s.visits}</td><td>${s.uniqueVisitors}</td></tr>`,
+        )
+        .join('')
+    : '<tr><td colspan="3" class="meta">No visits recorded yet.</td></tr>';
+  const recentRows = recent.length
+    ? recent
+        .map((r) => {
+          const when = r.ts ? new Date(r.ts).toLocaleString() : '—';
+          const extra = [r.utmCampaign, r.referrer].filter(Boolean).join(' · ');
+          return `<tr><td>${escapeHtml(when)}</td><td><code>${escapeHtml(r.source || 'direct')}</code></td><td class="meta">${escapeHtml(extra || '—')}</td></tr>`;
+        })
+        .join('')
+    : '<tr><td colspan="3" class="meta">No recent visits.</td></tr>';
+  el.innerHTML = `
+    <div class="row wrap halloween-analytics-stats">
+      <p><strong>${analytics.uniqueVisitors ?? 0}</strong> unique visitors</p>
+      <p><strong>${analytics.totalVisits ?? 0}</strong> visits</p>
+    </div>
+    <h4 class="admin-subhead">By source</h4>
+    <table class="admin-table halloween-analytics-table">
+      <thead><tr><th>Source</th><th>Visits</th><th>Unique</th></tr></thead>
+      <tbody>${sourceRows}</tbody>
+    </table>
+    <h4 class="admin-subhead">Recent visits</h4>
+    <table class="admin-table halloween-analytics-table">
+      <thead><tr><th>When</th><th>Source</th><th>Detail</th></tr></thead>
+      <tbody>${recentRows}</tbody>
+    </table>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+async function refreshHalloweenAnalytics() {
+  try {
+    const r = await api('/api/admin/halloween/analytics');
+    renderHalloweenAnalytics(r.analytics);
+  } catch {
+    /* not unlocked yet */
+  }
 }
 
 function generateUploadToken() {
@@ -830,6 +896,29 @@ document.getElementById('btnResetHalloweenCount')?.addEventListener('click', asy
     });
     applyHalloweenSettings(r.settings);
     setStatus('Halloween generation counter reset');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnRefreshHalloweenAnalytics')?.addEventListener('click', async () => {
+  try {
+    await refreshHalloweenAnalytics();
+    setStatus('Halloween analytics refreshed');
+  } catch (e) {
+    setStatus(String(e.message || e));
+  }
+});
+
+document.getElementById('btnResetHalloweenAnalytics')?.addEventListener('click', async () => {
+  if (!confirm('Reset all Halloween visit analytics?')) return;
+  try {
+    const r = await api('/api/admin/halloween/analytics/reset', {
+      method: 'POST',
+      body: '{}',
+    });
+    renderHalloweenAnalytics(r.analytics);
+    setStatus('Halloween analytics reset');
   } catch (e) {
     setStatus(String(e.message || e));
   }

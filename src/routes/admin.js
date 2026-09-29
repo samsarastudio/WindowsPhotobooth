@@ -15,6 +15,10 @@ import { purgeExpiredSessions, purgeMissingPhotoFiles, scanMissingPhotoFiles } f
 import { seedSampleGallery } from '../seed-samples.js';
 import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
 import { adminHalloweenPayload } from '../halloween/store.js';
+import {
+  getHalloweenAnalytics,
+  resetHalloweenAnalytics,
+} from '../halloween/analytics.js';
 
 export const adminRouter = Router();
 
@@ -288,6 +292,14 @@ adminRouter.post('/photos/resolve-missing', (_req, res) => {
 adminRouter.post('/purge-expired', (_req, res) => {
   const result = purgeExpiredSessions();
   return res.json({ ok: true, ...result });
+});
+
+adminRouter.get('/halloween/analytics', (_req, res) => {
+  return res.json({ ok: true, analytics: getHalloweenAnalytics() });
+});
+
+adminRouter.post('/halloween/analytics/reset', (_req, res) => {
+  return res.json({ ok: true, analytics: resetHalloweenAnalytics() });
 });
 
 adminRouter.post('/seed-samples', (_req, res) => {
