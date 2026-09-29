@@ -14,6 +14,7 @@ import { getUploadToken, requireAdminPin } from '../auth.js';
 import { purgeExpiredSessions, purgeMissingPhotoFiles, scanMissingPhotoFiles } from '../purge.js';
 import { seedSampleGallery } from '../seed-samples.js';
 import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
+import { adminHalloweenPayload } from '../halloween/store.js';
 
 export const adminRouter = Router();
 
@@ -33,6 +34,7 @@ function publicBaseUrlSource() {
 function adminSettingsPayload() {
   const settings = loadSettings();
   const uploadToken = getUploadToken();
+  const halloween = adminHalloweenPayload();
   return {
     defaultTtlDays: settings.defaultTtlDays,
     uploadToken,
@@ -44,6 +46,11 @@ function adminSettingsPayload() {
         : 'none',
     publicBaseUrl: config.publicBaseUrl,
     publicBaseUrlSource: publicBaseUrlSource(),
+    halloweenOpenAiApiKey: halloween.openAiApiKey,
+    halloweenApiKeyConfigured: halloween.apiKeyConfigured,
+    halloweenGenerationLimit: halloween.generationLimit,
+    halloweenGenerationUsed: halloween.generationUsed,
+    halloweenGenerationRemaining: halloween.generationRemaining,
   };
 }
 
@@ -71,6 +78,31 @@ adminRouter.patch('/settings', (req, res) => {
       return res.status(400).json({ ok: false, error: 'uploadToken must be at least 8 characters' });
     }
     patch.uploadToken = token;
+  }
+
+  if (req.body?.halloweenOpenAiApiKey !== undefined) {
+    if (typeof req.body.halloweenOpenAiApiKey !== 'string') {
+      return res.status(400).json({ ok: false, error: 'halloweenOpenAiApiKey must be a string' });
+    }
+    const key = req.body.halloweenOpenAiApiKey.trim();
+    // Ignore masked placeholder re-saves from the admin UI.
+    if (key && !key.includes('…') && !key.includes('...')) {
+      patch.halloweenOpenAiApiKey = key;
+    } else if (!key) {
+      patch.halloweenOpenAiApiKey = '';
+    }
+  }
+
+  if (req.body?.halloweenGenerationLimit !== undefined) {
+    const lim = Number(req.body.halloweenGenerationLimit);
+    if (!Number.isFinite(lim) || lim < 1 || lim > 100) {
+      return res.status(400).json({ ok: false, error: 'halloweenGenerationLimit must be 1–100' });
+    }
+    patch.halloweenGenerationLimit = Math.floor(lim);
+  }
+
+  if (req.body?.halloweenResetGenerationCount === true) {
+    patch.halloweenGenerationCount = 0;
   }
 
   if (!Object.keys(patch).length) {

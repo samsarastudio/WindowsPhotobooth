@@ -195,6 +195,10 @@ export function loadSettings() {
     showOriginalPhotos: true,
     /** Active booth app release id rolled out to kiosks (empty = no forced update). */
     boothUpdateActiveId: '',
+    /** HauntBooth /halloween demo — OpenAI key for live sample regenerations. */
+    halloweenOpenAiApiKey: '',
+    halloweenGenerationLimit: 5,
+    halloweenGenerationCount: 0,
   };
   try {
     if (!fs.existsSync(config.settingsPath)) {

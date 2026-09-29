@@ -14,7 +14,8 @@ import { wallRouter, adminWallRouter, ensureBrandingDir } from './routes/wall.js
 import { qrRouter, adminQrRouter } from './routes/qr.js';
 import { boothUpdateRouter, adminBoothUpdateRouter } from './routes/booth-update.js';
 import { adminPhysicalFrameRouter } from './routes/physical-frame.js';
-import { tabletRouter, boothJobsRouter } from './routes/tablet.js';
+import { tabletRouter, boothJobsRouter, ensureTabletSchema } from './routes/tablet.js';
+import { halloweenRouter, halloweenMediaHandler } from './routes/halloween.js';
 import { ensurePhysicalDir } from './physical-frame.js';
 import { ensureQrDirs } from './qr/store.js';
 import { purgeExpiredSessions } from './purge.js';
@@ -22,6 +23,7 @@ import { ensureHttpsCerts } from './https-certs.js';
 import { ensureThumb } from './thumbs.js';
 
 initDb();
+ensureTabletSchema();
 ensureFramesDir();
 ensureBrandingDir();
 ensureQrDirs();
@@ -106,6 +108,14 @@ app.use('/api/admin/qr', adminQrRouter);
 app.use('/api/admin/booth-updates', adminBoothUpdateRouter);
 app.use('/api/admin/physical-frame', adminPhysicalFrameRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/halloween', halloweenRouter);
+
+app.get('/halloween', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(config.publicDir, 'halloween.html'));
+});
+
+app.get('/media/halloween/:kind/:filename', halloweenMediaHandler);
 
 app.get('/media/frames/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
