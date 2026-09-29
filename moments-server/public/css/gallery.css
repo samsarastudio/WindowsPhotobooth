@@ -1122,6 +1122,14 @@ body.is-mosaic-completed .mosaic-watermark {
   margin-top: 0.75rem;
 }
 
+.frame-orient-group {
+  margin-top: 1rem;
+}
+
+.frame-orient-group .admin-subhead {
+  margin: 0 0 0.35rem;
+}
+
 .frame-card {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1134,9 +1142,15 @@ body.is-mosaic-completed .mosaic-watermark {
 .frame-card img {
   width: 100%;
   aspect-ratio: 3 / 2;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 8px;
   background: #111;
+}
+
+.frame-card img.is-portrait {
+  aspect-ratio: 2 / 3;
+  max-height: 200px;
+  justify-self: center;
 }
 
 .frame-card code {

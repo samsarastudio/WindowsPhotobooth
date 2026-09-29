@@ -386,20 +386,36 @@ function listPhotoFrameFiles() {
   return files;
 }
 
-/** Guest gallery, wall mosaic, and 6×4 print all use 3:2 (1.5). */
+/** Guest gallery / 6×4 landscape print. */
 const GALLERY_FRAME_ASPECT = 1.5;
-const GALLERY_FRAME_ASPECT_TOLERANCE = 0.04;
+/** AI Portrait / 4×6 portrait print. */
+const PORTRAIT_FRAME_ASPECT = 2 / 3;
+const FRAME_ASPECT_TOLERANCE = 0.04;
 
 function describeImageAspect(width, height) {
   const w = Number(width) || 0;
   const h = Number(height) || 0;
   if (w < 1 || h < 1) {
-    return { width: w, height: h, aspectRatio: null, fitsGallery: false };
+    return {
+      width: w,
+      height: h,
+      aspectRatio: null,
+      fitsGallery: false,
+      fitsPortrait: false,
+      orientation: 'other',
+    };
   }
   const aspectRatio = Math.round((w / h) * 10000) / 10000;
   const fitsGallery =
-    Math.abs(aspectRatio - GALLERY_FRAME_ASPECT) / GALLERY_FRAME_ASPECT <= GALLERY_FRAME_ASPECT_TOLERANCE;
-  return { width: w, height: h, aspectRatio, fitsGallery };
+    Math.abs(aspectRatio - GALLERY_FRAME_ASPECT) / GALLERY_FRAME_ASPECT <= FRAME_ASPECT_TOLERANCE;
+  const fitsPortrait =
+    Math.abs(aspectRatio - PORTRAIT_FRAME_ASPECT) / PORTRAIT_FRAME_ASPECT <= FRAME_ASPECT_TOLERANCE;
+  let orientation = 'other';
+  if (fitsGallery || aspectRatio > 1.05) orientation = 'landscape';
+  if (fitsPortrait || aspectRatio < 0.95) orientation = 'portrait';
+  if (fitsGallery) orientation = 'landscape';
+  if (fitsPortrait) orientation = 'portrait';
+  return { width: w, height: h, aspectRatio, fitsGallery, fitsPortrait, orientation };
 }
 
 async function readImageAspect(filePath) {
@@ -408,7 +424,14 @@ async function readImageAspect(filePath) {
     const m = await sharpMod(filePath).metadata();
     return describeImageAspect(m.width, m.height);
   } catch {
-    return { width: 0, height: 0, aspectRatio: null, fitsGallery: false };
+    return {
+      width: 0,
+      height: 0,
+      aspectRatio: null,
+      fitsGallery: false,
+      fitsPortrait: false,
+      orientation: 'other',
+    };
   }
 }
 
@@ -2719,8 +2742,11 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     fs.writeFileSync(rawPath, outBuf);
 
     // HauntBooth: wrap AI result in matching Halloween frame (portrait vs landscape).
-    const frameName = isPortraitOut ? 'halloween-haunt-portrait.png' : 'halloween-haunt.png';
-    const framePath = path.join(getPhotoFramesDir(), frameName);
+    const pf = loadMergedConfig().photoFrames || {};
+    const frameName = isPortraitOut
+      ? pf.defaultPortraitFrameFile || 'halloween-haunt-portrait.png'
+      : pf.defaultFrameFile || 'halloween-haunt.png';
+    const framePath = path.join(getPhotoFramesDir(), path.basename(String(frameName)));
     if (fs.existsSync(framePath)) {
       try {
         outBuf = await compositePhotoIntoFrame(sharpMod, framePath, rawPath, 1, '', '');

@@ -432,9 +432,15 @@
 .pb-admin-frame-card img {
   width: 100%;
   aspect-ratio: 3 / 2;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 8px;
   background: #111;
+}
+
+.pb-admin-frame-card img.is-portrait {
+  aspect-ratio: 2 / 3;
+  max-height: 220px;
+  justify-self: center;
 }
 
 .pb-admin-frame-meta {

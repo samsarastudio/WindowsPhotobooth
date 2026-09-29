@@ -187,15 +187,56 @@ async function refreshFrames() {
   const list = await api('/api/admin/frames');
   document.getElementById('statFrames').textContent = String(list.frames?.length || 0);
   frameList.innerHTML = '';
-  for (const f of list.frames || []) {
+  const frames = list.frames || [];
+  if (!frames.length) {
+    frameList.innerHTML = '<p class="meta">No frames on the server yet — upload a PNG overlay.</p>';
+    return;
+  }
+  const landscape = frames.filter((f) => frameOrientation(f) === 'landscape');
+  const portrait = frames.filter((f) => frameOrientation(f) === 'portrait');
+  const other = frames.filter((f) => frameOrientation(f) === 'other');
+  appendFrameGroup('Landscape · 3:2 (gallery / 6×4)', landscape, 'landscape');
+  appendFrameGroup('Portrait · 2:3 (AI Portrait / 4×6)', portrait, 'portrait');
+  appendFrameGroup('Other ratios', other, 'other');
+}
+
+function frameOrientation(f) {
+  if (f.orientation === 'landscape' || f.orientation === 'portrait' || f.orientation === 'other') {
+    return f.orientation;
+  }
+  if (f.fitsPortrait) return 'portrait';
+  if (f.fitsGallery) return 'landscape';
+  const ar = Number(f.aspectRatio) || (f.width && f.height ? f.width / f.height : NaN);
+  if (Number.isFinite(ar)) {
+    if (ar < 0.95) return 'portrait';
+    if (ar > 1.05) return 'landscape';
+  }
+  return 'other';
+}
+
+function appendFrameGroup(title, frames, orient) {
+  if (!frames.length) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'frame-orient-group';
+  const h = document.createElement('h3');
+  h.className = 'admin-subhead';
+  h.textContent = title;
+  wrap.appendChild(h);
+  const grid = document.createElement('div');
+  grid.className = 'frame-grid';
+  for (const f of frames) {
     const div = document.createElement('div');
-    div.className = 'frame-card';
+    div.className = `frame-card frame-card-${orient}`;
     const ratio = frameRatioNote(f);
+    const warn =
+      (orient === 'landscape' && f.fitsGallery === false) ||
+      (orient === 'portrait' && f.fitsPortrait === false) ||
+      orient === 'other';
     div.innerHTML = `
-      <img src="${f.url}?v=${Date.now()}" alt="" />
+      <img class="${orient === 'portrait' ? 'is-portrait' : ''}" src="${f.url}?v=${Date.now()}" alt="" />
       <strong>${f.label}</strong>
       <code>${f.filename}</code>
-      ${ratio ? `<p class="meta ${f.fitsGallery ? '' : 'frame-ratio-warn'}">${ratio}</p>` : ''}
+      ${ratio ? `<p class="meta ${warn ? 'frame-ratio-warn' : ''}">${ratio}</p>` : ''}
       <button type="button" class="btn ghost delete">Delete</button>
     `;
     div.querySelector('.delete').addEventListener('click', async () => {
@@ -204,21 +245,24 @@ async function refreshFrames() {
       setStatus(`Deleted frame ${f.filename}`);
       await refreshFrames();
     });
-    frameList.appendChild(div);
+    grid.appendChild(div);
   }
-  if (!(list.frames || []).length) {
-    frameList.innerHTML = '<p class="meta">No frames on the server yet — upload a PNG overlay.</p>';
-  }
+  wrap.appendChild(grid);
+  frameList.appendChild(wrap);
 }
 
 function frameRatioNote(f) {
   if (!f.width || !f.height) return '';
-  if (f.fitsGallery) return `${f.width}×${f.height} · 3:2 (fills gallery)`;
+  if (f.fitsGallery) return `${f.width}×${f.height} · 3:2 landscape (fills gallery)`;
+  if (f.fitsPortrait) return `${f.width}×${f.height} · 2:3 portrait (AI Portrait / 4×6)`;
   const ar = Number(f.aspectRatio) || f.width / f.height;
-  if (ar > 1.65) {
-    return `${f.width}×${f.height} · ~16:9 — gallery needs 3:2 (6×4, e.g. 1800×1200)`;
+  if (ar < 0.95) {
+    return `${f.width}×${f.height} · portrait — prefer 2:3 (e.g. 1200×1800)`;
   }
-  return `${f.width}×${f.height} · ${ar.toFixed(2)}:1 — gallery needs 3:2 (6×4)`;
+  if (ar > 1.65) {
+    return `${f.width}×${f.height} · ~16:9 — landscape needs 3:2 (6×4, e.g. 1800×1200)`;
+  }
+  return `${f.width}×${f.height} · ${ar.toFixed(2)}:1 — use 3:2 landscape or 2:3 portrait`;
 }
 
 function fillAlbumSelect() {
@@ -1668,7 +1712,7 @@ document.getElementById('btnUploadFrame').addEventListener('click', async () => 
     if (hint) hint.textContent = '';
     const note = out.frame ? frameRatioNote(out.frame) : '';
     setStatus(
-      out.frame?.fitsGallery === false
+      out.frame?.fitsGallery === false && out.frame?.fitsPortrait === false
         ? `Uploaded ${file.name}. ${note}`
         : `Uploaded ${file.name}${note ? ` — ${note}` : ''}`,
     );
@@ -1692,11 +1736,18 @@ document.getElementById('frameFile')?.addEventListener('change', () => {
   img.onload = () => {
     URL.revokeObjectURL(url);
     const ar = img.naturalWidth / img.naturalHeight;
-    const fits = Math.abs(ar - 1.5) / 1.5 <= 0.04;
-    hint.textContent = fits
-      ? `${img.naturalWidth}×${img.naturalHeight} · 3:2 — this will fill the gallery.`
-      : `${img.naturalWidth}×${img.naturalHeight} · ${ar.toFixed(2)}:1 — gallery tiles are 3:2 (6×4). Use 1800×1200 (or 2400×1600) to fill with no gap at the top.`;
-    hint.classList.toggle('frame-ratio-warn', !fits);
+    const fitsLand = Math.abs(ar - 1.5) / 1.5 <= 0.04;
+    const fitsPort = Math.abs(ar - 2 / 3) / (2 / 3) <= 0.04;
+    if (fitsLand) {
+      hint.textContent = `${img.naturalWidth}×${img.naturalHeight} · 3:2 landscape — fills gallery / 6×4.`;
+      hint.classList.remove('frame-ratio-warn');
+    } else if (fitsPort) {
+      hint.textContent = `${img.naturalWidth}×${img.naturalHeight} · 2:3 portrait — AI Portrait / 4×6.`;
+      hint.classList.remove('frame-ratio-warn');
+    } else {
+      hint.textContent = `${img.naturalWidth}×${img.naturalHeight} · ${ar.toFixed(2)}:1 — use 3:2 landscape (1800×1200) or 2:3 portrait (1200×1800).`;
+      hint.classList.add('frame-ratio-warn');
+    }
   };
   img.onerror = () => {
     URL.revokeObjectURL(url);

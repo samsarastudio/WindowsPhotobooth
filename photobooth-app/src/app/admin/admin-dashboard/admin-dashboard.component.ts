@@ -95,6 +95,8 @@ interface AdminFrameItem {
   height?: number;
   aspectRatio?: number | null;
   fitsGallery?: boolean;
+  fitsPortrait?: boolean;
+  orientation?: 'landscape' | 'portrait' | 'other';
 }
 
 interface UploadQueueSummary {
@@ -158,7 +160,8 @@ export class AdminDashboardComponent implements OnInit {
   draftGuestTextBrush = false;
   draftGuestTextBrushOpacity = 0.22;
   draftPhotoScale = 1;
-  draftDefaultFrameFile: string | null = 'onam-grma-2026.png';
+  draftDefaultFrameFile: string | null = 'halloween-haunt.png';
+  draftDefaultPortraitFrameFile: string | null = 'halloween-haunt-portrait.png';
   /** Empty = all frames on disk are offered to guests. */
   draftGuestFrameFiles: string[] = [];
   draftDefaultAiModeId: string | null = null;
@@ -335,6 +338,7 @@ export class AdminDashboardComponent implements OnInit {
     this.draftGuestTextBrushOpacity = cfg?.photoFrames?.guestTextBrushOpacity ?? 0.22;
     this.draftPhotoScale = cfg?.photoFrames?.photoScale ?? 1;
     this.draftDefaultFrameFile = cfg?.photoFrames?.defaultFrameFile ?? null;
+    this.draftDefaultPortraitFrameFile = cfg?.photoFrames?.defaultPortraitFrameFile ?? null;
     this.draftGuestFrameFiles = [...(cfg?.photoFrames?.guestFrameFiles ?? [])];
     this.draftDefaultAiModeId = cfg?.defaultAiModeId ?? null;
     this.draftAiModes = structuredClone(cfg?.aiModes ?? PHOTOBOOTH_DEFAULT_AI_MODES);
@@ -446,24 +450,65 @@ export class AdminDashboardComponent implements OnInit {
         height: f.height,
         aspectRatio: f.aspectRatio,
         fitsGallery: f.fitsGallery,
+        fitsPortrait: f.fitsPortrait,
+        orientation: f.orientation ?? (f.fitsPortrait ? 'portrait' : f.fitsGallery ? 'landscape' : 'other'),
       })),
     );
     if (
       this.draftDefaultFrameFile &&
       !this.photoFramesList().some((f) => f.filename === this.draftDefaultFrameFile)
     ) {
-      this.draftDefaultFrameFile = this.photoFramesList()[0]?.filename ?? null;
+      this.draftDefaultFrameFile =
+        this.landscapeFrames()[0]?.filename ?? this.photoFramesList()[0]?.filename ?? null;
     }
+    if (
+      this.draftDefaultPortraitFrameFile &&
+      !this.photoFramesList().some((f) => f.filename === this.draftDefaultPortraitFrameFile)
+    ) {
+      this.draftDefaultPortraitFrameFile = this.portraitFrames()[0]?.filename ?? null;
+    }
+  }
+
+  /** Landscape / 6×4 overlays (3:2). */
+  landscapeFrames(): AdminFrameItem[] {
+    return this.photoFramesList().filter((f) => this.frameOrientation(f) === 'landscape');
+  }
+
+  /** Portrait / 4×6 overlays (2:3). */
+  portraitFrames(): AdminFrameItem[] {
+    return this.photoFramesList().filter((f) => this.frameOrientation(f) === 'portrait');
+  }
+
+  otherFrames(): AdminFrameItem[] {
+    return this.photoFramesList().filter((f) => this.frameOrientation(f) === 'other');
+  }
+
+  frameOrientation(f: AdminFrameItem): 'landscape' | 'portrait' | 'other' {
+    if (f.orientation === 'landscape' || f.orientation === 'portrait' || f.orientation === 'other') {
+      return f.orientation;
+    }
+    if (f.fitsPortrait) return 'portrait';
+    if (f.fitsGallery) return 'landscape';
+    const ar = Number(f.aspectRatio);
+    if (Number.isFinite(ar)) {
+      if (ar < 0.95) return 'portrait';
+      if (ar > 1.05) return 'landscape';
+    }
+    return 'other';
   }
 
   frameSizeHint(f: AdminFrameItem): string | null {
     if (!f.width || !f.height) return null;
     const ar = f.aspectRatio ?? f.width / f.height;
-    if (f.fitsGallery) return `${f.width}×${f.height} · 3:2 (fills gallery)`;
-    if (ar > 1.65) {
-      return `${f.width}×${f.height} · ~16:9 — gallery needs 3:2 (6×4, e.g. 1800×1200)`;
+    if (f.fitsGallery) return `${f.width}×${f.height} · 3:2 landscape (gallery / 6×4)`;
+    if (f.fitsPortrait) return `${f.width}×${f.height} · 2:3 portrait (AI Portrait / 4×6)`;
+    if (ar < 0.95) {
+      return `${f.width}×${f.height} · portrait — prefer 2:3 (e.g. 1200×1800)`;
     }
-    return `${f.width}×${f.height} · ${ar.toFixed(2)}:1 — gallery needs 3:2 (6×4)`;
+    if (ar > 1.65) {
+      return `${f.width}×${f.height} · ~16:9 — landscape needs 3:2 (6×4, e.g. 1800×1200)`;
+    }
+    return `${f.width}×${f.height} · ${ar.toFixed(2)}:1 — use 3:2 landscape or 2:3 portrait`;
   }
 
   toggleGuestFrame(filename: string, enabled: boolean): void {
@@ -548,7 +593,13 @@ export class AdminDashboardComponent implements OnInit {
     }
     let defaultFrameFile = this.draftDefaultFrameFile;
     if (defaultFrameFile && enabled.length && !enabled.includes(defaultFrameFile)) {
-      defaultFrameFile = enabled[0] ?? null;
+      defaultFrameFile =
+        this.landscapeFrames().find((f) => f.guestEnabled)?.filename ?? enabled[0] ?? null;
+    }
+    let defaultPortraitFrameFile = this.draftDefaultPortraitFrameFile;
+    if (defaultPortraitFrameFile && enabled.length && !enabled.includes(defaultPortraitFrameFile)) {
+      defaultPortraitFrameFile =
+        this.portraitFrames().find((f) => f.guestEnabled)?.filename ?? null;
     }
     this.busy.set(true);
     try {
@@ -559,6 +610,7 @@ export class AdminDashboardComponent implements OnInit {
           guestAdjustPhoto: this.draftFramesEnabled && this.draftGuestAdjustPhoto,
           photoScale: this.draftPhotoScale,
           defaultFrameFile: defaultFrameFile || null,
+          defaultPortraitFrameFile: defaultPortraitFrameFile || null,
           guestFrameFiles,
           guestTextEnabled: this.draftFramesEnabled && this.draftGuestTextEnabled,
           guestTextOptional: this.draftGuestTextOptional,
@@ -935,16 +987,21 @@ export class AdminDashboardComponent implements OnInit {
         } else if (this.draftGuestFrameFiles.includes('__none__')) {
           this.draftGuestFrameFiles = [inst.filename];
         }
-        if (!this.draftDefaultFrameFile) {
+        if (!this.draftDefaultFrameFile && (inst.fitsGallery || inst.orientation !== 'portrait')) {
           this.draftDefaultFrameFile = inst.filename;
+        }
+        if (!this.draftDefaultPortraitFrameFile && (inst.fitsPortrait || inst.orientation === 'portrait')) {
+          this.draftDefaultPortraitFrameFile = inst.filename;
         }
         await this.refreshPhotoFrames();
         const published = await this.publishFrameQuiet(inst.filename);
         const ratioNote =
           inst.width && inst.height
             ? inst.fitsGallery
-              ? ` ${inst.width}×${inst.height} (3:2 — fills gallery).`
-              : ` ${inst.width}×${inst.height} — gallery needs 3:2 (6×4, e.g. 1800×1200) to fill without a gap.`
+              ? ` ${inst.width}×${inst.height} (3:2 landscape — fills gallery).`
+              : inst.fitsPortrait
+                ? ` ${inst.width}×${inst.height} (2:3 portrait — AI Portrait / 4×6).`
+                : ` ${inst.width}×${inst.height} — use 3:2 landscape (e.g. 1800×1200) or 2:3 portrait (e.g. 1200×1800).`
             : '';
         this.status.set(
           published
@@ -972,6 +1029,9 @@ export class AdminDashboardComponent implements OnInit {
         this.draftGuestFrameFiles = this.draftGuestFrameFiles.filter((f) => f !== filename);
         if (this.draftDefaultFrameFile === filename) {
           this.draftDefaultFrameFile = null;
+        }
+        if (this.draftDefaultPortraitFrameFile === filename) {
+          this.draftDefaultPortraitFrameFile = null;
         }
         const creds = this.momentsGalleryCreds();
         if (creds?.uploadToken && window.pbApi.galleryDeleteRemoteFrame) {
@@ -1103,6 +1163,9 @@ export class AdminDashboardComponent implements OnInit {
         this.draftGuestFrameFiles = this.draftGuestFrameFiles.filter((f) => f !== filename);
         if (this.draftDefaultFrameFile === filename) {
           this.draftDefaultFrameFile = null;
+        }
+        if (this.draftDefaultPortraitFrameFile === filename) {
+          this.draftDefaultPortraitFrameFile = null;
         }
         await this.refreshPhotoFrames();
       }

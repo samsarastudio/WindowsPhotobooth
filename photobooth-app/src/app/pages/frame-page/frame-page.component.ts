@@ -97,22 +97,10 @@ export class FramePageComponent implements OnInit {
     }
     // Prefer frames matching the photo orientation (portrait AI → portrait frame).
     const photo = this.photoPath();
-    if (photo && available.some((f) => typeof f.aspectRatio === 'number')) {
-      try {
-        const preferPortrait = /portrait|4x6|_ai\.png$/i.test(photo) || /_ai_raw/i.test(photo);
-        // Heuristic from filename; also check frame aspect when photo path suggests portrait.
-        const oriented = available.filter((f) => {
-          const ar = Number(f.aspectRatio);
-          if (!Number.isFinite(ar)) return true;
-          const frameIsPortrait = ar < 0.95;
-          if (preferPortrait) return frameIsPortrait;
-          // Default capture is landscape 6×4 — show landscape frames first.
-          return !frameIsPortrait;
-        });
-        if (oriented.length) available = oriented;
-      } catch {
-        /* keep available */
-      }
+    const preferPortrait = this.photoLooksPortrait(photo);
+    if (available.some((f) => typeof f.aspectRatio === 'number' || f.orientation || f.fitsPortrait != null)) {
+      const oriented = available.filter((f) => this.frameMatchesOrientation(f, preferPortrait));
+      if (oriented.length) available = oriented;
     }
     if (!available.length) {
       this.err.set('No enabled frames for guests. Enable at least one in Admin → Frames.');
@@ -125,12 +113,39 @@ export class FramePageComponent implements OnInit {
         url: f.url,
       })),
     );
-    const def = this.booth.photoFrames().defaultFrameFile;
+    const framesCfg = this.booth.photoFrames();
+    const def = preferPortrait
+      ? framesCfg.defaultPortraitFrameFile || framesCfg.defaultFrameFile
+      : framesCfg.defaultFrameFile || framesCfg.defaultPortraitFrameFile;
     const pick =
       (def && this.frames().some((f) => f.filename === def) && def) ||
       this.frames()[0]?.filename ||
       null;
     this.selected.set(pick);
+  }
+
+  private photoLooksPortrait(photo: string | null): boolean {
+    if (!photo) return false;
+    return /portrait|4x6|_ai\.png$/i.test(photo) || /_ai_raw/i.test(photo) || /-port-/i.test(photo);
+  }
+
+  private frameMatchesOrientation(
+    f: {
+      aspectRatio?: number | null;
+      fitsGallery?: boolean;
+      fitsPortrait?: boolean;
+      orientation?: string;
+    },
+    preferPortrait: boolean,
+  ): boolean {
+    if (f.fitsPortrait === true) return preferPortrait;
+    if (f.fitsGallery === true) return !preferPortrait;
+    if (f.orientation === 'portrait') return preferPortrait;
+    if (f.orientation === 'landscape') return !preferPortrait;
+    const ar = Number(f.aspectRatio);
+    if (!Number.isFinite(ar)) return true;
+    const frameIsPortrait = ar < 0.95;
+    return preferPortrait ? frameIsPortrait : !frameIsPortrait;
   }
 
   selectFrame(filename: string): void {

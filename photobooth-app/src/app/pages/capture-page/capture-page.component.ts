@@ -555,7 +555,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
 
   /**
    * Silently pick and composite a frame without showing the frame-selection screen.
-   * Chooses `defaultFrameFile` when set; otherwise picks randomly from the allowed set.
+   * Chooses landscape vs portrait default by photo orientation.
    */
   private async autoApplyFrameAndNavigate(filePath: string): Promise<void> {
     if (!window.pbApi?.listPhotoFrames || !window.pbApi?.applyPhotoFrame) {
@@ -583,15 +583,22 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Prefer landscape Halloween frame for booth captures (6×4).
-    const landscapePool = pool.filter((f) => {
+    const preferPortrait =
+      /portrait|4x6|_ai\.png$/i.test(filePath) || /_ai_raw/i.test(filePath) || /-port-/i.test(filePath);
+    const orientedPool = pool.filter((f) => {
+      if (f.fitsPortrait === true) return preferPortrait;
+      if (f.fitsGallery === true) return !preferPortrait;
+      if (f.orientation === 'portrait') return preferPortrait;
+      if (f.orientation === 'landscape') return !preferPortrait;
       const ar = Number(f.aspectRatio);
-      return !Number.isFinite(ar) || ar >= 1;
+      if (!Number.isFinite(ar)) return true;
+      return preferPortrait ? ar < 0.95 : ar >= 1;
     });
-    const pickPool = landscapePool.length ? landscapePool : pool;
+    const pickPool = orientedPool.length ? orientedPool : pool;
 
-    // Pick frame: prefer explicit default, otherwise random from pool.
-    const def = framesCfg.defaultFrameFile;
+    const def = preferPortrait
+      ? framesCfg.defaultPortraitFrameFile || framesCfg.defaultFrameFile
+      : framesCfg.defaultFrameFile || framesCfg.defaultPortraitFrameFile;
     const frameFile =
       (def && pickPool.some((f) => f.filename === def) ? def : null) ??
       pickPool[Math.floor(Math.random() * pickPool.length)].filename;

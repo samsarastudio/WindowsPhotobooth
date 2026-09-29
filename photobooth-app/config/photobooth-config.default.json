@@ -35,6 +35,7 @@
     "enabled": true,
     "photoScale": 1,
     "defaultFrameFile": "halloween-haunt.png",
+    "defaultPortraitFrameFile": "halloween-haunt-portrait.png",
     "guestFrameFiles": [
       "halloween-haunt.png",
       "halloween-haunt-portrait.png"

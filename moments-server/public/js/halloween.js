@@ -33,8 +33,16 @@ function toast(msg) {
 
 function updateQuota(m) {
   if (!quotaText || !m) return;
-  const key = m.apiKeyConfigured ? 'API ready' : 'API key needed in Admin';
-  quotaText.textContent = `${key} · ${m.generationRemaining} of ${m.generationLimit} live gens left`;
+  if (!m.apiKeyConfigured) {
+    quotaText.textContent = 'Preview unavailable — contact your operator';
+    return;
+  }
+  const left = m.generationRemaining;
+  const limit = m.generationLimit;
+  quotaText.textContent =
+    left === 1
+      ? `1 of ${limit} creations remaining`
+      : `${left} of ${limit} creations remaining`;
 }
 
 function renderGallery(items) {
@@ -75,11 +83,11 @@ function renderSamples(samples) {
       <div class="compare">
         <figure class="shot ${aspect}">
           <img src="${s.originalUrl}" alt="${s.title} original" />
-          <figcaption class="label">Original</figcaption>
+          <figcaption class="label">Guest photo</figcaption>
         </figure>
         <figure class="shot ${aspect}">
           <img class="ai-img" src="${s.aiUrl}" alt="${s.title} AI result" />
-          <figcaption class="label">AI generated</figcaption>
+          <figcaption class="label">Finished print</figcaption>
         </figure>
       </div>
     `;
@@ -136,7 +144,7 @@ async function generateCustom() {
   const mode = tryMode?.value === 'scene' ? 'scene' : 'portrait';
   busyId = 'custom';
   if (btnTryGenerate) btnTryGenerate.disabled = true;
-  if (tryStatus) tryStatus.textContent = 'Generating framed result… (30–90s)';
+  if (tryStatus) tryStatus.textContent = 'Creating your print… please wait';
 
   try {
     const fd = new FormData();
@@ -148,10 +156,15 @@ async function generateCustom() {
     });
     const data = await r.json();
     if (!data?.ok) {
-      throw new Error(data?.error || `Generate failed (${r.status})`);
+      throw new Error(data?.error || `Create failed (${r.status})`);
     }
-    if (tryStatus) tryStatus.textContent = `Done · ${data.remaining} left`;
-    toast('Custom photo result saved to gallery');
+    if (tryStatus) {
+      tryStatus.textContent =
+        data.remaining === 1
+          ? 'Complete · 1 creation remaining'
+          : `Complete · ${data.remaining} creations remaining`;
+    }
+    toast('Your print was added to Your creations');
     await loadMeta({ refreshSamples: false });
   } catch (err) {
     if (tryStatus) tryStatus.textContent = String(err.message || err);
@@ -168,8 +181,7 @@ tryFile?.addEventListener('change', async () => {
   if (!file) return;
   setCustomPreview(file);
   if (tryStatus) {
-    tryStatus.textContent =
-      'Ready — keep face to waist clear in frame, like the booth.';
+    tryStatus.textContent = 'Photo ready — choose an experience, then create your print.';
   }
 });
 
@@ -186,12 +198,11 @@ btnCamera?.addEventListener('click', async () => {
     }
     if (cameraActions) cameraActions.hidden = false;
     if (tryStatus) {
-      tryStatus.textContent =
-        'Frame yourself head-to-waist, then tap Capture.';
+      tryStatus.textContent = 'Position waist-up in frame, then take your photo.';
     }
   } catch (err) {
     toast(String(err.message || err));
-    if (tryStatus) tryStatus.textContent = 'Camera permission denied or unavailable.';
+    if (tryStatus) tryStatus.textContent = 'Camera access was declined or is unavailable.';
   }
 });
 
@@ -208,7 +219,7 @@ btnSnap?.addEventListener('click', async () => {
   if (blob) {
     setCustomPreview(blob);
     if (tryStatus) {
-      tryStatus.textContent = 'Captured — generate when ready (face to waist).';
+      tryStatus.textContent = 'Photo captured — create your print when ready.';
     }
   }
 });

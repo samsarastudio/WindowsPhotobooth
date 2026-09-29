@@ -409,8 +409,14 @@ export interface PhotoboothPhotoFramesConfig {
   enabled: boolean;
   /** Guest photo size inside the frame hole (1 = fill hole). */
   photoScale: number;
-  /** Optional default frame filename (e.g. `onam-grma-2026.png`). */
+  /**
+   * Optional default frame filename for landscape / 6×4 (e.g. `halloween-haunt.png`).
+   */
   defaultFrameFile: string | null;
+  /**
+   * Optional default frame for portrait / 4×6 AI Portrait (e.g. `halloween-haunt-portrait.png`).
+   */
+  defaultPortraitFrameFile: string | null;
   /**
    * Frame filenames offered to guests.
    * Empty array = all frames in `config/photo-frames/`.
@@ -418,7 +424,8 @@ export interface PhotoboothPhotoFramesConfig {
   guestFrameFiles: string[];
   /**
    * When true, skip the frame-selection screen and automatically apply a frame.
-   * Uses `defaultFrameFile` if set, otherwise picks randomly from `guestFrameFiles`
+   * Uses `defaultFrameFile` / `defaultPortraitFrameFile` by photo orientation,
+   * otherwise picks randomly from matching `guestFrameFiles`
    * (or all available frames when `guestFrameFiles` is empty).
    */
   autoApplyFrame: boolean;
@@ -459,6 +466,7 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   enabled: true,
   photoScale: 1,
   defaultFrameFile: 'halloween-haunt.png',
+  defaultPortraitFrameFile: 'halloween-haunt-portrait.png',
   guestFrameFiles: ['halloween-haunt.png', 'halloween-haunt-portrait.png'],
   autoApplyFrame: false,
   guestAdjustPhoto: true,

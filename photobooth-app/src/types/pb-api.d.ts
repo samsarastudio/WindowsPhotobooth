@@ -225,6 +225,8 @@ export interface PbApi {
       height?: number;
       aspectRatio?: number | null;
       fitsGallery?: boolean;
+      fitsPortrait?: boolean;
+      orientation?: 'landscape' | 'portrait' | 'other';
     }[];
     error?: string;
   }>;
@@ -274,6 +276,8 @@ export interface PbApi {
     height?: number;
     aspectRatio?: number | null;
     fitsGallery?: boolean;
+    fitsPortrait?: boolean;
+    orientation?: 'landscape' | 'portrait' | 'other';
     error?: string;
   }>;
   adminDeletePhotoFrame(

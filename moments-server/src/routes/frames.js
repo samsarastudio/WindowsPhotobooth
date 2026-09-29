@@ -5,8 +5,11 @@ import { Router } from 'express';
 import { config } from '../config.js';
 import { requireAdminPin, requireUploadToken } from '../auth.js';
 import { readFrameAspect } from '../frame-aspect.js';
+import { fileURLToPath } from 'node:url';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SEED_FRAMES_DIR = path.join(__dirname, '..', '..', 'seed-frames');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -15,7 +18,25 @@ const upload = multer({
 
 function ensureFramesDir() {
   fs.mkdirSync(config.framesDir, { recursive: true });
+  seedFramesIfMissing();
   return config.framesDir;
+}
+
+/** Copy bundled landscape + portrait starters into data/frames when absent. */
+function seedFramesIfMissing() {
+  if (!fs.existsSync(SEED_FRAMES_DIR)) return;
+  try {
+    for (const ent of fs.readdirSync(SEED_FRAMES_DIR, { withFileTypes: true })) {
+      if (!ent.isFile()) continue;
+      const ext = path.extname(ent.name).toLowerCase();
+      if (!IMAGE_EXT.has(ext)) continue;
+      const dest = path.join(config.framesDir, ent.name);
+      if (fs.existsSync(dest)) continue;
+      fs.copyFileSync(path.join(SEED_FRAMES_DIR, ent.name), dest);
+    }
+  } catch {
+    /* ignore seed errors */
+  }
 }
 
 function safeFrameName(name) {

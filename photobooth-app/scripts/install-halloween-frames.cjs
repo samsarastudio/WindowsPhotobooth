@@ -14,6 +14,12 @@ const framesDir = path.join(
 const momentsFrames = path.join(
   'f:/Workspace Important Projects/AI Photobooth/moments-server/public/assets/halloween/frames',
 );
+const momentsLibrary = path.join(
+  'f:/Workspace Important Projects/AI Photobooth/moments-server/data/frames',
+);
+const momentsSeed = path.join(
+  'f:/Workspace Important Projects/AI Photobooth/moments-server/seed-frames',
+);
 
 const LANDSCAPE_SRC = path.join(
   assets,
@@ -131,13 +137,17 @@ async function makeFrame(src, outW, outH, outPath) {
 async function main() {
   fs.mkdirSync(framesDir, { recursive: true });
   fs.mkdirSync(momentsFrames, { recursive: true });
+  fs.mkdirSync(momentsLibrary, { recursive: true });
+  fs.mkdirSync(momentsSeed, { recursive: true });
 
   const land = path.join(framesDir, 'halloween-haunt.png');
   const port = path.join(framesDir, 'halloween-haunt-portrait.png');
   await makeFrame(LANDSCAPE_SRC, 1800, 1200, land);
   await makeFrame(PORTRAIT_SRC, 1200, 1800, port);
-  fs.copyFileSync(land, path.join(momentsFrames, 'halloween-haunt.png'));
-  fs.copyFileSync(port, path.join(momentsFrames, 'halloween-haunt-portrait.png'));
+  for (const destDir of [momentsFrames, momentsLibrary, momentsSeed]) {
+    fs.copyFileSync(land, path.join(destDir, 'halloween-haunt.png'));
+    fs.copyFileSync(port, path.join(destDir, 'halloween-haunt-portrait.png'));
+  }
 
   const buildsRoot = 'f:/Workspace Important Projects/AI Photobooth/builds';
   if (fs.existsSync(buildsRoot)) {

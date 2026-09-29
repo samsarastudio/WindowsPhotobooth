@@ -55,7 +55,9 @@ export class CapturePhotoBrowserComponent implements OnInit {
   readonly makeFramedBusy = signal(false);
   readonly makeFramedErr = signal<string | null>(null);
   readonly framePickOpen = signal(false);
-  readonly framePickList = signal<{ filename: string; label: string; url: string }[]>([]);
+  readonly framePickList = signal<
+    { filename: string; label: string; url: string; orientation?: string }[]
+  >([]);
   readonly framePickSelected = signal<string | null>(null);
   readonly frameAdjustOpen = signal(false);
   readonly deleteBusy = signal(false);
@@ -338,11 +340,30 @@ export class CapturePhotoBrowserComponent implements OnInit {
         filename: f.filename,
         label: f.label || f.filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
         url: f.url,
+        orientation:
+          f.orientation ??
+          (f.fitsPortrait ? 'portrait' : f.fitsGallery ? 'landscape' : undefined),
       })),
     );
-    const def = this.booth.photoFrames().defaultFrameFile;
+    const cfg = this.booth.photoFrames();
+    const src = this.physicalAdjustSource() || '';
+    const preferPortrait =
+      /portrait|4x6|_ai\.png$/i.test(src) || /_ai_raw/i.test(src) || /-port-/i.test(src);
+    const oriented = r.frames.filter((f) => {
+      if (f.fitsPortrait === true) return preferPortrait;
+      if (f.fitsGallery === true) return !preferPortrait;
+      if (f.orientation === 'portrait') return preferPortrait;
+      if (f.orientation === 'landscape') return !preferPortrait;
+      const ar = Number(f.aspectRatio);
+      if (!Number.isFinite(ar)) return true;
+      return preferPortrait ? ar < 0.95 : ar >= 1;
+    });
+    const pickPool = oriented.length ? oriented : r.frames;
+    const def = preferPortrait
+      ? cfg.defaultPortraitFrameFile || cfg.defaultFrameFile
+      : cfg.defaultFrameFile || cfg.defaultPortraitFrameFile;
     const pick =
-      (def && r.frames.some((f) => f.filename === def) && def) || r.frames[0].filename;
+      (def && pickPool.some((f) => f.filename === def) && def) || pickPool[0].filename;
     this.framePickSelected.set(pick);
     this.framePickOpen.set(true);
   }

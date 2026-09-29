@@ -197,6 +197,12 @@ function normalizePhotoFramesConfig(
       : patch.defaultFrameFile === null
         ? null
         : base.defaultFrameFile;
+  let defaultPortraitFrameFile =
+    typeof patch.defaultPortraitFrameFile === 'string' && patch.defaultPortraitFrameFile.trim()
+      ? pathBasenameSafe(patch.defaultPortraitFrameFile.trim())
+      : patch.defaultPortraitFrameFile === null
+        ? null
+        : (base.defaultPortraitFrameFile ?? null);
   let guestFrameFiles: string[] = [...base.guestFrameFiles];
   if (Array.isArray(patch.guestFrameFiles)) {
     guestFrameFiles = patch.guestFrameFiles
@@ -210,6 +216,7 @@ function normalizePhotoFramesConfig(
     enabled: typeof patch.enabled === 'boolean' ? patch.enabled : base.enabled,
     photoScale,
     defaultFrameFile,
+    defaultPortraitFrameFile,
     guestFrameFiles,
     autoApplyFrame: typeof patch.autoApplyFrame === 'boolean' ? patch.autoApplyFrame : base.autoApplyFrame,
     guestAdjustPhoto:
