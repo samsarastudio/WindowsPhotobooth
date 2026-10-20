@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/gallery.css?v=20260831-32" />
-    <link rel="stylesheet" href="/css/admin.css?v=20260831-32" />
+    <link rel="stylesheet" href="/css/admin.css?v=20261019-tablet-link" />
   </head>
   <body class="admin-body">
     <div class="admin-shell">
@@ -63,6 +63,20 @@
         <div class="admin-content">
           <section class="card admin-section is-active" data-section="overview">
             <h2>Overview</h2>
+            <div class="tablet-launcher" aria-labelledby="tabletHeading">
+              <h3 id="tabletHeading">Tablet printing</h3>
+              <p id="tabletInstanceStatus" class="meta" aria-live="polite">Checking today's latest event…</p>
+              <div id="tabletInstanceDetails" hidden>
+                <p><strong id="tabletInstanceTitle"></strong></p>
+                <p><a id="tabletInstanceUrl" target="_blank" rel="noopener"></a></p>
+                <p class="meta">Open this address on the iPad to view photos and request prints. The booth PC must be running with printing enabled.</p>
+                <div class="row wrap">
+                  <a id="btnOpenTablet" class="btn primary" target="_blank" rel="noopener">Open tablet</a>
+                  <button id="btnCopyTablet" type="button" class="btn ghost">Copy link</button>
+                </div>
+              </div>
+              <button id="btnRefreshTablet" type="button" class="btn ghost">Refresh tablet link</button>
+            </div>
             <div class="stat-grid">
               <div class="stat"><strong id="statAlbums">0</strong><span>Albums</span></div>
               <div class="stat"><strong id="statPhotos">0</strong><span>Photos</span></div>
@@ -512,6 +526,6 @@
         </div>
       </div>
     </div>
-    <script src="/js/admin.js?v=20260929-halloween-analytics" type="module"></script>
+    <script src="/js/admin.js?v=20261019-tablet-link" type="module"></script>
   </body>
 </html>

@@ -547,3 +547,8 @@ code.warn {
 .pf-preview .photo-preview-img {
   max-height: min(42vh, 26rem);
 }
+
+.tablet-launcher { margin: 1rem 0 1.5rem; padding: 1.25rem; border: 1px solid var(--border, #514535); border-radius: 14px; background: rgba(224, 164, 83, .06); }
+.tablet-launcher h3 { margin-top: 0; }
+#tabletInstanceUrl { overflow-wrap: anywhere; }
+#btnRefreshTablet { margin-top: .8rem; }

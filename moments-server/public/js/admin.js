@@ -813,6 +813,7 @@ function applyWallForm(wall) {
 }
 
 async function refreshAll() {
+  await refreshTabletInstance();
   const settings = await api('/api/admin/settings');
   ttlEl.value = String(settings.settings.defaultTtlDays);
   applyTokenSettings(settings.settings);
@@ -2723,3 +2724,42 @@ document.getElementById('btnBoothUpdateUpload')?.addEventListener('click', async
     if (btn) btn.disabled = false;
   }
 });
+
+let tabletInstanceBusy = false;
+async function refreshTabletInstance() {
+  if (tabletInstanceBusy) return;
+  tabletInstanceBusy = true;
+  const status = document.getElementById('tabletInstanceStatus');
+  const details = document.getElementById('tabletInstanceDetails');
+  try {
+    const { instance } = await api('/api/admin/tablet-instance');
+    details.hidden = !instance;
+    if (!instance) {
+      status.textContent = 'No active event today. The tablet link appears after the booth creates today’s album.';
+      document.getElementById('btnOpenTablet').removeAttribute('href');
+      document.getElementById('tabletInstanceUrl').removeAttribute('href');
+      return;
+    }
+    const url = new URL(instance.url);
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid tablet address');
+    document.getElementById('tabletInstanceTitle').textContent = instance.title || instance.eventPrefix;
+    const link = document.getElementById('tabletInstanceUrl');
+    link.textContent = url.href;
+    link.href = url.href;
+    document.getElementById('btnOpenTablet').href = url.href;
+    status.textContent = `Latest event activity: ${new Date(instance.lastActivity).toLocaleString()}. This does not indicate whether the booth is online.`;
+  } catch {
+    details.hidden = true;
+    status.textContent = 'Could not load the tablet link. Try refreshing.';
+  } finally { tabletInstanceBusy = false; }
+}
+document.getElementById('btnRefreshTablet').addEventListener('click', refreshTabletInstance);
+document.getElementById('btnCopyTablet').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById('tabletInstanceUrl').href);
+    setStatus('Tablet link copied');
+  } catch { setStatus('Select and copy the tablet address shown above.'); }
+});
+setInterval(() => {
+  if (document.body.classList.contains('is-unlocked') && !document.hidden) void refreshTabletInstance();
+}, 15000);

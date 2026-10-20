@@ -9,20 +9,22 @@
   <body>
     <header class="tb-header">
       <div>
-        <p class="tb-eyebrow">Operator tablet</p>
+        <p class="tb-eyebrow">HauntBooth · Photo desk</p>
         <h1 id="tbTitle">Today’s captures</h1>
         <p id="tbSub" class="tb-sub">Loading…</p>
       </div>
       <div class="tb-header-actions">
         <label class="tb-pin">
-          Admin PIN
+          Operator PIN
           <input id="tbPin" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" />
         </label>
         <button type="button" class="tb-btn" id="tbRefresh">Refresh</button>
       </div>
     </header>
 
-    <p id="tbStatus" class="tb-status" hidden></p>
+    <p id="tbStatus" class="tb-status" role="status" hidden></p>
+
+    <p class="tb-guide">Review each photo, then send it to the booth printer. AI photos become available when processing is complete.</p>
 
     <main id="tbGrid" class="tb-grid" aria-live="polite"></main>
 
@@ -36,7 +38,7 @@
           <p class="tb-variant"></p>
           <p class="tb-time"></p>
         </div>
-        <button type="button" class="tb-btn tb-print">Send print to kiosk</button>
+        <button type="button" class="tb-btn tb-print">Print photo</button>
         <p class="tb-job" hidden></p>
       </article>
     </template>

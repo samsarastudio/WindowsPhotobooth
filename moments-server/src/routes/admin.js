@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
+import { latestTabletInstance } from '../tablet-instance.js';
 import { config, isLocalPublicBaseUrl, normalizePublicBaseUrl } from '../config.js';
 import {
   getDb,
@@ -23,6 +24,14 @@ import {
 export const adminRouter = Router();
 
 adminRouter.use(requireAdminPin);
+
+adminRouter.get('/tablet-instance', (_req, res) => {
+  const rows = getDb().prepare(`SELECT s.*, COALESCE(MAX(p.created_at), s.created_at) AS last_activity
+    FROM sessions s LEFT JOIN photos p ON p.session_id = s.id
+    GROUP BY s.id`).all();
+  res.set('Cache-Control', 'no-store');
+  res.json({ ok: true, instance: latestTabletInstance(rows, config.publicBaseUrl) });
+});
 
 function publicBaseUrlSource() {
   const envRaw = process.env.PUBLIC_BASE_URL || '';

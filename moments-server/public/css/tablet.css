@@ -179,3 +179,20 @@ h1 {
   0%, 100% { opacity: 0.75; }
   50% { opacity: 1; }
 }
+
+.tb-header { max-width: 1440px; margin: 1rem auto 1.5rem; }
+.tb-guide { max-width: 1440px; margin: 0 auto 1.5rem; color: #c9bdc5; line-height: 1.6; }
+.tb-grid { max-width: 1440px; margin: auto; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 24px; }
+.tb-card { padding: 12px; gap: 14px; border-color: #3b3038; box-shadow: 0 12px 32px #0003; }
+.tb-thumb-wrap { aspect-ratio: 4 / 3; }
+.tb-thumb { object-fit: contain; }
+.tb-btn { min-height: 48px; background: #f2a34d; border: 1px solid #f2a34d; }
+.tb-btn:hover:not(:disabled) { background: #ffc078; }
+.tb-pin input { min-height: 48px; width: 150px; }
+.tb-badge { text-transform: none; letter-spacing: 0; font-size: 0.8rem; }
+.tb-job { line-height: 1.5; color: #c9bdc5; }
+.tb-status { max-width: 1440px; margin: 0 auto 1rem; }
+.tb-empty { border: 1px dashed #544450; border-radius: 16px; }
+button:focus-visible, input:focus-visible { outline: 3px solid #ffd59e; outline-offset: 4px; }
+@media (max-width: 480px) { body { padding: 16px; } .tb-header-actions { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .tb-badge.is-processing { animation: none; } }
