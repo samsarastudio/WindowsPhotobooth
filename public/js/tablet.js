@@ -52,7 +52,7 @@ function render() {
   if (!state.photos.length) {
     const empty = document.createElement('p');
     empty.className = 'tb-empty';
-    empty.textContent = 'No photos yet for today. Waiting for booth uploads…';
+    empty.textContent = 'Ready for your first guest. New photos will appear here automatically.';
     el.grid.appendChild(empty);
     return;
   }
@@ -68,22 +68,22 @@ function render() {
     img.src = photo.thumbUrl || photo.url;
     img.alt = photo.variant || 'photo';
     const processing = photo.processStatus === 'processing';
-    badge.textContent = processing ? 'Processing' : 'Ready';
+    badge.textContent = processing ? 'Creating AI photo' : 'Ready to print';
     badge.classList.add(processing ? 'is-processing' : 'is-ready');
-    variant.textContent = `${(photo.variant || 'photo').toUpperCase()}${photo.hasAi ? ' · AI' : ''}`;
+    variant.textContent = processing ? 'AI photo' : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
     time.textContent = formatTime(photo.createdAt);
 
     if (processing) {
       printBtn.disabled = true;
-      printBtn.textContent = 'Waiting for AI…';
+      printBtn.textContent = 'Creating photo…';
     }
 
     if (photo.printJob) {
       jobEl.hidden = false;
-      jobEl.textContent = `Print: ${photo.printJob.status}${photo.printJob.error ? ` — ${photo.printJob.error}` : ''}`;
+      jobEl.textContent = ({ queued: 'Waiting for the booth to collect this print.', claimed: 'The booth is preparing your print.', done: 'Sent to printer. Check the printed photo.', error: 'Print unsuccessful. Check the booth and printer, then try again.' })[photo.printJob.status] || 'Checking print status…';
       if (photo.printJob.status === 'queued' || photo.printJob.status === 'claimed') {
         printBtn.disabled = true;
-        printBtn.textContent = 'Print queued…';
+        printBtn.textContent = 'Print requested';
       } else if (photo.printJob.status === 'done') {
         printBtn.textContent = 'Print again';
       }
@@ -99,7 +99,7 @@ function render() {
 async function sendPrint(photo, btn, jobEl) {
   const pin = el.pin.value.trim();
   if (!pin) {
-    setStatus('Enter the Moments Admin PIN to approve prints.');
+    setStatus('Enter your operator PIN to print this photo.');
     el.pin.focus();
     return;
   }
@@ -121,12 +121,12 @@ async function sendPrint(photo, btn, jobEl) {
     }
     localStorage.setItem(PIN_KEY, pin);
     jobEl.hidden = false;
-    jobEl.textContent = j.deduped ? 'Print already queued' : 'Print queued for kiosk';
-    btn.textContent = 'Print queued…';
+    jobEl.textContent = j.deduped ? 'Print already queued' : 'Print requested. Waiting for the booth.';
+    btn.textContent = 'Print requested';
     await loadToday({ silent: true });
   } catch (e) {
     btn.disabled = false;
-    btn.textContent = 'Send print to kiosk';
+    btn.textContent = 'Print photo';
     setStatus(String(e.message || e));
   }
 }
@@ -139,10 +139,10 @@ async function loadToday({ silent = false } = {}) {
     if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     state.slug = j.slug;
     state.photos = Array.isArray(j.photos) ? j.photos : [];
-    el.title.textContent = j.title || `Today — ${j.date || ''}`;
+    el.title.textContent = 'Today’s photos';
     el.sub.textContent = j.empty
-      ? `Waiting for album ${j.slug}`
-      : `${state.photos.length} capture${state.photos.length === 1 ? '' : 's'} · ${j.slug}`;
+      ? 'Photos appear automatically after each capture.'
+      : `${state.photos.length} photo${state.photos.length === 1 ? '' : 's'} · ${state.photos.filter(p => p.processStatus === 'processing').length} processing`;
     document.title = `Tablet · ${j.slug || state.prefix}`;
     render();
     connectStream(j.streamPath);
