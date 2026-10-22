@@ -6,7 +6,7 @@ vm.runInContext('const FRAME_HOLE_BLACK_MAX=18;'+['isChromaHolePixel','floodFill
 (async()=>{
  const out=path.resolve(__dirname,'../../output/frame-qa');fs.mkdirSync(out,{recursive:true});
  const white=await sharp({create:{width:1800,height:1200,channels:3,background:'#ffffff'}}).png().toBuffer();
- for(const file of ['halloween-horror.png','halloween-horror-portrait.png']){
+ for(const file of (process.argv.length>2?process.argv.slice(2):['halloween-horror.png','halloween-horror-portrait.png'])){
   const frame=path.resolve(__dirname,'../config/photo-frames',file);const prepared=await context.prepareFrameOverlay(sharp,frame);
   const overlay=await sharp(prepared.overlay).ensureAlpha().raw().toBuffer();
   for(const scale of [1,.8]){
