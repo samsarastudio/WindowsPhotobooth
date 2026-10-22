@@ -257,3 +257,17 @@ html[data-pb-theme='default'] .pb-backdrop-el {
 html[data-pb-theme='default'] body {
   background-color: #030303;
 }
+
+/* Keyboard navigation and reduced-motion support across guest screens. */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--pb-leaf, #337453);
+  outline-offset: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

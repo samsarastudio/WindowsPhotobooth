@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker } = require('electron');
 const path = require('path');
 const { pathToFileURL, URL } = require('url');
 const https = require('https');
@@ -181,6 +181,7 @@ function getAiBrandLogoAbsPath() {
 
 function getConfigDefaultPath() {
   const candidates = [
+    ...(app.isPackaged ? [path.join(process.resourcesPath, 'bundled-config', 'photobooth-config.default.json')] : []),
     path.join(getPortableRoot(), 'config', 'photobooth-config.default.json'),
     path.join(getBundleRoot(), 'config', 'photobooth-config.default.json'),
     path.join(__dirname, '..', 'config', 'photobooth-config.default.json'),
@@ -215,6 +216,7 @@ function readJsonSafe(p) {
 function ensureConfigFiles() {
   const dir = getConfigDir();
   fs.mkdirSync(dir, { recursive: true });
+  if (app.isPackaged) require('./ota-assets.cjs').seedMissingAssets(path.join(process.resourcesPath, 'bundled-config'), dir);
   const cfgPath = getConfigPath();
   if (!fs.existsSync(cfgPath)) {
     const def = getConfigDefaultPath();
@@ -490,14 +492,10 @@ function fallbackHoleRect(w, h) {
 }
 
 function holeRectFromBounds(minX, minY, maxX, maxY, w, h) {
-  const padX = Math.round((maxX - minX) * 0.01);
-  const padY = Math.round((maxY - minY) * 0.01);
-  return {
-    left: Math.max(0, minX + padX),
-    top: Math.max(0, minY + padY),
-    width: Math.max(32, Math.min(w - minX, maxX - minX - padX * 2)),
-    height: Math.max(32, Math.min(h - minY, maxY - minY - padY * 2)),
-  };
+  // Inclusive bounds with bleed under antialiased artwork, never an inset.
+  const left = Math.max(0, minX - 2), top = Math.max(0, minY - 2);
+  return { left, top, width: Math.min(w, maxX + 3) - left,
+    height: Math.min(h, maxY + 3) - top };
 }
 
 /**
@@ -534,10 +532,23 @@ async function prepareFrameOverlay(sharpMod, framePath) {
 
   const hasUsableAlpha = meta.hasAlpha === true && alphaHoles > total * 0.05;
   if (hasUsableAlpha) {
+    // The shipped Halloween overlays contain an opaque black matte beyond
+    // their rectangular alpha window. Key only those exact legacy assets;
+    // custom transparent frames must retain all their original artwork.
+    const stockMattes = new Set([
+      'c04e35619b3e2efe375d97ca3551fab6c02e2a3700ac261178d94c1076b6a9e5',
+      '4758793237ee5ac6cab39800f4e4d717e2c61e545601f13a7f6cede072cbfa4e',
+    ]);
+    const hash = require('crypto').createHash('sha256').update(fs.readFileSync(framePath)).digest('hex');
+    if (stockMattes.has(hash)) {
+      const fill = floodFillHoleMask(data, w, h, channels, Math.floor(w / 2), Math.floor(h / 2), 18);
+      for (let p = 0; p < total; p++) if (fill.mask[p]) data[p * channels + 3] = 0;
+      minX = Math.min(minX, fill.minX); minY = Math.min(minY, fill.minY);
+      maxX = Math.max(maxX, fill.maxX); maxY = Math.max(maxY, fill.maxY);
+    }
     const hole = holeRectFromBounds(minX, minY, maxX, maxY, w, h);
-    // Composite the original PNG — do not re-encode pixels or punch extra holes.
-    const overlay = await sharpMod(framePath).ensureAlpha().png().toBuffer();
-    return { hole, overlay, keyed: false };
+    const overlay = await sharpMod(data, { raw: { width: w, height: h, channels } }).png().toBuffer();
+    return { hole, overlay, keyed: stockMattes.has(hash) };
   }
 
   const seeds = [[Math.floor(w / 2), Math.floor(h / 2)]];
@@ -592,7 +603,8 @@ async function compositePhotoIntoFrame(
   creditLine = '',
   crop = null,
 ) {
-  const scale = Math.min(1, Math.max(0.5, Number(photoScale) || 1));
+  // Legacy inset settings exposed black backing. Guest frames always cover the opening.
+  const scale = 1;
   const meta = await sharpMod(framePath).metadata();
   const fw = meta.width || 1;
   const fh = meta.height || 1;
@@ -1319,18 +1331,14 @@ function listBackgroundImageFiles(modeId) {
 }
 
 function pickBackgroundImage(modeId, randomize, preferredFilename = null) {
-  const files = listBackgroundImageFiles(modeId);
+  const files = listBackgroundImageFiles(modeId).filter(name => !/placeholder/i.test(name));
   if (!files.length) return null;
-  // Scene Addition: always use the single canonical plate (first sorted file).
-  if (String(modeId || '').toLowerCase() === 'scene') {
-    const preferred = files.includes('pumpkin-patch.png') ? 'pumpkin-patch.png' : files[0];
-    return path.join(getAiBackgroundsDir(modeId), preferred);
-  }
   if (preferredFilename && typeof preferredFilename === 'string') {
     const safe = path.basename(preferredFilename.trim());
     if (safe && files.includes(safe)) {
       return path.join(getAiBackgroundsDir(modeId), safe);
     }
+    return null; // Never silently substitute a different guest-selected background.
   }
   const pick = randomize ? files[Math.floor(Math.random() * files.length)] : files[0];
   return path.join(getAiBackgroundsDir(modeId), pick);
@@ -1598,51 +1606,7 @@ const BRAND_LOGO_AI_SNIPPET =
   'Use the brand logo from the reference image(s) exactly — reproduce it on booth signage, product boxes, DJ equipment, headphones, and clothing where natural. Do not invent a different logo or mascot.';
 
 /** Prefer Zyn's head-swap model order so trustAiSeam can skip oval re-paste. */
-const GPT_IMAGE_EDIT_MODELS = [
-  'gpt-image-2.5-sunburst',
-  'gpt-image-2',
-  'gpt-image-1.5',
-];
-
-function gptImageEditQuality(model, preferMax = false) {
-  if (String(model || '').includes('2.5')) return preferMax ? 'max' : 'xhigh';
-  return 'high';
-}
-
-function buildGptImageEditForm(
-  FormData,
-  sceneBuf,
-  fullPrompt,
-  extraImages = [],
-  model = 'gpt-image-2.5-sunburst',
-  size = '1536x1024',
-  maskBuf = null,
-  quality = null,
-) {
-  const form = new FormData();
-  form.append('model', model);
-  form.append('image[]', sceneBuf, { filename: 'scene.png', contentType: 'image/png' });
-  const extras = Array.isArray(extraImages) ? extraImages : extraImages ? [extraImages] : [];
-  for (const extra of extras) {
-    if (!extra?.buf) continue;
-    form.append('image[]', extra.buf, {
-      filename: extra.filename || 'ref.png',
-      contentType: extra.contentType || 'image/png',
-    });
-  }
-  if (maskBuf) {
-    form.append('mask', maskBuf, { filename: 'mask.png', contentType: 'image/png' });
-  }
-  form.append('prompt', fullPrompt);
-  form.append('n', '1');
-  form.append('size', size);
-  form.append('quality', quality || gptImageEditQuality(model));
-  // input_fidelity is for gpt-image-1 / 1.5 only — omit on gpt-image-2+.
-  if (!String(model || '').startsWith('gpt-image-2')) {
-    form.append('input_fidelity', 'high');
-  }
-  return form;
-}
+const { callOpenAiImageEdit, httpsPostMultipart } = require('./openai-image-edit.cjs');
 
 function buildEditPrompt(rawPrompt, options = {}) {
   const DALLE2_PROMPT_MAX = 1000;
@@ -1677,145 +1641,6 @@ function buildEditPrompt(rawPrompt, options = {}) {
     fullPrompt = fullPrompt.slice(0, DALLE2_PROMPT_MAX);
   }
   return fullPrompt;
-}
-
-async function callOpenAiImageEdit(
-  apiKey,
-  pngBuf,
-  fullPrompt,
-  httpsPostMultipart,
-  FormData,
-  extraImages = [],
-  size = '1536x1024',
-  maskBuf = null,
-  options = {},
-) {
-  const preferMax = !!options.preferMax;
-  const allowDalle2Fallback = options.allowDalle2Fallback !== false;
-  const parseJsonSafe = (text) => {
-    try {
-      return JSON.parse(text);
-    } catch (_) {
-      return null;
-    }
-  };
-  const makeErr = (statusCode, json, text) =>
-    json?.error?.message || json?.message || text.slice(0, 400) || `HTTP ${statusCode}`;
-
-  const auth = { Authorization: `Bearer ${apiKey.trim()}` };
-  const gptModels = GPT_IMAGE_EDIT_MODELS;
-  let json = null;
-  let modelUsed = gptModels[0];
-  let lastErr = 'GPT image edit failed.';
-  const extras = Array.isArray(extraImages)
-    ? extraImages
-    : extraImages
-      ? [{ buf: extraImages, filename: 'brand-logo-ref.png' }]
-      : [];
-
-  for (const model of gptModels) {
-    const form = buildGptImageEditForm(
-      FormData,
-      pngBuf,
-      fullPrompt,
-      extras,
-      model,
-      size,
-      maskBuf,
-      gptImageEditQuality(model, preferMax),
-    );
-    const gptRes = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, auth);
-    const gptJson = parseJsonSafe(gptRes.body);
-    if (gptRes.statusCode >= 200 && gptRes.statusCode < 300 && gptJson) {
-      json = gptJson;
-      modelUsed = model;
-      break;
-    }
-    lastErr = makeErr(gptRes.statusCode, gptJson, gptRes.body);
-  }
-
-  if (!json) {
-    if (!allowDalle2Fallback) {
-      return { ok: false, error: lastErr };
-    }
-    // DALL·E 2 edits: single image only (no reference-image array). Avoid for head-swap portraits.
-    const dallePrompt = fullPrompt.length > 1000 ? fullPrompt.slice(0, 1000) : fullPrompt;
-    const form = new FormData();
-    form.append('image', pngBuf, { filename: 'photo.png', contentType: 'image/png' });
-    if (maskBuf) {
-      form.append('mask', maskBuf, { filename: 'mask.png', contentType: 'image/png' });
-    }
-    form.append('prompt', dallePrompt);
-    form.append('model', 'dall-e-2');
-    form.append('n', '1');
-    form.append('size', '1024x1024');
-    form.append('response_format', 'b64_json');
-    const d2Res = await httpsPostMultipart('https://api.openai.com/v1/images/edits', form, auth);
-    const d2Json = parseJsonSafe(d2Res.body);
-    const d2Ok = d2Res.statusCode >= 200 && d2Res.statusCode < 300 && !!d2Json;
-    if (!d2Ok) {
-      const fallbackErr = makeErr(d2Res.statusCode, d2Json, d2Res.body);
-      return {
-        ok: false,
-        error: `${lastErr} (GPT image edits failed; fallback dall-e-2 also failed: ${fallbackErr})`,
-      };
-    }
-    json = d2Json;
-    modelUsed = 'dall-e-2';
-  }
-
-  const entry = json.data && json.data[0];
-  const b64 = entry && entry.b64_json;
-  const imageUrl = entry && entry.url;
-  let outBuf;
-  if (b64) {
-    outBuf = Buffer.from(b64, 'base64');
-  } else if (imageUrl) {
-    const imgRes = await fetch(imageUrl);
-    if (!imgRes.ok) {
-      return { ok: false, error: 'Could not download generated image.' };
-    }
-    const ab = await imgRes.arrayBuffer();
-    outBuf = Buffer.from(ab);
-  } else {
-    return { ok: false, error: 'No image data in API response.' };
-  }
-  return { ok: true, outBuf, model: modelUsed };
-}
-
-/**
- * POST multipart/form-data using Node https + form.pipe().
- * Electron/Node global fetch (undici) often corrupts the `form-data` stream and OpenAI returns
- * "failed to parse multipart/form-data".
- */
-function httpsPostMultipart(urlString, form, authHeaders) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(urlString);
-    const req = https.request(
-      {
-        hostname: u.hostname,
-        port: u.port || 443,
-        path: `${u.pathname}${u.search}`,
-        method: 'POST',
-        headers: {
-          ...authHeaders,
-          ...form.getHeaders(),
-        },
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('end', () => {
-          resolve({
-            statusCode: res.statusCode,
-            body: Buffer.concat(chunks).toString('utf8'),
-          });
-        });
-      },
-    );
-    req.on('error', reject);
-    form.pipe(req);
-  });
 }
 
 function httpsGet(urlString, authHeaders) {
@@ -2144,6 +1969,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Canon warns USB printing may not recover after sleep. Keep the active
+  // booth awake; Electron releases this OS request when the app exits.
+  powerSaveBlocker.start('prevent-app-suspension');
   ensureConfigFiles();
   getLogsDir();
   ensureNativeCameraAssets();
@@ -2554,11 +2382,13 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     const apiKey = cfg.openAiApiKey;
     const brand = getBrandContext(cfg);
     const useBrandLogo = brand.applyBrandToAi && brand.hasLogo;
-    if (!apiKey || typeof apiKey !== 'string' || !apiKey.trim()) {
+    if (!(pipeline === 'scene' || useInpainting) && (!apiKey || typeof apiKey !== 'string' || !apiKey.trim())) {
       return { ok: false, error: 'OpenAI API key not configured.' };
     }
     const captureRoot = path.resolve(getCaptureDir());
-    const absImage = path.resolve(imagePath);
+    const requestedImage = path.resolve(imagePath);
+    if (!isPathUnder(requestedImage, captureRoot)) return { ok: false, error: 'Invalid image path.' };
+    const absImage = require('./ai-source.cjs').resolveAiSource(requestedImage);
     if (!fs.existsSync(absImage)) {
       return { ok: false, error: 'Source image not found.' };
     }
@@ -2570,9 +2400,11 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     let backgroundUsed = null;
     let effectivePrompt = prompt;
     const extraImages = [];
-    let scenePathForLock = null;
-    let faceForLock = null;
-    let sceneCompositeForFaceLock = null;
+    let prepared = null;
+    const preparation = require('./ai-edit-preparation.cjs');
+    const modelDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'bundled-config', 'ai-models')
+      : path.join(getBundleRoot(), 'config', 'ai-models');
     // Scene Addition → 6×4 landscape. AI Portrait head-swap → 4×6 portrait.
     let gptSize = '1536x1024';
 
@@ -2585,24 +2417,13 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         };
       }
       backgroundUsed = `${resolved.canId}/${resolved.filename} (${resolved.source})`;
-      const face = aiPipelines.loadCompositionFace(modeId, payload?.face);
-      scenePathForLock = resolved.imagePath;
-      const erased = await aiPipelines.buildHeadEraseScene(sharpMod, resolved.imagePath, face);
-      pngBuf = erased?.buf || null;
-      faceForLock = erased?.face || face;
-      const faceRef = await aiPipelines.prepareGuestHeadPng(sharpMod, absImage, 1024, 1024);
-      extraImages.push({ buf: faceRef, filename: 'guest-face.png' });
-      effectivePrompt = inpaintPrompt || prompt;
-      const portrait = await aiPipelines.sceneIsPortrait(sharpMod, resolved.imagePath);
-      gptSize = portrait ? '1024x1536' : '1536x1024';
-      appendAppLog('info', 'openai', 'head-swap composition', {
-        canId: resolved.canId,
-        source: resolved.source,
-        file: resolved.filename,
-        face: faceForLock,
-        gptSize,
-      });
-    } else if (useInpainting && modeId) {
+      prepared = await preparation.prepareHead(absImage, resolved.imagePath, modelDir,
+        aiPipelines.loadCompositionFace(modeId, payload?.face));
+      pngBuf = prepared.image;
+      extraImages.push({ buf: prepared.reference, filename: 'guest-reference.png' });
+      effectivePrompt = preparation.HEAD_PROMPT;
+      gptSize = '1024x1536';
+    } else if ((pipeline === 'scene' || useInpainting) && modeId) {
       const bgPath = pickBackgroundImage(modeId, randomizeBackground, backgroundFilename || null);
       if (!bgPath) {
         return {
@@ -2611,14 +2432,11 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         };
       }
       backgroundUsed = path.basename(bgPath);
-      pngBuf = await buildInpaintComposite(
-        sharpMod,
-        bgPath,
-        absImage,
-        useBrandLogo ? brand.logoPath : null,
-      );
-      sceneCompositeForFaceLock = null;
-      effectivePrompt = inpaintPrompt || prompt;
+      prepared = await preparation.prepareScene(absImage, bgPath, modelDir);
+      if (prepared.depth) backgroundUsed = `${backgroundUsed} (${prepared.depth})`;
+      pngBuf = prepared.image;
+      extraImages.push({ buf: prepared.reference, filename: 'selected-background.png' });
+      effectivePrompt = preparation.SCENE_PROMPT;
       pipeline = pipeline || 'scene';
       gptSize = '1536x1024';
     } else {
@@ -2630,46 +2448,24 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       return { ok: false, error: 'Prepared PNG is still above 4 MB.' };
     }
 
-    if (pipeline !== 'head-swap' && useBrandLogo && brand.logoPath) {
+    if (pipeline !== 'head-swap' && pipeline !== 'scene' && useBrandLogo && brand.logoPath) {
       const logoRefBuf = await prepareLogoReferencePng(sharpMod, brand.logoPath);
       if (logoRefBuf) {
         extraImages.push({ buf: logoRefBuf, filename: 'brand-logo-ref.png' });
       }
     }
 
-    const fullPrompt = buildEditPrompt(effectivePrompt, {
+    const fullPrompt = prepared ? effectivePrompt : buildEditPrompt(effectivePrompt, {
       inpainting: useInpainting || pipeline === 'scene' || pipeline === 'head-swap',
       brandName: brand.brandName,
       hasLogoRef: extraImages.some((x) => x.filename === 'brand-logo-ref.png'),
       pipeline,
     });
 
-    let maskBuf = null;
-    if (pipeline === 'head-swap' && faceForLock) {
-      const pngMeta = await sharpMod(pngBuf).metadata();
-      maskBuf = await aiPipelines.buildHeadEditMaskPng(
-        sharpMod,
-        pngMeta.width || 1024,
-        pngMeta.height || 1536,
-        faceForLock,
-      );
-      if ((pngMeta.height || 0) > (pngMeta.width || 0)) {
-        gptSize = '1024x1536';
-      }
-    } else if (pipeline === 'scene' && pngBuf) {
-      const pngMeta = await sharpMod(pngBuf).metadata();
-      maskBuf = await aiPipelines.buildScenePreserveMask(
-        sharpMod,
-        pngMeta.width || 1536,
-        pngMeta.height || 1024,
-      );
-      appendAppLog('info', 'openai', 'scene preserve mask (protect guests, blend scenery)', {
-        w: pngMeta.width,
-        h: pngMeta.height,
-      });
-    }
-
-    const editRes = await callOpenAiImageEdit(
+    const maskBuf = prepared?.mask || null;
+    const editRes = prepared?.strictScene
+      ? { ok: true, outBuf: prepared.image, model: prepared.model }
+      : await callOpenAiImageEdit(
       apiKey,
       pngBuf,
       fullPrompt,
@@ -2680,7 +2476,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       maskBuf,
       {
         preferMax: pipeline === 'head-swap' || useInpainting,
-        allowDalle2Fallback: pipeline !== 'head-swap',
+        allowDalle2Fallback: !prepared,
       },
     );
     if (!editRes.ok) {
@@ -2689,39 +2485,10 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     }
 
     let outBuf = editRes.outBuf;
-    if (pipeline === 'head-swap' && scenePathForLock) {
-      // Skip oval re-paste for gpt-image-2.5 — it caused double-face / floating forehead artifacts.
-      const trustAiSeam = String(editRes.model || '').includes('2.5');
-      if (trustAiSeam) {
-        appendAppLog('info', 'openai', 'trusting AI seam (skip oval re-paste)', {
-          model: editRes.model,
-          face: faceForLock,
-        });
-      } else {
-        outBuf = await aiPipelines.blendHeadOntoOriginalScene(
-          sharpMod,
-          scenePathForLock,
-          outBuf,
-          faceForLock,
-        );
-        appendAppLog('info', 'openai', 'head locked onto original scene', {
-          face: faceForLock,
-          model: editRes.model,
-        });
-      }
-    } else if (pipeline === 'scene' && sceneCompositeForFaceLock) {
-      try {
-        outBuf = await aiPipelines.lockGuestSubjectsOntoAi(
-          sharpMod,
-          sceneCompositeForFaceLock,
-          outBuf,
-        );
-        appendAppLog('info', 'openai', 'guest faces locked onto scene result', {
-          model: editRes.model,
-        });
-      } catch (lockErr) {
-        appendAppLog('warn', 'openai', 'face lock skipped', String(lockErr));
-      }
+    if (prepared) {
+      outBuf = pipeline === 'scene'
+        ? await preparation.preserveSceneSubjects(prepared, outBuf)
+        : await preparation.preservePortraitPlate(prepared, outBuf);
     }
 
     // Final export: AI Portrait → 4×6 portrait (1200×1800); Scene → 6×4 landscape (1800×1200).
@@ -2747,12 +2514,15 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       ? pf.defaultPortraitFrameFile || 'halloween-haunt-portrait.png'
       : pf.defaultFrameFile || 'halloween-haunt.png';
     const framePath = path.join(getPhotoFramesDir(), path.basename(String(frameName)));
-    if (fs.existsSync(framePath)) {
+    if (pf.enabled === true && !pf.guestFrameFiles?.includes('__none__') && !fs.existsSync(framePath)) {
+      throw new Error('The selected photo frame is unavailable. Please ask our team to check the frame settings.');
+    }
+    if (pf.enabled === true && !pf.guestFrameFiles?.includes('__none__') && fs.existsSync(framePath)) {
       try {
         outBuf = await compositePhotoIntoFrame(sharpMod, framePath, rawPath, 1, '', '');
         appendAppLog('info', 'openai', 'ai framed', { frameName, pipeline });
       } catch (frameErr) {
-        appendAppLog('warn', 'openai', 'ai frame skipped', String(frameErr));
+        throw new Error('Your photo was created, but its frame could not be applied. Please try again.');
       }
     } else {
       appendAppLog('warn', 'openai', 'ai frame missing', { frameName });
@@ -2765,7 +2535,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       inpainting: useInpainting,
       pipeline,
       size: `${outW}x${outH}`,
-      framed: fs.existsSync(framePath),
+      framed: pf.enabled === true && !pf.guestFrameFiles?.includes('__none__') && fs.existsSync(framePath),
     });
     return {
       ok: true,
@@ -3163,6 +2933,7 @@ ipcMain.handle('admin:listAiBackgrounds', async (_e, modeId) => {
       return {
         filename,
         url: `${pathToFileURL(full).href}?v=${Date.now()}`,
+        ...require('./background-set.cjs').backgroundSetInfo(full),
       };
     });
     return { ok: true, modeId: id, backgrounds: items };
@@ -3518,8 +3289,8 @@ ipcMain.handle('admin:deleteAiBackground', async (_e, modeId, filename) => {
     if (!full) {
       return { ok: false, error: 'Background file not found.' };
     }
-    fs.unlinkSync(full);
-    return { ok: true, removed: path.basename(full) };
+    const removed = require('./background-set.cjs').removeBackgroundSet(path.dirname(full), path.basename(full));
+    return { ok: true, ...removed };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -3922,7 +3693,8 @@ function enqueueGalleryUpload(payload) {
   // Prefer an existing row for this file+variant — including already-ok (avoid re-upload duplicates).
   let item = q.items.find((i) => i.filePath === abs && i.variant === variant);
   const now = new Date().toISOString();
-  if (item?.status === 'ok' && item.shareUrl) {
+  const statusChanged = payload?.processStatus && payload.processStatus !== item?.processStatus;
+  if (item?.status === 'ok' && item.shareUrl && !statusChanged) {
     notifyUploadQueueItem(item);
     return item;
   }
@@ -3952,7 +3724,7 @@ function enqueueGalleryUpload(payload) {
     if (payload?.processStatus) {
       item.processStatus = String(payload.processStatus).trim().toLowerCase();
     }
-    if (item.status !== 'ok') {
+    if (item.status !== 'ok' || statusChanged) {
       item.status = 'queued';
       item.error = undefined;
     }
@@ -4386,6 +4158,8 @@ function mapWinPrinter(w) {
     displayName: name,
     description: driverName,
     isDefault: !!w.Default,
+    workOffline: w.WorkOffline === true,
+    printerStatus: Number(w.PrinterStatus) || 0,
     status: 0,
     driverName,
     portName,
@@ -4423,7 +4197,7 @@ async function listWindowsPrintersDetailed() {
         '-ExecutionPolicy',
         'Bypass',
         '-Command',
-        `Get-CimInstance Win32_Printer | Select-Object Name,DriverName,PortName,Default | ConvertTo-Json -Compress`,
+        `Get-CimInstance Win32_Printer | Select-Object Name,DriverName,PortName,Default,WorkOffline,PrinterStatus | ConvertTo-Json -Compress`,
       ],
       { windowsHide: true, encoding: 'utf8', timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
     );
@@ -4516,7 +4290,7 @@ ipcMain.handle('print:repairSelphyUsb', async () => {
     const repair = await repairSelphyUsb({ elevateIfNeeded: true, force: true });
     const all = await listWindowsPrintersDetailed();
     const printers = boothPrintQueues(all, allowWifi);
-    return { ok: !!repair?.ok || printers.length > 0, repair, printers, selphyUsb: repair?.probe };
+    return { ok: !!repair?.ok, repair, printers, selphyUsb: repair?.probe };
   } catch (e) {
     appendAppLog('error', 'print', 'repairSelphyUsb failed', String(e));
     return { ok: false, error: String(e) };
@@ -4550,6 +4324,13 @@ $imgPath = ${psQuote(abs)}
 $printerName = ${printerName ? psQuote(printerName) : "''"}
 $bleed = ${bleed}
 $fitMode = ${psQuote(fitMode)}
+# Recheck immediately before entering the vendor driver; the device can go
+# offline after the initial queue lookup or while the print image is prepared.
+$queue = Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq $printerName } | Select-Object -First 1
+if (-not $queue) { throw 'The selected printer is no longer installed. Select a printer in Admin.' }
+if ($queue.WorkOffline -or $queue.PrinterStatus -eq 7) {
+  throw 'Printer is offline. Turn it on and check its connection, then try printing again.'
+}
 $img = [System.Drawing.Image]::FromFile($imgPath)
 try {
   $doc = New-Object System.Drawing.Printing.PrintDocument
@@ -4750,6 +4531,8 @@ async function resolveBoothPrinter(preferredName) {
       });
     }
   }
+  const connectionError = require('./printer-readiness.cjs').printerConnectionError(all.find(p => p.name === chosen));
+  if (connectionError) return { ok: false, error: connectionError, all, usbList };
   return { ok: true, chosen, all, usbList };
 }
 

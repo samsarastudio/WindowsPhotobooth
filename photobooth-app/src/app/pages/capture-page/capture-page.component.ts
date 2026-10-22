@@ -512,16 +512,9 @@ export class CapturePageComponent implements OnInit, OnDestroy {
       this.physicalAdjustPath.set(filePath);
       return;
     }
-    const framesCfg = this.booth.photoFrames();
-    if (framesCfg.enabled) {
-      if (framesCfg.autoApplyFrame) {
-        await this.autoApplyFrameAndNavigate(filePath);
-        return;
-      }
-      await this.router.navigate(['/frame'], { state: { path: filePath } });
-      return;
-    }
-    await this.router.navigate(['/result'], { state: { path: filePath, preview: true } });
+    const modeId = this.aiStyle.selectedModeId();
+    const isAi = this.booth.aiGenerationEnabled() && !!modeId && modeId !== PLAIN_PHOTO_MODE_ID;
+    await this.router.navigate(['/prepare'], { state: { path: filePath, kind: isAi ? 'ai' : 'standard', modeId, backgroundFilename: this.aiStyle.selectedBackgroundFilename() } });
   }
 
   async onPhysicalAdjustConfirm(crop: PhysicalPhotoCrop): Promise<void> {

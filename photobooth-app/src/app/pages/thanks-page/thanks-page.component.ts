@@ -23,6 +23,7 @@ export class ThanksPageComponent implements OnInit, OnDestroy {
 
   readonly copy = this.booth.copy;
   readonly secondsLeft = signal(0);
+  readonly aiProcessing = signal(history.state?.aiProcessing === true);
 
   private timer?: ReturnType<typeof setInterval>;
   private cleared = false;

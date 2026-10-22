@@ -117,7 +117,7 @@ export function summarizeHalloweenAnalytics(storeInput) {
   const visits = store.events.filter((e) => e.type === 'visit');
   const visitors = new Set(visits.map((e) => e.visitorId));
   /** @type {Record<string, { visits: number, uniqueVisitors: number, _ids: Set<string> }>} */
-  const bySourceMap = {};
+  const bySourceMap = Object.create(null);
   for (const e of visits) {
     const key = e.source || 'direct';
     if (!bySourceMap[key]) {

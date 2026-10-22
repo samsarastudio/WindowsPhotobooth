@@ -413,6 +413,11 @@
               </label>
               @if (m.useInpainting && m.pipeline !== 'head-swap') {
                 <label class="pb-admin-check">
+                  <input type="checkbox" [(ngModel)]="m.allowBackgroundChoice" />
+                  Let guests choose their background
+                </label>
+                <p class="pb-hint">Shows the picker when two or more backgrounds are available. The selected image is used directly behind the original people.</p>
+                <label class="pb-admin-check">
                   <input type="checkbox" [(ngModel)]="m.randomizeBackground" />
                   Randomize background per guest
                 </label>
@@ -424,15 +429,18 @@
                 <div class="pb-admin-bg-grid">
                   @for (bg of backgroundsForMode(m.id); track bg.filename) {
                     <figure class="pb-admin-bg-thumb">
-                      <img [src]="bg.url" [alt]="bg.filename" loading="lazy" />
-                      <figcaption>{{ bg.filename }}</figcaption>
+                      <img [src]="bg.url" [alt]="bg.displayName || bg.filename" loading="lazy" />
+                      <figcaption>{{ bg.displayName || bg.filename }}</figcaption>
+                      @if (bg.isSet) {
+                        <small>{{ bg.variantCount }} depth variants</small>
+                      }
                       <button
                         type="button"
                         class="pb-btn pb-btn-ghost pb-btn-sm"
                         [disabled]="busy()"
                         (click)="deleteAiBackground(m.id, bg.filename)"
                       >
-                        Remove
+                        {{ bg.isSet ? 'Remove background set' : 'Remove background' }}
                       </button>
                     </figure>
                   } @empty {
@@ -957,7 +965,7 @@
               Driver: <code>{{ sp.driverName || 'unknown' }}</code>
               · Port: <code>{{ sp.portName || 'unknown' }}</code>
               @if (sp.isUsb && sp.usesIppDriver) {
-                · <strong>USB IPP fallback</strong> — jobs can spool; postcard size may be ignored until the USB print driver binds
+                · <strong>USB · Microsoft IPP</strong> — Windows built-in driver; verify postcard size with a test print
               } @else if (!sp.isUsb) {
                 · <strong>Wi‑Fi / network</strong> — postcard size and color may be ignored; USB is more reliable
               } @else if (sp.isCanonDriver) {

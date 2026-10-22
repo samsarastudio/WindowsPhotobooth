@@ -56,8 +56,11 @@ interface ThemeListItem {
 }
 
 interface AiBackgroundItem {
+  displayName?: string;
   filename: string;
   url: string;
+  isSet?: boolean;
+  variantCount?: number;
 }
 
 interface CompositionPreview {
@@ -799,7 +802,7 @@ export class AdminDashboardComponent implements OnInit {
     const usbHint = r.selphyUsb?.code28
       ? ' SELPHY USB print interface is Code 28 — tap Fix SELPHY USB driver (one Windows approval).'
       : r.selphyUsb?.usesIppDriver
-        ? ' Queue is Microsoft IPP on USB — usable as a fallback; Fix SELPHY USB driver binds the real print interface.'
+        ? ' Microsoft IPP is the Windows USB printer driver. Use Fix SELPHY only if the connection is not ready.'
         : '';
     if (
       this.draftPrint.printerName &&
@@ -826,7 +829,7 @@ export class AdminDashboardComponent implements OnInit {
     const tags: string[] = [];
     if (p.isDefault) tags.push('Windows default');
     if (p.isUsb) {
-      if (p.usesIppDriver) tags.push('USB IPP fallback');
+      if (p.usesIppDriver) tags.push('USB · Microsoft IPP');
       else if (p.isCanonDriver) tags.push('Canon USB');
     } else {
       tags.push('Wi‑Fi');
@@ -904,13 +907,13 @@ export class AdminDashboardComponent implements OnInit {
       const reason = r.repair?.reason || '';
       if (r.repair?.needsReboot) {
         this.status.set(
-          'USB driver still shows Code 28. Leave the printer plugged in and restart Windows, then Refresh printers.',
+          'Windows reports that a restart is required. Leave the printer connected and restart Windows.',
         );
       } else if (reason === 'uac-declined') {
         this.status.set('Windows approval was declined. The USB print driver cannot bind without it.');
       } else if (reason === 'printer-not-present') {
         this.status.set(
-          'Windows did not see a live SELPHY USB device. Leave it plugged in (Device Manager may show SELPHY under Other devices — that interface is not the printer). Tap Fix SELPHY USB driver again and approve the Windows prompt.',
+          'Windows cannot detect the CP1500 USB connection. Check printer power and the USB connection, then refresh.',
         );
       } else if (r.ok) {
         this.status.set(
@@ -920,7 +923,7 @@ export class AdminDashboardComponent implements OnInit {
         );
         await this.refreshPrinters();
       } else {
-        this.status.set(r.error || 'SELPHY USB repair did not complete.');
+        this.status.set(r.error || ({ 'usb-port-unresolved': 'The CP1500 USB port is not ready. Add the detected printer in Windows Settings → Printers & scanners.', 'connection-not-ready': 'The CP1500 connection is not ready. Check Windows printer settings and try again.', 'queue-offline': 'The CP1500 queue is still offline. Check the printer connection and try again.' } as Record<string, string>)[reason] || 'SELPHY USB repair did not complete.');
       }
     } catch (e) {
       this.status.set(String(e));
@@ -1550,13 +1553,17 @@ export class AdminDashboardComponent implements OnInit {
       this.status.set('Background removal requires Electron.');
       return;
     }
-    if (!confirm(`Remove background "${filename}" from mode ${modeId}?`)) return;
+    const bg = this.backgroundsForMode(modeId).find(item => item.filename === filename);
+    const label = bg?.displayName || filename.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+    if (!confirm(bg?.isSet
+      ? `Remove the "${label}" background set and all ${bg.variantCount} depth variants from the booth?`
+      : `Remove background "${label}" from the booth?`)) return;
     this.busy.set(true);
     try {
       const r = await window.pbApi.adminDeleteAiBackground(modeId, filename);
       if (r.ok) {
         await this.refreshAiBackgrounds(modeId);
-        this.status.set(`Removed ${filename}.`);
+        this.status.set(bg?.isSet ? `Removed the ${label} set and its depth variants.` : `Removed ${label}.`);
       } else {
         this.status.set(r.error ?? 'Could not remove background.');
       }
@@ -1580,6 +1587,7 @@ export class AdminDashboardComponent implements OnInit {
           id: m.id.trim(),
           label: m.label.trim(),
           prompt: m.prompt.trim(),
+          allowBackgroundChoice: m.allowBackgroundChoice === true,
           useInpainting: m.useInpainting === true || pipeline === 'scene' || pipeline === 'head-swap',
           randomizeBackground:
             pipeline === 'head-swap' ? false : m.randomizeBackground !== false,

@@ -1,0 +1,46 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const ts=require('typescript');
+const source=fs.readFileSync(path.resolve(__dirname,'../electron/main.cjs'),'utf8');
+const ast=ts.createSourceFile('main.cjs',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
+function extract(name){return ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(ast);}
+async function main(){
+ const picker={path,listBackgroundImageFiles:()=>['a.png','b.png'],getAiBackgroundsDir:()=>'/backgrounds'};
+ vm.createContext(picker);vm.runInContext(extract('pickBackgroundImage'),picker);
+ assert.equal(picker.pickBackgroundImage('scene',true,'b.png'),path.join('/backgrounds','b.png'));
+ assert.equal(picker.pickBackgroundImage('scene',false,null),path.join('/backgrounds','a.png'));
+ assert.equal(picker.pickBackgroundImage('scene',true,'missing.png'),null);
+ const q={items:[{filePath:path.resolve('capture.png'),variant:'original',status:'ok',shareUrl:'local',processStatus:'processing'}]};
+ const queue={path,loadUploadQueue:()=>q,saveUploadQueue:()=>{},notifyUploadQueueItem:()=>{},galleryBaseUrl:v=>v,uploadFlushRunning:false};
+ vm.createContext(queue);vm.runInContext(extract('enqueueGalleryUpload'),queue);
+ const item=queue.enqueueGalleryUpload({filePath:'capture.png',variant:'original',processStatus:'ready'});
+ assert.equal(item.status,'queued');assert.equal(item.processStatus,'ready');assert.equal(q.items.length,1);
+ const code=ts.transpileModule(fs.readFileSync(path.resolve(__dirname,'../src/app/services/ai-background-job.service.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText;
+ const uploads=[],calls=[];let finishFirst;
+ const gallery={uploadPath:async(...a)=>{uploads.push(a);return {status:'ok'};}};
+ const log={info:async()=>{},warn:async()=>{},error:async()=>{}};
+ const core={Injectable:()=>()=>{},inject:token=>token==='gallery'?gallery:log,signal:value=>{const f=()=>value;f.set=v=>value=v;return f;}};
+ const scope={exports:{},structuredClone,window:{pbApi:{openAiGenerateImage:async req=>{calls.push(req);if(calls.length===1)await new Promise(r=>finishFirst=r);return {ok:true,path:req.imagePath+'_ai.png'};}}},require:name=>name==='@angular/core'?core:name.includes('gallery-upload')?{GalleryUploadService:'gallery'}:{BoothLogService:'log'}};
+ vm.createContext(scope);vm.runInContext(code,scope);
+ const service=new scope.exports.AiBackgroundJobService();
+ const mode={id:'scene',prompt:'test',pipeline:'scene',randomizeBackground:false};
+ const first=service.run({imagePath:'one',mode,backgroundFilename:'a.png'});
+ const second=service.run({imagePath:'two',mode,backgroundFilename:'b.png'});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(calls.length,1);assert.equal(uploads.filter(x=>x[2].processStatus==='processing').length,2);
+ finishFirst();await Promise.all([first,second]);
+ assert.equal(calls.length,2);assert.equal(calls[1].backgroundFilename,'b.png');assert.equal(calls[1].randomizeBackground,false);assert.equal(service.busy(),false);
+ uploads.length=0;
+ gallery.uploadPath=async(...args)=>{uploads.push(args);return args[1]==='ai'?{status:'error',error:'Invalid upload token'}:{status:'ok'};};
+ await service.run({imagePath:'upload-failure',mode});
+ assert.equal(service.lastError(),'Invalid upload token');
+ assert.equal(uploads.some(x=>x[1]==='original'&&x[2].processStatus==='ready'),false);
+ uploads.length=0;
+ gallery.uploadPath=async(...args)=>{uploads.push(args);return {status:'queued'};};
+ await service.run({imagePath:'offline',mode});
+ assert.equal(uploads.some(x=>x[1]==='original'&&x[2].processStatus==='ready'),false);
+ console.log('PASS: explicit selection, missing selection, deterministic default, processing-to-ready requeue, consecutive captures, preserved background choice.');
+}
+main().catch(error=>{console.error(error);process.exitCode=1});

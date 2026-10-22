@@ -1,10 +1,10 @@
 {
   "id": "bride",
-  "label": "Bride",
+  "label": "Pirate",
   "face": {
-    "xPercent": 39,
-    "yPercent": 8,
-    "widthPercent": 17,
-    "heightPercent": 16
+    "xPercent": 42.49742046302459,
+    "yPercent": 8.809915040709441,
+    "widthPercent": 11.573698961617522,
+    "heightPercent": 8.833865215822327
   }
 }

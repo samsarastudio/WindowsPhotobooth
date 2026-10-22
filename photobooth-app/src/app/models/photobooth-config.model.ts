@@ -195,7 +195,7 @@ export interface PhotoboothCopyAiMode {
   back: string;
   /**
    * Label for the non-AI option (regular booth photo only).
-   * Use "Photocapture", "Default", etc. — not an admin `aiModes` row.
+   * Use "Classic photo", "Default", etc. — not an admin `aiModes` row.
    */
   plainPhotoLabel: string;
   /** Top-level card that opens the AI Portrait character picker. */
@@ -219,13 +219,13 @@ export interface PhotoboothCopySceneSelect {
 export interface PhotoboothCopyBoothMode {
   title: string;
   subtitle: string;
-  /** Photo Print experience */
+  /** Classic photo experience */
   defaultLabel: string;
   defaultHint: string;
-  /** AI Halloween Portrait experience */
+  /** AI portrait experience */
   aiPortraitLabel: string;
   aiPortraitHint: string;
-  /** Optional Scene Addition */
+  /** Optional AI background */
   sceneLabel: string;
   sceneHint: string;
   /** Note that magnet/physical is offered at the end of every path */
@@ -336,6 +336,8 @@ export interface PhotoboothAiMode {
   useInpainting?: boolean;
   /** Pick a random background from `config/ai-backgrounds/{modeId}/` per generation. */
   randomizeBackground?: boolean;
+  /** Let guests choose when this mode has more than one background. */
+  allowBackgroundChoice?: boolean;
   /** Prompt sent after compositing guest onto background; overrides `prompt` when inpainting. */
   inpaintPrompt?: string;
   /**
@@ -367,7 +369,7 @@ export const DJ_PROMPT_ONLY =
 export const NEWSPAPER_AI_PROMPT =
   'Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject\'s face remains recognizable but stylized to match the printed newspaper aesthetic.';
 
-/** Scene Addition — keep cropped guests, paint Halloween scenery around them. */
+/** AI background — keep cropped guests, paint Halloween scenery around them. */
 export const HALLOWEEN_SCENE_PROMPT =
   `Place the guests exactly as captured into this Halloween environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged — never alter identity or invent extra limbs. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
 
@@ -467,7 +469,7 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   photoScale: 1,
   defaultFrameFile: 'halloween-haunt.png',
   defaultPortraitFrameFile: 'halloween-haunt-portrait.png',
-  guestFrameFiles: ['halloween-haunt.png', 'halloween-haunt-portrait.png'],
+  guestFrameFiles: ['halloween-haunt.png', 'halloween-haunt-portrait.png', 'halloween-horror.png', 'halloween-horror-portrait.png'],
   autoApplyFrame: false,
   guestAdjustPhoto: true,
   guestTextEnabled: false,
@@ -519,7 +521,7 @@ export interface PhotoboothGuestFlowConfig {
 }
 
 export const PHOTOBOOTH_DEFAULT_GUEST_FLOW: PhotoboothGuestFlowConfig = {
-  skipAiPreviewToThanks: false,
+  skipAiPreviewToThanks: true,
   thanksAutoReturnSec: 8,
   boothId: 'booth-1',
 };
@@ -624,7 +626,7 @@ export const PHOTOBOOTH_DEFAULT_BRANDING: PhotoboothBranding = {
 export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   {
     id: 'scene',
-    label: 'Scene Addition',
+    label: 'AI background',
     prompt: HALLOWEEN_SCENE_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -683,7 +685,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'bride',
-    label: 'Bride',
+    label: 'Pirate',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -693,7 +695,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'morticia',
-    label: 'Morticia',
+    label: 'Raven Countess',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -710,7 +712,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     mainScale: 1,
     topScale: 1,
     title: 'HauntBooth',
-    subtitle: 'Tap to transform into a\nHalloween keepsake.',
+    subtitle: 'Your Halloween photo starts here.',
     ctaLabel: 'Tap to Start',
     startAria: 'Tap to Start',
     adminLink: 'Admin',
@@ -746,7 +748,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     savedPrefix: 'Saved:',
     retake: 'Retake',
     submit: 'Done',
-    confirmPhoto: 'Done',
+    confirmPhoto: 'Use this photo',
     generateAi: 'Create AI version',
     generatingAi: 'Creating your AI image…',
     aiPreviewTitle: 'AI version',
@@ -757,12 +759,12 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     galleryBackToResult: 'Back to photo',
     galleryFinish: 'Finish',
     thinkingSummary: 'Preparing your image',
-    thinkingStepAnalyze: 'Analysing framing and composition',
-    thinkingStepPlan: 'Applying your chosen style directions',
-    thinkingStepBackground: 'Selecting branded environment and compositing your photo',
-    thinkingStepImage: 'Rendering with the image API',
+    thinkingStepAnalyze: 'Preparing your photo',
+    thinkingStepPlan: 'Adding your chosen style',
+    thinkingStepBackground: 'Creating your background',
+    thinkingStepImage: 'Finishing your photo',
     thinkingFootnote:
-      'Runs on OpenAI Images (edit). Unlike ChatGPT, the booth cannot stream GPT‑5 “thinking” text for image jobs.',
+      'This may take a moment. Please wait while we finish your photo.',
     share: 'Share',
     sharing: 'Uploading…',
     shareQrTitle: 'Scan to view your photo',
@@ -773,12 +775,12 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     printing: 'Printing…',
     printed: 'Printed',
     printFailed: 'Print failed',
-    makePhysical: 'Make glow magnet',
-    remakePhysical: 'Remake glow magnet',
+    makePhysical: 'Create glow magnet',
+    remakePhysical: 'Adjust glow magnet',
     makingPhysical: 'Creating magnet sheet…',
     physicalErrorPrefix: 'Magnet failed:',
-    makeFramed: 'Make framed',
-    remakeFramed: 'Remake framed',
+    makeFramed: 'Add a frame',
+    remakeFramed: 'Change frame',
     makingFramed: 'Applying frame…',
     framedErrorPrefix: 'Frame failed:',
   },
@@ -802,29 +804,29 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     cancel: 'Cancel',
     previewHint: 'Tap a photo to preview',
     reprint: 'Reprint',
-    makePhysical: 'Make physical sheet',
-    remakePhysical: 'Remake physical sheet',
+    makePhysical: 'Create magnet print',
+    remakePhysical: 'Adjust magnet print',
     makingPhysical: 'Creating sheet…',
     originalLabel: 'Original',
-    makeFramed: 'Make framed',
-    remakeFramed: 'Remake framed',
+    makeFramed: 'Add a frame',
+    remakeFramed: 'Change frame',
     makingFramed: 'Applying frame…',
     pickFrameTitle: 'Choose a frame',
-    pickFrameHint: 'Applied to this original. Same overlay guests get after capture.',
+    pickFrameHint: 'Choose a border for this photo.',
     applyFrame: 'Apply frame',
   },
   aiMode: {
-    title: 'Pick your spell',
-    subtitle: 'Scene Addition keeps your faces — AI Portrait drops you into a costume',
+    title: 'Choose your photo style',
+    subtitle: 'Choose a classic photo, a character portrait, or an AI background.',
     back: 'Back',
-    plainPhotoLabel: 'Photocapture',
+    plainPhotoLabel: 'Classic photo',
     portraitEntryLabel: 'AI Portrait',
-    portraitEntryHint: 'Become one of five Halloween characters — your face stays yours',
-    sceneEntryHint: 'Keep your group as-is and paint haunted scenery around you',
+    portraitEntryHint: 'Choose a Halloween character for your portrait.',
+    sceneEntryHint: 'Add a Halloween background to your group photo.',
   },
   portraitSelect: {
-    title: 'Choose your haunt',
-    subtitle: 'Pick a character — we keep your real face',
+    title: 'Choose your character',
+    subtitle: 'Choose a Halloween look for your portrait.',
     back: 'Back',
   },
   sceneSelect: {
@@ -834,16 +836,16 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
   },
   boothMode: {
     title: 'Choose your experience',
-    subtitle: 'Every visit includes a digital framed copy. Add a glow magnet at the end if you like.',
-    defaultLabel: 'Photo Print',
-    defaultHint: 'Original photo with a custom Screampark frame and digital copy',
-    aiPortraitLabel: 'AI Halloween Portrait',
-    aiPortraitHint: 'Become a haunt character — your real face, costume look, framed digital copy',
-    sceneLabel: 'Scene Addition',
-    sceneHint: 'Keep your group as-is and paint Halloween scenery around you',
-    magnetNote: 'Glow-in-the-Dark Photo Magnet is available after your photo — for Photo Print or AI Portrait.',
+    subtitle: 'Pick a style to get started.',
+    defaultLabel: 'Classic photo',
+    defaultHint: 'Capture the moment, just as you are.',
+    aiPortraitLabel: 'AI portrait',
+    aiPortraitHint: 'See yourself as a Halloween character.',
+    sceneLabel: 'AI background',
+    sceneHint: 'Give your group photo a Halloween setting.',
+    magnetNote: 'Ask our team about photo prints and glow magnets.',
     physicalLabel: 'Glow magnet',
-    physicalHint: 'Dual cut sheet for glow-in-the-dark magnets',
+    physicalHint: 'Create a keepsake photo magnet.',
     back: 'Back',
   },
   frame: {
@@ -871,7 +873,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
   thanks: {
     title: 'Thank you!',
     subtitle: 'Your photo is being prepared.',
-    footnote: 'Pick it up at the Moments station when ready.',
+    footnote: 'Our team will show you the finished photo on the tablet and help you print it.',
     done: 'Done',
   },
   physicalAdjust: {

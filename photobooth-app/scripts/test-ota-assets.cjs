@@ -1,0 +1,15 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');const {applyReleaseProfile}=require('../electron/ota-assets.cjs');
+const root=fs.mkdtempSync(path.resolve(__dirname,'../../builds/ota-migration-'));const bundle=path.join(root,'bundle'),config=path.join(root,'config');
+fs.mkdirSync(path.join(bundle,'ai-backgrounds/scene'),{recursive:true});fs.mkdirSync(path.join(config,'ai-backgrounds/scene'),{recursive:true});
+const profile={version:'1.1.48',settings:{aiModes:[{id:'scene',pipeline:'scene'}],aiGenerationEnabled:true,adminPin:'must-not-transfer',gallery:{uploadToken:'must-not-transfer'}}};
+fs.writeFileSync(path.join(bundle,'release-profile.json'),JSON.stringify(profile));fs.writeFileSync(path.join(bundle,'ai-backgrounds/scene/scene.png'),'new-art');fs.writeFileSync(path.join(config,'ai-backgrounds/scene/scene.png'),'old-art');fs.writeFileSync(path.join(config,'ai-backgrounds/scene/custom.png'),'custom');
+const before={aiModes:[{id:'dj'}],gallery:{uploadToken:'existing-test-token'},adminPin:'existing-pin',print:{printerName:'existing-printer'},camera:{id:'existing-camera'},guestFlow:{boothId:'existing-booth',skipAiPreviewToThanks:true}};fs.writeFileSync(path.join(config,'photobooth-config.json'),JSON.stringify(before));
+applyReleaseProfile(bundle,config);const after=JSON.parse(fs.readFileSync(path.join(config,'photobooth-config.json')));assert.equal(after.aiModes[0].id,'scene');for(const k of ['gallery','adminPin','print','camera','guestFlow'])assert.deepEqual(after[k],before[k]);assert.equal(fs.readFileSync(path.join(config,'ai-backgrounds/scene/scene.png'),'utf8'),'new-art');assert.equal(fs.readFileSync(path.join(config,'.ota-backups/1.1.48/ai-backgrounds/scene/scene.png'),'utf8'),'old-art');assert(fs.existsSync(path.join(config,'ai-backgrounds/scene/custom.png')));fs.writeFileSync(path.join(config,'ai-backgrounds/scene/scene.png'),'edited-after-update');applyReleaseProfile(bundle,config);assert.equal(fs.readFileSync(path.join(config,'ai-backgrounds/scene/scene.png'),'utf8'),'edited-after-update');console.log('PASS OTA profile: settings, artwork, backup, protected settings, custom files, idempotency');
+
+const newProfile={version:'1.1.53',settings:{guestFlow:{skipAiPreviewToThanks:true,boothId:'must-not-replace',thanksAutoReturnSec:999}}};
+fs.writeFileSync(path.join(bundle,'release-profile.json'),JSON.stringify(newProfile));
+after.guestFlow={boothId:'existing-booth',thanksAutoReturnSec:8,skipAiPreviewToThanks:false};fs.writeFileSync(path.join(config,'photobooth-config.json'),JSON.stringify(after));
+applyReleaseProfile(bundle,config);const upgraded=JSON.parse(fs.readFileSync(path.join(config,'photobooth-config.json')));
+assert.deepEqual(upgraded.guestFlow,{boothId:'existing-booth',thanksAutoReturnSec:8,skipAiPreviewToThanks:true});
+assert(fs.existsSync(path.join(config,'.release-1.1.53')));assert(fs.existsSync(path.join(config,'.ota-backups/1.1.53/photobooth-config.json')));
+console.log('PASS 1.1.53 tablet default migration preserves booth identity, timeout and credentials');

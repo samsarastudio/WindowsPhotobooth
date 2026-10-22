@@ -6,6 +6,7 @@ photobooth-app/dist/
 photobooth-app/node_modules/
 photobooth-app/.angular/
 photobooth-app/build/
+photobooth-app/config/ai-models/*.onnx
 
 # Moments gallery
 moments-server/node_modules/
@@ -21,3 +22,10 @@ Thumbs.db
 *.log
 .idea/
 .vscode/
+
+# Local releases, credentials and campaign renders
+/AI Booth Build/
+/builds/
+/output/
+*.dpapi
+__pycache__/

@@ -43,3 +43,19 @@
   margin-top: clamp(0.5rem, 2vmin, 1rem);
   min-width: min(100%, 220px);
 }
+
+.pb-thanks-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(70, 160, 110, 0.18);
+  color: var(--pb-ink);
+  font: 32px system-ui, sans-serif;
+}
+.pb-thanks-return {
+  margin: 0;
+  color: var(--pb-ink-muted);
+  font-size: 0.85rem;
+}

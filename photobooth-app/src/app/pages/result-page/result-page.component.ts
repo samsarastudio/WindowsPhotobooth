@@ -120,7 +120,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly physicalAdjustSource = computed(() => {
     const p = this.path();
     if (!p) return '';
-    if (this.isPhysicalSheetPath(p)) return this.originalCapturePath(p);
+    if (this.isPhysicalSheetPath(p)) return this.digitalPath() || this.originalCapturePath(p);
     return p;
   });
   readonly printUsesPhysicalLayout = computed(
@@ -223,7 +223,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.startShareUploadIfNeeded(pp);
-    this.maybeAutoSkipAiWait();
+    // Generation is completed on the dedicated processing screen.
   }
 
   /** When admin enabled skip-to-thanks, never show the AI waiting UI. */
@@ -322,7 +322,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       this.beginSkipAiFlow();
       return;
     }
-    const source = this.isPhysicalSheetPath(pp) ? this.originalCapturePath(pp) : pp;
+    const source = this.originalCapturePath(pp);
     this.aiGenerating.set(true);
     this.aiErr.set(null);
     this.aiModelUsed.set(null);
@@ -348,10 +348,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         prompt: mode.prompt,
         modeId: mode.id,
         useInpainting: mode.useInpainting === true,
-        randomizeBackground:
-          mode.pipeline === 'scene'
-            ? !this.aiStyle.selectedBackgroundFilename()
-            : mode.randomizeBackground !== false,
+        randomizeBackground: !this.aiStyle.selectedBackgroundFilename() && mode.randomizeBackground === true,
         backgroundFilename: this.aiStyle.selectedBackgroundFilename() || undefined,
         inpaintPrompt: mode.inpaintPrompt,
         pipeline: mode.pipeline,
@@ -499,10 +496,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   originalCapturePath(p: string): string {
-    return p
-      .replace(/_physical\.png$/i, '.jpg')
-      .replace(/_ai\.png$/i, '.jpg')
-      .replace(/_framed\.png$/i, '.jpg');
+    return p.replace(/(?:_(?:physical|ai|framed))+\.png$/i, '.jpg');
   }
 
   confirmPreview(): void {

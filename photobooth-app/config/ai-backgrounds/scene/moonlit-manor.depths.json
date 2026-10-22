@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "moonlit-manor",
+  "displayName": "Enchanted Harvest Garden",
+  "variants": {
+    "close": "depths/moonlit-manor/close.png",
+    "medium": "depths/moonlit-manor/medium.png",
+    "wide": "depths/moonlit-manor/wide.png"
+  },
+  "baseSha256": "581f0036ba8027c8e75cc1b9e51270a9648ca6a04868814f355bf324722c47be"
+}

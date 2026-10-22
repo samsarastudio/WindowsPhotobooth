@@ -1,0 +1,20 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {removeBackgroundSet,backgroundSetInfo}=require('../electron/background-set.cjs');
+const base=path.resolve(__dirname,'../../builds/ai-flow-qa');
+const root=fs.mkdtempSync(path.join(base,'remove-set-test-'));
+fs.mkdirSync(path.join(root,'depths','test'),{recursive:true});
+fs.writeFileSync(path.join(root,'test.png'),'main');
+fs.writeFileSync(path.join(root,'other.png'),'keep');
+const variants={};for(const d of ['close','medium','wide']){variants[d]=`depths/test/${d}.png`;fs.writeFileSync(path.join(root,variants[d]),d);}
+fs.writeFileSync(path.join(root,'test.depths.json'),JSON.stringify({version:1,variants}));
+assert.equal(backgroundSetInfo(path.join(root,'test.png')).variantCount,3);
+const removed=removeBackgroundSet(root,'test.png');assert.equal(removed.removedFiles,5);
+assert.equal(fs.existsSync(path.join(root,'test.png')),false);
+for(const p of Object.values(variants))assert.equal(fs.existsSync(path.join(root,p)),false);
+assert.equal(fs.readFileSync(path.join(root,'other.png'),'utf8'),'keep');
+assert.throws(()=>removeBackgroundSet(root,'../other.png'),/Invalid/);
+fs.writeFileSync(path.join(root,'bad.png'),'main');fs.writeFileSync(path.join(root,'bad.depths.json'),JSON.stringify({version:1,variants:{close:'other.png'}}));
+assert.throws(()=>removeBackgroundSet(root,'bad.png'),/outside/);assert.ok(fs.existsSync(path.join(root,'bad.png')));
+removeBackgroundSet(root,'other.png');assert.equal(fs.existsSync(path.join(root,'other.png')),false);
+console.log('PASS: set removal, all variants, standalone image, unrelated set preservation, traversal rejection, validation before mutation.');

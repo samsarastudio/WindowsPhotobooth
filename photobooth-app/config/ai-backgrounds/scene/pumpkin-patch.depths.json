@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "scene": "pumpkin-patch",
+  "variants": {
+    "close": "depths/pumpkin-patch/close.png",
+    "medium": "depths/pumpkin-patch/medium.png",
+    "wide": "depths/pumpkin-patch/wide.png"
+  },
+  "baseSha256": "81190d2add659815307aa13d5b00fc7a43b4705e0d66f5e6a20731aeca0e1a50"
+}

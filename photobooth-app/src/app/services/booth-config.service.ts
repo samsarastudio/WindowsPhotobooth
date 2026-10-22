@@ -134,6 +134,7 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
         id,
         label,
         prompt,
+        allowBackgroundChoice: o['allowBackgroundChoice'] === true,
         ...(useInpainting ? { useInpainting: true, randomizeBackground } : {}),
         ...(inpaintRaw ? { inpaintPrompt: inpaintRaw } : {}),
         ...(pipeline ? { pipeline } : {}),

@@ -1,10 +1,10 @@
 {
   "id": "morticia",
-  "label": "Morticia",
+  "label": "Raven Countess",
   "face": {
-    "xPercent": 40,
-    "yPercent": 4,
-    "widthPercent": 17,
-    "heightPercent": 17
+    "xPercent": 42.446394697881864,
+    "yPercent": 8.730823172582687,
+    "widthPercent": 11.760203866050386,
+    "heightPercent": 9.013393226358291
   }
 }

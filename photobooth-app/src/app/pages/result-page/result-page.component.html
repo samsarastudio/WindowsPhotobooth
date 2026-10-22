@@ -1,6 +1,6 @@
 <div class="pb-page pb-result" [class.is-share-open]="shareOpen()" [class.is-preview]="isPreview()">
   <div class="pb-kiosk-surface pb-result-inner">
-    <h1 class="pb-result-title">{{ copy().result.title }}</h1>
+    <h1 class="pb-result-title">{{ viewingPhysicalSheet() ? "Your magnet layout is ready" : isPreview() ? "Review your photo" : "Your photo is ready" }}</h1>
 
     @if (imageDataUrl(); as src) {
       <div class="pb-result-frame" [style.--result-ar]="resultAspectRatio() ?? 1.5">
@@ -17,58 +17,6 @@
       } @else {
         <p class="pb-loading">{{ copy().result.loading }}</p>
       }
-    }
-
-    @if (showAiSection()) {
-      <div class="pb-result-ai" [class.is-generating]="aiGenerating()">
-        @if (aiGenerating()) {
-          <p class="pb-result-ai-status">
-            {{ copy().result.generatingAi }}
-            <span class="pb-result-ai-eta">
-              @if (aiOvertime()) {
-                · elapsed {{ aiElapsedLabel() }}
-              } @else {
-                · ETA {{ aiEtaLabel() }}
-              }
-            </span>
-          </p>
-        } @else if (aiErr()) {
-          <p class="pb-msg pb-result-ai-err">{{ copy().result.aiErrorPrefix }} {{ aiErr() }}</p>
-        }
-
-        @if (!aiGenerating()) {
-          <button
-            type="button"
-            class="pb-btn pb-btn-primary pb-result-ai-btn"
-            [disabled]="!canRunAiGeneration()"
-            (click)="generateAi()"
-          >
-            {{ copy().result.generateAi }}
-          </button>
-          @if (!booth.openAiConfigured()) {
-            <p class="pb-hint pb-result-ai-hint">OpenAI API key must be set in Admin → AI.</p>
-          }
-        }
-      </div>
-    }
-
-    @if (showMakeFramed()) {
-      <div class="pb-result-physical">
-        <button
-          type="button"
-          class="pb-btn pb-btn-ghost pb-result-physical-btn"
-          [disabled]="makeFramedBusy()"
-          (click)="openMakeFramed()"
-        >
-          @if (makeFramedBusy()) {
-            {{ copy().result.makingFramed }}
-          } @else if (viewingFramedPhoto()) {
-            {{ copy().result.remakeFramed }}
-          } @else {
-            {{ copy().result.makeFramed }}
-          }
-        </button>
-      </div>
     }
 
     <!-- Always last conversion option: available for photocapture, frames, Scene, and Portrait AI. -->
@@ -136,13 +84,13 @@
             @if (printBusy()) {
               {{ copy().result.printing }}
             } @else if (printDone()) {
-              {{ copy().result.printed }}
+              Sent to printer
             } @else {
-              {{ copy().result.print }}
+              {{ viewingPhysicalSheet() ? 'Print magnet sheet' : copy().result.print }}
             }
           </button>
         }
-        <button type="button" class="pb-btn pb-btn-primary" (click)="submit()">{{ copy().result.submit }}</button>
+        <button type="button" class="pb-btn pb-btn-ghost" (click)="submit()">{{ copy().result.submit }}</button>
       }
     </div>
     @if (printErr(); as pe) {

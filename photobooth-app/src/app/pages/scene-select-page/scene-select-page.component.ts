@@ -36,6 +36,7 @@ export class SceneSelectPageComponent implements OnInit {
     }
     const modeId = this.sceneModeId();
     this.aiStyle.selectMode(modeId);
+    this.aiStyle.selectBackground(null);
     void this.loadScenes(modeId);
   }
 
@@ -59,10 +60,15 @@ export class SceneSelectPageComponent implements OnInit {
         .filter((b) => !!b?.filename && !!b?.url)
         .map((b) => ({
           filename: b.filename,
-          label: this.labelFor(b.filename),
+          label: b.displayName || this.labelFor(b.filename),
           url: b.url,
         }));
       this.scenes.set(items);
+      const mode = this.booth.primaryAiModes().find((m) => m.id === modeId);
+      if (items.length === 1) this.choose(items[0].filename);
+      else if (items.length > 1 && !mode?.allowBackgroundChoice) {
+        void this.router.navigate(['/capture']);
+      }
     } catch {
       this.scenes.set([]);
     } finally {

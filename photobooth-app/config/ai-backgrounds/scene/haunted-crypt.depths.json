@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "haunted-crypt",
+  "displayName": "Pumpkin Lantern Cottage",
+  "variants": {
+    "close": "depths/haunted-crypt/close.png",
+    "medium": "depths/haunted-crypt/medium.png",
+    "wide": "depths/haunted-crypt/wide.png"
+  },
+  "baseSha256": "99f14b8d03591b29d4d7284e440e953386d6aaedb70edf1c8abc6129babc84d0"
+}

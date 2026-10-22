@@ -152,7 +152,7 @@ export interface PbApi {
   adminListAiBackgrounds(modeId: string): Promise<{
     ok: boolean;
     modeId?: string;
-    backgrounds?: { filename: string; url: string }[];
+    backgrounds?: { filename: string; url: string; isSet?: boolean; variantCount?: number; displayName?: string }[];
     error?: string;
   }>;
   adminPickAiBackgroundImage(): Promise<{ ok: boolean; canceled?: boolean; path?: string }>;

@@ -176,8 +176,8 @@ async function runScheduledRepair() {
   return {
     ok: !probe?.needsRepair,
     repaired: true,
-    reason: probe?.needsRepair ? 'still-broken' : 'ok',
-    needsReboot: !!probe?.needsRepair,
+    reason: probe?.needsRepair ? (probe.reason || 'connection-not-ready') : 'ok',
+    needsReboot: false,
     via: 'scheduled-task',
     probe,
   };
@@ -211,8 +211,8 @@ async function runElevatedRegisterAndRepair() {
   return {
     ok: !probe.needsRepair,
     repaired: true,
-    reason: probe.needsRepair ? 'still-broken' : 'ok',
-    needsReboot: !!probe.needsRepair,
+    reason: probe.needsRepair ? (probe.reason || 'connection-not-ready') : 'ok',
+    needsReboot: false,
     via: 'elevated',
     probe,
   };

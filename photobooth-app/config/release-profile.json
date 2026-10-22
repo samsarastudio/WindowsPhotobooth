@@ -1,0 +1,221 @@
+{
+  "version": "1.1.53",
+  "settings": {
+    "activeThemeId": "halloween",
+    "aiModes": [
+      {
+        "id": "scene",
+        "label": "AI background",
+        "pipeline": "scene",
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Place the guests exactly as captured into this Halloween environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged \u2014 never alter identity or invent extra limbs. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.",
+        "inpaintPrompt": "BLEND the guests into this Halloween scene \u2014 do not recreate them. CRITICAL: keep every person exactly as placed (faces, bodies, legs, feet, clothing, pose, count). NEVER invent extra legs, limbs, or people. Only replace the indoor room/booth background around them with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup, no identity change, no body regeneration."
+      },
+      {
+        "id": "vampire",
+        "label": "Vampire",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      },
+      {
+        "id": "witch",
+        "label": "Witch",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      },
+      {
+        "id": "werewolf",
+        "label": "Werewolf",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      },
+      {
+        "id": "reaper",
+        "label": "Reaper",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      },
+      {
+        "id": "phantom",
+        "label": "Phantom",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      },
+      {
+        "id": "bride",
+        "label": "Pirate",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      },
+      {
+        "id": "morticia",
+        "label": "Raven Countess",
+        "pipeline": "head-swap",
+        "portraitOnly": true,
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "prompt": "Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode \u2014 chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.",
+        "inpaintPrompt": "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION \u2014 the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar \u2014 if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar \u2014 no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face."
+      }
+    ],
+    "defaultAiModeId": null,
+    "guestModes": {
+      "defaultEnabled": true,
+      "physicalFrameEnabled": true
+    },
+    "photoFrames": {
+      "enabled": true,
+      "photoScale": 1,
+      "defaultFrameFile": "halloween-haunt.png",
+      "defaultPortraitFrameFile": "halloween-haunt-portrait.png",
+      "guestFrameFiles": [
+        "halloween-haunt.png",
+        "halloween-haunt-portrait.png",
+        "halloween-horror.png",
+        "halloween-horror-portrait.png"
+      ],
+      "autoApplyFrame": true,
+      "guestAdjustPhoto": true,
+      "guestTextEnabled": false,
+      "guestTextOptional": true,
+      "guestTextMaxLength": 36,
+      "guestTextCreditLine": "by HauntBooth",
+      "guestTextXPercent": 50,
+      "guestTextYPercent": 78,
+      "guestTextSizePercent": 3.4,
+      "guestTextColor": "#e08c30",
+      "guestTextCreditColor": "#d8c4a0",
+      "guestTextAlign": "center",
+      "guestTextBrush": false,
+      "guestTextBrushOpacity": 0.22
+    },
+    "copy": {
+      "attract": {
+        "icon": "\ud83c\udf83",
+        "tagline": "Enter if you dare",
+        "mainScale": 1,
+        "topScale": 1,
+        "title": "HauntBooth",
+        "subtitle": "Your Halloween photo starts here.",
+        "ctaLabel": "Tap to Start",
+        "startAria": "Tap to Start",
+        "adminLink": "Admin"
+      },
+      "qr": {
+        "icon": "\ud83d\udd10",
+        "title": "Scan your QR",
+        "subtitle": "Hold your phone to the photobooth scanner to begin your photo experience.",
+        "scanSuccess": "QR verified",
+        "footer": "Have your registration QR ready.",
+        "codeLabel": "Code",
+        "ok": "OK",
+        "back": "Back",
+        "invalidCode": "Invalid code. Use 1234 to continue (debug).",
+        "debugHint": "Debug \u2014 type ok then Enter",
+        "bypassCode": "1234"
+      },
+      "capture": {
+        "sideTitle": "Strike a pose",
+        "instructions": "Stand in the frame \u00b7 Face the camera \u00b7 Leave a little space above your head \u00b7 Smile when the countdown ends",
+        "starting": "Starting camera\u2026",
+        "readyTitle": "Get Ready",
+        "readySubtitle": "Center yourself in the frame. Your photo begins in\u2026",
+        "footerHint": "Look at the camera and hold still.",
+        "smileHint": "Smile \u2014 capturing soon"
+      },
+      "result": {
+        "title": "Your photo",
+        "loading": "Loading\u2026",
+        "savedPrefix": "Saved:",
+        "retake": "Retake",
+        "submit": "Done",
+        "confirmPhoto": "Use this photo",
+        "generateAi": "Create AI version",
+        "generatingAi": "Creating your AI photo\u2026",
+        "aiPreviewTitle": "AI version",
+        "aiErrorPrefix": "AI generation failed:",
+        "aiGalleryTitle": "Your photos",
+        "galleryThumbOriginal": "Original",
+        "galleryThumbAi": "AI style",
+        "galleryBackToResult": "Back to photo",
+        "galleryFinish": "Finish",
+        "thinkingSummary": "Preparing your photo",
+        "thinkingStepAnalyze": "Preparing your photo",
+        "thinkingStepPlan": "Applying your chosen Halloween style",
+        "thinkingStepBackground": "Building scenery and locking your faces",
+        "thinkingStepImage": "Finishing your photo",
+        "thinkingFootnote": "This may take a moment. Please wait while we finish your photo.",
+        "share": "Share",
+        "sharing": "Uploading\u2026",
+        "shareQrTitle": "Scan to view your photo",
+        "shareBack": "Back",
+        "uploadFailed": "Could not upload to gallery",
+        "print": "Print",
+        "printing": "Printing\u2026",
+        "printed": "Printed",
+        "printFailed": "Print failed"
+      },
+      "history": {
+        "title": "Print history",
+        "empty": "No photos yet \u2014 take one to see it here.",
+        "back": "Back to start",
+        "ariaOpen": "Reprint previous photos"
+      },
+      "aiMode": {
+        "title": "Choose your photo style",
+        "subtitle": "Choose a classic photo, a character portrait, or an AI background.",
+        "back": "Back",
+        "plainPhotoLabel": "Classic photo",
+        "portraitEntryLabel": "AI Portrait",
+        "portraitEntryHint": "Choose a Halloween character for your portrait.",
+        "sceneEntryHint": "Add a Halloween background to your group photo."
+      },
+      "portraitSelect": {
+        "title": "Choose your character",
+        "subtitle": "Choose a Halloween look for your portrait.",
+        "back": "Back"
+      },
+      "frame": {
+        "title": "Choose a frame",
+        "subtitle": "Pick a keepsake border for your photo",
+        "continueLabel": "Use this frame",
+        "skipLabel": "Skip frame",
+        "applying": "Applying frame\u2026"
+      },
+      "sceneSelect": {
+        "title": "Choose your scene",
+        "subtitle": "Pick the Halloween backdrop for your group",
+        "back": "Back"
+      }
+    },
+    "aiGenerationEnabled": true,
+    "guestFlow": {
+      "skipAiPreviewToThanks": true
+    }
+  }
+}

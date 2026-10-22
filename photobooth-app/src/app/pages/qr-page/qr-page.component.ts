@@ -65,7 +65,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
         this.booth.primaryAiModes()[0];
       if (scene) this.aiStyle.selectMode(scene.id);
       this.aiStyle.selectBackground(null);
-      void this.router.navigate(['/capture']);
+      void this.router.navigate([scene?.allowBackgroundChoice ? '/scene-select' : '/capture']);
       return;
     }
     if (experience === 'photoPrint') {

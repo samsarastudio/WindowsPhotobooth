@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Moments Tablet — Today</title>
-    <link rel="stylesheet" href="/css/tablet.css" />
+    <link rel="stylesheet" href="/css/tablet.css?v=20261022-filmstrip" />
   </head>
   <body>
     <header class="tb-header">
@@ -26,7 +26,7 @@
 
     <p class="tb-guide">Review each photo, then send it to the booth printer. AI photos become available when processing is complete.</p>
 
-    <main id="tbGrid" class="tb-grid" aria-live="polite"></main>
+    <main class="tb-workspace"><section id="tbPreview" class="tb-preview" aria-label="Selected photo"></section><nav class="tb-pagination" aria-label="Photo pages"><button class="tb-btn tb-ghost" id="tbPrev">Previous</button><label>Page <select id="tbPage" aria-label="Page number"></select></label><span id="tbPageMeta" role="status"></span><button class="tb-btn tb-ghost" id="tbNext">Next</button></nav><section id="tbGrid" class="tb-grid" aria-label="Photo filmstrip"></section></main>
 
     <template id="tbCardTpl">
       <article class="tb-card">
@@ -43,6 +43,6 @@
       </article>
     </template>
 
-    <script src="/js/tablet.js" type="module"></script>
+    <script src="/js/tablet.js?v=20261022-filmstrip" type="module"></script>
   </body>
 </html>

@@ -20,6 +20,7 @@ export class AiBackgroundJobService {
 
   readonly busy = signal(false);
   readonly lastError = signal<string | null>(null);
+  private tail: Promise<void> = Promise.resolve();
 
   /**
    * Fire-and-forget. Marks the capture as processing on Moments, generates AI,
@@ -29,23 +30,25 @@ export class AiBackgroundJobService {
     void this.run(req);
   }
 
-  async run(req: AiBackgroundJobRequest): Promise<void> {
+  run(req: AiBackgroundJobRequest): Promise<void> {
+    const request = structuredClone(req);
+    const announced = this.galleryUpload.uploadPath(request.imagePath, 'original', { processStatus: 'processing' })
+      .catch((error) => { void this.log.warn('ai-bg', 'processing upload unavailable', { error: String(error) }); });
+    const job = this.tail.then(async () => { await announced; await this.execute(request); });
+    this.tail = job.catch(() => undefined);
+    return job;
+  }
+
+  private async execute(req: AiBackgroundJobRequest): Promise<void> {
     const imagePath = String(req.imagePath || '').trim();
     const mode = req.mode;
     if (!imagePath || !mode || !window.pbApi?.openAiGenerateImage) {
       this.lastError.set('AI background job missing path or API.');
       return;
     }
-    if (this.busy()) {
-      void this.log.warn('ai-bg', 'job already running — skipping');
-      return;
-    }
     this.busy.set(true);
     this.lastError.set(null);
     void this.log.info('ai-bg', 'start', { modeId: mode.id, imagePath });
-
-    // Show a processing card on the tablet immediately.
-    void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'processing' });
 
     try {
       const bg = String(req.backgroundFilename || '').trim();
@@ -54,7 +57,7 @@ export class AiBackgroundJobService {
         prompt: mode.prompt,
         modeId: mode.id,
         useInpainting: mode.useInpainting === true,
-        randomizeBackground: mode.pipeline === 'scene' ? !bg : mode.randomizeBackground !== false,
+        randomizeBackground: !bg && mode.randomizeBackground === true,
         backgroundFilename: bg || undefined,
         inpaintPrompt: mode.inpaintPrompt,
         pipeline: mode.pipeline,
@@ -67,9 +70,18 @@ export class AiBackgroundJobService {
         void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'ready' });
         return;
       }
-      void this.galleryUpload.uploadPath(r.path, 'ai', { processStatus: 'ready' });
-      void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'ready' });
-      void this.log.info('ai-bg', 'done', { aiPath: r.path, model: r.model });
+      const uploaded = await this.galleryUpload.uploadPath(r.path, 'ai', { processStatus: 'ready' });
+      if (uploaded.status === 'error') {
+        this.lastError.set(uploaded.error ?? 'Photo finished, but backend upload failed.');
+        void this.log.error('ai-bg', 'result upload failed', { error: uploaded.error });
+        return;
+      }
+      // A queued result must not clear the tablet's processing state before its
+      // image arrives. Moments also completes the family when the AI upload lands.
+      if (uploaded.status === 'ok') {
+        await this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'ready' });
+      }
+      void this.log.info('ai-bg', uploaded.status === 'ok' ? 'done' : 'result upload queued', { aiPath: r.path, model: r.model });
     } catch (e) {
       const err = String(e);
       this.lastError.set(err);

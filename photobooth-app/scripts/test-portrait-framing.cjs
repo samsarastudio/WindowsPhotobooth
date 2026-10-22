@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict');
+const {portraitCrop}=require('../electron/portrait-framing.cjs');
+assert.equal(portraitCrop([{x:500,y:100,w:250,h:330}],1536,1024),null);
+const faces=[{x:450,y:120,w:120,h:130},{x:720,y:70,w:130,h:145},{x:1000,y:30,w:120,h:140}];
+const c=portraitCrop(faces,1536,1024);
+assert.equal(c.width/c.height,1.5);
+assert.ok(c.top+c.height<850,'Visible shoe area must be outside portrait crop');
+for(const f of faces)assert.ok(f.x>=c.left&&f.x+f.w<c.left+c.width&&f.y+f.h<c.height);
+assert.throws(()=>portraitCrop([{x:0,y:30,w:100,h:120},{x:1400,y:30,w:100,h:120}],1536,1024),/retake/);
+console.log('PASS: wide framing cropped without aspect distortion; all faces retained; tight portraits unchanged; unsafe group framing asks for retake.');

@@ -55,7 +55,10 @@
               {
                 "glob": "**/*",
                 "input": "config",
-                "output": "/config"
+                "output": "/config",
+                "ignore": [
+                  "ai-models/**"
+                ]
               }
             ],
             "styles": [
@@ -123,7 +126,10 @@
               {
                 "glob": "**/*",
                 "input": "config",
-                "output": "/config"
+                "output": "/config",
+                "ignore": [
+                  "ai-models/**"
+                ]
               }
             ],
             "styles": [

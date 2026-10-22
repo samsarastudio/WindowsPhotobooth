@@ -15,6 +15,7 @@ import { FramePageComponent } from './pages/frame-page/frame-page.component';
 import { CaptionPageComponent } from './pages/caption-page/caption-page.component';
 import { HistoryPageComponent } from './pages/history-page/history-page.component';
 import { ThanksPageComponent } from './pages/thanks-page/thanks-page.component';
+import { PreparePageComponent } from './pages/prepare-page/prepare-page.component';
 
 export const routes: Routes = [
   { path: '', component: AttractPageComponent },
@@ -25,6 +26,7 @@ export const routes: Routes = [
   { path: 'portrait-select', component: PortraitSelectPageComponent },
   { path: 'scene-select', component: SceneSelectPageComponent },
   { path: 'capture', component: CapturePageComponent },
+  { path: 'prepare', component: PreparePageComponent },
   { path: 'frame', component: FramePageComponent },
   { path: 'caption', component: CaptionPageComponent },
   { path: 'result', component: ResultPageComponent },

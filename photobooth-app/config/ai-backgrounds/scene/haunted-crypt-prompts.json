@@ -1,0 +1,27 @@
+{
+  "generator": "built-in image_gen",
+  "trendSources": [
+    "https://ir.homedepot.com/news-releases/2026/07-15-2026-130113180",
+    "https://www.homedepot.com/c/ap/creating-a-ghostly-graveyard-for-halloween/9ba683603be9fa5395fab901cb9941ee"
+  ],
+  "assets": [
+    {
+      "scene": "haunted-crypt",
+      "depth": "close",
+      "path": "C:\\Users\\Unity\\.codex\\generated_images\\01a152ce-4473-7b80-8bc1-bba2835cdba6\\exec-89fc5d4e-0006-46eb-9023-ee106f0ec21f.png",
+      "prompt": "Use case: photorealistic-natural. Create a landscape 3:2 1536x1024 background plate, camera framing variant of this SAME Haunted Crypt physical set. Preserve the ruined gothic chapel, deep empty green-lit crypt opening, huge weathered stone skeletal sentinels at far edges, chains, graveyard, bare branches, cold moonlight and sparse edge candles. Truly ominous and unsettling, not cozy. CLOSE head-and-shoulders portrait setup, eye-level 70mm lens and guest plane 1.2m from camera. NO visible foreground floor, crop ground and stairs away, chapel architecture enlarged and softly defocused in distance, sentinel columns partly cropped at extreme edges with skulls high in outer corners. Empty central 70% for real guests who will be composited later. Soft neutral front fill at guest plane, no strong color cast. Change perspective and object scale coherently; not merely blur. No people, no living faces, no human silhouettes, no text, no graphic border, no gore. Keep stone skeletons clearly architectural sculptures. Single seamless photograph."
+    },
+    {
+      "scene": "haunted-crypt",
+      "depth": "medium",
+      "path": "C:\\Users\\Unity\\.codex\\generated_images\\01a152ce-4473-7b80-8bc1-bba2835cdba6\\exec-c3be9f69-736e-4fbd-b4bd-bf72e336fdb5.png",
+      "prompt": "Use case: photorealistic-natural. Create a landscape 3:2 1536x1024 background plate, camera framing variant of this SAME Haunted Crypt physical set. Preserve the ruined gothic chapel, deep empty green-lit crypt opening, huge weathered stone skeletal sentinels at far edges, chains, graveyard, bare branches, cold moonlight and sparse edge candles. Truly ominous and unsettling, not cozy. MEDIUM waist-up portrait setup, eye-level 50mm lens and guest plane 2.5m away. Very little floor visible at bottom, enlarge chapel relative to reference, moderate background focus, skeletal sentinels still readable at outer edges. Empty central 70% for real guests who will be composited later. Soft neutral front fill at guest plane, no strong color cast. Change perspective and object scale coherently; not merely blur. No people, no living faces, no human silhouettes, no text, no graphic border, no gore. Keep stone skeletons clearly architectural sculptures. Single seamless photograph."
+    },
+    {
+      "scene": "haunted-crypt",
+      "depth": "wide",
+      "path": "C:\\Users\\Unity\\.codex\\generated_images\\01a152ce-4473-7b80-8bc1-bba2835cdba6\\exec-7eddb80f-8cf8-4781-bdd5-11ec14f68057.png",
+      "prompt": "Use case: photorealistic-natural. Asset: professional Halloween photobooth BACKGROUND PLATE, landscape 3:2, 1536x1024. Design HAUNTED CRYPT, a genuinely creepy premium practical haunted-attraction photography set inspired by current immersive cemetery and oversized skeletal decoration trends, wholly original design. WIDE / FULL-LENGTH camera framing: eye-level 40mm lens, guest plane about 4m away, empty level weathered stone foreground occupying bottom quarter for guests' feet, physically plausible depth. Ancient ruined gothic chapel in middle distance with broken pointed arch, pitch-black open crypt door and faint sickly green light deep inside, crooked gravestones at outer edges, leafless twisted branches framing top, heavy rusty chain and corroded ironwork. Two imposing weathered carved STONE SKELETAL SENTINELS far left and right as physical architectural props, stern skull faces rather than smiling skeletons, almost entirely in shadow. Creeping low ground fog, cold moonlight, desaturated slate, subtle bruised violet shadows, sparse guttering candle clusters at extreme edges. Very few dark rotten pumpkins at lower corners, no cheerful orange autumn leaves. Empty central 70% guest area with quiet backdrop at head height; props must not intersect future guests. Real tactile stone, damp surfaces, believable atmospheric perspective, ominous rather than cozy. Portrait-compatible soft neutral fill at guest plane; background remains dark but readable, not black mush. No living people, no human silhouettes, no gore, no text, logos, captions, graphic frame or watermark. Single seamless cinematic photograph, not collage."
+    }
+  ]
+}

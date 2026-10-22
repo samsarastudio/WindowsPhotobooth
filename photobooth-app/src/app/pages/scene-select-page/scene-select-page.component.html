@@ -9,9 +9,9 @@
     <p class="pb-sub">{{ copy().sceneSelect.subtitle }}</p>
 
     @if (thumbsLoading()) {
-      <p class="pb-hint">Loading scenes…</p>
+      <p class="pb-hint">Loading backgrounds…</p>
     } @else if (!hasScenes()) {
-      <p class="pb-hint">No scenes available. Add plates under config/ai-backgrounds/scene.</p>
+      <p class="pb-hint">Backgrounds are not available right now. Please choose another experience or ask our team for help.</p>
     } @else {
       <ul class="pb-scene-grid" role="list">
         @for (s of scenes(); track s.filename) {

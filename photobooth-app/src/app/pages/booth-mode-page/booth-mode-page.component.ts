@@ -64,6 +64,11 @@ export class BoothModePageComponent implements OnInit {
   }
 
   private async loadThumbs(): Promise<void> {
+    // UI artwork is bundled with the app, independent of editable capture assets.
+    if (this.booth.activeThemeId() === 'halloween') {
+      this.thumbs.set({ photo: 'halloween/classic.png', portrait: 'halloween/portrait.png', scene: 'halloween/scene.png' });
+      return;
+    }
     const next: { photo?: string | null; portrait?: string | null; scene?: string | null } = {};
     try {
       if (window.pbApi?.listPhotoFrames) {
@@ -125,9 +130,8 @@ export class BoothModePageComponent implements OnInit {
         this.booth.primaryAiModes().find((m) => m.pipeline === 'scene') ||
         this.booth.primaryAiModes()[0];
       if (scene) this.aiStyle.selectMode(scene.id);
-      // Single fixed Scene Addition plate — no multi-scene picker.
       this.aiStyle.selectBackground(null);
-      await this.router.navigate(['/capture']);
+      await this.router.navigate([scene?.allowBackgroundChoice ? '/scene-select' : '/capture']);
       return;
     }
     await this.router.navigate(['/capture']);
