@@ -37,8 +37,11 @@ function framesDirImageCount() {
  * Do not re-copy after an admin deletes a seed frame.
  */
 function seedFramesIfEmpty() {
+  ensureFramesDir();
+  const marker = path.join(config.framesDir, '.seeded');
+  if (fs.existsSync(marker)) return;
+  if (framesDirImageCount() > 0) { fs.writeFileSync(marker, '1'); return; }
   if (!fs.existsSync(SEED_FRAMES_DIR)) return;
-  if (framesDirImageCount() > 0) return;
   try {
     for (const ent of fs.readdirSync(SEED_FRAMES_DIR, { withFileTypes: true })) {
       if (!ent.isFile()) continue;
@@ -46,6 +49,7 @@ function seedFramesIfEmpty() {
       if (!IMAGE_EXT.has(ext)) continue;
       fs.copyFileSync(path.join(SEED_FRAMES_DIR, ent.name), path.join(config.framesDir, ent.name));
     }
+    fs.writeFileSync(marker, '1');
   } catch {
     /* ignore seed errors */
   }

@@ -1,3 +1,4 @@
+import { initFrameGenerator } from './frame-generator.js';
 const pinEl = document.getElementById('pin');
 const loginCard = document.getElementById('loginCard');
 const panel = document.getElementById('panel');
@@ -37,7 +38,7 @@ let albumsCache = [];
 /** @type {any[]} */
 let photosCache = [];
 let photoPage = 1;
-const PHOTO_PAGE_SIZE = 24;
+const PHOTO_PAGE_SIZE = 8;
 /** @type {string | null} */
 let selectedPreviewId = null;
 /** @type {Set<string>} */
@@ -508,7 +509,10 @@ function renderPhotoPager(filteredLen, pageCount) {
     photoPage = Math.min(pageCount, photoPage + 1);
     renderPhotoGrid();
   });
-  pager.append(prev, next);
+  const select=document.createElement('select');select.setAttribute('aria-label','Photo page');select.className='input';
+  for(let n=1;n<=pageCount;n++)select.add(new Option(`Page ${n}`,String(n),false,n===photoPage));
+  select.addEventListener('change',()=>{photoPage=Number(select.value);renderPhotoGrid();});
+  pager.append(prev, select, next);
 }
 
 function renderPhotoPreview(photo, slug) {
@@ -553,7 +557,7 @@ function renderPhotoPreview(photo, slug) {
 function renderPhotoGrid() {
   const slug = photoAlbum?.value;
   if (photoGrid) {
-    photoGrid.style.display = 'grid';
+    photoGrid.style.display = 'flex';
     photoGrid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(104px, 1fr))';
     photoGrid.style.gap = '0.55rem';
   }
@@ -2763,3 +2767,5 @@ document.getElementById('btnCopyTablet').addEventListener('click', async () => {
 setInterval(() => {
   if (document.body.classList.contains('is-unlocked') && !document.hidden) void refreshTabletInstance();
 }, 15000);
+
+initFrameGenerator({api,setStatus,refreshFrames});
