@@ -88,6 +88,9 @@ function render() {
     const printBtn = node.querySelector('.tb-print');
     const jobEl = node.querySelector('.tb-job');
     const retryBtn = node.querySelector('.tb-retry');
+    const magnetBtn = node.querySelector('.tb-magnet');
+    magnetBtn.hidden = !photo.canMakeMagnet;
+    magnetBtn.onclick = () => void makeMagnet(photo, magnetBtn);
     retryBtn.hidden = !photo.canRetryPortrait;
     retryBtn.onclick = async () => {
       const pin = el.pin.value.trim();
@@ -190,6 +193,29 @@ async function sendPrint(photo, btn, jobEl) {
     btn.textContent = 'Print photo';
     setStatus(String(e.message || e));
   } finally { state.pendingPrints.delete(photo.id); }
+}
+
+async function makeMagnet(photo, button) {
+  const pin = el.pin.value.trim();
+  if (!pin) { setStatus('Enter your operator PIN to create a magnet.'); el.pin.focus(); return; }
+  button.disabled = true;
+  button.textContent = 'Creating magnet…';
+  try {
+    const response = await fetch(`/api/tablet/photos/${encodeURIComponent(photo.id)}/magnet`, {
+      method:'POST', headers:{'X-Admin-Pin':pin}, signal:AbortSignal.timeout(60000),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw Error(result.error || 'Could not create magnet');
+    const dialog = document.getElementById('tbMagnetDialog');
+    dialog.querySelector('.tb-magnet-image').src = result.photo.url;
+    const print = dialog.querySelector('.tb-print'), job = dialog.querySelector('.tb-job');
+    print.disabled = false; print.textContent = 'Print magnet'; job.hidden = true;
+    print.onclick = () => void sendPrint(result.photo, print, job);
+    dialog.querySelector('.tb-close').onclick = () => dialog.close();
+    attachPhotoSharing(dialog, result.photo, true, setStatus);
+    dialog.showModal();
+  } catch(error) { setStatus(error.message || 'Could not create magnet'); }
+  finally { button.disabled = false; button.textContent = 'Create magnet'; }
 }
 
 async function loadToday({ silent = false } = {}) {

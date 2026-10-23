@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Moments Tablet — Today</title>
-    <link rel="stylesheet" href="/css/tablet.css?v=20261023-retry" />
+    <link rel="stylesheet" href="/css/tablet.css?v=20261023-magnet" />
   </head>
   <body>
     <header class="tb-header">
@@ -40,13 +40,27 @@
         </div>
         <button type="button" class="tb-btn tb-print">Print photo</button>
         <button type="button" class="tb-btn tb-retry" hidden>Retry AI portrait</button>
+        <button type="button" class="tb-btn tb-ghost tb-magnet" hidden>Create magnet</button>
         <button type="button" class="tb-btn tb-ghost tb-download" disabled>Download photo</button>
         <button type="button" class="tb-btn tb-ghost tb-share" disabled>Share / Save to Photos</button>
         <p class="tb-job" hidden></p>
       </article>
     </template>
+    <dialog id="tbMagnetDialog" class="tb-magnet-dialog">
+      <h2>Magnet cut sheet</h2>
+      <p>Two unframed photos, laid out for physical cutting.</p>
+      <img class="tb-magnet-image" alt="Magnet cut sheet preview" />
+      <div class="tb-magnet-actions">
+        <button class="tb-btn tb-print">Print magnet</button>
+        <button class="tb-btn tb-ghost tb-download">Download photo</button>
+        <button class="tb-btn tb-ghost tb-share">Share / Save to Photos</button>
+        <button class="tb-btn tb-ghost tb-close">Back to photos</button>
+      </div>
+      <p class="tb-job" role="status" hidden></p>
+    </dialog>
 
-    <script src="/js/tablet.js?v=20261023-retry" type="module"></script>
+    <script src="/js/tablet.js?v=20261023-magnet" type="module"></script>
   </body>
 </html>
+
 

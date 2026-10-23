@@ -18,7 +18,7 @@ import { notifyWallPhoto } from './wall.js';
 import { warmThumb, warmAlbumThumbs } from '../thumbs.js';
 import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
 
-const VARIANTS = new Set(['original', 'framed', 'ai', 'physical']);
+const VARIANTS = new Set(['original', 'framed', 'ai', 'physical', 'magnet-source']);
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -220,7 +220,7 @@ sessionsRouter.post(
     }
     const variant = String(req.body?.variant || 'original').toLowerCase();
     if (!VARIANTS.has(variant)) {
-      return res.status(400).json({ ok: false, error: 'variant must be original|framed|ai|physical' });
+      return res.status(400).json({ ok: false, error: 'variant must be original|framed|ai|physical|magnet-source' });
     }
 
     const width = req.body?.width ? Number(req.body.width) : null;
@@ -347,7 +347,7 @@ sessionsRouter.post(
     const photo = publicPhoto(session.slug, row);
     warmThumb(session.slug, filename);
     const showOriginals = loadSettings().showOriginalPhotos !== false;
-    const pushLive = variant !== 'physical' && (variant !== 'original' || showOriginals || processStatus === 'processing');
+    const pushLive = variant !== 'physical' && variant !== 'magnet-source' && (variant !== 'original' || showOriginals || processStatus === 'processing');
     if (pushLive) {
       broadcastPhotoAdded(session.slug, photo);
       notifyWallPhoto({

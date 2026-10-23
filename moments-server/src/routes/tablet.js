@@ -12,6 +12,7 @@ import {
 import { requireAdminPin, requireUploadToken } from '../auth.js';
 import { subscribeSession } from '../sse.js';
 import { retryPortrait } from './portrait-jobs.js';
+import { magnetSource, createTabletMagnet } from '../tablet-magnet.js';
 
 function todayIso(date = new Date()) {
   const y = date.getFullYear();
@@ -98,6 +99,7 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
     processError: portraitJob?.status === 'failed' ? portraitJob.error : null,
     generationType: portraitJob ? 'portrait' : null,
     canRetryPortrait: portraitJob?.status === 'failed',
+    canMakeMagnet: !!magnetSource(siblings, portraitJob),
     retryPhotoId: portraitJob ? original.id : null,
     familyKey: family,
     hasAi,
@@ -115,6 +117,10 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
 }
 
 export const tabletRouter = Router();
+tabletRouter.post('/photos/:photoId/magnet', requireAdminPin, async (req,res) => {
+  try { res.json({ok:true,photo:await createTabletMagnet(req.params.photoId)}); }
+  catch(error) { res.status(409).json({ok:false,error:error.message}); }
+});
 tabletRouter.post('/photos/:photoId/retry', requireAdminPin, (req, res) => {
   const {status, error, ...result} = retryPortrait(req.params.photoId);
   res.status(status).json({ok: !error, ...result, ...(error ? {error} : {})});
@@ -150,6 +156,7 @@ tabletRouter.get('/today', (req, res) => {
   // Prefer AI > framed > original for the tile hero.
   const photos = [];
   for (const siblings of byFamily.values()) {
+    if (siblings.every(p => p.variant === 'magnet-source')) continue;
     const preferred =
       siblings.find((p) => p.variant === 'ai') ||
       siblings.find((p) => p.variant === 'framed') ||
