@@ -111,6 +111,11 @@ app.use('/api/admin/physical-frame', adminPhysicalFrameRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/halloween', halloweenRouter);
 
+app.get(['/signage', '/signage/'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(config.publicDir, 'signage.html'));
+});
+
 app.get('/halloween', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   return res.sendFile(path.join(config.publicDir, 'halloween.html'));
