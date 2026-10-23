@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'portrait-retry-test-'));
+process.env.DATA_DIR=dir;
+process.env.OPENAI_API_KEY='test-not-a-real-key';
+const {initDb,getDb,closeDb}=await import('../src/db.js');
+const {ensureTabletSchema}=await import('../src/routes/tablet.js');
+const {initPortraitJobs,retryPortrait}=await import('../src/routes/portrait-jobs.js');
+const {default:sharp}=await import('sharp');
+initDb();ensureTabletSchema();initPortraitJobs();
+const db=getDb();
+const now=new Date().toISOString();
+db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?,?,?)').run('s','retry-test','Test','2026-10-23',now,'2099-01-01T00:00:00Z',null);
+db.prepare("INSERT INTO photos(id,session_id,variant,filename,mime,bytes,source_local_name,created_at,process_status) VALUES('p','s','original','p.png','image/png',1,'capture.png',?,'failed')").run(now);
+let networkCalls=0;
+globalThis.fetch=async()=>{networkCalls++;throw Error('Network forbidden in retry test');};
+test('portrait retry preserves inputs, deduplicates taps and reuses paid output',async()=>{
+ try {
+  assert.equal(retryPortrait('missing').status,409);
+  db.prepare("INSERT INTO portrait_jobs(id,request_key,original_id,status,prompt,created_at) VALUES('job','key','p','failed','test',?)").run(now);
+  assert.equal(retryPortrait('p').status,409);
+  const jobDir=path.join(dir,'portrait-jobs','job');fs.mkdirSync(jobDir,{recursive:true});
+  const png=await sharp({create:{width:8,height:12,channels:4,background:'#abcdef'}}).png().toBuffer();
+  for(const name of ['image','reference','mask','openai'])fs.writeFileSync(path.join(jobDir,name+'.png'),png);
+  assert.equal(retryPortrait('p').status,202);
+  assert.equal(retryPortrait('p').reused,true);
+  assert.equal(db.prepare("SELECT process_status FROM photos WHERE id='p'").get().process_status,'processing');
+  const deadline=Date.now()+10000;
+  while(db.prepare("SELECT status FROM portrait_jobs WHERE id='job'").get().status!=='ready'&&Date.now()<deadline)await new Promise(r=>setTimeout(r,20));
+  assert.equal(db.prepare("SELECT status FROM portrait_jobs WHERE id='job'").get().status,'ready');
+  assert.equal(retryPortrait('p').reused,true);
+  assert.equal(db.prepare("SELECT count(*) AS n FROM photos WHERE variant='ai'").get().n,1);
+  assert.equal(networkCalls,0);
+ } finally {closeDb();fs.rmSync(dir,{recursive:true,force:true});}
+});

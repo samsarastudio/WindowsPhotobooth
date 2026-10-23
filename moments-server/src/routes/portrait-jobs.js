@@ -17,6 +17,24 @@ portraitJobsRouter.use(requireUploadToken);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20*1024*1024, files: 4, fields: 4, fieldSize: 20000 } });
 const jobDir = id => path.join(config.dataDir, 'portrait-jobs', id);
 let active = false;
+export function retryPortrait(photoId) {
+  const db = getDb();
+  const job = db.prepare('SELECT * FROM portrait_jobs WHERE original_id=? OR photo_id=? ORDER BY created_at DESC LIMIT 1').get(photoId, photoId);
+  if (!job) return { status: 409, error: 'Portrait inputs never reached Moments. Retake this photo on the kiosk; the server cannot recreate the selected portrait from the capture alone.' };
+  const original = db.prepare('SELECT * FROM photos WHERE id=?').get(job.original_id);
+  const session = original && db.prepare('SELECT * FROM sessions WHERE id=?').get(original.session_id);
+  if (!session || isSessionExpired(session)) return { status: 410, error: 'This capture has expired. Please take a new photo.' };
+  if (job.status !== 'failed') return { status: 200, job: jobView(job), reused: true };
+  if (!['image', 'reference', 'mask'].every(name => fs.existsSync(path.join(jobDir(job.id), name + '.png')))) return { status: 409, error: 'Portrait inputs are missing. Please retake this photo on the kiosk.' };
+  if (!getHalloweenApiKey()) return { status: 503, error: 'Configure the OpenAI key in Moments admin first.' };
+  if (db.prepare("SELECT count(*) AS n FROM portrait_jobs WHERE status IN ('queued','running')").get().n >= 20) return { status: 429, error: 'Portrait queue is full. Try again shortly.' };
+  db.transaction(() => {
+    db.prepare("UPDATE portrait_jobs SET status='queued',error=NULL WHERE id=? AND status='failed'").run(job.id);
+    db.prepare("UPDATE photos SET process_status='processing' WHERE id=?").run(job.original_id);
+  })();
+  setImmediate(() => void drain());
+  return { status: 202, job: jobView(db.prepare('SELECT * FROM portrait_jobs WHERE id=?').get(job.id)) };
+}
 export function initPortraitJobs() {
   getDb().exec(`CREATE TABLE IF NOT EXISTS portrait_jobs (id TEXT PRIMARY KEY, request_key TEXT UNIQUE NOT NULL, original_id TEXT NOT NULL, status TEXT NOT NULL, prompt TEXT NOT NULL, created_at TEXT NOT NULL, error TEXT, photo_id TEXT, model TEXT)`);
   // A running paid request has an unknown outcome after a server crash. Never bill twice automatically.
@@ -57,9 +75,12 @@ async function drain(){
   try{
    const original=getDb().prepare('SELECT * FROM photos WHERE id=?').get(job.original_id);const session=original?getDb().prepare('SELECT * FROM sessions WHERE id=?').get(original.session_id):null;if(!session||isSessionExpired(session))throw Error('Capture session expired');
    const dir=jobDir(job.id),read=name=>fs.readFileSync(path.join(dir,name+'.png'));
-   const result=await callOpenAiImageEdit(getHalloweenApiKey(),read('image'),job.prompt,[{buf:read('reference'),filename:'guest-reference.png'}],'1024x1536',read('mask'),{preferMax:true});
+   const result=fs.existsSync(path.join(dir,'openai.png'))
+     ? {ok:true,outBuf:read('openai'),model:job.model}
+     : await callOpenAiImageEdit(getHalloweenApiKey(),read('image'),job.prompt,[{buf:read('reference'),filename:'guest-reference.png'}],'1024x1536',read('mask'),{preferMax:true});
    if(!result.ok)throw Error(result.error);
    fs.writeFileSync(path.join(dir,'openai.png'),result.outBuf);
+   getDb().prepare('UPDATE portrait_jobs SET model=? WHERE id=?').run(result.model || null,job.id);
    let output=await sharp(result.outBuf).resize(1200,1800,{fit:'cover',position:'centre'}).png().toBuffer();
    if(fs.existsSync(path.join(dir,'frame.png'))){const frame=read('frame'),meta=await sharp(frame).metadata();if(!meta.hasAlpha)throw Error('The portrait frame needs a transparent opening');output=await sharp(output).resize(meta.width,meta.height,{fit:'cover'}).composite([{input:frame}]).png().toBuffer();}
    const id=nanoid(14),filename=id+'.png',dest=path.join(config.photosDir,session.slug);fs.mkdirSync(dest,{recursive:true});fs.writeFileSync(path.join(dest,filename),output);const meta=await sharp(output).metadata();
