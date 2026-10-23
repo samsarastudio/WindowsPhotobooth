@@ -5,7 +5,7 @@ function prepare(photo) {
   if (url.origin !== location.origin) return Promise.reject(new Error('Invalid photo URL'));
   const key = `${photo.id}:${url.href}`;
   if (!files.has(key)) {
-    const pending = fetch(url).then(async response => {
+    const pending = fetch(url, {signal: AbortSignal.timeout(30000)}).then(async response => {
       if (!response.ok) throw new Error('Photo could not be downloaded');
       const blob = await response.blob();
       if (!blob.type.startsWith('image/')) throw new Error('Photo is not available yet');
@@ -14,7 +14,7 @@ function prepare(photo) {
     });
     files.set(key, pending);
     pending.catch(() => files.delete(key));
-    while (files.size > 3) files.delete(files.keys().next().value);
+    while (files.size > 1) files.delete(files.keys().next().value);
   }
   return files.get(key);
 }

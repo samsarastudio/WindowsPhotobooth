@@ -11,6 +11,7 @@ import {
 } from '../db.js';
 import { requireAdminPin, requireUploadToken } from '../auth.js';
 import { subscribeSession } from '../sse.js';
+import { retryPortrait } from './portrait-jobs.js';
 
 function todayIso(date = new Date()) {
   const y = date.getFullYear();
@@ -96,6 +97,8 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
     processingStage: portraitJob?.status === 'queued' ? 'server-queued' : portraitJob?.status === 'running' ? 'server-generating' : !hasAi && row.process_status === 'processing' ? 'kiosk-processing' : null,
     processError: portraitJob?.status === 'failed' ? portraitJob.error : null,
     generationType: portraitJob ? 'portrait' : null,
+    canRetryPortrait: portraitJob?.status === 'failed',
+    retryPhotoId: portraitJob ? original.id : null,
     familyKey: family,
     hasAi,
     hasFramed,
@@ -112,6 +115,10 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
 }
 
 export const tabletRouter = Router();
+tabletRouter.post('/photos/:photoId/retry', requireAdminPin, (req, res) => {
+  const {status, error, ...result} = retryPortrait(req.params.photoId);
+  res.status(status).json({ok: !error, ...result, ...(error ? {error} : {})});
+});
 export const boothJobsRouter = Router();
 
 /** Public tablet feed for today's album. */

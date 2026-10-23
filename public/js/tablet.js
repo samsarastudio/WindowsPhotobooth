@@ -53,7 +53,13 @@ function formatTime(iso) {
   }
 }
 
+let lastRenderKey = '';
+function renderKey() {
+  return JSON.stringify([state.photos, state.page, state.selectedId, [...state.pendingPrints]]);
+}
 function render() {
+  // Polling unchanged data must not tear down images, buttons, or an active touch.
+  if (renderKey() === lastRenderKey) return;
   el.grid.innerHTML = '';
   preview.replaceChildren();
   const pages=Math.max(1,Math.ceil(state.photos.length/PAGE_SIZE));
@@ -70,6 +76,7 @@ function render() {
     empty.className = 'tb-empty';
     empty.textContent = 'Ready for your first guest. New photos will appear here automatically.';
     el.grid.appendChild(empty);
+    lastRenderKey = renderKey();
     return;
   }
   for (const photo of items) {
@@ -80,8 +87,27 @@ function render() {
     const time = node.querySelector('.tb-time');
     const printBtn = node.querySelector('.tb-print');
     const jobEl = node.querySelector('.tb-job');
+    const retryBtn = node.querySelector('.tb-retry');
+    retryBtn.hidden = !photo.canRetryPortrait;
+    retryBtn.onclick = async () => {
+      const pin = el.pin.value.trim();
+      if (!pin) { setStatus('Enter your operator PIN to retry this portrait.'); el.pin.focus(); return; }
+      if (!confirm('Retry this portrait? A new OpenAI generation may use credits.')) return;
+      retryBtn.disabled = true;
+      try {
+        const response = await fetch(`/api/tablet/photos/${encodeURIComponent(photo.retryPhotoId || photo.id)}/retry`, {
+          method: 'POST', headers: {'X-Admin-Pin': pin},
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || 'Retry could not start');
+        setStatus('Portrait queued on Moments. It will appear here when ready.');
+        await loadToday({silent:true});
+      } catch (error) { setStatus(error.message || 'Retry could not start. Refresh to check the job before trying again.'); }
+      finally { retryBtn.disabled = false; }
+    };
 
     img.src = photo.thumbUrl || photo.url;
+    img.decoding = 'async';
     img.alt = photo.variant || 'photo';
     const processing = photo.processStatus === 'processing';
     const failed = photo.processStatus === 'failed';
@@ -89,6 +115,9 @@ function render() {
     badge.classList.add(failed ? 'is-failed' : processing ? 'is-processing' : 'is-ready');
     variant.textContent = failed ? (photo.processError || 'Ask the booth operator to check generation') : processing ? ({'server-queued':'Portrait queued on Moments','server-generating':'Moments is generating your portrait','kiosk-processing':'Waiting for processing on the kiosk'}[photo.processingStage] || 'AI photo') : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
     time.textContent = formatTime(photo.createdAt);
+    if (processing && photo.processingStage === 'kiosk-processing' && Date.now() - Date.parse(photo.createdAt) > 10 * 60 * 1000) {
+      variant.textContent = 'Still waiting for the kiosk. If the kiosk stopped, retake there: no portrait inputs reached Moments.';
+    }
     if (!processing && !failed && photo.variant === 'ai' && photo.generationType === 'portrait') {
       variant.textContent = 'AI portrait · OpenAI';
     }
@@ -122,6 +151,7 @@ function render() {
     }
 
   }
+  lastRenderKey = renderKey();
 }
 
 async function sendPrint(photo, btn, jobEl) {
@@ -166,7 +196,7 @@ async function loadToday({ silent = false } = {}) {
   if(state.loading)return;state.loading=true;
   if (!silent) setStatus('', false);
   try {
-    const r = await fetch(`/api/tablet/today?prefix=${encodeURIComponent(state.prefix)}`);
+    const r = await fetch(`/api/tablet/today?prefix=${encodeURIComponent(state.prefix)}`, {signal: AbortSignal.timeout(15000)});
     const j = await r.json();
     if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     state.slug = j.slug;
