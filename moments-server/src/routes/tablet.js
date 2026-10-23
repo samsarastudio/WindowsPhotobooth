@@ -13,6 +13,8 @@ import { requireAdminPin, requireUploadToken } from '../auth.js';
 import { subscribeSession } from '../sse.js';
 import { retryPortrait } from './portrait-jobs.js';
 import { magnetSource, createTabletMagnet } from '../tablet-magnet.js';
+import {portraitQueuePosition} from '../portrait-queue.js';
+import QRCode from 'qrcode';
 
 function todayIso(date = new Date()) {
   const y = date.getFullYear();
@@ -85,7 +87,7 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
   const hasAi = siblings.some((p) => p.variant === 'ai');
   const hasFramed = siblings.some((p) => p.variant === 'framed');
   const original = siblings.find(p => p.variant === 'original');
-  const portraitJob = original ? getDb().prepare('SELECT status, error, created_at FROM portrait_jobs WHERE original_id=? ORDER BY created_at DESC LIMIT 1').get(original.id) : null;
+  const portraitJob = original ? getDb().prepare('SELECT status, error, created_at, queue_order FROM portrait_jobs WHERE original_id=? ORDER BY created_at DESC LIMIT 1').get(original.id) : null;
   const printJob = getDb()
     .prepare(
       `SELECT id, status, created_at, done_at, error FROM print_jobs
@@ -94,6 +96,8 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
     .get(row.id);
   return {
     ...base,
+    capturedAt: original?.created_at || row.created_at,
+    queuePosition: portraitQueuePosition(getDb(),portraitJob),
     processStatus: tabletProcessStatus(siblings.length ? siblings : [row]),
     processingStage: portraitJob?.status === 'queued' ? 'server-queued' : portraitJob?.status === 'running' ? 'server-generating' : !hasAi && row.process_status === 'processing' ? 'kiosk-processing' : null,
     processError: portraitJob?.status === 'failed' ? portraitJob.error : null,
@@ -117,6 +121,14 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
 }
 
 export const tabletRouter = Router();
+tabletRouter.get('/photos/:photoId/qr', async (req,res) => {
+  const row = getDb().prepare('SELECT * FROM photos WHERE id=?').get(req.params.photoId);
+  const session = row && getDb().prepare('SELECT * FROM sessions WHERE id=?').get(row.session_id);
+  if (!session || isSessionExpired(session) || row.variant === 'magnet-source' || row.process_status !== 'ready') return res.status(404).json({ok:false,error:'Finished photo unavailable'});
+  const url = `${config.publicBaseUrl}/download/${encodeURIComponent(row.id)}`;
+  try { res.json({ok:true,url,qr:await QRCode.toDataURL(url,{width:360,margin:4,errorCorrectionLevel:'M'})}); }
+  catch {res.status(500).json({ok:false,error:'Could not create QR code'});}
+});
 tabletRouter.post('/photos/:photoId/magnet', requireAdminPin, async (req,res) => {
   try { res.json({ok:true,photo:await createTabletMagnet(req.params.photoId)}); }
   catch(error) { res.status(409).json({ok:false,error:error.message}); }
@@ -164,7 +176,7 @@ tabletRouter.get('/today', (req, res) => {
       siblings[0];
     if (preferred) photos.push(tabletPhoto(session.slug, preferred, siblings));
   }
-  photos.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  photos.sort((a, b) => String(a.capturedAt).localeCompare(String(b.capturedAt)) || a.familyKey.localeCompare(b.familyKey));
   return res.json({
     ok: true,
     empty: false,

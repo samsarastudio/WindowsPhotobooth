@@ -211,6 +211,10 @@ app.get(['/tablet', '/tablet/:prefix'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(config.publicDir, 'tablet.html'));
 });
+app.get('/download/:photoId', (_req,res) => {
+  res.setHeader('Cache-Control','no-store');
+  res.sendFile(path.join(config.publicDir,'download.html'));
+});
 
 app.get(['/q', '/q/:code'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');

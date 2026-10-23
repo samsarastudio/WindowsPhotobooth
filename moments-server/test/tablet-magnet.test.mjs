@@ -16,6 +16,8 @@ test('classic and background magnets exclude frames; portraits denied; duplicate
   assert.equal((await fetch(base+'/api/tablet/photos/framed/magnet',{method:'POST'})).status,401);
   const response=await fetch(base+'/api/tablet/photos/framed/magnet',{method:'POST',headers:{'x-admin-pin':config.adminPin}});assert.equal(response.status,200);
   const photo=(await response.json()).photo;assert.equal(photo.id,classic.id);
+  const qr=await (await fetch(base+'/api/tablet/photos/'+photo.id+'/qr')).json();assert.equal(qr.ok,true);assert(qr.url.endsWith('/download/'+photo.id));assert(qr.qr.startsWith('data:image/png;base64,'));assert.equal((await sharp(Buffer.from(qr.qr.split(',')[1],'base64')).metadata()).width,360);
+  assert.equal((await fetch(base+'/api/tablet/photos/missing/qr')).status,404);
   const print=await fetch(base+'/api/tablet/photos/'+photo.id+'/print',{method:'POST',headers:{'x-admin-pin':config.adminPin,'Content-Type':'application/json'},body:'{}'});
   const queued=await print.json();assert.equal(queued.job.layoutMode,'physicalFrame');assert.equal(queued.job.status,'queued');
  }finally{await new Promise(resolve=>server.close(resolve));}

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Moments Tablet — Today</title>
-    <link rel="stylesheet" href="/css/tablet.css?v=20261023-magnet" />
+    <link rel="stylesheet" href="/css/tablet.css?v=20261023-queue-qr" />
   </head>
   <body>
     <header class="tb-header">
@@ -41,6 +41,7 @@
         <button type="button" class="tb-btn tb-print">Print photo</button>
         <button type="button" class="tb-btn tb-retry" hidden>Retry AI portrait</button>
         <button type="button" class="tb-btn tb-ghost tb-magnet" hidden>Create magnet</button>
+        <button type="button" class="tb-btn tb-ghost tb-qr">Show download QR</button>
         <button type="button" class="tb-btn tb-ghost tb-download" disabled>Download photo</button>
         <button type="button" class="tb-btn tb-ghost tb-share" disabled>Share / Save to Photos</button>
         <p class="tb-job" hidden></p>
@@ -58,9 +59,17 @@
       </div>
       <p class="tb-job" role="status" hidden></p>
     </dialog>
+    <dialog id="tbQrDialog" class="tb-magnet-dialog tb-qr-dialog">
+      <h2>Scan to get your photo</h2><p>Open your phone’s camera and scan this code.</p>
+      <img class="tb-qr-image" width="360" height="360" alt="QR code for this photo">
+      <p>On your phone, tap Download or Share / Save to Photos.</p>
+      <p><a class="tb-qr-link" target="_blank" rel="noopener">Open photo download page</a></p>
+      <button class="tb-btn tb-close">Done</button>
+    </dialog>
 
-    <script src="/js/tablet.js?v=20261023-magnet" type="module"></script>
+    <script src="/js/tablet.js?v=20261023-queue-qr" type="module"></script>
   </body>
 </html>
+
 
 

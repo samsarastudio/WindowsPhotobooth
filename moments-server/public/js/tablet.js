@@ -114,10 +114,27 @@ function render() {
     img.alt = photo.variant || 'photo';
     const processing = photo.processStatus === 'processing';
     const failed = photo.processStatus === 'failed';
+    const qrButton = node.querySelector('.tb-qr');
+    qrButton.disabled = processing || failed;
+    qrButton.onclick = async () => {
+      qrButton.disabled = true;
+      try {
+        const response = await fetch(`/api/tablet/photos/${encodeURIComponent(photo.id)}/qr`,{signal:AbortSignal.timeout(15000)});
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw Error(result.error || 'Could not create QR');
+        const dialog = document.getElementById('tbQrDialog');
+        dialog.querySelector('.tb-qr-image').src = result.qr;
+        dialog.querySelector('.tb-qr-link').href = result.url;
+        dialog.querySelector('.tb-close').onclick = () => dialog.close();
+        dialog.showModal();
+      } catch(error) {setStatus(error.message);}
+      finally {qrButton.disabled=false;}
+    };
     badge.textContent = failed ? 'AI photo failed' : processing ? 'Creating AI photo' : 'Ready to print';
     badge.classList.add(failed ? 'is-failed' : processing ? 'is-processing' : 'is-ready');
     variant.textContent = failed ? (photo.processError || 'Ask the booth operator to check generation') : processing ? ({'server-queued':'Portrait queued on Moments','server-generating':'Moments is generating your portrait','kiosk-processing':'Waiting for processing on the kiosk'}[photo.processingStage] || 'AI photo') : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
-    time.textContent = formatTime(photo.createdAt);
+    time.textContent = formatTime(photo.capturedAt || photo.createdAt);
+    if (processing && photo.queuePosition) variant.textContent = photo.processingStage === 'server-generating' ? 'Creating your portrait · first in queue' : `Portrait queue · position ${photo.queuePosition}`;
     if (processing && photo.processingStage === 'kiosk-processing' && Date.now() - Date.parse(photo.createdAt) > 10 * 60 * 1000) {
       variant.textContent = 'Still waiting for the kiosk. If the kiosk stopped, retake there: no portrait inputs reached Moments.';
     }
@@ -226,9 +243,12 @@ async function loadToday({ silent = false } = {}) {
     const j = await r.json();
     if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     state.slug = j.slug;
-    const previousIds = new Set(state.photos.map(photo => photo.id));
+    const selectedFamily = state.photos.find(photo => photo.id === state.selectedId)?.familyKey;
+    const previousFamilies = new Set(state.photos.map(photo => photo.familyKey || photo.id));
     const incoming = Array.isArray(j.photos) ? j.photos : [];
-    const arrived = incoming.find(photo => !previousIds.has(photo.id));
+    const selectedReplacement = selectedFamily && incoming.find(photo => photo.familyKey === selectedFamily);
+    if (selectedReplacement) state.selectedId = selectedReplacement.id;
+    const arrived = incoming.find(photo => !previousFamilies.has(photo.familyKey || photo.id));
     // New captures and completed AI versions appear in the main preview.
     // Keep an in-flight print request stable until its submission completes.
     if (state.photos.length && arrived && !state.pendingPrints.size) {
