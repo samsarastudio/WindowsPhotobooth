@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { tabletProcessStatus } from '../tablet-photo-state.js';
 import { tabletPrintLayout } from '../tablet-print-layout.js';
 import { nanoid } from 'nanoid';
 import { config } from '../config.js';
@@ -81,14 +82,6 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
   const family = captureFamilyKey(row.source_local_name, row.filename);
   const hasAi = siblings.some((p) => p.variant === 'ai');
   const hasFramed = siblings.some((p) => p.variant === 'framed');
-  const processStatus =
-    row.process_status === 'processing' ||
-    (row.variant === 'original' && !hasAi && !hasFramed && row.process_status !== 'ready')
-      ? row.process_status || 'ready'
-      : row.process_status || 'ready';
-  // If booth marked processing and AI/framed arrived, treat family as ready.
-  const familyProcessing =
-    processStatus === 'processing' && !hasAi && !hasFramed;
   const printJob = getDb()
     .prepare(
       `SELECT id, status, created_at, done_at, error FROM print_jobs
@@ -97,7 +90,7 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
     .get(row.id);
   return {
     ...base,
-    processStatus: familyProcessing ? 'processing' : 'ready',
+    processStatus: tabletProcessStatus(siblings.length ? siblings : [row]),
     familyKey: family,
     hasAi,
     hasFramed,
@@ -190,6 +183,10 @@ function acceptPrintRequest(req, res) {
   if (!row) return res.status(404).json({ ok: false, error: 'Photo not found' });
   const session = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(row.session_id);
   if (!session) return res.status(404).json({ ok: false, error: 'Session not found' });
+
+  if (row.process_status === 'processing' || row.process_status === 'failed') {
+    return res.status(409).json({ ok: false, error: row.process_status === 'failed' ? 'AI generation failed. Please check the booth before printing.' : 'AI photo is still processing.' });
+  }
 
   const boothId =
     typeof req.body?.boothId === 'string' && req.body.boothId.trim()

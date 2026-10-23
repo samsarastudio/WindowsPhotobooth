@@ -1,3 +1,4 @@
+import { portraitJobsRouter, initPortraitJobs } from './routes/portrait-jobs.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
@@ -24,6 +25,7 @@ import { ensureThumb } from './thumbs.js';
 
 initDb();
 ensureTabletSchema();
+initPortraitJobs();
 ensureFramesDir();
 seedFramesIfEmpty();
 ensureBrandingDir();
@@ -103,6 +105,7 @@ app.use('/api/qr', qrRouter);
 app.use('/api/booth-update', boothUpdateRouter);
 app.use('/api/tablet', tabletRouter);
 app.use('/api/booth', boothJobsRouter);
+app.use('/api/portrait-jobs', portraitJobsRouter);
 app.use('/api/admin/frames', adminFramesRouter);
 app.use('/api/admin/wall', adminWallRouter);
 app.use('/api/admin/qr', adminQrRouter);

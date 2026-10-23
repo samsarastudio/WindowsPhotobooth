@@ -229,7 +229,7 @@ sessionsRouter.post(
     const processStatusRaw = String(req.body?.processStatus || req.body?.process_status || '')
       .trim()
       .toLowerCase();
-    const processStatus = processStatusRaw === 'processing' ? 'processing' : 'ready';
+    const processStatus = ['processing', 'failed'].includes(processStatusRaw) ? processStatusRaw : 'ready';
 
     // Dedupe: same local capture filename + variant in this session → return existing.
     // If the DB row exists but the file was deleted, rewrite the file so thumbnails aren't black.
@@ -252,11 +252,11 @@ sessionsRouter.post(
           existing.bytes = req.file.buffer.length;
           existing.mime = req.file.mimetype || existing.mime;
           existing.process_status = processStatus;
-        } else if (processStatus === 'ready' && existing.process_status === 'processing') {
+        } else if (processStatusRaw && processStatus !== existing.process_status) {
           getDb()
             .prepare('UPDATE photos SET process_status = ? WHERE id = ?')
-            .run('ready', existing.id);
-          existing.process_status = 'ready';
+            .run(processStatus, existing.id);
+          existing.process_status = processStatus;
         }
         const photo = publicPhoto(session.slug, existing);
         return res.json({ ok: true, photo, deduped: true });
