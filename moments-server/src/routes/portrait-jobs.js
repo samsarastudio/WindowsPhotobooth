@@ -40,7 +40,7 @@ export function initPortraitJobs() {
   // A running paid request has an unknown outcome after a server crash. Never bill twice automatically.
   const interrupted=getDb().prepare("SELECT original_id FROM portrait_jobs WHERE status='running'").all();
   for(const row of interrupted)getDb().prepare("UPDATE photos SET process_status='failed' WHERE id=?").run(row.original_id);
-  getDb().prepare("UPDATE portrait_jobs SET status='failed', error='Server restarted during generation. Please retake the photo.' WHERE status='running'").run();
+  getDb().prepare("UPDATE portrait_jobs SET status='failed', error='Server restarted during generation. Use Retry AI portrait to try again.' WHERE status='running'").run();
   void drain();
 }
 function jobView(job) {
@@ -90,3 +90,4 @@ async function drain(){
   }catch(e){getDb().prepare("UPDATE portrait_jobs SET status='failed',error=? WHERE id=?").run(String(e.message||e).slice(0,500),job.id);getDb().prepare("UPDATE photos SET process_status='failed' WHERE id=?").run(job.original_id);}
  }}finally{active=false;}
 }
+
