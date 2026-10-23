@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'tablet-magnet-test-'));process.env.DATA_DIR=dir;
 const {initDb,getDb,closeDb,captureFamilyKey,selectGuestPhotos}=await import('../src/db.js');
-const {ensureTabletSchema}=await import('../src/routes/tablet.js');const {initPortraitJobs}=await import('../src/routes/portrait-jobs.js');const {createTabletMagnet,magnetSource}=await import('../src/tablet-magnet.js');const {config}=await import('../src/config.js');const {default:sharp}=await import('sharp');
+const {ensureTabletSchema,tabletRouter}=await import('../src/routes/tablet.js');const {initPortraitJobs}=await import('../src/routes/portrait-jobs.js');const {createTabletMagnet,magnetSource}=await import('../src/tablet-magnet.js');const {config}=await import('../src/config.js');const {default:sharp}=await import('sharp');
 initDb();ensureTabletSchema();initPortraitJobs();const db=getDb();const now=new Date().toISOString();
 db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?,?,?)').run('s','magnet-test','Test','2026-10-23',now,'2099-01-01T00:00:00Z',null);
 const folder=path.join(config.photosDir,'magnet-test');fs.mkdirSync(folder,{recursive:true});
@@ -9,6 +9,17 @@ async function photo(id,variant,source,color){const png=await sharp({create:{wid
 test('classic and background magnets exclude frames; portraits denied; duplicate creation reused',async()=>{try{
  await photo('original','original','capture.jpg','#0000ff');await photo('framed','framed','capture_framed.png','#ff0000');
  const classic=await createTabletMagnet('framed');assert.equal(classic.variant,'physical');
+ const {default:express}=await import('express');const app=express();app.use(express.json());app.use('/api/tablet',tabletRouter);
+ const server=await new Promise(resolve=>{const server=app.listen(0,'127.0.0.1',()=>resolve(server));});
+ try {
+  const base='http://127.0.0.1:'+server.address().port;
+  assert.equal((await fetch(base+'/api/tablet/photos/framed/magnet',{method:'POST'})).status,401);
+  const response=await fetch(base+'/api/tablet/photos/framed/magnet',{method:'POST',headers:{'x-admin-pin':config.adminPin}});assert.equal(response.status,200);
+  const photo=(await response.json()).photo;assert.equal(photo.id,classic.id);
+  const print=await fetch(base+'/api/tablet/photos/'+photo.id+'/print',{method:'POST',headers:{'x-admin-pin':config.adminPin,'Content-Type':'application/json'},body:'{}'});
+  const queued=await print.json();assert.equal(queued.job.layoutMode,'physicalFrame');assert.equal(queued.job.status,'queued');
+ }finally{await new Promise(resolve=>server.close(resolve));}
+
  const decoded=await sharp(path.join(folder,classic.id+'.png')).removeAlpha().raw().toBuffer();for(let i=0;i<decoded.length;i+=3)assert(!(decoded[i]>200&&decoded[i+1]<40&&decoded[i+2]<40),'Frame red must never appear');
  assert.equal((await createTabletMagnet('framed')).id,classic.id);
  await photo('ai','ai','capture_ai.png','#ff0000');await assert.rejects(createTabletMagnet('ai'));
