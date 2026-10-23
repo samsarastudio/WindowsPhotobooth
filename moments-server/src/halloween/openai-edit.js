@@ -69,6 +69,7 @@ function httpsPostMultipart(urlString, form, authHeaders) {
         });
       },
     );
+    req.setTimeout(300000, () => req.destroy(new Error('OpenAI portrait request timed out.')));
     req.on('error', reject);
     form.pipe(req);
   });

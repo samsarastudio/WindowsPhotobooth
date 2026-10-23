@@ -9,6 +9,15 @@ export function purgeExpiredSessions(now = new Date()) {
   const expired = db.prepare('SELECT * FROM sessions WHERE expires_at <= ?').all(iso);
   let photosRemoved = 0;
   for (const row of expired) {
+    if (db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='portrait_jobs'").get()) {
+      const jobs = db.prepare('SELECT j.id FROM portrait_jobs j JOIN photos p ON p.id=j.original_id WHERE p.session_id=?').all(row.id);
+      for (const job of jobs) {
+        if (/^[A-Za-z0-9_-]{20}$/.test(job.id)) {
+          fs.rmSync(path.join(config.dataDir, 'portrait-jobs', job.id), { recursive: true, force: true });
+        }
+        db.prepare('DELETE FROM portrait_jobs WHERE id=?').run(job.id);
+      }
+    }
     const count = db.prepare('SELECT COUNT(*) AS c FROM photos WHERE session_id = ?').get(row.id).c;
     photosRemoved += count;
     db.prepare('DELETE FROM sessions WHERE id = ?').run(row.id);

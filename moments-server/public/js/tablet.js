@@ -83,14 +83,15 @@ function render() {
     img.src = photo.thumbUrl || photo.url;
     img.alt = photo.variant || 'photo';
     const processing = photo.processStatus === 'processing';
-    badge.textContent = processing ? 'Creating AI photo' : 'Ready to print';
-    badge.classList.add(processing ? 'is-processing' : 'is-ready');
-    variant.textContent = processing ? 'AI photo' : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
+    const failed = photo.processStatus === 'failed';
+    badge.textContent = failed ? 'AI photo failed' : processing ? 'Creating AI photo' : 'Ready to print';
+    badge.classList.add(failed ? 'is-failed' : processing ? 'is-processing' : 'is-ready');
+    variant.textContent = failed ? 'Ask the booth operator to check generation' : processing ? 'AI photo' : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
     time.textContent = formatTime(photo.createdAt);
 
-    if (processing) {
+    if (processing || failed) {
       printBtn.disabled = true;
-      printBtn.textContent = 'Creating photo…';
+      printBtn.textContent = failed ? 'AI photo unavailable' : 'Creating photo…';
     }
 
     if (photo.printJob) {
@@ -105,7 +106,7 @@ function render() {
     }
 
     if(state.pendingPrints.has(photo.id)){printBtn.disabled=true;printBtn.textContent='Sending…';}
-    if (!processing) {
+    if (!processing && !failed) {
       printBtn.addEventListener('click', () => void sendPrint(photo, printBtn, jobEl));
     }
     const thumb=document.createElement('button');thumb.type='button';thumb.className='tb-film-thumb';thumb.setAttribute('aria-label',`${variant.textContent}, ${time.textContent}`);thumb.setAttribute('aria-pressed',String(photo.id===state.selectedId));
