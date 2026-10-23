@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { refreshStockFrames } from '../stock-frame-refresh.js';
 import path from 'node:path';
 import multer from 'multer';
 import { Router } from 'express';
@@ -38,6 +39,7 @@ function framesDirImageCount() {
  */
 function seedFramesIfEmpty() {
   ensureFramesDir();
+  refreshStockFrames(SEED_FRAMES_DIR, config.framesDir);
   const marker = path.join(config.framesDir, '.seeded');
   if (fs.existsSync(marker)) return;
   if (framesDirImageCount() > 0) { fs.writeFileSync(marker, '1'); return; }
