@@ -227,6 +227,7 @@ export class CameraService {
         audio: false,
         video: {
           deviceId: { exact: preferredDeviceId },
+          ...{ resizeMode: 'none' },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -238,7 +239,7 @@ export class CameraService {
     }
     attempts.push({
       audio: false,
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      video: { ...{ resizeMode: 'none' }, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
     });
     attempts.push({
       audio: false,

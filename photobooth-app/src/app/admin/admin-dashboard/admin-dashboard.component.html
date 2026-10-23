@@ -936,6 +936,11 @@
             />
             Show Wi‑Fi / network printers
           </label>
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftPrint.allowOfflineQueue" />
+            Queue prints while the printer is offline
+          </label>
+          <p class="pb-hint">Queued jobs print when the printer reconnects. Queue acceptance does not confirm a physical print.</p>
           <label>Printer</label>
           <select class="pb-input" [(ngModel)]="draftPrint.printerName">
             <option [ngValue]="null">

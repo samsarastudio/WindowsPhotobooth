@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {tabletPrintLayout} from '../src/tablet-print-layout.js';
+test('tablet downloads retain edge-safe layout without relying on temporary filename',()=>{assert.equal(tabletPrintLayout('framed'),'framedPhoto');assert.equal(tabletPrintLayout('ai'),'framedPhoto');assert.equal(tabletPrintLayout('physical'),'physicalFrame');assert.equal(tabletPrintLayout('original'),null);assert.equal(tabletPrintLayout('original','physicalFrame'),'physicalFrame');});

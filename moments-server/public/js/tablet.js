@@ -95,7 +95,7 @@ function render() {
 
     if (photo.printJob) {
       jobEl.hidden = false;
-      jobEl.textContent = ({ queued: 'Waiting for the booth to collect this print.', claimed: 'The booth is preparing your print.', done: 'Sent to printer. Check the printed photo.', error: 'Print unsuccessful. Check the booth and printer, then try again.' })[photo.printJob.status] || 'Checking print status…';
+      jobEl.textContent = ({ queued: 'Waiting for the booth to collect this print.', claimed: 'The booth is preparing your print.', done: 'Accepted by the Windows print queue. Printing waits if the printer is offline.', error: 'Print unsuccessful. Check the booth and printer, then try again.' })[photo.printJob.status] || 'Checking print status…';
       if (photo.printJob.status === 'queued' || photo.printJob.status === 'claimed') {
         printBtn.disabled = true;
         printBtn.textContent = 'Print requested';
@@ -162,7 +162,16 @@ async function loadToday({ silent = false } = {}) {
     const j = await r.json();
     if (!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
     state.slug = j.slug;
-    state.photos = Array.isArray(j.photos) ? j.photos : [];
+    const previousIds = new Set(state.photos.map(photo => photo.id));
+    const incoming = Array.isArray(j.photos) ? j.photos : [];
+    const arrived = incoming.find(photo => !previousIds.has(photo.id));
+    // New captures and completed AI versions appear in the main preview.
+    // Keep an in-flight print request stable until its submission completes.
+    if (state.photos.length && arrived && !state.pendingPrints.size) {
+      state.selectedId = arrived.id;
+      state.page = 1;
+    }
+    state.photos = incoming;
     const selectedIndex=state.photos.findIndex(p=>p.id===state.selectedId);
     if(selectedIndex>=0)state.page=Math.floor(selectedIndex/PAGE_SIZE)+1;
     el.title.textContent = 'Today’s photos';

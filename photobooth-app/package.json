@@ -1,7 +1,7 @@
 {
   "name": "photobooth-app",
-  "version": "1.1.53",
-  "description": "PhotoBooth \u2014 Electron + Angular + Canon EDSDK",
+  "version": "1.1.54",
+  "description": "PhotoBooth — Electron + Angular + Canon EDSDK",
   "main": "electron/main.cjs",
   "scripts": {
     "ng": "ng",

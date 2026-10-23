@@ -178,6 +178,8 @@ export interface PhotoboothPrintConfig {
   framedBottomExtraMm: number;
   /** Include Wi‑Fi / IPP / WSD queues in the printer list (USB is still preferred). */
   allowWifiPrinters: boolean;
+  /** Queue jobs in Windows even when the selected printer is offline. */
+  allowOfflineQueue: boolean;
 }
 
 export const PHOTOBOOTH_DEFAULT_PRINT: PhotoboothPrintConfig = {
@@ -187,6 +189,7 @@ export const PHOTOBOOTH_DEFAULT_PRINT: PhotoboothPrintConfig = {
   framedEdgeInsetMm: 4,
   framedBottomExtraMm: 2.5,
   allowWifiPrinters: false,
+  allowOfflineQueue: false,
 };
 
 export interface PhotoboothCopyAiMode {

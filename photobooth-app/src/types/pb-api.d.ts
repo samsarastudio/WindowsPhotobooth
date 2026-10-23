@@ -30,7 +30,7 @@ export interface PbCaptureHistoryItem {
   framedPath?: string;
   displayPath: string;
   printPath: string;
-  layoutMode?: 'physicalFrame';
+  layoutMode?: 'physicalFrame' | 'framedPhoto';
   /** Physical cut sheet vs digital/framed capture. */
   kind: 'physical' | 'normal';
   label: string;
@@ -468,7 +468,7 @@ export interface PbApi {
     filePath: string;
     deviceName?: string | null;
     /** Dual-column physical frame cut sheet â€” one postcard with both photos. */
-    layoutMode?: 'physicalFrame';
+    layoutMode?: 'physicalFrame' | 'framedPhoto';
   }): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;
   printTest(): Promise<{ ok: boolean; deviceName?: string | null; paper?: string | null; error?: string }>;
 }

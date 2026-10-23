@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { tabletPrintLayout } from '../tablet-print-layout.js';
 import { nanoid } from 'nanoid';
 import { config } from '../config.js';
 import {
@@ -194,10 +195,7 @@ function acceptPrintRequest(req, res) {
     typeof req.body?.boothId === 'string' && req.body.boothId.trim()
       ? req.body.boothId.trim().slice(0, 64)
       : null;
-  const layoutMode =
-    row.variant === 'physical' || req.body?.layoutMode === 'physicalFrame'
-      ? 'physicalFrame'
-      : null;
+  const layoutMode = tabletPrintLayout(row.variant, req.body?.layoutMode);
 
   // Avoid duplicate queued jobs for same photo.
   const existing = getDb()

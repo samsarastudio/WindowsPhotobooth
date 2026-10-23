@@ -2421,7 +2421,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         aiPipelines.loadCompositionFace(modeId, payload?.face));
       pngBuf = prepared.image;
       extraImages.push({ buf: prepared.reference, filename: 'guest-reference.png' });
-      effectivePrompt = preparation.HEAD_PROMPT;
+      effectivePrompt = preparation.buildPortraitPrompt(prepared.characterId);
       gptSize = '1024x1536';
     } else if ((pipeline === 'scene' || useInpainting) && modeId) {
       const bgPath = pickBackgroundImage(modeId, randomizeBackground, backgroundFilename || null);
@@ -2484,12 +2484,10 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       return { ok: false, error: editRes.error };
     }
 
+    if (pipeline === 'head-swap') fs.writeFileSync(path.join(path.dirname(absImage), path.basename(absImage, path.extname(absImage)) + '_openai.png'), editRes.outBuf);
     let outBuf = editRes.outBuf;
-    if (prepared) {
-      outBuf = pipeline === 'scene'
-        ? await preparation.preserveSceneSubjects(prepared, outBuf)
-        : await preparation.preservePortraitPlate(prepared, outBuf);
-    }
+    if (prepared && pipeline === 'scene') outBuf = await preparation.preserveSceneSubjects(prepared, outBuf);
+    // Use the OpenAI portrait directly; no face repaint or app-applied makeup.
 
     // Final export: AI Portrait → 4×6 portrait (1200×1800); Scene → 6×4 landscape (1800×1200).
     const outMeta = await sharpMod(outBuf).metadata();
@@ -4328,7 +4326,7 @@ $fitMode = ${psQuote(fitMode)}
 # offline after the initial queue lookup or while the print image is prepared.
 $queue = Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq $printerName } | Select-Object -First 1
 if (-not $queue) { throw 'The selected printer is no longer installed. Select a printer in Admin.' }
-if ($queue.WorkOffline -or $queue.PrinterStatus -eq 7) {
+if (($queue.WorkOffline -or $queue.PrinterStatus -eq 7) -and ${options.allowOfflineQueue === true ? '$false' : '$true'}) {
   throw 'Printer is offline. Turn it on and check its connection, then try printing again.'
 }
 $img = [System.Drawing.Image]::FromFile($imgPath)
@@ -4483,7 +4481,7 @@ try {
 /**
  * One-shot photo print of the original capture file (DSLR → SELPHY postcard).
  */
-async function resolveBoothPrinter(preferredName) {
+async function resolveBoothPrinter(preferredName, allowOfflineQueue = false) {
   const allowWifi = printAllowWifi();
   const all = await listWindowsPrintersDetailed();
   const usbList = boothPrintQueues(all, allowWifi);
@@ -4532,7 +4530,7 @@ async function resolveBoothPrinter(preferredName) {
     }
   }
   const connectionError = require('./printer-readiness.cjs').printerConnectionError(all.find(p => p.name === chosen));
-  if (connectionError) return { ok: false, error: connectionError, all, usbList };
+  if (connectionError && !allowOfflineQueue) return { ok: false, error: connectionError, all, usbList };
   return { ok: true, chosen, all, usbList };
 }
 
@@ -4566,12 +4564,12 @@ async function executePrintPhoto(payload) {
       (typeof printCfg.printerName === 'string' && printCfg.printerName.trim()
         ? printCfg.printerName.trim()
         : null);
-    const resolved = await resolveBoothPrinter(preferred);
+    const resolved = await resolveBoothPrinter(preferred, printCfg.allowOfflineQueue === true);
     if (!resolved.ok) return { ok: false, error: resolved.error };
 
     const physicalLayout =
       payload?.layoutMode === 'physicalFrame' || isPhysicalFrameLayoutPath(abs);
-    const framedLayout = !physicalLayout && isFramedPrintPath(abs);
+    const framedLayout = !physicalLayout && (payload?.layoutMode === 'framedPhoto' || isFramedPrintPath(abs) || (/_ai\.png$/i.test(abs) && cfg.photoFrames?.enabled === true));
     let printPath = abs;
     let printTmp = null;
     if (physicalLayout || framedLayout) {
@@ -4626,6 +4624,7 @@ async function executePrintPhoto(payload) {
         {
           fitMode: keepEdges ? 'contain' : 'cover',
           physicalPostcard: physicalLayout || framedLayout,
+          allowOfflineQueue: printCfg.allowOfflineQueue === true,
         },
       );
       appendAppLog('info', 'print', 'photoprint spooled', {

@@ -6,7 +6,7 @@ const {detectFaces}=require('./face-geometry.cjs');
 const {resolveDepthBackground}=require('./background-depth.cjs');
 
 async function prepareScene(source,background,modelDir) {
-  let original=await sharp(source).rotate().resize(1536,1024,{fit:'contain',background:'#202020'}).removeAlpha().png().toBuffer();
+  let original=await sharp(source).rotate().resize(1536,1024,{fit:'cover',position:'centre'}).removeAlpha().png().toBuffer();
   let faces=await detectFaces(original,path.join(modelDir,'yunet.onnx'));
   if(!faces.length) throw new Error('No clear face was found. Please face the camera and retake.');
   const crop=require('./portrait-framing.cjs').portraitCrop(faces,1536,1024);
@@ -54,33 +54,20 @@ async function preserveSceneSubjects(prepared) {
   if (!prepared.strictScene) throw new Error('Background replacement requires strict subject preservation.');
   return prepared.image;
 }
-async function preservePortraitPlate(prepared,generated) {
-  const generatedSized=await sharp(generated).resize(prepared.width,prepared.height,{fit:'fill'}).png().toBuffer();
-  const faces=await detectFaces(generatedSized,path.join(prepared.modelDir,'yunet.onnx'));
-  if(faces.length!==1) throw new Error('The portrait did not produce one clear face. Please try again.');
-  const g=prepared.guestFace,d=faces[0];
-  const distance=f=>Math.hypot(f.points[1].x-f.points[0].x,f.points[1].y-f.points[0].y);
-  const angle=f=>Math.atan2(f.points[1].y-f.points[0].y,f.points[1].x-f.points[0].x);
-  if(Math.abs(angle(g)-angle(d))>.1) throw new Error('The portrait changed the head angle. Please regenerate with the guest facing forward.');
-  const scale=distance(d)/distance(g);
-  const gm=await sharp(prepared.reference).metadata();
-  const left=Math.max(0,Math.floor(g.x-g.w*.08)),top=Math.max(0,Math.floor(g.y));
-  const width=Math.min(gm.width-left,Math.ceil(g.w*1.16)),height=Math.min(gm.height-top,Math.ceil(g.h*1.05));
-  const faceMask=Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><radialGradient id="f"><stop offset="0.65" stop-color="white"/><stop offset="1" stop-color="white" stop-opacity="0"/></radialGradient></defs><ellipse cx="${width/2}" cy="${height/2}" rx="${width*.43}" ry="${height*.48}" fill="url(#f)"/></svg>`);
-  const subjectAlpha=await subjectMask(prepared.reference,path.join(prepared.modelDir,'u2net.onnx'));
-  const isolated=await sharp(prepared.reference).joinChannel(subjectAlpha,{raw:{width:gm.width,height:gm.height,channels:1}}).png().toBuffer();
-  const crop=await sharp(isolated).extract({left,top,width,height}).composite([{input:faceMask,blend:'dest-in'}]).png().toBuffer();
-  let scaled=await sharp(crop).resize(Math.round(width*scale),Math.round(height*scale)).png().toBuffer();
-  const px=Math.round(d.points[0].x-(g.points[0].x-left)*scale),py=Math.round(d.points[0].y-(g.points[0].y-top)*scale);
-  if(px<0||py<0||px+Math.round(width*scale)>prepared.width||py+Math.round(height*scale)>prepared.height) throw new Error('The portrait face alignment is out of bounds. Please retry.');
-  const lightingTarget=await sharp(generatedSized).extract({left:px,top:py,width:Math.round(width*scale),height:Math.round(height*scale)}).png().toBuffer();
-  scaled=await require('./portrait-lighting.cjs').matchPortraitLighting(scaled,lightingTarget);
-  // Feather the preservation boundary to avoid a hard oval at the neck.
-  const alpha=await sharp(prepared.mask).extractChannel('alpha').blur(24).raw().toBuffer();
-  const original=await sharp(prepared.image).joinChannel(alpha,{raw:{width:prepared.width,height:prepared.height,channels:1}}).png().toBuffer();
-  const composed=await sharp(generatedSized).composite([{input:original},{input:scaled,left:px,top:py}]).png().toBuffer();
-  return require('./character-makeup.cjs').applyCharacterMakeup(composed,d,prepared.characterId);
+// Compatibility export: never repaint or paste a guest face over OpenAI's portrait.
+async function preservePortraitPlate(prepared, generated) { return generated; }
+const PORTRAIT_MAKEUP = {
+ vampire: 'Refined vampire makeup: subtle smoky eyes and dark wine lip tint, preserving natural skin texture and facial hair; no exaggerated fangs or changed mouth shape.',
+ witch: 'Elegant witch makeup: plum smoky eye shadow, fine eyeliner and muted berry lips. No green skin, altered nose or exaggerated features.',
+ werewolf: 'Subtle theatrical werewolf makeup: textured brown shading at temples and cheek edges, a few delicate fur-like brush strokes outside the central face. Keep a human nose, jaw and mouth; no muzzle, animal eyes or facial prosthetic.',
+ reaper: 'Haunting reaper makeup: soft charcoal eye shadow and restrained cool gray shading. No skull replacement, opaque face paint or hollow eyes.',
+ phantom: 'Ghostly phantom makeup: delicate cool silver eye shadow and lightly desaturated theatrical complexion with natural skin texture. No opaque mask or changed eye color.',
+ bride: 'Adventurous pirate makeup: subtle weathered bronzer and light kohl eyeliner. Keep facial features, natural skin tone and facial hair recognizable; no added scars.',
+ morticia: 'Elegant gothic countess makeup: defined fine eyeliner, smoky plum eye shadow and deep berry lipstick following the original lip contour. Preserve the guest natural skin texture and recognizable features.'
+};
+function buildPortraitPrompt(characterId) {
+ return HEAD_PROMPT + ' COSTUME MAKEUP: ' + (PORTRAIT_MAKEUP[characterId] || 'Use subtle theatrical makeup appropriate to the supplied costume.') + ' Makeup is cosmetic pigment only, not a different face: retain exact eye spacing, facial width, nose shape, jaw, mouth, age, expression, hairline and distinctive marks. Integrate scene lighting and makeup in this generated image; it is the final portrait and will receive no face replacement or makeup overlays afterward.';
 }
 const SCENE_PROMPT="Image 1 is the exact photographic layout to finish, with the original guests already placed in the selected Halloween setting. Image 2 is the same selected background for reference. Edit ONLY the transparent boundary band, which includes both sides of the hair and clothing silhouette. Remove ALL remnants of the original gray studio backdrop, including gray wedges behind heads, gray outlines embedded between curls and the pale rim around hair. Reconstruct fine individual hair strands against the selected scene. The hair must meet the new background naturally without a pasted-on cutout edge. Blend the adjacent background into a coherent photograph. Do not move, resize, recolor or regenerate any person. Keep faces, expressions, skin texture, eyewear, clothing, hands, handbag and all accessories absolutely unchanged. Keep the background architecture, objects and composition unchanged. Preserve the existing camera viewpoint and foreground scale: guests are near the camera at the gate and the manor is far behind them. No extra glow, halos, outlines, duplicate edges or double exposures. No changes outside the mask.";
 const HEAD_PROMPT='Image 1 is the costume portrait template. Image 2 is the original guest photo and sole identity reference. Replace ONLY the template head inside the mask with the exact guest head: same face, expression, eyes, nose, mouth, beard, skin texture, age and hair. Do not blend their identity with the template model. Preserve facial proportions and distinctive details. Match the existing template head size, position, angle and collar connection naturally. No elongated neck, floating head, oval cutout, doubled hair, or extra face. Keep all costume, body, pose, props and scenery outside the head mask unchanged. The result must look like the same guest wearing the costume, not a similar person.';
-module.exports={prepareScene,prepareHead,preserveSceneSubjects,preservePortraitPlate,SCENE_PROMPT,HEAD_PROMPT};
+module.exports={prepareScene,prepareHead,preserveSceneSubjects,preservePortraitPlate,SCENE_PROMPT,HEAD_PROMPT,buildPortraitPrompt,PORTRAIT_MAKEUP};

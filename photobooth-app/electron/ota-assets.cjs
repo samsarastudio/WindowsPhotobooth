@@ -5,6 +5,7 @@ const path = require('path');
 // custom images or restoring sets an operator has already removed.
 function seedMissingAssets(bundled, config) {
   applyReleaseProfile(bundled, config);
+  require('./stock-frame-refresh.cjs').refreshStockFrames(path.join(bundled, 'photo-frames'), path.join(config, 'photo-frames'));
   const marker = path.join(config, '.assets-1.1.47');
   if (fs.existsSync(marker) || !fs.existsSync(bundled)) return;
   for (const name of ['ai-backgrounds', 'photo-frames', 'compositions']) {
