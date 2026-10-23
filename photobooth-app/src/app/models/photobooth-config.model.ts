@@ -469,7 +469,7 @@ export const PHOTOBOOTH_DEFAULT_PHOTO_FRAMES: PhotoboothPhotoFramesConfig = {
   photoScale: 1,
   defaultFrameFile: 'halloween-haunt.png',
   defaultPortraitFrameFile: 'halloween-haunt-portrait.png',
-  guestFrameFiles: ['halloween-haunt.png', 'halloween-haunt-portrait.png', 'halloween-horror.png', 'halloween-horror-portrait.png', 'screampark-logo-halloween-2026.png', 'screampark-logo-halloween-2026-portrait.png'],
+  guestFrameFiles: ['halloween-haunt.png', 'halloween-haunt-portrait.png', 'halloween-horror.png', 'halloween-horror-portrait.png', 'screampark-logo-halloween-2026.png', 'screampark-logo-halloween-2026-portrait.png', 'screampark-logo-halloween-2026-slim.png', 'screampark-logo-halloween-2026-slim-portrait.png'],
   autoApplyFrame: false,
   guestAdjustPhoto: true,
   guestTextEnabled: false,
