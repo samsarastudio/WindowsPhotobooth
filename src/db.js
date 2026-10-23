@@ -262,6 +262,7 @@ export function captureFamilyKey(sourceLocalName, filename) {
     .replace(/\\/g, '/');
   const base = raw.split('/').pop() || raw;
   return base
+    .replace(/_ai_raw(?=\.|$)/g, '')
     .replace(/_framed(?=\.|$)/g, '')
     .replace(/_physical(?=\.|$)/g, '')
     .replace(/_ai(?=\.|$)/g, '')
@@ -279,7 +280,7 @@ export function selectDisplayPhotos(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const includeOriginals = opts.includeOriginals !== false;
   const created = (p) => String(p.created_at || p.createdAt || '');
-  const guest = list.filter((p) => p.variant !== 'physical');
+  const guest = list.filter((p) => p.variant !== 'physical' && p.variant !== 'magnet-source');
   const framedAi = guest.filter((p) => p.variant && p.variant !== 'original');
   if (!includeOriginals) {
     return framedAi.sort((a, b) => created(a).localeCompare(created(b)));
