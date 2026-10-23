@@ -11,6 +11,7 @@ import { requireUploadToken } from '../auth.js';
 import { getHalloweenApiKey } from '../halloween/store.js';
 import { callOpenAiImageEdit } from '../halloween/openai-edit.js';
 import { broadcastPhotoAdded } from '../sse.js';
+import {initPortraitQueue,nextPortraitOrder,portraitQueuePosition,claimNextPortrait} from '../portrait-queue.js';
 
 export const portraitJobsRouter = Router();
 portraitJobsRouter.use(requireUploadToken);
@@ -29,7 +30,7 @@ export function retryPortrait(photoId) {
   if (!getHalloweenApiKey()) return { status: 503, error: 'Configure the OpenAI key in Moments admin first.' };
   if (db.prepare("SELECT count(*) AS n FROM portrait_jobs WHERE status IN ('queued','running')").get().n >= 20) return { status: 429, error: 'Portrait queue is full. Try again shortly.' };
   db.transaction(() => {
-    db.prepare("UPDATE portrait_jobs SET status='queued',error=NULL WHERE id=? AND status='failed'").run(job.id);
+    db.prepare("UPDATE portrait_jobs SET status='queued',error=NULL,queue_order=? WHERE id=? AND status='failed'").run(nextPortraitOrder(db),job.id);
     db.prepare("UPDATE photos SET process_status='processing' WHERE id=?").run(job.original_id);
   })();
   setImmediate(() => void drain());
@@ -37,6 +38,7 @@ export function retryPortrait(photoId) {
 }
 export function initPortraitJobs() {
   getDb().exec(`CREATE TABLE IF NOT EXISTS portrait_jobs (id TEXT PRIMARY KEY, request_key TEXT UNIQUE NOT NULL, original_id TEXT NOT NULL, status TEXT NOT NULL, prompt TEXT NOT NULL, created_at TEXT NOT NULL, error TEXT, photo_id TEXT, model TEXT)`);
+  initPortraitQueue(getDb());
   // A running paid request has an unknown outcome after a server crash. Never bill twice automatically.
   const interrupted=getDb().prepare("SELECT original_id FROM portrait_jobs WHERE status='running'").all();
   for(const row of interrupted)getDb().prepare("UPDATE photos SET process_status='failed' WHERE id=?").run(row.original_id);
@@ -46,7 +48,7 @@ export function initPortraitJobs() {
 function jobView(job) {
   const row=job.photo_id?getDb().prepare('SELECT * FROM photos WHERE id=?').get(job.photo_id):null;
   const session=row?getDb().prepare('SELECT * FROM sessions WHERE id=?').get(row.session_id):null;
-  return {id:job.id,status:job.status,createdAt:job.created_at,error:job.error,model:job.model,photo:row&&session?publicPhoto(session.slug,row):null};
+  return {id:job.id,status:job.status,queuePosition:portraitQueuePosition(getDb(),job),createdAt:job.created_at,error:job.error,model:job.model,photo:row&&session?publicPhoto(session.slug,row):null};
 }
 portraitJobsRouter.get('/capabilities',(_req,res)=>res.json({ok:true,portraitGeneration:true,configured:!!getHalloweenApiKey()}));
 portraitJobsRouter.get('/by-photo/:photoId',(req,res)=>{const job=getDb().prepare('SELECT * FROM portrait_jobs WHERE original_id=? OR photo_id=? ORDER BY created_at DESC LIMIT 1').get(req.params.photoId,req.params.photoId);return res.json({ok:true,job:job?jobView(job):null});});
@@ -64,14 +66,13 @@ portraitJobsRouter.post('/',upload.fields([{name:'image',maxCount:1},{name:'refe
   const existing=getDb().prepare('SELECT * FROM portrait_jobs WHERE request_key=?').get(key);if(existing)return res.json({ok:true,job:jobView(existing)});
   if(getDb().prepare("SELECT count(*) AS n FROM portrait_jobs WHERE status IN ('queued','running')").get().n>=20)return res.status(429).json({ok:false,error:'Portrait queue is full. Please try again shortly.'});
   const id=nanoid(20),dir=jobDir(id);fs.mkdirSync(dir,{recursive:true});for(const [name,buffer]of Object.entries(files))fs.writeFileSync(path.join(dir,name+'.png'),buffer);
-  getDb().transaction(()=>{getDb().prepare("INSERT INTO portrait_jobs(id,request_key,original_id,status,prompt,created_at) VALUES(?,?,?,'queued',?,?)").run(id,key,original.id,prompt,new Date().toISOString());getDb().prepare("UPDATE photos SET process_status='processing' WHERE id=?").run(original.id);})();
+  getDb().transaction(()=>{getDb().prepare("INSERT INTO portrait_jobs(id,request_key,original_id,status,prompt,created_at,queue_order) VALUES(?,?,?,'queued',?,?,?)").run(id,key,original.id,prompt,new Date().toISOString(),nextPortraitOrder(getDb()));getDb().prepare("UPDATE photos SET process_status='processing' WHERE id=?").run(original.id);})();
   res.status(202).json({ok:true,job:jobView(getDb().prepare('SELECT * FROM portrait_jobs WHERE id=?').get(id))});void drain();
  }catch(e){res.status(400).json({ok:false,error:String(e.message||e)});}
 });
 async function drain(){
  if(active)return;active=true;
- try {while(true){const job=getDb().prepare("SELECT * FROM portrait_jobs WHERE status='queued' ORDER BY created_at LIMIT 1").get();if(!job)break;
-  getDb().prepare("UPDATE portrait_jobs SET status='running' WHERE id=?").run(job.id);
+ try {while(true){const job=claimNextPortrait(getDb());if(!job)break;
   try{
    const original=getDb().prepare('SELECT * FROM photos WHERE id=?').get(job.original_id);const session=original?getDb().prepare('SELECT * FROM sessions WHERE id=?').get(original.session_id):null;if(!session||isSessionExpired(session))throw Error('Capture session expired');
    const dir=jobDir(job.id),read=name=>fs.readFileSync(path.join(dir,name+'.png'));
