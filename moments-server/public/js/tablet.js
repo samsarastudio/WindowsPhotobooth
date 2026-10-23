@@ -1,3 +1,4 @@
+import { attachPhotoSharing } from './tablet-share.js?v=20261023';
 const PIN_KEY = 'moments-tablet-admin-pin';
 
 function prefixFromPath() {
@@ -86,8 +87,11 @@ function render() {
     const failed = photo.processStatus === 'failed';
     badge.textContent = failed ? 'AI photo failed' : processing ? 'Creating AI photo' : 'Ready to print';
     badge.classList.add(failed ? 'is-failed' : processing ? 'is-processing' : 'is-ready');
-    variant.textContent = failed ? 'Ask the booth operator to check generation' : processing ? 'AI photo' : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
+    variant.textContent = failed ? (photo.processError || 'Ask the booth operator to check generation') : processing ? ({'server-queued':'Portrait queued on Moments','server-generating':'Moments is generating your portrait','kiosk-processing':'Waiting for processing on the kiosk'}[photo.processingStage] || 'AI photo') : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
     time.textContent = formatTime(photo.createdAt);
+    if (!processing && !failed && photo.variant === 'ai' && photo.generationType === 'portrait') {
+      variant.textContent = 'AI portrait · OpenAI';
+    }
 
     if (processing || failed) {
       printBtn.disabled = true;
@@ -112,7 +116,10 @@ function render() {
     const thumb=document.createElement('button');thumb.type='button';thumb.className='tb-film-thumb';thumb.setAttribute('aria-label',`${variant.textContent}, ${time.textContent}`);thumb.setAttribute('aria-pressed',String(photo.id===state.selectedId));
     const small=img.cloneNode(true),stamp=document.createElement('span');stamp.textContent=time.textContent;thumb.append(small,stamp);
     thumb.addEventListener('click',()=>{state.selectedId=photo.id;render();});el.grid.appendChild(thumb);
-    if(photo.id===state.selectedId){img.src=photo.url||photo.thumbUrl;img.loading='eager';preview.appendChild(node);}
+    if(photo.id===state.selectedId){
+      img.src=photo.url||photo.thumbUrl;img.loading='eager';preview.appendChild(node);
+      attachPhotoSharing(node, photo, !processing && !failed, setStatus);
+    }
 
   }
 }

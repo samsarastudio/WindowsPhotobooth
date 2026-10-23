@@ -82,6 +82,8 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
   const family = captureFamilyKey(row.source_local_name, row.filename);
   const hasAi = siblings.some((p) => p.variant === 'ai');
   const hasFramed = siblings.some((p) => p.variant === 'framed');
+  const original = siblings.find(p => p.variant === 'original');
+  const portraitJob = original ? getDb().prepare('SELECT status, error, created_at FROM portrait_jobs WHERE original_id=? ORDER BY created_at DESC LIMIT 1').get(original.id) : null;
   const printJob = getDb()
     .prepare(
       `SELECT id, status, created_at, done_at, error FROM print_jobs
@@ -91,6 +93,9 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
   return {
     ...base,
     processStatus: tabletProcessStatus(siblings.length ? siblings : [row]),
+    processingStage: portraitJob?.status === 'queued' ? 'server-queued' : portraitJob?.status === 'running' ? 'server-generating' : !hasAi && row.process_status === 'processing' ? 'kiosk-processing' : null,
+    processError: portraitJob?.status === 'failed' ? portraitJob.error : null,
+    generationType: portraitJob ? 'portrait' : null,
     familyKey: family,
     hasAi,
     hasFramed,

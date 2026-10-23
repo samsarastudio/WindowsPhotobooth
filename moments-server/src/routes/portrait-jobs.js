@@ -28,9 +28,10 @@ export function initPortraitJobs() {
 function jobView(job) {
   const row=job.photo_id?getDb().prepare('SELECT * FROM photos WHERE id=?').get(job.photo_id):null;
   const session=row?getDb().prepare('SELECT * FROM sessions WHERE id=?').get(row.session_id):null;
-  return {id:job.id,status:job.status,error:job.error,model:job.model,photo:row&&session?publicPhoto(session.slug,row):null};
+  return {id:job.id,status:job.status,createdAt:job.created_at,error:job.error,model:job.model,photo:row&&session?publicPhoto(session.slug,row):null};
 }
 portraitJobsRouter.get('/capabilities',(_req,res)=>res.json({ok:true,portraitGeneration:true,configured:!!getHalloweenApiKey()}));
+portraitJobsRouter.get('/by-photo/:photoId',(req,res)=>{const job=getDb().prepare('SELECT * FROM portrait_jobs WHERE original_id=? OR photo_id=? ORDER BY created_at DESC LIMIT 1').get(req.params.photoId,req.params.photoId);return res.json({ok:true,job:job?jobView(job):null});});
 portraitJobsRouter.get('/:id',(req,res)=>{const job=getDb().prepare('SELECT * FROM portrait_jobs WHERE id=?').get(req.params.id);return job?res.json({ok:true,job:jobView(job)}):res.status(404).json({ok:false,error:'Portrait job not found'});});
 portraitJobsRouter.post('/',upload.fields([{name:'image',maxCount:1},{name:'reference',maxCount:1},{name:'mask',maxCount:1},{name:'frame',maxCount:1}]),async(req,res)=>{
  try {
