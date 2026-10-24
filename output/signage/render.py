@@ -57,7 +57,7 @@ display(bg,(1020,91),'CHOOSE YOUR KEEPSAKE',72,WHITE)
 txt(bg,(1024,182),'PHOTO PRINTS, AI PHOTOS & FRIDGE MAGNETS',24,MUTED)
 rows=[('CLASSIC PHOTO','$10','Halloween background included','One print + digital copy'),
       ('AI PORTRAIT','$15','Your Halloween character transformation','+ digital copy'),
-      ('HALLOWEEN SPECIAL FRIDGE MAGNET','$'+MAGNET_PRICE,'One magnet + digital copy','Original photo or AI transformation')]
+      ('HALLOWEEN SPECIAL FRIDGE MAGNET','$'+MAGNET_PRICE,'One postcard print + photo magnet','+ digital copy')]
 for j,(title,price,l1,l2) in enumerate(rows):
     y=262+j*206
     if j==2:
@@ -88,7 +88,7 @@ bg=Image.alpha_composite(plain_background.convert('RGBA'),design_overlay).conver
 backgrounds=[bg]*4
 
 titles=[('Capture the moment.','PHOTO PRINT'),('Create your Halloween look.','AI PORTRAIT'),('A Halloween scene to share.','AI GROUP PHOTO'),('A personalized keepsake.','HALLOWEEN SPECIAL FRIDGE MAGNET')]
-benefits=[('Your original photo, printed as a keepsake.','One print + digital copy'),('Your portrait with an AI Halloween look.','Individual portrait + digital copy'),('Your group in an AI Halloween scene.','Halloween background + digital copy'),('Your original photo or AI photo on a fridge magnet.','One magnet + digital copy. AI photo option included.')]
+benefits=[('Your original photo, printed as a keepsake.','One print + digital copy'),('Your portrait with an AI Halloween look.','Individual portrait + digital copy'),('Your group in an AI Halloween scene.','Halloween background + digital copy'),('Your original photo or AI photo on a fridge magnet.','One postcard print + photo magnet + digital copy. AI photo option included.')]
 
 def card(im,src,box,scale=1.0):
     x,y,w,h=map(round,box)

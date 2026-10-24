@@ -40,7 +40,7 @@ r.txt(menu,(60,90),'PHOTO PRINTS, AI PHOTOS & FRIDGE MAGNETS',24,r.MUTED)
 for y,title,price,line1,line2 in [
     (145,'CLASSIC PHOTO','$10','Halloween background included','One print + digital copy'),
     (302,'AI PORTRAIT','$15','Your Halloween character transformation','+ digital copy'),
-    (459,'FRIDGE MAGNET','$'+r.MAGNET_PRICE,'One magnet + digital copy','Original photo or AI transformation')]:
+    (459,'FRIDGE MAGNET','$'+r.MAGNET_PRICE,'One postcard print + photo magnet','+ digital copy')]:
     if y==459:
         d.rectangle((48,y,1032,780),fill=(18,26,22),outline=r.GOLD,width=4)
         r.display(menu,(72,y+14),'HALLOWEEN SPECIAL',32,r.GOLD)
