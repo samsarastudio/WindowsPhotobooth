@@ -8,7 +8,7 @@ process.env.DATA_DIR=dir;
 process.env.OPENAI_API_KEY='test-not-a-real-key';
 const {initDb,getDb,closeDb}=await import('../src/db.js');
 const {ensureTabletSchema}=await import('../src/routes/tablet.js');
-const {initPortraitJobs,retryPortrait}=await import('../src/routes/portrait-jobs.js');
+const {initPortraitJobs,retryPortrait,submitBackgroundRecovery}=await import('../src/routes/portrait-jobs.js');
 const {default:sharp}=await import('sharp');
 initDb();ensureTabletSchema();initPortraitJobs();
 const db=getDb();
@@ -33,6 +33,17 @@ test('portrait retry preserves inputs, deduplicates taps and reuses paid output'
   assert.equal(db.prepare("SELECT status FROM portrait_jobs WHERE id='job'").get().status,'ready');
   assert.equal(retryPortrait('p').reused,true);
   assert.equal(db.prepare("SELECT count(*) AS n FROM photos WHERE variant='ai'").get().n,1);
+  assert.equal(networkCalls,0);
+  db.prepare("INSERT INTO photos(id,session_id,variant,filename,mime,bytes,source_local_name,created_at,process_status) VALUES('bg','s','original','bg.png','image/png',1,'background.png',?,'failed')").run(now);
+  db.prepare("INSERT INTO portrait_jobs(id,request_key,original_id,status,prompt,created_at,job_kind) VALUES('bgjob','background-recovery:bg','bg','failed','test',?,'background')").run(now);
+  const bgDir=path.join(dir,'portrait-jobs','bgjob');fs.mkdirSync(bgDir,{recursive:true});
+  for(const name of ['image','reference','openai'])fs.writeFileSync(path.join(bgDir,name+'.png'),png);
+  assert.equal((await submitBackgroundRecovery('bg')).id,'bgjob');
+  assert.equal((await submitBackgroundRecovery('bg')).id,'bgjob');
+  const bgDeadline=Date.now()+10000;
+  while(db.prepare("SELECT status FROM portrait_jobs WHERE id='bgjob'").get().status!=='ready'&&Date.now()<bgDeadline)await new Promise(r=>setTimeout(r,20));
+  assert.equal(db.prepare("SELECT status FROM portrait_jobs WHERE id='bgjob'").get().status,'ready');
+  assert.equal(db.prepare("SELECT count(*) AS n FROM photos WHERE variant='magnet-source'").get().n,1);
   assert.equal(networkCalls,0);
  } finally {closeDb();fs.rmSync(dir,{recursive:true,force:true});}
 });

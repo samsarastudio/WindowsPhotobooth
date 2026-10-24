@@ -11,7 +11,7 @@ import {
 } from '../db.js';
 import { requireAdminPin, requireUploadToken } from '../auth.js';
 import { subscribeSession } from '../sse.js';
-import { retryPortrait } from './portrait-jobs.js';
+import { retryPortrait, submitBackgroundRecovery } from './portrait-jobs.js';
 import { magnetSource, createTabletMagnet } from '../tablet-magnet.js';
 import {portraitQueuePosition} from '../portrait-queue.js';
 import QRCode from 'qrcode';
@@ -87,7 +87,7 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
   const hasAi = siblings.some((p) => p.variant === 'ai');
   const hasFramed = siblings.some((p) => p.variant === 'framed');
   const original = siblings.find(p => p.variant === 'original');
-  const portraitJob = original ? getDb().prepare('SELECT status, error, created_at, queue_order FROM portrait_jobs WHERE original_id=? ORDER BY created_at DESC LIMIT 1').get(original.id) : null;
+  const portraitJob = original ? getDb().prepare('SELECT status, error, created_at, queue_order, job_kind FROM portrait_jobs WHERE original_id=? ORDER BY created_at DESC LIMIT 1').get(original.id) : null;
   const printJob = getDb()
     .prepare(
       `SELECT id, status, created_at, done_at, error FROM print_jobs
@@ -101,9 +101,11 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
     processStatus: tabletProcessStatus(siblings.length ? siblings : [row]),
     processingStage: portraitJob?.status === 'queued' ? 'server-queued' : portraitJob?.status === 'running' ? 'server-generating' : !hasAi && row.process_status === 'processing' ? 'kiosk-processing' : null,
     processError: portraitJob?.status === 'failed' ? portraitJob.error : null,
-    generationType: portraitJob ? 'portrait' : null,
+    generationType: portraitJob?.job_kind || null,
+    sourceOriginalId: original?.id || null,
+    canRecoverBackground: !!original && !['queued','running'].includes(portraitJob?.status) && portraitJob?.job_kind !== 'portrait' && !hasAi,
     canRetryPortrait: portraitJob?.status === 'failed',
-    canMakeMagnet: !!magnetSource(siblings, portraitJob),
+    canMakeMagnet: !!magnetSource(siblings, portraitJob?.job_kind === 'portrait'),
     retryPhotoId: portraitJob ? original.id : null,
     familyKey: family,
     hasAi,
@@ -121,6 +123,10 @@ function tabletPhoto(sessionSlug, row, siblings = []) {
 }
 
 export const tabletRouter = Router();
+tabletRouter.post('/photos/:photoId/background',requireAdminPin,async(req,res)=>{
+ try {res.status(202).json({ok:true,job:await submitBackgroundRecovery(req.params.photoId)});}
+ catch(error){res.status(409).json({ok:false,error:error.message});}
+});
 tabletRouter.get('/photos/:photoId/qr', async (req,res) => {
   const row = getDb().prepare('SELECT * FROM photos WHERE id=?').get(req.params.photoId);
   const session = row && getDb().prepare('SELECT * FROM sessions WHERE id=?').get(row.session_id);

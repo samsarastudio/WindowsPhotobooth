@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
 import { latestTabletInstance } from '../tablet-instance.js';
+import {frameOriginal} from '../recovery-frame.js';
 import { config, isLocalPublicBaseUrl, normalizePublicBaseUrl } from '../config.js';
 import {
   getDb,
@@ -24,6 +25,13 @@ import {
 export const adminRouter = Router();
 
 adminRouter.use(requireAdminPin);
+adminRouter.post('/photos/frame-originals',async(req,res)=>{
+ const ids=[...new Set(Array.isArray(req.body?.photoIds)?req.body.photoIds:[])];
+ if(!ids.length||ids.length>20)return res.status(400).json({ok:false,error:'Select 1–20 originals'});
+ const photos=[],errors=[];
+ for(const id of ids){try{photos.push(await frameOriginal(id,String(req.body.frame||'')));}catch(e){errors.push({id,error:e.message});}}
+ res.json({ok:true,photos,errors});
+});
 
 adminRouter.get('/tablet-instance', (_req, res) => {
   const rows = getDb().prepare(`SELECT s.*, COALESCE(MAX(p.created_at), s.created_at) AS last_activity

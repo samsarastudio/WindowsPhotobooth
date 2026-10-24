@@ -9,6 +9,10 @@ async function photo(id,variant,source,color){const png=await sharp({create:{wid
 test('classic and background magnets exclude frames; portraits denied; duplicate creation reused',async()=>{try{
  await photo('original','original','capture.jpg','#0000ff');await photo('framed','framed','capture_framed.png','#ff0000');
  const classic=await createTabletMagnet('framed');assert.equal(classic.variant,'physical');
+ const {frameOriginal}=await import('../src/recovery-frame.js');
+ const frame=Buffer.from('<svg width="600" height="400"><path fill="red" fill-rule="evenodd" d="M0 0H600V400H0Z M30 30V370H570V30Z"/></svg>');await sharp(frame).png().toFile(path.join(config.framesDir,'test.png'));
+ const recovered=await frameOriginal('original','test.png');assert.equal(recovered.variant,'framed');assert.equal(recovered.width,600);assert.equal((await frameOriginal('original','test.png')).id,recovered.id);await assert.rejects(frameOriginal('original','../test.png'));
+
  const {default:express}=await import('express');const app=express();app.use(express.json());app.use('/api/tablet',tabletRouter);
  const server=await new Promise(resolve=>{const server=app.listen(0,'127.0.0.1',()=>resolve(server));});
  try {

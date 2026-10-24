@@ -88,14 +88,24 @@ function render() {
     const printBtn = node.querySelector('.tb-print');
     const jobEl = node.querySelector('.tb-job');
     const retryBtn = node.querySelector('.tb-retry');
+    const backgroundBtn = node.querySelector('.tb-background');
+    backgroundBtn.hidden = !photo.canRecoverBackground;
+    backgroundBtn.onclick = async () => {
+      const pin = el.pin.value.trim();
+      if (!pin) {setStatus('Enter your operator PIN for background recovery.');el.pin.focus();return;}
+      if (!confirm('Use OpenAI credits to replace this original’s background with Pumpkin Patch on Moments? Review masks and faces before printing.')) return;
+      backgroundBtn.disabled=true;
+      try {const response=await fetch(`/api/tablet/photos/${encodeURIComponent(photo.sourceOriginalId)}/background`,{method:'POST',headers:{'X-Admin-Pin':pin},signal:AbortSignal.timeout(60000)});const result=await response.json();if(!response.ok||!result.ok)throw Error(result.error||'Could not start recovery');setStatus('Background recovery queued on Moments. The kiosk is not needed for generation.');await loadToday({silent:true});}
+      catch(error){setStatus(error.message);}finally{backgroundBtn.disabled=false;}
+    };
     const magnetBtn = node.querySelector('.tb-magnet');
     magnetBtn.hidden = !photo.canMakeMagnet;
     magnetBtn.onclick = () => void makeMagnet(photo, magnetBtn);
     retryBtn.hidden = !photo.canRetryPortrait;
     retryBtn.onclick = async () => {
       const pin = el.pin.value.trim();
-      if (!pin) { setStatus('Enter your operator PIN to retry this portrait.'); el.pin.focus(); return; }
-      if (!confirm('Retry this portrait? A new OpenAI generation may use credits.')) return;
+      if (!pin) { setStatus('Enter your operator PIN to retry this AI photo.'); el.pin.focus(); return; }
+      if (!confirm('Retry this AI photo? A new OpenAI generation may use credits.')) return;
       retryBtn.disabled = true;
       try {
         const response = await fetch(`/api/tablet/photos/${encodeURIComponent(photo.retryPhotoId || photo.id)}/retry`, {
@@ -103,7 +113,7 @@ function render() {
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw new Error(result.error || 'Retry could not start');
-        setStatus('Portrait queued on Moments. It will appear here when ready.');
+        setStatus('AI photo queued on Moments. It will appear here when ready.');
         await loadToday({silent:true});
       } catch (error) { setStatus(error.message || 'Retry could not start. Refresh to check the job before trying again.'); }
       finally { retryBtn.disabled = false; }
@@ -134,9 +144,10 @@ function render() {
     badge.classList.add(failed ? 'is-failed' : processing ? 'is-processing' : 'is-ready');
     variant.textContent = failed ? (photo.processError || 'Ask the booth operator to check generation') : processing ? ({'server-queued':'Portrait queued on Moments','server-generating':'Moments is generating your portrait','kiosk-processing':'Waiting for processing on the kiosk'}[photo.processingStage] || 'AI photo') : ({ ai: 'AI photo', framed: 'Framed photo', original: 'Classic photo', physical: 'Magnet print' })[photo.variant] || 'Photo';
     time.textContent = formatTime(photo.capturedAt || photo.createdAt);
-    if (processing && photo.queuePosition) variant.textContent = photo.processingStage === 'server-generating' ? 'Creating your portrait · first in queue' : `Portrait queue · position ${photo.queuePosition}`;
+    if (processing && photo.queuePosition) variant.textContent = photo.processingStage === 'server-generating' ? `Creating your ${photo.generationType==='background'?'background':'portrait'} · first in queue` : `AI queue · position ${photo.queuePosition}`;
+    if (photo.generationType==='background') {retryBtn.textContent='Retry AI background';if(!processing&&!failed)variant.textContent='AI background · OpenAI';}
     if (processing && photo.processingStage === 'kiosk-processing' && Date.now() - Date.parse(photo.createdAt) > 10 * 60 * 1000) {
-      variant.textContent = 'Still waiting for the kiosk. If the kiosk stopped, retake there: no portrait inputs reached Moments.';
+      variant.textContent = 'Still waiting for the kiosk. Use background recovery below, or ask the operator to check the kiosk.';
     }
     if (!processing && !failed && photo.variant === 'ai' && photo.generationType === 'portrait') {
       variant.textContent = 'AI portrait · OpenAI';
