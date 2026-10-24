@@ -1,8 +1,8 @@
 {
   "portrait": {
-    "version": "962754fe845c058ad5ef664e7adbcd6b64c69b446f334473b8839b941f96add3",
-    "url": "/assets/signage/video2-portrait-962754fe845c058a.mp4",
-    "bytes": 32352907,
+    "version": "1a8c8dd50026fdda0a7f80775e81dbc2f5969cf98a837642dc2c9a98e0621515",
+    "url": "/assets/signage/video2-portrait-1a8c8dd50026fdda.mp4",
+    "bytes": 30484572,
     "width": 1080,
     "height": 1920,
     "fps": "30/1",
@@ -12,9 +12,9 @@
     "title": "Video 2"
   },
   "landscape": {
-    "version": "3aec72890b3c15e4a41c6b1fc7acf2fd7f6dae350a3a1da8a8583cd8cee9fa09",
-    "url": "/assets/signage/video2-landscape-3aec72890b3c15e4.mp4",
-    "bytes": 26398170,
+    "version": "15bfe7b06b2c887ccf15b74e543d86ba731c08ba6b96b0a3041be0ab966dc3e2",
+    "url": "/assets/signage/video2-landscape-15bfe7b06b2c887c.mp4",
+    "bytes": 25350571,
     "width": 1920,
     "height": 1080,
     "fps": "30/1",
