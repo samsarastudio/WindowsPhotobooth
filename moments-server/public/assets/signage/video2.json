@@ -1,0 +1,26 @@
+{
+  "portrait": {
+    "version": "962754fe845c058ad5ef664e7adbcd6b64c69b446f334473b8839b941f96add3",
+    "url": "/assets/signage/video2-portrait-962754fe845c058a.mp4",
+    "bytes": 32352907,
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "frames": 1800,
+    "seconds": 60,
+    "decode": "passed",
+    "title": "Video 2"
+  },
+  "landscape": {
+    "version": "3aec72890b3c15e4a41c6b1fc7acf2fd7f6dae350a3a1da8a8583cd8cee9fa09",
+    "url": "/assets/signage/video2-landscape-3aec72890b3c15e4.mp4",
+    "bytes": 26398170,
+    "width": 1920,
+    "height": 1080,
+    "fps": "30/1",
+    "frames": 1800,
+    "seconds": 60,
+    "decode": "passed",
+    "title": "Video 2"
+  }
+}

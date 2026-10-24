@@ -1,7 +1,9 @@
 """Editable, deterministic Screampark signage master. Pillow + FFmpeg, no API keys."""
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
-import math, subprocess, json, sys
+import math, subprocess, json, sys, os
+
+MAGNET_PRICE=os.environ.get('SIGNAGE_MAGNET_PRICE','25')
 
 ROOT = Path(__file__).resolve().parent
 A = ROOT / 'assets'
@@ -53,9 +55,9 @@ txt(bg,(66,109),'PERSONALIZED PHOTOS & KEEPSAKES',22,WHITE)
 txt(bg,(1024,49),'HALLOWEEN PHOTO EXPERIENCES',24,GOLD)
 display(bg,(1020,91),'CHOOSE YOUR KEEPSAKE',72,WHITE)
 txt(bg,(1024,182),'PHOTO PRINTS, AI PHOTOS & FRIDGE MAGNETS',24,MUTED)
-rows=[('PHOTO PRINT','$10','One original photo print','+ a digital copy'),
-      ('AI DIGITAL PHOTO','$15','Individual character portrait','or group Halloween background'),
-      ('HALLOWEEN SPECIAL FRIDGE MAGNET','$25','One magnet + digital copy','Original photo or AI transformation')]
+rows=[('CLASSIC PHOTO','$10','Halloween background included','One print + digital copy'),
+      ('AI PORTRAIT','$15','Your Halloween character transformation','+ digital copy'),
+      ('HALLOWEEN SPECIAL FRIDGE MAGNET','$'+MAGNET_PRICE,'One magnet + digital copy','Original photo or AI transformation')]
 for j,(title,price,l1,l2) in enumerate(rows):
     y=262+j*206
     if j==2:
@@ -77,7 +79,7 @@ d.rectangle((1042,860,1265,942),fill=GOLD)
 display(bg,(1056,865),'HALLOWEEN',32,(17,20,15),max_width=196)
 display(bg,(1056,900),'OFFER',30,(17,20,15),max_width=196)
 display(bg,(1284,865),'AI PHOTO OPTION INCLUDED',38,(17,20,15),max_width=536)
-txt(bg,(1286,911),'WITH YOUR $25 FRIDGE MAGNET',22,(17,20,15))
+txt(bg,(1286,911),f'WITH YOUR ${MAGNET_PRICE} FRIDGE MAGNET',22,(17,20,15))
 txt(bg,(1024,975),'ALL PRICES IN CAD',22,MUTED)
 txt(bg,(1420,975),'Choose at the booth.',24,WHITE,True)
 txt(bg,(64,1021),'PERSONALIZED PHOTOS & KEEPSAKES',20,MUTED)

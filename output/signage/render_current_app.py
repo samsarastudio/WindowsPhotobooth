@@ -77,7 +77,7 @@ def hero(i,u):
     r.display(im,(52,30),'TAKE HOME THE HORROR',76,accent,max_width=976)
     for j,line in enumerate(["Ontario's most terrifying haunted attraction",'is back with even more horror and gore.']):
         d.text((55,131+j*35),line,font=r.font(30),fill=r.WHITE)
-    titles=['A NIGHT TO REMEMBER. YOURS TO KEEP.','MEET YOUR HALLOWEEN ALTER EGO.','STEP INTO YOUR HALLOWEEN STORY.','HALLOWEEN SPECIAL FRIDGE MAGNET']
+    titles=['YOUR HALLOWEEN PHOTO. JUST $10.','MEET YOUR HALLOWEEN ALTER EGO.','HALLOWEEN BACKGROUND INCLUDED. $10.','HALLOWEEN SPECIAL FRIDGE MAGNET']
     r.display(im,(54,226),titles[i],39,r.WHITE,max_width=972)
     # Moving sparks and trails behind cards.
     for j in range(22):
@@ -101,10 +101,10 @@ def hero(i,u):
         r.display(im,(55,988),'SIX HAUNTING LOOKS. WHICH ONE ARE YOU?',30,accent,max_width=970)
     elif i==2:
         carousel(im,scene_tiles,u)
-        r.display(im,(54,918),'STEP INTO A NIGHT OF HALLOWEEN MAGIC',36,accent,max_width=970)
+        r.display(im,(54,918),'A HALLOWEEN MOMENT. A MEMORY TO KEEP.',36,accent,max_width=970)
     elif i==0:
-        carousel(im,print_tiles,u)
-        r.display(im,(54,918),'YOUR HALLOWEEN MOMENT, PRINTED TO KEEP.',36,accent,max_width=970)
+        carousel(im,scene_tiles,u)
+        r.display(im,(54,918),'STEP INTO HALLOWEEN. KEEP THE MEMORY.',36,accent,max_width=970)
     else:
         impact(im,u-.5)
         fly(im,magnet_tile,330,330,u,0)
@@ -128,14 +128,16 @@ def frame(t,landscape=False):
         im=Image.new('RGB',(1080,1920));im.paste(top,(0,0));im.paste(p.menu,(0,1080))
     return im
 if __name__=='__main__':
+    export=Path(sys.argv[sys.argv.index('--output-dir')+1]) if '--output-dir' in sys.argv else OUT
+    export.mkdir(parents=True,exist_ok=True)
     landscape='--landscape' in sys.argv; name='landscape' if landscape else 'portrait'
-    for i in range(4):frame(STARTS[i]+(21 if i==1 else 6),landscape).save(OUT/f'{name}-{i+1}.jpg',quality=94)
-    frame(13.5,landscape).save(OUT/f'{name}-solo.jpg',quality=94)
+    for i in range(4):frame(STARTS[i]+(21 if i==1 else 6),landscape).save(export/f'{name}-{i+1}.jpg',quality=94)
+    frame(13.5,landscape).save(export/f'{name}-solo.jpg',quality=94)
     if '--stills' in sys.argv:sys.exit()
     w,h=(1920,1080) if landscape else (1080,1920)
     chapter=int(sys.argv[sys.argv.index('--chapter')+1]) if '--chapter' in sys.argv else None
     target=f'halloween-{name}.mp4' if chapter is None else f'{name}-part-{chapter}.mp4'
-    cmd=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{w}x{h}','-r',str(FPS),'-i','-','-an','-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(OUT/target)]
+    cmd=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{w}x{h}','-r',str(FPS),'-i','-','-an','-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(export/target)]
     encoder=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     for n in (range(TOTAL*FPS) if chapter is None else range(STARTS[chapter]*FPS,(STARTS[chapter]+DURATIONS[chapter])*FPS)):
         encoder.stdin.write(frame(n/FPS,landscape).tobytes())

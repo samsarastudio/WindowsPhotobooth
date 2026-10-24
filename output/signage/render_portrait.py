@@ -38,9 +38,9 @@ menu=Image.new('RGB',(1080,840),(10,14,19)); d=ImageDraw.Draw(menu)
 r.display(menu,(58,22),'CHOOSE YOUR KEEPSAKE',56,r.WHITE,max_width=960)
 r.txt(menu,(60,90),'PHOTO PRINTS, AI PHOTOS & FRIDGE MAGNETS',24,r.MUTED)
 for y,title,price,line1,line2 in [
-    (145,'PHOTO PRINT','$10','One original photo print','+ digital copy'),
-    (302,'AI DIGITAL PHOTO','$15','Individual character portrait','or group Halloween background'),
-    (459,'FRIDGE MAGNET','$25','One magnet + digital copy','Original photo or AI transformation')]:
+    (145,'CLASSIC PHOTO','$10','Halloween background included','One print + digital copy'),
+    (302,'AI PORTRAIT','$15','Your Halloween character transformation','+ digital copy'),
+    (459,'FRIDGE MAGNET','$'+r.MAGNET_PRICE,'One magnet + digital copy','Original photo or AI transformation')]:
     if y==459:
         d.rectangle((48,y,1032,780),fill=(18,26,22),outline=r.GOLD,width=4)
         r.display(menu,(72,y+14),'HALLOWEEN SPECIAL',32,r.GOLD)
@@ -58,7 +58,7 @@ d.rectangle((66,666,304,762),fill=r.GOLD)
 r.display(menu,(83,676),'HALLOWEEN',32,(16,22,16),max_width=210)
 r.display(menu,(83,714),'OFFER',32,(16,22,16),max_width=210)
 r.display(menu,(328,673),'AI PHOTO OPTION INCLUDED',44,(16,22,16),max_width=660)
-r.txt(menu,(330,729),'WITH YOUR $25 FRIDGE MAGNET',24,(16,22,16))
+r.txt(menu,(330,729),f'WITH YOUR ${r.MAGNET_PRICE} FRIDGE MAGNET',24,(16,22,16))
 r.txt(menu,(60,802),'ALL PRICES IN CAD',22,r.MUTED)
 r.txt(menu,(735,802),'CHOOSE AT THE BOOTH',22,r.WHITE)
 
