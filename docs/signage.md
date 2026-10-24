@@ -10,6 +10,8 @@ To publish the locally rendered videos, first run the signage validation script,
 node moments-server/scripts/publish-signage.mjs output/signage/current-app
 ```
 
+Named campaigns: pass `video2` as the final publish argument to publish a separate Video 2 manifest and make it the default. Use `/signage?video=2&layout=portrait` (or `landscape`) to pin a display to that campaign. The original campaign remains available via `video1.json` and `?video=1`. Named campaigns have separate browser cache entries.
+
 Deploy `public/assets/signage/` with the server, including its manifest and both hashed MP4 files. The manifest is written only after both assets are copied. Keep older hashed files until connected devices have updated. Click **Check for update** or reload the player to load a new version. Do not replace the file behind an existing hash.
 
 Browser regression test: `node moments-server/scripts/test-signage.cjs`. Install Playwright or set `PLAYWRIGHT_MODULE` to an available Playwright package; Chrome is required. The test starts an isolated Moments server with a temporary database and uses the published local videos.

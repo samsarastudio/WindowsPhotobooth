@@ -62,6 +62,16 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     await page.locator('#layout').selectOption('auto'); await playing('landscape');
     await page.setViewportSize({ width: 720, height: 1280 }); await playing('portrait');
     assert.equal(downloads, 2, 'Auto rotation reuses both cached layouts');
+    if (fs.existsSync(path.join(root, 'public/assets/signage/video2.json'))) {
+      await page.goto(`${base}/signage?video=2&layout=portrait`); await playing('portrait');
+      const version2 = await page.locator('video').getAttribute('data-version');
+      assert.match(await page.locator('#status').textContent(), /Video 2/);
+      await page.goto(`${base}/signage?video=1&layout=portrait`); await playing('portrait');
+      assert.notEqual(await page.locator('video').getAttribute('data-version'), version2, 'Original campaign is preserved');
+      const beforeReturn = downloads;
+      await page.goto(`${base}/signage?video=2&layout=portrait`); await playing('portrait');
+      assert.equal(downloads, beforeReturn, 'Named campaign has a separate reusable cache');
+    }
     await page.screenshot({ path: path.join(data, 'portrait-player.png') });
     const memory = await browser.newContext();
     await memory.addInitScript(() => { indexedDB.open = () => { throw Error('Storage unavailable'); }; });

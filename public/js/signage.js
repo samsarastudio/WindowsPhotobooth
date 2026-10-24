@@ -3,6 +3,8 @@ const status = document.querySelector('#status');
 const layout = document.querySelector('#layout');
 const start = document.querySelector('#start');
 const params = new URLSearchParams(location.search);
+const campaignNumber = /^[1-9][0-9]*$/.test(params.get('video') || '') ? params.get('video') : '';
+const manifestUrl = `/assets/signage/${campaignNumber ? 'video' + campaignNumber : 'manifest'}.json`;
 layout.value = ['portrait', 'landscape'].includes(params.get('layout')) ? params.get('layout') : 'auto';
 const screenShape = matchMedia('(orientation: portrait)');
 let currentUrl, idleTimer, wakeLock, requestId = 0, activeController;
@@ -66,13 +68,14 @@ async function load() {
   activeController = new AbortController();
   const signal = activeController.signal;
   const orientation = layout.value === 'auto' ? (screenShape.matches ? 'portrait' : 'landscape') : layout.value;
+  const cacheKey = campaignNumber ? `video${campaignNumber}:${orientation}` : orientation;
   status.textContent = `Loading ${orientation} signage…`;
   let previous;
-  try { previous = await cache('readonly', orientation); } catch { /* Memory playback works without persistent storage. */ }
+  try { previous = await cache('readonly', cacheKey); } catch { /* Memory playback works without persistent storage. */ }
   try {
     let asset;
     try {
-      const response = await fetch('/assets/signage/manifest.json', { cache: 'no-store', signal });
+      const response = await fetch(manifestUrl, { cache: 'no-store', signal });
       if (!response.ok) throw Error('No signage published');
       asset = (await response.json())[orientation];
       if (!asset?.version || !asset?.url) throw Error('Missing signage layout');
@@ -91,7 +94,7 @@ async function load() {
         blob = previous.blob; asset = previous; persistent = true;
       }
       if (!persistent) {
-        try { await cache('readwrite', orientation, { ...asset, blob }); persistent = true; }
+        try { await cache('readwrite', cacheKey, { ...asset, blob }); persistent = true; }
         catch { /* Quota/private browsing: retain the complete blob in memory. */ }
       }
     }
@@ -102,7 +105,7 @@ async function load() {
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     video.dataset.layout = orientation;
     video.dataset.version = asset.version;
-    status.textContent = `${orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${persistent ? 'Saved on this device' : 'Loaded in memory'} · Continuous loop`;
+    status.textContent = `${asset.title ? asset.title + ' · ' : ''}${orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${persistent ? 'Saved on this device' : 'Loaded in memory'} · Continuous loop`;
     await play();
   } catch (error) {
     if (id !== requestId || signal.aborted) return;
