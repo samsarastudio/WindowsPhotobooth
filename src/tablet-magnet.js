@@ -19,7 +19,7 @@ export async function createTabletMagnet(photoId) {
   const family = captureFamilyKey(row.source_local_name, row.filename);
   const siblings = db.prepare('SELECT * FROM photos WHERE session_id=?').all(session.id).filter(p => captureFamilyKey(p.source_local_name,p.filename) === family);
   const original = siblings.find(p => p.variant === 'original');
-  const portrait = original && db.prepare('SELECT id FROM portrait_jobs WHERE original_id=?').get(original.id);
+  const portrait = original && db.prepare("SELECT id FROM portrait_jobs WHERE original_id=? AND job_kind='portrait'").get(original.id);
   const source = magnetSource(siblings, portrait);
   if (!source) throw Error('Magnet requires a finished Classic photo or an unframed Background photo. Portraits are not supported.');
   const sourceName = `magnet-${source.id}_physical.png`;

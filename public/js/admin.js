@@ -2769,3 +2769,16 @@ setInterval(() => {
 }, 15000);
 
 initFrameGenerator({api,setStatus,refreshFrames});
+// Recovery is explicit: original selection → frame preview → kiosk print queue.
+document.getElementById('btnRecoverOriginals')?.addEventListener('click',async()=>{
+ const ids=[...selectedPhotoIds];
+ if(!ids.length||ids.some(id=>photosCache.find(p=>p.id===id)?.variant!=='original')){setStatus('Select original photos only using the gallery checkboxes.');return;}
+ const dialog=document.createElement('dialog');dialog.style='max-width:960px;width:90vw;background:#211b23;color:white;padding:24px;border-radius:16px';
+ dialog.innerHTML='<h2>Recover originals</h2><p>Choose a configured frame, review the result, then send it to the kiosk.</p><select class="input recovery-frame"></select><button class="btn recovery-preview">Create previews</button><div class="recovery-photos" style="display:flex;gap:12px;flex-wrap:wrap;margin:16px 0"></div><p class="recovery-status" role="status"></p><button class="btn recovery-print" disabled>Send previews to kiosk printer</button> <button class="btn recovery-close">Close</button>';
+ document.body.append(dialog);dialog.showModal();dialog.querySelector('.recovery-close').onclick=()=>{dialog.close();dialog.remove()};
+ const status=dialog.querySelector('.recovery-status'),select=dialog.querySelector('select'),print=dialog.querySelector('.recovery-print');let photos=[];
+ try{const data=await api('/api/frames');for(const f of data.frames||[])if(f.filename.endsWith('.png'))select.add(new Option(f.label||f.filename,f.filename));if([...select.options].some(o=>o.value==='halloween-haunt.png'))select.value='halloween-haunt.png';}catch(e){status.textContent=e.message;}
+ select.onchange=()=>{photos=[];print.disabled=true;dialog.querySelector('.recovery-photos').replaceChildren();};
+ dialog.querySelector('.recovery-preview').onclick=async event=>{const button=event.target;button.disabled=true;print.disabled=true;status.textContent='Creating previews…';try{const r=await api('/api/admin/photos/frame-originals',{method:'POST',body:JSON.stringify({photoIds:ids,frame:select.value})});photos=r.photos||[];const box=dialog.querySelector('.recovery-photos');box.replaceChildren();for(const photo of photos){const img=document.createElement('img');img.src=photo.url;img.alt='Framed original preview';img.style='width:280px;max-width:100%;object-fit:contain';box.append(img);}status.textContent=`${photos.length} ready. `+(r.errors||[]).map(e=>e.error).join('; ');print.disabled=!photos.length;}catch(e){status.textContent=e.message;}finally{button.disabled=false;}};
+ print.onclick=async()=>{print.disabled=true;let sent=0;const errors=[];for(const photo of photos){try{await api(`/api/tablet/photos/${encodeURIComponent(photo.id)}/print`,{method:'POST',body:'{}'});sent++;}catch(e){errors.push(e.message);}}status.textContent=`${sent} sent to the kiosk print queue. `+errors.join('; ');print.disabled=!errors.length;};
+});

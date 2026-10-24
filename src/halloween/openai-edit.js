@@ -60,6 +60,8 @@ function httpsPostMultipart(urlString, form, authHeaders) {
       },
       (res) => {
         const chunks = [];
+        res.on('error', reject);
+        res.on('aborted', () => reject(new Error('OpenAI connection closed before the image finished. Use Retry to try again.')));
         res.on('data', (chunk) => chunks.push(chunk));
         res.on('end', () => {
           resolve({
@@ -69,7 +71,9 @@ function httpsPostMultipart(urlString, form, authHeaders) {
         });
       },
     );
-    req.setTimeout(300000, () => req.destroy(new Error('OpenAI portrait request timed out.')));
+    const deadline = setTimeout(() => req.destroy(new Error('OpenAI image request timed out. Use Retry to try again.')), 300000);
+    req.on('close', () => clearTimeout(deadline));
+    req.setTimeout(300000, () => req.destroy(new Error('OpenAI image request timed out.')));
     req.on('error', reject);
     form.pipe(req);
   });
@@ -103,7 +107,7 @@ export async function callOpenAiImageEdit(
   const auth = { Authorization: `Bearer ${String(apiKey || '').trim()}` };
   let lastErr = 'GPT image edit failed.';
 
-  for (const model of GPT_IMAGE_EDIT_MODELS) {
+  for (const model of GPT_IMAGE_EDIT_MODELS.slice(0, options.maxAttempts || GPT_IMAGE_EDIT_MODELS.length)) {
     const form = buildGptImageEditForm(
       pngBuf,
       fullPrompt,
