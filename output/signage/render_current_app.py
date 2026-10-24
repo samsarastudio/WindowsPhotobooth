@@ -28,7 +28,15 @@ tiles=[tile(photo,label,224,306) for label,photo in cards]
 solo_tiles=[tile(photo,label,520,680) for label,photo in cards]
 scene_tiles=[tile(photo,manifest['scenes'][n]['label'].upper(),900,590) for n,photo in enumerate(scenes)]
 print_tiles=[tile(photo,'YOUR FRAMED PRINT',900,590) for photo in prints]
-magnet_tile=tile(r.magnet_off,'FRIDGE MAGNET + DIGITAL COPY',430,580)
+postcard_photo=ImageOps.expand(scenes[0],border=32,fill=(250,246,234))
+postcard_tile=tile(postcard_photo,'ONE POSTCARD PRINT',540,430)
+# Use one physical magnet, with the same family photo placed in its photo opening.
+magnet_preview=r.magnet_on.copy()
+magnet_insert=ImageOps.fit(scenes[0],(236,154),method=Image.Resampling.LANCZOS)
+magnet_mask=Image.new('L',(236,154));ImageDraw.Draw(magnet_mask).polygon([(8,0),(234,12),(228,152),(0,144)],fill=255)
+magnet_preview.paste(magnet_insert,(204,163),magnet_mask)
+magnet_preview=magnet_preview.crop((132,108,540,377))
+magnet_tile=tile(magnet_preview,'ONE PHOTO MAGNET',330,330)
 
 def pose(im,card,cx,cy,scale=1,angle=0):
     size=(max(1,round(card.width*scale)),max(1,round(card.height*scale)))
@@ -74,10 +82,10 @@ def hero(i,u):
     plate_time=11.9667-abs((u%23.9334)-11.9667)
     im=p.moving_plate(i,plate_time);d=ImageDraw.Draw(im)
     d.rectangle((0,0,1080,285),fill=(12,9,16))
-    r.display(im,(52,30),'TAKE HOME THE HORROR',76,accent,max_width=976)
+    r.display(im,(52,30),'HALLOWEEN SOUVENIRS',76,accent,max_width=976)
     for j,line in enumerate(["Ontario's most terrifying haunted attraction",'is back with even more horror and gore.']):
         d.text((55,131+j*35),line,font=r.font(30),fill=r.WHITE)
-    titles=['YOUR HALLOWEEN PHOTO. JUST $10.','MEET YOUR HALLOWEEN ALTER EGO.','HALLOWEEN BACKGROUND INCLUDED. $10.','HALLOWEEN SPECIAL FRIDGE MAGNET']
+    titles=['YOUR HALLOWEEN SOUVENIR. JUST $10.','YOUR CHARACTER. YOUR HALLOWEEN STORY.','A PHOTO SOUVENIR TO SHARE. $10.','ONE NIGHT. THREE WAYS TO KEEP IT.']
     r.display(im,(54,226),titles[i],39,r.WHITE,max_width=972)
     # Moving sparks and trails behind cards.
     for j in range(22):
@@ -101,14 +109,20 @@ def hero(i,u):
         r.display(im,(55,988),'SIX HAUNTING LOOKS. WHICH ONE ARE YOU?',30,accent,max_width=970)
     elif i==2:
         carousel(im,scene_tiles,u)
-        r.display(im,(54,918),'A HALLOWEEN MOMENT. A MEMORY TO KEEP.',36,accent,max_width=970)
+        r.display(im,(54,918),'CAPTURE THE NIGHT. TAKE HOME THE MEMORY.',36,accent,max_width=970)
     elif i==0:
         carousel(im,scene_tiles,u)
-        r.display(im,(54,918),'STEP INTO HALLOWEEN. KEEP THE MEMORY.',36,accent,max_width=970)
+        r.display(im,(54,918),'YOUR NIGHT. YOUR PHOTO. YOUR SOUVENIR.',36,accent,max_width=970)
     else:
         impact(im,u-.5)
-        fly(im,magnet_tile,330,330,u,0)
-        r.display(im,(54,958),'TURN TONIGHT INTO A KEEPSAKE.',38,accent,max_width=970)
+        r.display(im,(75,304),'YOUR COMPLETE SOUVENIR SET. $25',48,accent,max_width=930)
+        fly(im,postcard_tile,65,405,u,0)
+        fly(im,magnet_tile,685,455,u,1)
+        r.display(im,(618,562),'+',70,accent,max_width=60)
+        d=ImageDraw.Draw(im)
+        d.rounded_rectangle((240,870,840,932),radius=12,fill=(18,26,22),outline=accent,width=2)
+        r.display(im,(270,882),'+ DIGITAL COPY INCLUDED',36,r.WHITE,max_width=540)
+        r.display(im,(54,968),'A LITTLE HALLOWEEN TO TAKE HOME.',35,accent,max_width=970)
     d=ImageDraw.Draw(im);d.line((54,1050,1026,1050),fill=red,width=4)
     d.line((54,1050,54+972*min(u/(DURATIONS[i]-1),1),1050),fill=accent,width=4)
     return im

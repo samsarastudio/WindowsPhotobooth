@@ -53,7 +53,7 @@ d.line((960,52,960,1028),fill=(67,59,47),width=2)
 display(bg,(64,35),'HALLOWEEN MEMORIES',58,GOLD)
 txt(bg,(66,109),'PERSONALIZED PHOTOS & KEEPSAKES',22,WHITE)
 txt(bg,(1024,49),'HALLOWEEN PHOTO EXPERIENCES',24,GOLD)
-display(bg,(1020,91),'CHOOSE YOUR KEEPSAKE',72,WHITE)
+display(bg,(1020,91),'CHOOSE YOUR SOUVENIR',72,WHITE)
 txt(bg,(1024,182),'PHOTO PRINTS, AI PHOTOS & FRIDGE MAGNETS',24,MUTED)
 rows=[('CLASSIC PHOTO','$10','Halloween background included','One print + digital copy'),
       ('AI PORTRAIT','$15','Your Halloween character transformation','+ digital copy'),

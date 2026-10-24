@@ -35,7 +35,7 @@ def moving_plate(i,u):
     return Image.alpha_composite(plate,motion_shade).convert('RGB')
 
 menu=Image.new('RGB',(1080,840),(10,14,19)); d=ImageDraw.Draw(menu)
-r.display(menu,(58,22),'CHOOSE YOUR KEEPSAKE',56,r.WHITE,max_width=960)
+r.display(menu,(58,22),'CHOOSE YOUR SOUVENIR',56,r.WHITE,max_width=960)
 r.txt(menu,(60,90),'PHOTO PRINTS, AI PHOTOS & FRIDGE MAGNETS',24,r.MUTED)
 for y,title,price,line1,line2 in [
     (145,'CLASSIC PHOTO','$10','Halloween background included','One print + digital copy'),
