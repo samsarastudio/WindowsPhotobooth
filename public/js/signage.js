@@ -1,10 +1,12 @@
 const video = document.querySelector('#video');
 const status = document.querySelector('#status');
 const layout = document.querySelector('#layout');
+const campaign = document.querySelector('#campaign');
 const start = document.querySelector('#start');
 const params = new URLSearchParams(location.search);
-const campaignNumber = /^[1-9][0-9]*$/.test(params.get('video') || '') ? params.get('video') : '';
-const manifestUrl = `/assets/signage/${campaignNumber ? 'video' + campaignNumber : 'manifest'}.json`;
+let campaignNumber = /^[1-9][0-9]*$/.test(params.get('video') || '') ? params.get('video') : '';
+if (![...campaign.options].some(option => option.value === campaignNumber)) campaign.add(new Option(`Video ${campaignNumber}`, campaignNumber));
+campaign.value = campaignNumber;
 layout.value = ['portrait', 'landscape'].includes(params.get('layout')) ? params.get('layout') : 'auto';
 const screenShape = matchMedia('(orientation: portrait)');
 let currentUrl, idleTimer, wakeLock, requestId = 0, activeController;
@@ -67,7 +69,11 @@ async function load() {
   activeController?.abort();
   activeController = new AbortController();
   const signal = activeController.signal;
-  const orientation = layout.value === 'auto' ? (screenShape.matches ? 'portrait' : 'landscape') : layout.value;
+  const manifestUrl = `/assets/signage/${campaignNumber ? 'video' + campaignNumber : 'manifest'}.json`;
+  const orientation = campaignNumber === '3' ? 'portrait' : layout.value === 'auto' ? (screenShape.matches ? 'portrait' : 'landscape') : layout.value;
+  layout.disabled = campaignNumber === '3';
+  if (campaignNumber === '3') layout.value = 'portrait';
+  layout.title = campaignNumber === '3' ? 'Video 3 is portrait only' : '';
   const cacheKey = campaignNumber ? `video${campaignNumber}:${orientation}` : orientation;
   status.textContent = `Loading ${orientation} signage…`;
   let previous;
@@ -105,6 +111,7 @@ async function load() {
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     video.dataset.layout = orientation;
     video.dataset.version = asset.version;
+    video.dataset.campaign = campaignNumber;
     status.textContent = `${asset.title ? asset.title + ' · ' : ''}${orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${persistent ? 'Saved on this device' : 'Loaded in memory'} · Continuous loop`;
     await play();
   } catch (error) {
@@ -125,6 +132,12 @@ document.querySelector('#fullscreen').addEventListener('click', async () => {
 layout.addEventListener('change', () => {
   params.set('layout', layout.value); history.replaceState(null, '', `${location.pathname}?${params}`);
   layout.blur(); load();
+});
+campaign.addEventListener('change', () => {
+  campaignNumber = campaign.value;
+  if (campaignNumber) params.set('video', campaignNumber); else params.delete('video');
+  history.replaceState(null, '', `${location.pathname}?${params}`);
+  campaign.blur(); load();
 });
 screenShape.addEventListener('change', () => { if (layout.value === 'auto') load(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
