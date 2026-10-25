@@ -16,8 +16,8 @@ def menu():
     for y,line in [(260,'One postcard print + one photo magnet'),(308,'+ digital copy')]:
         r.txt(im,(78,y),line,32,r.WHITE)
     d.rounded_rectangle((72,372,1008,488),radius=10,fill=r.GREEN)
-    r.display(im,(96,387),'AI PHOTO OPTION INCLUDED',43,(16,22,16),max_width=884)
-    r.txt(im,(98,447),'Complete souvenir set for $10 more than AI digital',28,(16,22,16))
+    r.display(im,(96,387),'PRINT IT. DISPLAY IT. SHARE IT.',43,(16,22,16),max_width=884)
+    r.txt(im,(98,447),'Your complete Halloween souvenir set',28,(16,22,16))
     for y,title,price,line in [(542,'CLASSIC PHOTO','$10','Halloween background + one print + digital copy'),(665,'AI PORTRAIT','$15','Your Halloween character + digital copy')]:
         r.display(im,(72,y),title,43,r.WHITE,max_width=700)
         r.display(im,(851,y),price,65,r.GOLD,max_width=158)
@@ -51,20 +51,28 @@ def frame(t):
         for offset,width,color in [(35,30,c.red),(0,20,c.accent),(-9,4,r.WHITE)]:d.line((x+offset,0,x-270+offset,1080),fill=color,width=width)
     im=Image.new('RGB',(1080,1920));im.paste(top,(0,0));im.paste(MENU,(0,1080));return im
 
-if __name__=='__main__':
-    for t in [5,17,25.5,29,32,35,38,41,45,54]:frame(t).save(OUT/f'preview-{t}.jpg',quality=93)
-    if '--stills' in sys.argv:sys.exit()
-    target=OUT/'halloween-portrait.mp4'
+def render(target):
     encoder=subprocess.Popen(['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s','1080x1920','-r','30','-i','-','-an','-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(target)],stdin=subprocess.PIPE)
     for n in range(TOTAL*FPS):
         encoder.stdin.write(frame(n/FPS).tobytes())
         if n%300==0:print('Video 3:',n//FPS,'/',TOTAL,'seconds',flush=True)
     encoder.stdin.close()
     if encoder.wait():raise RuntimeError('Export failed')
+
+if __name__=='__main__':
+    for t in [5,17,25.5,29,32,35,38,41,45,54]:frame(t).save(OUT/f'preview-{t}.jpg',quality=93)
+    if '--stills' in sys.argv:sys.exit()
+    target=OUT/'halloween-portrait.mp4'
+    if '--pricing-only' in sys.argv:
+        panel=OUT/'portrait-pricing.png'; MENU.save(panel)
+        replacement=OUT/'halloween-portrait-next.mp4'
+        subprocess.run(['ffmpeg','-y','-v','error','-i',str(target),'-loop','1','-i',str(panel),'-filter_complex','[0:v][1:v]overlay=0:1080:shortest=1[v]','-map','[v]','-an','-t','60','-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',str(replacement)],check=True)
+        replacement.replace(target)
+    else:
+        render(target)
     meta=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_streams','-show_format','-of','json',str(target)]));v=meta['streams'][0]
     assert (v['width'],v['height'],int(v['nb_frames']))==(1080,1920,1800)
     assert abs(float(meta['format']['duration'])-60)<.05
     subprocess.run(['ffmpeg','-v','error','-i',str(target),'-f','null','-'],check=True)
     (OUT/'video-validation.json').write_text(json.dumps({'portrait':{'width':1080,'height':1920,'fps':v['r_frame_rate'],'frames':1800,'seconds':60,'decode':'passed'}},indent=2))
     print('Video 3 validated',flush=True)
-
