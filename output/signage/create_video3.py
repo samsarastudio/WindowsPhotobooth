@@ -1,27 +1,54 @@
 """Local portrait campaign: tangible bundle first, clear alternatives, character previews."""
 import json, math, subprocess, sys
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from functools import lru_cache
 import render_current_app as c
 r=c.r
+r.font=lru_cache(maxsize=256)(r.font)
 OUT=c.OUT/'video3'; OUT.mkdir(exist_ok=True)
 TOTAL=60; FPS=30
 
+def thumbnails(im,photo,x,y):
+    """Physical print and phone preview; QR is a labeled illustration, not a download link."""
+    d=ImageDraw.Draw(im)
+    d.rounded_rectangle((x,y,x+184,y+112),radius=3,fill=(250,246,234))
+    image=ImageOps.fit(photo,(170,96),method=Image.Resampling.LANCZOS)
+    im.paste(image,(x+7,y+7))
+    r.display(im,(x,y+117),'POSTCARD PRINT',23,r.WHITE,max_width=190)
+    px=x+280
+    d.rounded_rectangle((px,y-4,px+74,y+112),radius=12,fill=(14,17,22),outline=r.WHITE,width=3)
+    im.paste(ImageOps.fit(photo,(62,87)),(px+6,y+8))
+    d.line((px+27,y+103,px+47,y+103),fill=r.WHITE,width=3)
+    # QR-style pictogram with finder corners, intentionally no encoded destination.
+    qx=px+96; qy=y+21; cell=3
+    d.rectangle((qx-6,qy-6,qx+69,qy+69),fill='white')
+    for row in range(21):
+        for col in range(21):
+            if (row*13+col*7+row*col)%5<2:
+                d.rectangle((qx+col*cell,qy+row*cell,qx+col*cell+2,qy+row*cell+2),fill='black')
+    for dx,dy in [(0,0),(42,0),(0,42)]:
+        d.rectangle((qx+dx,qy+dy,qx+dx+20,qy+dy+20),fill='black')
+        d.rectangle((qx+dx+3,qy+dy+3,qx+dx+17,qy+dy+17),fill='white')
+        d.rectangle((qx+dx+6,qy+dy+6,qx+dx+14,qy+dy+14),fill='black')
+    d.text((qx-3,qy+70),'QR sample',font=r.font(18),fill=r.MUTED)
+    r.display(im,(px-7,y+117),'DIGITAL COPY',23,r.WHITE,max_width=200)
+
 def menu():
     im=Image.new('RGB',(1080,840),(10,14,19));d=ImageDraw.Draw(im)
-    r.display(im,(56,22),'TAKE HOME THE NIGHT',59,r.WHITE,max_width=960)
-    d.rounded_rectangle((48,112,1032,510),radius=18,fill=(26,28,18),outline=r.GOLD,width=4)
-    r.display(im,(76,132),'HALLOWEEN SPECIAL',35,r.GOLD,max_width=700)
-    r.display(im,(76,183),'FRIDGE MAGNET SET',52,r.WHITE,max_width=700)
-    r.display(im,(818,165),'$25',106,r.GOLD,max_width=185)
-    for y,line in [(260,'One postcard print + one photo magnet'),(308,'+ digital copy')]:
-        r.txt(im,(78,y),line,32,r.WHITE)
-    d.rounded_rectangle((72,372,1008,488),radius=10,fill=r.GREEN)
-    r.display(im,(96,387),'PRINT IT. DISPLAY IT. SHARE IT.',43,(16,22,16),max_width=884)
-    r.txt(im,(98,447),'Your complete Halloween souvenir set',28,(16,22,16))
-    for y,title,price,line in [(542,'CLASSIC PHOTO','$10','Halloween background + one print + digital copy'),(665,'AI PORTRAIT','$15','Your Halloween character + digital copy')]:
+    r.display(im,(56,18),'TAKE HOME THE NIGHT',56,r.WHITE,max_width=960)
+    d.rounded_rectangle((48,100,1032,484),radius=18,fill=(26,28,18),outline=r.GOLD,width=4)
+    d.rounded_rectangle((62,111,1018,158),radius=8,fill=(255,166,77))
+    r.display(im,(80,116),'HALLOWEEN PROMOTION',32,(20,12,8),max_width=900)
+    r.display(im,(76,162),'FRIDGE MAGNET SET',49,r.WHITE,max_width=700)
+    r.display(im,(818,147),'$25',106,r.GOLD,max_width=185)
+    r.txt(im,(78,229),'One postcard-sized print + one photo magnet',30,r.WHITE)
+    r.txt(im,(78,272),'+ digital copy',30,r.WHITE)
+    thumbnails(im,c.scenes[0],280,323)
+    for y,title,price,detail in [(508,'CLASSIC PHOTO','$10','Your photo in a Halloween background'),(652,'AI PORTRAIT','$15','Your Halloween character transformation')]:
         r.display(im,(72,y),title,43,r.WHITE,max_width=700)
         r.display(im,(851,y),price,65,r.GOLD,max_width=158)
-        r.txt(im,(74,y+61),line,28,r.WHITE)
+        r.txt(im,(74,y+53),detail,28,r.WHITE)
+        r.txt(im,(74,y+91),'One postcard-sized print + digital copy',30,r.GOLD)
     r.txt(im,(60,802),'ALL PRICES IN CAD',22,r.MUTED)
     r.txt(im,(650,802),'ASK AT THE PHOTO BOOTH',24,r.WHITE)
     return im
@@ -29,8 +56,8 @@ MENU=menu()
 
 def scene(t):
     if t<12:i,u,title,sub=3,t,'KEEP THE FRIGHT. TAKE HOME THE FUN.','YOUR HALLOWEEN SOUVENIR SET'
-    elif t<24:i,u,title,sub=0,t-12,'STEP INTO HALLOWEEN. JUST $10.','A PHOTO TODAY. A MEMORY TO KEEP.'
-    elif t<48:i,u,title,sub=1,t-24,'BECOME YOUR HALLOWEEN CHARACTER','AI PORTRAIT + DIGITAL COPY  $15'
+    elif t<24:i,u,title,sub=0,t-12,'STEP INTO HALLOWEEN. JUST $10.','POSTCARD-SIZED PRINT + DIGITAL COPY'
+    elif t<48:i,u,title,sub=1,t-24,'BECOME YOUR HALLOWEEN CHARACTER','POSTCARD-SIZED PRINT + DIGITAL COPY  $15'
     else:i,u,title,sub=3,t-48,'ONE NIGHT. A SOUVENIR TO KEEP.','PRINT IT. DISPLAY IT. SHARE IT.'
     im=c.hero(i,u);d=ImageDraw.Draw(im)
     d.rectangle((0,0,1080,285),fill=(12,9,16))

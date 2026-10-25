@@ -25,3 +25,5 @@ Video 3 opens with the $25 postcard, physical photo magnet and digital-copy set,
 Deploy `public/assets/signage/` with the server, including its manifest and both hashed MP4 files. The manifest is written only after both assets are copied. Keep older hashed files until connected devices have updated. Click **Check for update** or reload the player to load a new version. Do not replace the file behind an existing hash.
 
 Browser regression test: `node moments-server/scripts/test-signage.cjs`. Install Playwright or set `PLAYWRIGHT_MODULE` to an available Playwright package; Chrome is required. The test starts an isolated Moments server with a temporary database and uses the published local videos.
+
+Video 3 inclusions: Classic Photo ($10) and AI Portrait ($15) each include one postcard-sized print and a digital copy. The $25 magnet set includes one postcard-sized print, one photo magnet and a digital copy. Print and phone thumbnails illustrate the deliverables; the small QR pictogram is labeled "QR sample" and is not a customer download link.
