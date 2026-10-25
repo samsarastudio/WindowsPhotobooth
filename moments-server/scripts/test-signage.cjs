@@ -73,6 +73,32 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       assert.equal(downloads, beforeReturn, 'Named campaign has a separate reusable cache');
     }
     await page.screenshot({ path: path.join(data, 'portrait-player.png') });
+    if (fs.existsSync(path.join(root, 'public/assets/signage/video3.json'))) {
+      await page.locator('#campaign').selectOption('3');
+      await page.waitForFunction(() => document.querySelector('video').dataset.campaign === '3');
+      await playing('portrait');
+      assert.equal(await page.locator('#layout').inputValue(), 'portrait');
+      assert(await page.locator('#layout').isDisabled());
+      assert.match(page.url(), /video=3/);
+      const version3 = await page.locator('video').getAttribute('data-version');
+      await page.locator('#campaign').selectOption('2');
+      await page.waitForFunction(() => document.querySelector('video').dataset.campaign === '2');
+      await playing('portrait');
+      assert.notEqual(await page.locator('video').getAttribute('data-version'), version3);
+      assert(await page.locator('#layout').isEnabled());
+      const cachedDownloads = downloads;
+      await page.locator('#campaign').selectOption('3');
+      await page.waitForFunction(() => document.querySelector('video').dataset.campaign === '3');
+      await playing('portrait');
+      assert.equal(downloads, cachedDownloads, 'Video 3 switches back using its own cache');
+      await page.goto(`${base}/signage?video=3&layout=landscape`);
+      await playing('portrait');
+      assert.equal(await page.locator('video').evaluate(v => v.videoHeight), 1920);
+      await page.locator('video').evaluate(v => { v.currentTime = v.duration - .25; });
+      await wait(1000);
+      assert(await page.locator('video').evaluate(v => v.currentTime < 3 && !v.paused), 'Video 3 loops');
+      await page.screenshot({ path: path.join(data, 'video3-player.png') });
+    }
     const memory = await browser.newContext();
     await memory.addInitScript(() => { indexedDB.open = () => { throw Error('Storage unavailable'); }; });
     const memoryPage = await memory.newPage();
