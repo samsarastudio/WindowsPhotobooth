@@ -1,4 +1,5 @@
 import { portraitJobsRouter, initPortraitJobs } from './routes/portrait-jobs.js';
+import { gameRouter, adminGameRouter } from './routes/game.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
@@ -99,6 +100,10 @@ app.get('/api/share/:photoId', (req, res) => {
 });
 
 app.use('/api/sessions', sessionsRouter);
+app.use('/api/game', gameRouter);
+app.use('/api/admin/game', adminGameRouter);
+app.get('/play', (_req,res) => res.sendFile(path.join(config.publicDir,'game-register.html')));
+app.get('/game-admin', (_req,res) => res.sendFile(path.join(config.publicDir,'game-admin.html')));
 app.use('/api/frames', framesRouter);
 app.use('/api/wall', wallRouter);
 app.use('/api/qr', qrRouter);
