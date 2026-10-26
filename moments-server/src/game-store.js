@@ -9,6 +9,7 @@ export function createGameStore(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS game_settings (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL, salt TEXT NOT NULL, pin_hash TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS game_players (id TEXT PRIMARY KEY, token TEXT UNIQUE NOT NULL, name TEXT NOT NULL, email TEXT NOT NULL, dob TEXT NOT NULL, credits INTEGER NOT NULL DEFAULT 0 CHECK(credits>=0), redeemed INTEGER NOT NULL DEFAULT 0 CHECK(redeemed>=0), created TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS game_player_identity ON game_players(email,dob);
     CREATE TABLE IF NOT EXISTS game_rounds (id TEXT PRIMARY KEY, player_id TEXT NOT NULL REFERENCES game_players(id), kiosk TEXT NOT NULL, state TEXT NOT NULL, rules TEXT NOT NULL, base_score INTEGER, base_made INTEGER, extra_score INTEGER, extra_made INTEGER, photos INTEGER NOT NULL DEFAULT 0, reward_reason TEXT NOT NULL DEFAULT '', created TEXT NOT NULL);
     CREATE UNIQUE INDEX IF NOT EXISTS game_one_active_player ON game_rounds(player_id) WHERE state IN ('active','extension_active');
     CREATE UNIQUE INDEX IF NOT EXISTS game_one_active_kiosk ON game_rounds(kiosk) WHERE state IN ('active','extension_active');
@@ -64,6 +65,10 @@ export function createGameStore(db) {
     const date = new Date(dob + 'T00:00:00Z');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || !Number.isFinite(+date) || date.toISOString().slice(0,10) !== dob || dob < '1900-01-01' || dob > new Date().toISOString().slice(0,10)) fail('Enter a valid date of birth.');
     return once(input.requestId, 'register', { name, email, dob }, () => {
+      // Reuse the oldest matching pass without changing paid credits or rewards.
+      const normalizeName = value => value.trim().replace(/\s+/g,' ').normalize('NFKC').toLowerCase();
+      const existing = db.prepare('SELECT id,token,name FROM game_players WHERE email=? AND dob=? ORDER BY rowid').all(email,dob).find(p=>normalizeName(p.name)===normalizeName(name));
+      if (existing) return { ...view(existing.id), token: existing.token };
       const id = randomUUID(), token = 'MOMENTS-' + randomBytes(24).toString('hex');
       db.prepare('INSERT INTO game_players(id,token,name,email,dob,created) VALUES (?,?,?,?,?,?)').run(id,token,name,email,dob,new Date().toISOString());
       audit(id,'registered',{}); return { ...view(id), token };
