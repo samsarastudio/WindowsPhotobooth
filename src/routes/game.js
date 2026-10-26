@@ -24,6 +24,7 @@ gameRouter.post('/claim',requireUploadToken,action(req=>get().claim(req.body)));
 gameRouter.post('/result',requireUploadToken,action(req=>({round:get().result(req.body)})));
 adminGameRouter.use(rate(100),requireAdminPin);
 adminGameRouter.get('/',action(req=>({players:get().list(req.query.q),config:get().settings(),audit:get().history()})));
+adminGameRouter.get('/players/:id/qr',async(req,res)=>{try{const player=get().view(req.params.id,true);res.set('Cache-Control','no-store').type('png').send(await QRCode.toBuffer(player.token,{width:480,margin:3}));}catch(e){res.sendStatus(e.status||500);}});
 adminGameRouter.post('/grant',action(req=>({player:get().grant(req.body)})));
 adminGameRouter.post('/redeem',action(req=>({player:get().redeem(req.body)})));
 adminGameRouter.post('/recover',action(req=>({player:get().recover(req.body)})));
