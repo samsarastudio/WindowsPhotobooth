@@ -66,14 +66,16 @@ export class AiBackgroundJobService {
         const err = r.error ?? 'Generation failed.';
         this.lastError.set(err);
         void this.log.error('ai-bg', 'generate failed', { error: err });
-        // Still mark original ready so tablet can print the capture.
-        void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'ready' });
+        // Never present a failed AI capture as a finished classic photo.
+        void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'failed' });
         return;
       }
+      if (r.rawPath && req.mode.pipeline === 'scene') this.galleryUpload.queueUpload(r.rawPath, 'magnet-source');
       const uploaded = await this.galleryUpload.uploadPath(r.path, 'ai', { processStatus: 'ready' });
       if (uploaded.status === 'error') {
         this.lastError.set(uploaded.error ?? 'Photo finished, but backend upload failed.');
         void this.log.error('ai-bg', 'result upload failed', { error: uploaded.error });
+        void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'failed' });
         return;
       }
       // A queued result must not clear the tablet's processing state before its
@@ -86,7 +88,7 @@ export class AiBackgroundJobService {
       const err = String(e);
       this.lastError.set(err);
       void this.log.error('ai-bg', 'exception', { error: err });
-      void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'ready' });
+      void this.galleryUpload.uploadPath(imagePath, 'original', { processStatus: 'failed' });
     } finally {
       this.busy.set(false);
     }

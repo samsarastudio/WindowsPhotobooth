@@ -2,7 +2,7 @@ import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { BoothConfigService } from './booth-config.service';
 import { BoothLogService } from './booth-log.service';
 
-export type GalleryPhotoVariant = 'original' | 'framed' | 'ai' | 'physical';
+export type GalleryPhotoVariant = 'original' | 'framed' | 'ai' | 'physical' | 'magnet-source' | 'magnet-source';
 
 export interface GalleryUploadRecord {
   path: string;
@@ -217,7 +217,7 @@ export class GalleryUploadService implements OnDestroy {
   async uploadPath(
     filePath: string,
     variant: GalleryPhotoVariant,
-    opts?: { processStatus?: 'processing' | 'ready' },
+    opts?: { processStatus?: 'processing' | 'ready' | 'failed' },
   ): Promise<GalleryUploadRecord> {
     const pending: GalleryUploadRecord = { path: filePath, variant, status: 'queued' };
     this.byPath.update((m) => ({ ...m, [filePath]: pending }));
@@ -343,7 +343,7 @@ export class GalleryUploadService implements OnDestroy {
   queueUpload(
     filePath: string,
     variant: GalleryPhotoVariant,
-    opts?: { processStatus?: 'processing' | 'ready' },
+    opts?: { processStatus?: 'processing' | 'ready' | 'failed' },
   ): void {
     void this.uploadPath(filePath, variant, opts);
   }
@@ -354,7 +354,7 @@ export class GalleryUploadService implements OnDestroy {
    */
   commitGuestCapture(
     displayPath: string,
-    opts?: { processStatus?: 'processing' | 'ready' },
+    opts?: { processStatus?: 'processing' | 'ready' | 'failed' },
   ): void {
     if (!displayPath) return;
     const variant = this.inferVariant(displayPath);

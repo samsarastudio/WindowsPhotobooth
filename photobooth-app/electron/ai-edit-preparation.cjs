@@ -8,20 +8,22 @@ const {resolveDepthBackground}=require('./background-depth.cjs');
 async function prepareScene(source,background,modelDir) {
   let original=await sharp(source).rotate().resize(1536,1024,{fit:'cover',position:'centre'}).removeAlpha().png().toBuffer();
   let faces=await detectFaces(original,path.join(modelDir,'yunet.onnx'));
-  if(!faces.length) throw new Error('No clear face was found. Please face the camera and retake.');
-  const crop=require('./portrait-framing.cjs').portraitCrop(faces,1536,1024);
-  if(crop){
-    original=await sharp(original).extract(crop).resize(1536,1024,{fit:'fill'}).png().toBuffer();
-    faces=faces.map(f=>({...f,x:(f.x-crop.left)*1536/crop.width,y:f.y*1024/crop.height,w:f.w*1536/crop.width,h:f.h*1024/crop.height}));
-  }
-  const faceRatio=faces.reduce((sum,f)=>sum+f.w/1536,0)/faces.length;
+  // Costumes and full-face masks are valid subjects; segmentation does not require a human face.
+  const faceRatio=faces.length ? faces.reduce((sum,f)=>sum+f.w/1536,0)/faces.length : .15;
   // Optical depth treatment, without changing the chosen scene's geometry/artwork.
   const selected=resolveDepthBackground(background,faces,1024);
   const blur=selected.depth?0:Math.max(1.5,Math.min(5,.9+faceRatio*14));
   let plate=sharp(selected.path).rotate().resize(1536,1024,{fit:'cover'});
   if(blur>0)plate=plate.blur(blur);
-  const reference=await plate.png().toBuffer();
+  let reference=await plate.png().toBuffer();
   const composed=await replaceBackground(original,reference,path.join(modelDir,'birefnet-lite.onnx'));
+  // A guest-approved source crop must not be automatically reframed again.
+  const crop=/_crop\.(?:jpe?g|png)$/i.test(String(source)) ? null : require('./subject-framing.cjs').subjectCrop(composed.alpha,1536,1024);
+  if(crop){
+    const reframe=buf=>sharp(buf).extract(crop).resize(1536,1024).png().toBuffer();
+    [original,reference,composed.output]=await Promise.all([reframe(original),reframe(reference),reframe(composed.output)]);
+    for(const key of ['alpha','lightingWeights','faceProtection']) composed[key]=await sharp(composed[key],{raw:{width:1536,height:1024,channels:1}}).extract(crop).resize(1536,1024).raw().toBuffer();
+  }
   // Scene replacement never exposes guest pixels to a generative image editor.
   return {image:composed.output,original,reference,alpha:composed.alpha,lightingWeights:composed.lightingWeights,faceProtection:composed.faceProtection,crop,blur,depth:selected.depth,backgroundPath:selected.path,
     width:1536,height:1024,strictScene:true,model:'birefnet-lite'};

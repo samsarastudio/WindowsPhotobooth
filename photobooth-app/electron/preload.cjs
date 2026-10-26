@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('pbApi', {
     ipcRenderer.invoke('admin:installComposition', modeId, sourcePath),
   openAiGenerateImage: (payload) => ipcRenderer.invoke('openai:generateImage', payload),
   listPhotoFrames: () => ipcRenderer.invoke('frames:list'),
+  photoFramePreview: (filename) => ipcRenderer.invoke('frames:preview', filename),
   applyPhotoFrame: (payload) => ipcRenderer.invoke('frames:apply', payload),
   applyPhysicalFrameLayout: (payload) =>
     ipcRenderer.invoke('layouts:physicalFrameDual', payload || {}),
@@ -72,6 +73,7 @@ contextBridge.exposeInMainWorld('pbApi', {
   gallerySyncFrames: (payload) => ipcRenderer.invoke('gallery:syncFrames', payload),
   galleryPublishFrame: (payload) => ipcRenderer.invoke('gallery:publishFrame', payload),
   galleryDeleteRemoteFrame: (payload) => ipcRenderer.invoke('gallery:deleteRemoteFrame', payload),
+  portraitThumbnails: () => ipcRenderer.invoke('portraits:thumbnails'),
   listPrinters: (payload) => ipcRenderer.invoke('print:listPrinters', payload || {}),
   repairSelphyUsb: () => ipcRenderer.invoke('print:repairSelphyUsb'),
   printPhoto: (payload) => ipcRenderer.invoke('print:photo', payload),

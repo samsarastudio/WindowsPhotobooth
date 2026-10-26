@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "evil-dead-cabin",
+  "displayName": "Cabin in the Woods",
+  "variants": {
+    "close": "depths/evil-dead-cabin/close.webp",
+    "medium": "depths/evil-dead-cabin/medium.webp",
+    "wide": "depths/evil-dead-cabin/wide.webp"
+  },
+  "baseSha256": "575132dca187c11cfc043787447b669b10a8e11162fb334ede366af42e539a9e"
+}

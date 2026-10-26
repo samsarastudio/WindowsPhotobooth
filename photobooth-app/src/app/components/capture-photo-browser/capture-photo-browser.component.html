@@ -9,10 +9,10 @@
       [class.is-on]="kindFilter() === 'physical'"
       (click)="setKind('physical')"
     >
-      {{ copy().history.filterPhysical }}
+      Magnet sheets
     </button>
     <button type="button" class="pb-cb-chip" [class.is-on]="kindFilter() === 'normal'" (click)="setKind('normal')">
-      {{ copy().history.filterDigital }}
+      Framed photos
     </button>
     <button
       type="button"
@@ -20,7 +20,7 @@
       [class.is-on]="kindFilter() === 'original'"
       (click)="setKind('original')"
     >
-      {{ copy().history.filterOriginal }}
+      Originals
     </button>
   </div>
   <div class="pb-cb-filters" role="group" aria-label="Date">
@@ -140,9 +140,9 @@
       @if (makeFramedBusy()) {
         {{ copy().history.makingFramed }}
       } @else if (selected()?.hasFramed) {
-        {{ copy().history.remakeFramed }}
+        Change frame / crop
       } @else {
-        {{ copy().history.makeFramed }}
+        Add frame / crop
       }
     </button>
   }
@@ -158,9 +158,9 @@
       @if (makePhysicalBusy()) {
         {{ copy().history.makingPhysical }}
       } @else if (selected()?.hasPhysical) {
-        {{ copy().history.remakePhysical }}
+        Make magnet / crop
       } @else {
-        {{ copy().history.makePhysical }}
+        Make magnet / crop
       }
     </button>
   }
@@ -178,7 +178,7 @@
       } @else if (printDone()) {
         {{ copy().result.printed }}
       } @else {
-        {{ copy().history.reprint }}
+        Print selected photo
       }
     </button>
   }
@@ -203,7 +203,7 @@
 @if (confirmDelete()) {
   <div class="pb-cb-modal" role="dialog" aria-modal="true" aria-labelledby="pb-cb-del-title">
     <div class="pb-cb-modal-card">
-      <p id="pb-cb-del-title">{{ copy().history.deleteConfirm }}</p>
+      <p id="pb-cb-del-title">Delete this capture and all its versions, including the original, framed photo and magnet sheets?</p>
       <div class="pb-row">
         <button type="button" class="pb-btn pb-btn-ghost" (click)="confirmDelete.set(false)">
           {{ copy().history.cancel }}

@@ -1,0 +1,4 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+const {retrySubmission}=require('../electron/server-portrait.cjs');
+test('portrait submission recovers lost responses with bounded retries',async()=>{let calls=0;const waits=[];const result=await retrySubmission(async()=>{if(++calls<3)throw Error('Network lost');return 'same-job';},async n=>waits.push(n));assert.equal(result,'same-job');assert.equal(calls,3);assert.deepEqual(waits,[1000,2000]);});
+test('invalid credentials fail immediately; outage cannot retry forever',async()=>{let calls=0;await assert.rejects(retrySubmission(async()=>{calls++;throw Object.assign(Error('Unauthorized'),{status:401});},async()=>{}));assert.equal(calls,1);calls=0;await assert.rejects(retrySubmission(async()=>{calls++;throw Error('Offline');},async()=>{}));assert.equal(calls,4);});

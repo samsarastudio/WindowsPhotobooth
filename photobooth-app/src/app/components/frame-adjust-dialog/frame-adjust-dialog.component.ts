@@ -91,6 +91,13 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
     this.zoom.set(Math.min(4, Math.max(1, Math.round((this.zoom() + delta) * 20) / 20)));
   }
 
+  resetCrop(): void {
+    if (this.busy()) return;
+    this.zoom.set(1);
+    this.panX.set(0);
+    this.panY.set(0);
+  }
+
   onZoomInput(ev: Event): void {
     const v = Number((ev.target as HTMLInputElement).value);
     if (Number.isFinite(v)) this.zoom.set(Math.min(4, Math.max(1, v)));
@@ -158,11 +165,13 @@ export class FrameAdjustDialogComponent implements OnDestroy, AfterViewInit {
       }
       const photoUrl = await window.pbApi.readFileBase64(filePath);
       if (gen !== this.loadGen) return;
-      const [photo, frame] = await Promise.all([this.loadImg(photoUrl), this.loadImg(item.url)]);
+      const prepared=await window.pbApi.photoFramePreview(frameFile);
+      if(!prepared.ok||!prepared.url||!prepared.hole)throw Error(prepared.error||'Frame preview unavailable');
+      const [photo, frame] = await Promise.all([this.loadImg(photoUrl), this.loadImg(prepared.url)]);
       if (gen !== this.loadGen) return;
       this.photo = photo;
       this.frame = frame;
-      this.hole = this.findHole(frame);
+      this.hole = prepared.hole;
       this.ready.set(true);
       queueMicrotask(() => this.draw());
     } catch (e) {

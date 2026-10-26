@@ -1090,8 +1090,10 @@ async function prepareFramedPrintRaster(
   edgeInsetMm = 4,
   bottomExtraMm = 2.5,
 ) {
-  const pageW = mmToPostcardPx(SELPHY_POSTCARD_W_MM, dpi);
-  const pageH = mmToPostcardPx(SELPHY_POSTCARD_H_MM, dpi);
+  const source = await sharpMod(imagePath).metadata();
+  const portrait = source.height > source.width;
+  const pageW = mmToPostcardPx(portrait ? SELPHY_POSTCARD_H_MM : SELPHY_POSTCARD_W_MM, dpi);
+  const pageH = mmToPostcardPx(portrait ? SELPHY_POSTCARD_W_MM : SELPHY_POSTCARD_H_MM, dpi);
   const lr = mmToPostcardPx(Math.max(0, Number(edgeInsetMm) || 0), dpi);
   const extraBottom = mmToPostcardPx(Math.max(0, Number(bottomExtraMm) || 0), dpi);
   const innerW = Math.max(8, pageW - lr * 2);
@@ -2243,6 +2245,8 @@ function listCaptureHistory(options = {}) {
       capturedAt: new Date(latestMs).toISOString(),
       originalPath: abs.replace(/\\/g, '/'),
       framedPath: hasFramed ? framedPath.replace(/\\/g, '/') : undefined,
+      aiPath: hasAi ? aiPath.replace(/\\/g, '/') : undefined,
+      physicalPath: hasPhysical ? physicalPath.replace(/\\/g, '/') : undefined,
       displayPath: displayPath.replace(/\\/g, '/'),
       printPath: displayPath.replace(/\\/g, '/'),
       layoutMode,
@@ -2258,7 +2262,7 @@ function listCaptureHistory(options = {}) {
 }
 
 function isCaptureHistoryId(id) {
-  return /^capture_[0-9]+$/i.test(String(id || ''));
+  return /^capture_[0-9]+(?:_crop)?$/i.test(String(id || ''));
 }
 
 function deleteCaptureHistory(id) {
@@ -2336,6 +2340,7 @@ ipcMain.handle('file:saveJpeg', async (_e, fullPath, base64Body) => {
 });
 
 ipcMain.handle('openai:generateImage', async (_e, payload) => {
+  const generationStarted = Date.now();
   appendAppLog('info', 'openai', 'generateImage start', {
     modeId: payload?.modeId,
     useInpainting: !!payload?.useInpainting,
@@ -2382,7 +2387,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     const apiKey = cfg.openAiApiKey;
     const brand = getBrandContext(cfg);
     const useBrandLogo = brand.applyBrandToAi && brand.hasLogo;
-    if (!(pipeline === 'scene' || useInpainting) && (!apiKey || typeof apiKey !== 'string' || !apiKey.trim())) {
+    if (!(pipeline === 'scene' || pipeline === 'head-swap' || useInpainting) && (!apiKey || typeof apiKey !== 'string' || !apiKey.trim())) {
       return { ok: false, error: 'OpenAI API key not configured.' };
     }
     const captureRoot = path.resolve(getCaptureDir());
@@ -2432,7 +2437,8 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
         };
       }
       backgroundUsed = path.basename(bgPath);
-      prepared = await preparation.prepareScene(absImage, bgPath, modelDir);
+      prepared = await require('./scene-process.cjs').prepareSceneIsolated(absImage, bgPath, modelDir, (file, args) => require('electron').utilityProcess.fork(file, args, { serviceName: 'PhotoBooth background removal', stdio: 'ignore' }));
+      appendAppLog('info', 'openai', 'background removal prepared', {elapsedMs:Date.now()-generationStarted});
       if (prepared.depth) backgroundUsed = `${backgroundUsed} (${prepared.depth})`;
       pngBuf = prepared.image;
       extraImages.push({ buf: prepared.reference, filename: 'selected-background.png' });
@@ -2461,6 +2467,27 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
       hasLogoRef: extraImages.some((x) => x.filename === 'brand-logo-ref.png'),
       pipeline,
     });
+
+    if (pipeline === 'head-swap') {
+      const gallery = cfg.gallery || {};
+      const base = galleryBaseUrl(gallery.apiBaseUrl);
+      const token = String(gallery.uploadToken || '').trim();
+      if (!base || !token) return { ok: false, error: 'Configure Moments URL and upload token in Admin for server portraits.' };
+      const original = await require('./server-portrait.cjs').retrySubmission(async () => {
+        const uploaded = await uploadPhotoOnce({ apiBaseUrl: base, uploadToken: token, eventPrefix: gallery.sessionPrefix, filePath: absImage, variant: 'original', processStatus: 'processing' }, AbortSignal.timeout(60000));
+        if (!uploaded.ok) { const error = new Error(uploaded.error || 'Portrait capture upload failed'); error.status = uploaded.status; throw error; }
+        return uploaded;
+      });
+      if (!original.ok || !original.photoId) return { ok: false, error: original.error || 'Could not upload the portrait capture to Moments.' };
+      const pf = cfg.photoFrames || {};
+      const useFrame = pf.enabled === true && !pf.guestFrameFiles?.includes('__none__');
+      const framePath = useFrame ? path.join(getPhotoFramesDir(), path.basename(pf.defaultPortraitFrameFile || 'halloween-haunt-portrait.png')) : null;
+      if (framePath && !fs.existsSync(framePath)) throw new Error('Portrait frame is missing. Sync frames in Admin before trying again.');
+      const outputPath = path.join(path.dirname(absImage), path.basename(absImage, path.extname(absImage)) + '_ai.png');
+      const result = await require('./server-portrait.cjs').generateServerPortrait({ base, token, originalPhotoId: original.photoId, prepared, prompt: fullPrompt, framePath, outputPath });
+      appendAppLog('info', 'openai', 'server portrait ready', { outPath: outputPath, model: result.model });
+      return result;
+    }
 
     const maskBuf = prepared?.mask || null;
     const editRes = prepared?.strictScene
@@ -2497,7 +2524,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     const outH = isPortraitOut ? 1800 : 1200;
     outBuf = await sharpMod(outBuf)
       .resize(outW, outH, { fit: 'cover', position: 'centre' })
-      .png({ compressionLevel: 9, effort: 8 })
+      .png({ compressionLevel: 3 })
       .toBuffer();
 
     const dir = path.dirname(absImage);
@@ -2528,6 +2555,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
 
     fs.writeFileSync(outPath, outBuf);
     appendAppLog('info', 'openai', 'generateImage ok', {
+      elapsedMs: Date.now() - generationStarted,
       model: editRes.model,
       outPath,
       inpainting: useInpainting,
@@ -2972,6 +3000,11 @@ ipcMain.handle('admin:listCompositions', async () => {
     return { ok: false, error: String(e), items: [] };
   }
 });
+ipcMain.handle('portraits:thumbnails', async () => {
+  const modes = loadMergedConfig().aiModes || [];
+  const ids = modes.filter(m => m && (m.pipeline === 'head-swap' || m.portraitOnly === true)).map(m => sanitizeModeId(m.id));
+  return require('./portrait-thumbnails.cjs').portraitThumbnails([...new Set(ids)], id => aiPipelines.resolveComposition(id));
+});
 
 ipcMain.handle('admin:getComposition', async (_e, modeId) => {
   try {
@@ -3062,6 +3095,15 @@ ipcMain.handle('frames:list', async () => {
   } catch (e) {
     return { ok: false, error: String(e), frames: [] };
   }
+});
+
+ipcMain.handle('frames:preview', async (_e, filename) => {
+  try {
+    if(typeof filename !== 'string' || path.basename(filename)!==filename) throw Error('Invalid frame');
+    const sharp=require('sharp'),file=path.join(getPhotoFramesDir(),filename);
+    const {hole,overlay}=await prepareFrameOverlay(sharp,file);
+    return {ok:true,hole,url:'data:image/png;base64,'+overlay.toString('base64')};
+  } catch(e) { return {ok:false,error:String(e)}; }
 });
 
 ipcMain.handle('frames:apply', async (_e, payload) => {
@@ -3172,7 +3214,8 @@ ipcMain.handle('layouts:physicalFrameDual', async (_e, payload) => {
       panY: payload?.cropPanY ?? payload?.panY,
     };
     appendAppLog('info', 'layouts', 'physicalFrameDual start', { imagePath, ...opts });
-    const outBuf = await compositePhysicalFrameDual(sharpMod, imagePath, opts);
+    const magnetSource = require('./magnet-source.cjs').resolveMagnetSource(imagePath);
+    const outBuf = await compositePhysicalFrameDual(sharpMod, magnetSource, {...opts, borderEnabled:false});
     const dir = path.dirname(imagePath);
     const base = path.basename(imagePath, path.extname(imagePath));
     const outPath = path.join(dir, `${base}_physical.png`);
@@ -3516,7 +3559,7 @@ async function uploadPhotoOnce(payload, signal) {
   form.append('variant', variant);
   form.append('sourceLocalName', path.basename(abs));
   const processStatus = String(payload?.processStatus || '').trim().toLowerCase();
-  if (processStatus === 'processing' || processStatus === 'ready') {
+  if (processStatus === 'processing' || processStatus === 'ready' || processStatus === 'failed') {
     form.append('processStatus', processStatus);
   }
 
@@ -3705,8 +3748,8 @@ function enqueueGalleryUpload(payload) {
       uploadToken: String(payload?.uploadToken || '').trim(),
       eventPrefix: String(payload?.eventPrefix || 'session').trim() || 'session',
       processStatus:
-        String(payload?.processStatus || '').trim().toLowerCase() === 'processing'
-          ? 'processing'
+        ['processing', 'failed'].includes(String(payload?.processStatus || '').trim().toLowerCase())
+          ? String(payload.processStatus).trim().toLowerCase()
           : 'ready',
       status: 'queued',
       attempts: 0,
@@ -4355,6 +4398,7 @@ try {
   # Canon SELPHY CP1500 postcard is 100.0 x 148.0 mm (not 6x4 inch).
   $targetW = [int][Math]::Round(148.0 / 25.4 * 100)
   $targetH = [int][Math]::Round(100.0 / 25.4 * 100)
+  $photoLandscape = $img.Width -ge $img.Height
   $chosenPaper = $null
   foreach ($ps in $doc.PrinterSettings.PaperSizes) {
     $n = [string]$ps.PaperName
@@ -4378,22 +4422,20 @@ try {
     $chosenPaper = $best
   }
   if ($chosenPaper -eq $null) {
-    $chosenPaper = New-Object System.Drawing.Printing.PaperSize('SELPHY Postcard 100x148mm', $targetW, $targetH)
+    $chosenPaper = New-Object System.Drawing.Printing.PaperSize('SELPHY Postcard 100x148mm', $targetH, $targetW)
     try { $doc.PrinterSettings.PaperSizes.Add($chosenPaper) } catch {}
   }
   $doc.DefaultPageSettings.PaperSize = $chosenPaper
-  if ($chosenPaper.Width -ge $chosenPaper.Height) {
-    $doc.DefaultPageSettings.Landscape = $false
-  } else {
-    $doc.DefaultPageSettings.Landscape = $true
-  }
+  # DEVMODE orientation describes the photo, not the driver's stock dimensions.
+  $doc.DefaultPageSettings.Landscape = $photoLandscape
+  $doc.PrinterSettings.DefaultPageSettings.Landscape = $photoLandscape
 
   $script:pbImg = $img
   $script:paperName = $chosenPaper.PaperName
   $script:bleed = $bleed
   $script:fitMode = $fitMode
-  $script:targetW = $targetW
-  $script:targetH = $targetH
+  $script:targetW = [int][Math]::Round($(if ($photoLandscape) { 148.0 } else { 100.0 }) / 25.4 * 100)
+  $script:targetH = [int][Math]::Round($(if ($photoLandscape) { 100.0 } else { 148.0 }) / 25.4 * 100)
   $doc.add_PrintPage({
     param($sender, $e)
     $page = $e.PageBounds
@@ -4427,7 +4469,7 @@ try {
   })
 
   $doc.Print()
-  Write-Output ("OK|" + $doc.PrinterSettings.PrinterName + "|" + $script:paperName + "|" + $script:bleed)
+  Write-Output ("OK|" + $doc.PrinterSettings.PrinterName + "|" + $script:paperName + "|" + $script:bleed + "|" + $(if ($photoLandscape) { 'landscape' } else { 'portrait' }))
 } finally {
   if ($img) { $img.Dispose() }
 }
@@ -4467,6 +4509,7 @@ try {
       printer: parts[1] || printerName || null,
       paper: parts[2] || null,
       bleed: parts[3] || String(bleed),
+      orientation: parts[4] || null,
     };
   } catch (e) {
     const detail = [e.stderr, e.stdout, e.message].filter(Boolean).join(' | ');
@@ -4614,8 +4657,7 @@ async function executePrintPhoto(payload) {
       } catch (_m) {
         /* ignore */
       }
-      // Portrait AI (4×6): contain so it does not stretch/crop to fill landscape postcard.
-      // Landscape scene (6×4): cover as before.
+      // Preserve framed edges on a postcard oriented to match the final image.
       const keepEdges = physicalLayout || framedLayout || isPortraitPhoto;
       const result = await printPhotoViaWindowsSpooler(
         printPath,
@@ -4636,6 +4678,7 @@ async function executePrintPhoto(payload) {
         deviceName: result.printer || resolved.chosen || 'default',
         paper: result.paper || null,
         bleed: result.bleed || (keepEdges ? 1 : bleedScale),
+        orientation: result.orientation,
       });
       return {
         ok: true,

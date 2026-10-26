@@ -36,9 +36,15 @@ export class PortraitSelectPageComponent implements OnInit {
   }
 
   async loadThumbs(): Promise<void> {
+    if (this.thumbsLoading()) return;
     this.thumbsLoading.set(true);
     const next: Record<string, string> = {};
     try {
+      if (window.pbApi?.portraitThumbnails) {
+        const result = await window.pbApi.portraitThumbnails();
+        for (const item of result.items || []) if (item.url) next[item.modeId] = item.url;
+        return;
+      }
       if (window.pbApi?.adminListCompositions) {
         const r = await window.pbApi.adminListCompositions();
         if (r.ok && Array.isArray(r.items)) {
@@ -68,11 +74,15 @@ export class PortraitSelectPageComponent implements OnInit {
   }
 
   choose(id: string): void {
+    if (!this.thumbFor(id)) return;
     this.aiStyle.selectMode(id);
     void this.router.navigate(['/capture']);
   }
 
   thumbFor(id: string): string | null {
     return this.thumbUrls()[id] || null;
+  }
+  thumbnailFailed(id: string): void {
+    this.thumbUrls.update(urls => { const next = {...urls}; delete next[id]; return next; });
   }
 }

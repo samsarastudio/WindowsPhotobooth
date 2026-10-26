@@ -1,5 +1,14 @@
 # Halloween scene backgrounds
 
+New cinematic sets: `graveyard.webp` (Blood Moon Graveyard) and
+`evil-dead-cabin.webp` (Cabin in the Woods). Each main image is its medium plate,
+with close/medium/wide WebP variants and a checksum-protected `.depths.json`,
+using the same framing selection and whole-set Admin removal as the original sets.
+Natural tree/foliage borders are baked into the scenery, not applied to guests.
+Full-resolution masters and built-in image-generation prompts are saved under
+`output/cinematic-backgrounds/` at the repository root. The cinematic OTA seeder
+adds complete sets once and respects archived removals and existing custom plates.
+
 Three guest-facing scene choices:
 
 - `pumpkin-patch.png`: warm physical Halloween set, based on the original app family demo and its background setting prompt.

@@ -516,7 +516,9 @@ export interface PhotoboothGuestFlowConfig {
    * wait + result gallery and go straight to Thank you. AI runs in the background
    * and lands on Moments for tablet review / print.
    */
-  skipAiPreviewToThanks: boolean;
+  skipAiPreviewToThanks: boolean; // Legacy setting retained for migration.
+  skipPortraitPreviewToThanks: boolean;
+  skipBackgroundPreviewToThanks: boolean;
   /** Seconds on Thank you before returning to attract (0 = stay until tap). */
   thanksAutoReturnSec: number;
   /** Booth id claimed by Moments print jobs (tablet → kiosk). */
@@ -525,6 +527,8 @@ export interface PhotoboothGuestFlowConfig {
 
 export const PHOTOBOOTH_DEFAULT_GUEST_FLOW: PhotoboothGuestFlowConfig = {
   skipAiPreviewToThanks: true,
+  skipPortraitPreviewToThanks: true,
+  skipBackgroundPreviewToThanks: true,
   thanksAutoReturnSec: 8,
   boothId: 'booth-1',
 };

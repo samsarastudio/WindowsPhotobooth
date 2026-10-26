@@ -11,9 +11,11 @@
     <ul class="pb-portrait-grid" role="list">
       @for (c of characters(); track c.id) {
         <li>
-          <button type="button" class="pb-portrait-card" (click)="choose(c.id)">
+          <button type="button" class="pb-portrait-card" (click)="choose(c.id)" [disabled]="!thumbFor(c.id)">
             @if (thumbFor(c.id); as src) {
-              <img [src]="src" [alt]="c.label" loading="lazy" decoding="async" />
+              <img [src]="src" [alt]="c.label" loading="eager" decoding="async" width="360" height="480" (error)="thumbnailFailed(c.id)" />
+            } @else {
+              <span class="pb-portrait-placeholder">{{ thumbsLoading() ? 'Loading preview…' : 'Preview unavailable' }}</span>
             }
             <span class="pb-portrait-card-label">{{ c.label }}</span>
           </button>
@@ -22,6 +24,7 @@
     </ul>
 
     <div class="pb-row">
+      <button type="button" class="pb-btn pb-btn-ghost" (click)="loadThumbs()" [disabled]="thumbsLoading()">Reload previews</button>
       <a [routerLink]="backLink()" class="pb-btn pb-btn-ghost">{{ copy().portraitSelect.back }}</a>
     </div>
   </div>

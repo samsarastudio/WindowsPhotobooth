@@ -1623,6 +1623,8 @@ export class AdminDashboardComponent implements OnInit {
         defaultAiModeId: defaultId,
         guestFlow: {
           skipAiPreviewToThanks: this.draftGuestFlow.skipAiPreviewToThanks === true,
+          skipPortraitPreviewToThanks: this.draftGuestFlow.skipPortraitPreviewToThanks === true,
+          skipBackgroundPreviewToThanks: this.draftGuestFlow.skipBackgroundPreviewToThanks === true,
           thanksAutoReturnSec: Math.max(
             0,
             Math.min(120, Math.floor(Number(this.draftGuestFlow.thanksAutoReturnSec) || 0)),

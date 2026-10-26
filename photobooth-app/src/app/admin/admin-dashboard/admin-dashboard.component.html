@@ -283,15 +283,19 @@
             Enable AI style step (Scene Addition / AI Portrait) after unlock — admin controlled
           </label>
           <label class="pb-admin-check">
-            <input type="checkbox" [(ngModel)]="draftGuestFlow.skipAiPreviewToThanks" />
-            Skip AI wait on kiosk — show Thank you; result + print on Moments tablet
+            <input type="checkbox" [(ngModel)]="draftGuestFlow.skipPortraitPreviewToThanks" />
+            Portrait: skip preview — show Thank you; generate on Moments
           </label>
           <p class="pb-hint pb-hint-tight">
             When enabled, guests confirm their photo and leave immediately. AI generates in the
             background and appears on the tablet URL for that day. Staff approve print there; the
             booth polls Moments and prints on the kiosk.
           </p>
-          @if (draftGuestFlow.skipAiPreviewToThanks) {
+          <label class="pb-admin-check">
+            <input type="checkbox" [(ngModel)]="draftGuestFlow.skipBackgroundPreviewToThanks" />
+            Background: skip preview — show Thank you; process on this kiosk
+          </label>
+          @if (draftGuestFlow.skipPortraitPreviewToThanks || draftGuestFlow.skipBackgroundPreviewToThanks) {
             <label>Thank you auto-return (seconds, 0 = stay until Done)</label>
             <input
               class="pb-input"

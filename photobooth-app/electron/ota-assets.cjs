@@ -5,6 +5,8 @@ const path = require('path');
 // custom images or restoring sets an operator has already removed.
 function seedMissingAssets(bundled, config) {
   applyReleaseProfile(bundled, config);
+  seedVibrantScenes(bundled, config);
+  require('./cinematic-scenes.cjs').seedCinematicScenes(bundled, config);
   require('./stock-frame-refresh.cjs').refreshStockFrames(path.join(bundled, 'photo-frames'), path.join(config, 'photo-frames'));
   const marker = path.join(config, '.assets-1.1.47');
   if (fs.existsSync(marker) || !fs.existsSync(bundled)) return;
@@ -65,4 +67,23 @@ function applyReleaseProfile(bundled, config) {
   fs.writeFileSync(marker, new Date().toISOString());
 }
 
-module.exports = { seedMissingAssets, applyReleaseProfile };
+const VIBRANT_SCENES=['haunted-harvest-carnival.webp','witch-lantern-garden.webp','vampire-candlelit-ballroom.webp'];
+function seedVibrantScenes(bundled, config){
+  const marker=path.join(config,'.scenes-1.1.62');
+  if(fs.existsSync(marker))return;
+  const source=path.join(bundled,'ai-backgrounds','scene'),target=path.join(config,'ai-backgrounds','scene');
+  if(!VIBRANT_SCENES.every(name=>fs.existsSync(path.join(source,name))))return;
+  const removed=new Set();
+  const inspectRemoved=dir=>{if(!fs.existsSync(dir))return;for(const entry of fs.readdirSync(dir,{withFileTypes:true})){if(entry.isSymbolicLink())continue;if(entry.isDirectory())inspectRemoved(path.join(dir,entry.name));else removed.add(entry.name);}};
+  inspectRemoved(path.join(config,'ai-backgrounds','.removed'));inspectRemoved(path.join(target,'.removed'));
+  fs.mkdirSync(target,{recursive:true});
+  for(const name of VIBRANT_SCENES)if(!removed.has(name)&&!fs.existsSync(path.join(target,name)))fs.copyFileSync(path.join(source,name),path.join(target,name));
+  const settingsFile=path.join(config,'photobooth-config.json');
+  if(fs.existsSync(settingsFile)){
+    const settings=JSON.parse(fs.readFileSync(settingsFile,'utf8'));
+    for(const mode of settings.aiModes||[])if(mode.pipeline==='scene')mode.allowBackgroundChoice=true;
+    const temp=settingsFile+'.scenes-tmp';fs.writeFileSync(temp,JSON.stringify(settings,null,2));fs.renameSync(temp,settingsFile);
+  }
+  fs.writeFileSync(marker,new Date().toISOString());
+}
+module.exports = { seedMissingAssets, applyReleaseProfile, seedVibrantScenes, VIBRANT_SCENES };

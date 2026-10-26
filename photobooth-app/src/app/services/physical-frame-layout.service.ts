@@ -22,6 +22,7 @@ export class PhysicalFrameLayoutService {
     const r = await window.pbApi.applyPhysicalFrameLayout({
       imagePath,
       ...pf,
+      borderEnabled: false,
       cropZoom: c.zoom,
       cropPanX: c.panX,
       cropPanY: c.panY,

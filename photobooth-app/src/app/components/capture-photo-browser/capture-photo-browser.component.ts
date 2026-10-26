@@ -11,6 +11,7 @@ import { FrameAdjustDialogComponent } from '../frame-adjust-dialog/frame-adjust-
 
 export type CaptureKindFilter = 'all' | 'physical' | 'normal' | 'original';
 export type CaptureWhenFilter = 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom';
+type GalleryItem = PbCaptureHistoryItem & { captureId: string; variant: 'original' | 'framed' | 'physical' | 'ai' };
 
 @Component({
   selector: 'pb-capture-photo-browser',
@@ -32,7 +33,7 @@ export class CapturePhotoBrowserComponent implements OnInit {
   readonly showPrint = input(true);
   readonly pageSize = input(24);
 
-  readonly photos = signal<PbCaptureHistoryItem[]>([]);
+  readonly photos = signal<GalleryItem[]>([]);
   readonly selectedId = signal<string | null>(null);
   readonly thumbUrls = signal<Record<string, string>>({});
   readonly previewUrls = signal<Record<string, string>>({});
@@ -79,12 +80,10 @@ export class CapturePhotoBrowserComponent implements OnInit {
     const toMs = this.rangeEndMs(when);
     return this.photos().filter((p) => {
       if (kind === 'physical') {
-        if ((p.kind || (p.layoutMode === 'physicalFrame' ? 'physical' : 'normal')) !== 'physical')
-          return false;
+        if (p.variant !== 'physical') return false;
       } else if (kind === 'normal') {
-        // Digital: framed / AI / unframed — including captures that also have a physical sheet.
-        if (!p.hasFramed && (p.kind || 'normal') === 'physical') return false;
-      }
+        if (p.variant !== 'framed') return false;
+      } else if (kind === 'original' && p.variant !== 'original') return false;
       const t = Date.parse(p.capturedAt);
       if (!Number.isFinite(t)) return true;
       if (fromMs != null && t < fromMs) return false;
@@ -107,15 +106,16 @@ export class CapturePhotoBrowserComponent implements OnInit {
   });
 
   readonly canPrint = computed(
-    () => this.printEnabled() && !!this.selected() && !this.printBusy() && !this.printDone(),
+    () => this.printEnabled() && !!this.selected() && !this.printBusy() && !this.printDone()
+      && !this.loading() && !this.makeFramedBusy() && !this.makePhysicalBusy(),
   );
 
   readonly canMakePhysical = computed(
-    () => this.kindFilter() === 'original' && !!this.selected(),
+    () => !!this.selected() && ['original', 'framed'].includes(this.selected()!.variant),
   );
 
   readonly canMakeFramed = computed(
-    () => this.kindFilter() === 'original' && !!this.selected(),
+    () => !!this.selected() && ['original', 'framed'].includes(this.selected()!.variant),
   );
 
   readonly viewingOriginals = computed(() => this.kindFilter() === 'original');
@@ -143,11 +143,24 @@ export class CapturePhotoBrowserComponent implements OnInit {
         this.photos.set([]);
         return;
       }
-      const list = r.photos ?? [];
+      const list: GalleryItem[] = (r.photos ?? []).flatMap(p => {
+        const variants: GalleryItem[] = [];
+        const add = (variant: GalleryItem['variant'], filePath: string, label: string) => variants.push({
+          ...p, id: `${p.id}::${variant}`, captureId: p.id, variant, label,
+          displayPath: filePath, printPath: filePath,
+          kind: variant === 'physical' ? 'physical' : 'normal',
+          layoutMode: variant === 'physical' ? 'physicalFrame' : undefined,
+        });
+        add('original', p.originalPath, 'Original');
+        if (p.hasFramed && p.framedPath) add('framed', p.framedPath, 'Framed');
+        if (p.aiPath) add('ai', p.aiPath, 'AI photo');
+        if (p.hasPhysical) add('physical', p.physicalPath || p.displayPath, 'Magnet sheet');
+        return variants;
+      });
       this.photos.set(list);
       this.page.set(1);
       await this.ensureThumbs(this.pageItems());
-      const keep = list.find((p) => p.id === this.selectedId());
+      const keep = this.filtered().find((p) => p.id === this.selectedId());
       if (keep) {
         this.selectedId.set(keep.id);
         await this.ensurePreview(keep);
@@ -165,6 +178,8 @@ export class CapturePhotoBrowserComponent implements OnInit {
   }
 
   setKind(kind: CaptureKindFilter): void {
+    this.printDone.set(false);
+    this.printErr.set(null);
     this.kindFilter.set(kind);
     this.page.set(1);
     void this.afterFilterChange();
@@ -200,7 +215,7 @@ export class CapturePhotoBrowserComponent implements OnInit {
     if (first) void this.selectPhoto(first);
   }
 
-  async selectPhoto(photo: PbCaptureHistoryItem): Promise<void> {
+  async selectPhoto(photo: GalleryItem): Promise<void> {
     this.selectedId.set(photo.id);
     this.printDone.set(false);
     this.printErr.set(null);
@@ -216,25 +231,14 @@ export class CapturePhotoBrowserComponent implements OnInit {
   }
 
   sourceOriginal(photo: PbCaptureHistoryItem): string {
-    if (photo.originalPath) return photo.originalPath;
-    const p = photo.displayPath || photo.printPath || '';
-    return p
-      .replace(/_physical\.png$/i, '.jpg')
-      .replace(/_ai\.png$/i, '.jpg')
-      .replace(/_framed\.png$/i, '.jpg');
+    return photo.originalPath || '';
   }
 
   viewPath(photo: PbCaptureHistoryItem): string {
-    if (this.viewingOriginals()) return this.sourceOriginal(photo);
-    if (this.kindFilter() === 'normal' && photo.hasFramed) {
-      return photo.framedPath || photo.displayPath.replace(/_physical\.png$/i, '_framed.png');
-    }
     return photo.displayPath;
   }
 
   viewLabel(photo: PbCaptureHistoryItem): string {
-    if (this.viewingOriginals()) return this.copy().history.originalLabel;
-    if (this.kindFilter() === 'normal' && photo.hasFramed) return 'Framed';
     return photo.label;
   }
 
@@ -267,12 +271,10 @@ export class CapturePhotoBrowserComponent implements OnInit {
     }
     this.printBusy.set(true);
     try {
-      const originals = this.viewingOriginals();
-      const viewingFramed = this.kindFilter() === 'normal' && !!photo.hasFramed;
       const r = await window.pbApi.printPhoto({
         filePath: this.viewPath(photo),
         deviceName: this.booth.print().printerName || undefined,
-        layoutMode: originals || viewingFramed ? undefined : photo.layoutMode,
+        layoutMode: photo.layoutMode,
       });
       if (!r.ok) {
         this.printErr.set(r.error ?? 'Print failed.');
@@ -311,8 +313,12 @@ export class CapturePhotoBrowserComponent implements OnInit {
         return;
       }
       this.physicalAdjustOpen.set(false);
+      this.thumbUrls.set({});
+      this.previewUrls.set({});
+      this.kindFilter.set('physical');
       await this.reload();
-      this.setKind('physical');
+      const created = this.photos().find(p => p.displayPath === r.path);
+      if (created) await this.selectPhoto(created);
     } catch (e) {
       this.makePhysicalErr.set(String(e));
     } finally {
@@ -415,10 +421,10 @@ export class CapturePhotoBrowserComponent implements OnInit {
       this.galleryUpload.queueUpload(r.path, 'framed');
       this.thumbUrls.set({});
       this.previewUrls.set({});
-      const id = this.selectedId();
+      const id = this.selected()?.captureId;
+      this.kindFilter.set('normal');
       await this.reload();
-      this.setKind('normal');
-      const item = this.photos().find((p) => p.id === id);
+      const item = this.photos().find((p) => p.captureId === id && p.variant === 'framed');
       if (item) await this.selectPhoto(item);
     } catch (e) {
       this.makeFramedErr.set(String(e));
@@ -441,7 +447,7 @@ export class CapturePhotoBrowserComponent implements OnInit {
     }
     this.deleteBusy.set(true);
     try {
-      const r = await window.pbApi.deleteCaptureHistory(photo.id);
+      const r = await window.pbApi.deleteCaptureHistory(photo.captureId);
       if (!r.ok) {
         this.err.set(r.error || 'Could not delete photo.');
         return;
@@ -491,7 +497,7 @@ export class CapturePhotoBrowserComponent implements OnInit {
         ? await window.pbApi.readFileThumbBase64(filePath, 1100)
         : await window.pbApi.readFileBase64(filePath);
       this.previewUrls.update((m) => ({ ...m, [key]: url }));
-      if (this.selectedId() === photo.id) this.previewUrl.set(url);
+      if (this.selectedId() === photo.id && this.thumbKey(photo) === key) this.previewUrl.set(url);
     } catch {
       if (this.selectedId() === photo.id) this.previewUrl.set(this.thumbUrls()[key] ?? null);
     }

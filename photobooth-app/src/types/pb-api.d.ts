@@ -28,6 +28,8 @@ export interface PbCaptureHistoryItem {
   capturedAt: string;
   originalPath: string;
   framedPath?: string;
+  aiPath?: string;
+  physicalPath?: string;
   displayPath: string;
   printPath: string;
   layoutMode?: 'physicalFrame' | 'framedPhoto';
@@ -176,6 +178,7 @@ export interface PbApi {
     }[];
     error?: string;
   }>;
+  portraitThumbnails(): Promise<{ok:boolean;items?:{modeId:string;url:string|null}[]}>;
   adminGetComposition(modeId: string): Promise<{
     ok: boolean;
     modeId?: string;
@@ -211,10 +214,12 @@ export interface PbApi {
     model?: string;
     backgroundUsed?: string | null;
     inpainting?: boolean;
+    rawPath?: string;
     pipeline?: string;
     brandApplied?: boolean;
     error?: string;
   }>;
+  photoFramePreview(filename: string): Promise<{ok:boolean;error?:string;url?:string;hole?:{left:number;top:number;width:number;height:number}}>;
   listPhotoFrames(): Promise<{
     ok: boolean;
     frames?: {
@@ -299,8 +304,8 @@ export interface PbApi {
     uploadToken: string;
     eventPrefix: string;
     filePath: string;
-    variant: 'original' | 'framed' | 'ai' | 'physical';
-    processStatus?: 'processing' | 'ready';
+    variant: 'original' | 'framed' | 'ai' | 'physical' | 'magnet-source';
+    processStatus?: 'processing' | 'ready' | 'failed';
   }): Promise<{
     ok: boolean;
     queued?: boolean;

@@ -81,6 +81,13 @@ export class PhysicalFrameAdjustDialogComponent implements OnDestroy, AfterViewI
     this.zoom.set(Math.min(4, Math.max(1, Math.round((this.zoom() + delta) * 20) / 20)));
   }
 
+  resetCrop(): void {
+    if (this.busy()) return;
+    this.zoom.set(1);
+    this.panX.set(0);
+    this.panY.set(0);
+  }
+
   onZoomInput(ev: Event): void {
     const v = Number((ev.target as HTMLInputElement).value);
     if (Number.isFinite(v)) this.zoom.set(Math.min(4, Math.max(1, v)));
@@ -208,7 +215,7 @@ export class PhysicalFrameAdjustDialogComponent implements OnDestroy, AfterViewI
     const sB = (pf.safeInsetBottomMm / 10) * scale;
 
     const crop = this.crop();
-    this.drawCell(ctx, rotated, mx, my, cellW, cellH, pad, sL, sR, sT, sB, crop, pf.borderEnabled);
+    this.drawCell(ctx, rotated, mx, my, cellW, cellH, pad, sL, sR, sT, sB, crop, false);
     this.drawCell(
       ctx,
       rotated,
@@ -222,7 +229,7 @@ export class PhysicalFrameAdjustDialogComponent implements OnDestroy, AfterViewI
       sT,
       sB,
       crop,
-      pf.borderEnabled,
+      false,
     );
   }
 
@@ -266,3 +273,4 @@ export class PhysicalFrameAdjustDialogComponent implements OnDestroy, AfterViewI
     }
   }
 }
+

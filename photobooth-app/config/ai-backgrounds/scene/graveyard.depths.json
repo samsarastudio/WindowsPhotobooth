@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "graveyard",
+  "displayName": "Blood Moon Graveyard",
+  "variants": {
+    "close": "depths/graveyard/close.webp",
+    "medium": "depths/graveyard/medium.webp",
+    "wide": "depths/graveyard/wide.webp"
+  },
+  "baseSha256": "5ba721ebc421f3c738a3c780c44fb6e10c4569d088ca17c567962c8244ae79a1"
+}

@@ -19,9 +19,14 @@ if (Get-Process PhotoBooth -ErrorAction SilentlyContinue | Where-Object { $_.Pat
 New-Item -ItemType Directory -Force -Path $Builds | Out-Null
 $Meta = [ordered]@{version=$Version; buildId=$BuildId; builtAt=[DateTime]::UtcNow.ToString('o'); channel='folder'; productName='PhotoBooth'}
 $Meta | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Payload 'version.json') -Encoding Ascii
-$Items = @(Get-ChildItem -LiteralPath $Payload).FullName
-# Direct compression avoids two redundant copies of the large model files.
-Compress-Archive -LiteralPath $Items -DestinationPath $ZipPath -CompressionLevel Optimal
+# Use standard Deflate ZIP with stronger compression, retaining every model and asset.
+$SevenZip = Join-Path $AppRoot 'node_modules/7zip-bin/win/x64/7za.exe'
+if (-not (Test-Path -LiteralPath $SevenZip)) { throw 'Run npm install before packaging (7zip-bin is required).' }
+Push-Location -LiteralPath $Payload
+try {
+  & $SevenZip a -tzip -mm=Deflate -mx=9 -mfb=258 -mpass=15 $ZipPath '*' | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'OTA ZIP compression failed.' }
+} finally { Pop-Location }
 if ((Get-Item -LiteralPath $ZipPath).Length -gt 600MB) { throw "Package exceeds Moments server's 600 MB limit: $ZipPath" }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Archive = [IO.Compression.ZipFile]::OpenRead($ZipPath)

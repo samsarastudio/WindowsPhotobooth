@@ -29,7 +29,7 @@
         class="pb-pf-zoom-range"
         type="range"
         min="1"
-        max="3"
+        max="4"
         step="0.05"
         [value]="zoom()"
         [disabled]="busy()"
@@ -42,6 +42,7 @@
     </div>
 
     <div class="pb-row pb-pf-actions">
+      <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy() || !ready()" (click)="resetCrop()">Reset crop / fill frame</button>
       <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="cancel()">
         {{ copy().physicalAdjust.cancel }}
       </button>

@@ -101,7 +101,8 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       !this.isPreview() &&
       !!this.path() &&
       !this.aiGenerating() &&
-      this.booth.guestModes().physicalFrameEnabled !== false,
+      this.booth.guestModes().physicalFrameEnabled !== false &&
+      this.selectedMode()?.pipeline !== 'head-swap',
   );
   readonly viewingFramedPhoto = computed(() => !!this.path() && /_framed\.png$/i.test(this.path() || ''));
   readonly showMakeFramed = computed(
@@ -114,13 +115,14 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   );
   /**
    * Source for Make physical / Make framed.
-   * Prefer the image currently on screen (AI / framed) so every option can print a sheet;
-   * fall back to the original capture when viewing an existing physical sheet.
+   * Magnets use the unframed scene result or classic capture, never the decorative frame.
    */
   readonly physicalAdjustSource = computed(() => {
-    const p = this.path();
+    let p = this.path();
     if (!p) return '';
-    if (this.isPhysicalSheetPath(p)) return this.digitalPath() || this.originalCapturePath(p);
+    if (this.isPhysicalSheetPath(p)) p = this.digitalPath() || this.originalCapturePath(p);
+    if (/_ai\.png$/i.test(p)) return p.replace(/_ai\.png$/i, '_ai_raw.png');
+    if (/_framed\.png$/i.test(p)) return this.originalCapturePath(p);
     return p;
   });
   readonly printUsesPhysicalLayout = computed(
@@ -134,7 +136,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   readonly showAiSection = computed(() => {
     if (this.isPreview()) return false;
     // Skip mode: never show the Generate / waiting UI on the kiosk.
-    if (this.booth.guestFlow().skipAiPreviewToThanks) return false;
+    if ((this.selectedMode()?.pipeline === 'scene' ? this.booth.guestFlow().skipBackgroundPreviewToThanks : this.booth.guestFlow().skipPortraitPreviewToThanks)) return false;
     if (!this.booth.aiGenerationEnabled()) return false;
     const id = this.aiStyle.selectedModeId();
     if (!id || id === PLAIN_PHOTO_MODE_ID) return false;
@@ -142,7 +144,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   });
 
   readonly canRunAiGeneration = computed(
-    () => this.showAiSection() && this.booth.openAiConfigured(),
+    () => this.showAiSection(),
   );
 
   readonly selectedMode = computed(() => {
@@ -228,9 +230,9 @@ export class ResultPageComponent implements OnInit, OnDestroy {
 
   /** When admin enabled skip-to-thanks, never show the AI waiting UI. */
   private shouldSkipAiWait(): boolean {
-    if (!this.booth.guestFlow().skipAiPreviewToThanks) return false;
+    if (!(this.selectedMode()?.pipeline === 'scene' ? this.booth.guestFlow().skipBackgroundPreviewToThanks : this.booth.guestFlow().skipPortraitPreviewToThanks)) return false;
     if (!this.booth.aiGenerationEnabled()) return false;
-    if (!this.booth.openAiConfigured()) return false;
+
     const id = this.aiStyle.selectedModeId();
     if (!id || id === PLAIN_PHOTO_MODE_ID) return false;
     return !!this.selectedMode();
@@ -358,6 +360,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.aiModelUsed.set(r.model ?? null);
+      if (r.rawPath && mode.pipeline === 'scene') this.galleryUpload.queueUpload(r.rawPath, 'magnet-source');
       this.galleryUpload.queueUpload(r.path, 'ai');
       this.gallerySession.setPair(source, r.path);
       void this.router.navigate(['/ai-gallery']);

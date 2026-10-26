@@ -481,6 +481,8 @@ function normalizeGuestFlowConfig(
   const thanksSec = Number(o.thanksAutoReturnSec);
   return {
     skipAiPreviewToThanks: o.skipAiPreviewToThanks === true,
+    skipPortraitPreviewToThanks: o.skipPortraitPreviewToThanks ?? o.skipAiPreviewToThanks === true,
+    skipBackgroundPreviewToThanks: o.skipBackgroundPreviewToThanks ?? o.skipAiPreviewToThanks === true,
     thanksAutoReturnSec:
       Number.isFinite(thanksSec) && thanksSec >= 0 ? Math.min(120, Math.floor(thanksSec)) : base.thanksAutoReturnSec,
     boothId: typeof o.boothId === 'string' && o.boothId.trim() ? o.boothId.trim() : base.boothId,
