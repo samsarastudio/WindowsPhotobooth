@@ -108,10 +108,10 @@ def hero(i,u):
                 pose(im,card,cx,cy+math.sin(v*1.8+n)*5,.7+.3*k,(1-k)*(30 if n%2 else -30)+math.sin(v+n)*.7)
         r.display(im,(55,988),'SIX HAUNTING LOOKS. WHICH ONE ARE YOU?',30,accent,max_width=970)
     elif i==2:
-        carousel(im,scene_tiles,u)
+        carousel(im,scene_tiles,u,slot=12/len(scene_tiles))
         r.display(im,(54,918),'CAPTURE THE NIGHT. TAKE HOME THE MEMORY.',36,accent,max_width=970)
     elif i==0:
-        carousel(im,scene_tiles,u)
+        carousel(im,scene_tiles,u,slot=12/len(scene_tiles))
         r.display(im,(54,918),'YOUR NIGHT. YOUR PHOTO. YOUR SOUVENIR.',36,accent,max_width=970)
     else:
         impact(im,u-.5)
