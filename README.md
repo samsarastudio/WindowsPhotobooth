@@ -207,3 +207,45 @@ Uploads: original, framed, and AI variants. Share QR on the result screen opens 
 - Change default TTL for **new** sessions
 - Extend / delete existing sessions
 - Purge expired sessions (also runs automatically every 6 hours)
+
+
+## Live game desk (Angular + server events)
+
+The game desk uses AOT-compiled Angular 19 islands for player cards, the detail popup,
+the live kiosk ribbon and reports. Signals hold snapshots, OnPush cards keep stable
+player identities, and no Zone.js or runtime compiler is shipped. Host payment/PIN
+forms remain outside the live regions so updates do not replace in-progress input.
+
+`npm ci` and `npm run build:game-admin` rebuild `public/js/game-admin-angular.js` and
+its license file. These generated assets are checked in: the Pi needs only
+`npm ci --omit=dev` and a service restart after pulling the server changes.
+
+Authenticated `GET /api/admin/game/events` streams change notifications via SSE.
+The browser fetches a fresh authorized snapshot only after a change, on search,
+on initial connection/reconnection, or when explicitly refreshed. Idle tabs do not
+poll. Credentials remain in headers, never URLs. SSE reconnects with backoff and
+closes on lock. Reverse proxies must allow streaming (buffering is disabled by the
+response header); the stream sends a 15-second keepalive. The current systemd
+single-process server uses in-process events; multiple replicas would require a
+shared pub/sub transport before scaling out.
+
+The updated Unity kiosk sends `/api/game/progress` with the reserved round/run IDs,
+phase, counted shots and score. Heartbeats establish connection freshness; unchanged
+heartbeats do not invalidate dashboard snapshots. Only the authenticated claim
+consumes a chance, and only the durable result endpoint awards photos. Late/recovered
+attempt telemetry cannot overwrite the current run. A connection older than 20 seconds
+is labelled unconfirmed rather than represented as reliably live.
+
+Player details include payment count/amount/time, credit-use time, game-start time,
+last connection and result status/score. Game reports include payment totals, credits,
+extensions, attempt completion/recovery, accuracy, scores and photo balances, plus a
+CSV of the latest 200 attempts. Aggregate payment/reward totals include legacy data;
+new lifecycle metrics are labelled tracked attempts because old kiosks did not send
+start/heartbeat data. Times in the UI use the host browser timezone; stored times and
+CSV timestamps are UTC ISO strings.
+
+The new default is 10 shots, 10 points per made basket, 99 points for two photos (so
+all 10 baskets qualify). A one-time migration updates the old 10-shot/60-point default
+to 99; customized targets and already-purchased round rules are preserved. The kiosk
+home copy reads the server rules, so deploy/restart Moments as well as updating the
+Windows game. Existing paid extension and two-chance photo guarantees remain.

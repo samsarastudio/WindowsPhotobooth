@@ -1,0 +1,35 @@
+Bundled license information:
+
+@angular/core/fesm2022/untracked-BKcld_ew.mjs:
+@angular/core/fesm2022/primitives/di.mjs:
+@angular/core/fesm2022/primitives/signals.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/common/fesm2022/dom_tokens-rA0ACyx7.mjs:
+@angular/common/fesm2022/location-Dq4mJT-A.mjs:
+@angular/common/fesm2022/common_module-Dx7dWex5.mjs:
+@angular/common/fesm2022/xhr-BfNfxNDv.mjs:
+@angular/common/fesm2022/common.mjs:
+@angular/platform-browser/fesm2022/dom_renderer-DGKzginR.mjs:
+@angular/platform-browser/fesm2022/browser-0WrrQdE0.mjs:
+@angular/platform-browser/fesm2022/platform-browser.mjs:
+  /**
+   * @license Angular v19.2.21
+   * (c) 2010-2025 Google LLC. https://angular.io/
+   * License: MIT
+   */
+
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+@angular/core/fesm2022/core.mjs:
+  /*!
+  * @license
+  * Copyright Google LLC All Rights Reserved.
+  *
+  * Use of this source code is governed by an MIT-style license that can be
+  * found in the LICENSE file at https://angular.dev/license
+  */

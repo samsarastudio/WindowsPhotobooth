@@ -1,0 +1,46 @@
+import {Component, ChangeDetectionStrategy, signal, input, computed, provideExperimentalZonelessChangeDetection} from '@angular/core';
+import {bootstrapApplication} from '@angular/platform-browser';
+const snapshot=signal<any>(null);
+const selection=signal<string|null>(null);
+const selectedPlayer=computed(()=>snapshot()?.players.find((p:any)=>p.id===selection()));
+const money=(n:number)=>new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD'}).format(n/100);
+const when=(s:string)=>s?new Date(s).toLocaleString():'—';
+const phaseNames:any={scanned:'QR accepted · preparing',preparing:'Preparing to play',playing:'Game playing',awaiting_result:'Game played · awaiting result',completed:'Result received',recovered:'Recovered by host'};
+const clock=signal(Date.now());
+function phase(r:any){return (phaseNames[r.phase]||r.phase)+(!['completed','recovered'].includes(r.phase)&&clock()-Date.parse(r.last_seen||r.scanned_at)>20000?' · connection unconfirmed':'');}
+function status(p:any){const run=p.runs.find((r:any)=>!['completed','recovered'].includes(r.phase));return run?phase(run):p.rounds.some((r:any)=>['active','extension_active'].includes(r.state))?'Chance reserved · awaiting kiosk':p.credits?'CHANCE READY':p.completedPlays?'GAME PLAYED':'VISIT HOST TO ADD CHANCE';}
+function action(p:any,kind:string,r?:any){document.dispatchEvent(new CustomEvent('moments-player-action',{detail:{playerId:p.id,kind,roundId:r?.id}}));}
+function eventText(a:any){const d=JSON.parse(a.detail);switch(a.kind){case 'manual-payment':return `${d.count} ${d.kind==='play'?'chance credit(s)':'extension(s)'} added · ${money(d.amount)}`;case 'started':return 'QR accepted · '+(d.extension?'extension used':'1 chance credit used');case 'result':return 'Result received · '+d.score+' points';case 'recovered':return 'Interrupted attempt recovered by host';case 'photos-redeemed':return d.count+' photo(s) redeemed';default:return phaseNames[a.kind.replace('game-','')]||a.kind;}}
+@Component({selector:'moments-player-card',standalone:true,changeDetection:ChangeDetectionStrategy.OnPush,template:`
+<article class="card player compact-player">
+<button class="card-details-trigger" (click)="details()" [attr.aria-label]="'View details for '+p().name">
+<span class="badge">{{status(p())}}</span><h2>{{p().name}}</h2><p class="muted">{{p().email}}</p>
+<div class="stats"><div><strong>{{p().credits}}</strong><span>CHANCES READY</span></div><div><strong>{{p().available}}</strong><span>PHOTOS LEFT</span></div><div><strong>{{p().earned}}</strong><span>PHOTOS EARNED</span></div></div>
+@if(p().runs[0];as r){<p class="card-score">{{r.score}} points · {{r.phase==='completed'?'Result received':'Latest attempt'}}</p>}
+<span class="details-hint">Tap for details ↗</span></button>
+<div class="actions card-actions"><button (click)="action(p(),'qr')">Show QR</button><button (click)="action(p(),'play')">+ Add paid chances</button>
+@if(p().available){<button (click)="action(p(),'redeem')">Redeem photos</button>}
+@for(r of p().rounds;track r.id){@if(r.state==='eligible'){<button (click)="action(p(),'extension',r)">+{{r.rules.extraShots}} shots · {{money(r.rules.extensionPrice)}}</button>}@if(r.state==='active'||r.state==='extension_active'){<button (click)="action(p(),'recover',r)">Recover interrupted play</button>}}
+</div></article>`})
+class PlayerCard{p=input.required<any>();status=status;action=action;money=money;details(){selection.set(this.p().id);const d=document.getElementById('playerDetailsDialog') as HTMLDialogElement;d.showModal();}}
+@Component({selector:'moments-player-cards',standalone:true,imports:[PlayerCard],changeDetection:ChangeDetectionStrategy.OnPush,template:`
+<div id="playerGrid" class="grid">@for(p of data()?.players||[];track p.id){<moments-player-card [p]="p"/>}@empty{<p class="muted">No matching players yet. Share the registration QR to get started.</p>}</div>
+<dialog id="playerDetailsDialog" aria-labelledby="playerDetailsTitle" (close)="clearSelection()"><div class="detail-dialog-header"><p class="eyebrow">Player activity</p><button type="button" (click)="close()" aria-label="Close player details">Close</button></div>
+@if(selected();as p){<h2 id="playerDetailsTitle">{{p.name}}</h2><p>{{p.email}} · DOB {{p.dob}}</p><span class="badge">{{status(p)}}</span>
+<div class="stats"><div><strong>{{p.credits}}</strong><span>CHANCES READY</span></div><div><strong>{{p.available}}</strong><span>PHOTOS LEFT</span></div><div><strong>{{p.completedPlays}}</strong><span>COMPLETED CHANCES</span></div></div>
+<h3>Game attempts</h3>@for(r of p.runs;track r.id){<section class="session-summary"><strong>{{r.extension?'Extension':'Paid chance'}} · {{phase(r)}}</strong><p>{{r.score}} points · {{r.attempts}} shots · {{r.made}} baskets</p><dl><dt>Kiosk</dt><dd>{{r.kiosk}}</dd><dt>QR accepted / credit used</dt><dd>{{when(r.scanned_at)}}</dd><dt>Game started</dt><dd>{{when(r.started_at)}}</dd><dt>Result received</dt><dd>{{r.phase==='completed'?when(r.finished_at):'Not received'}}</dd><dt>Last connection</dt><dd>{{when(r.last_seen)}}</dd></dl></section>}@empty{<p class="muted">No attempts tracked yet. Earlier activity appears below.</p>}
+<h3>Credits & history</h3>@for(a of p.timeline;track $index){<div class="audit"><strong>{{eventText(a)}}</strong><div class="muted">{{when(a.created)}}</div></div>}
+<div class="actions detail-actions"><button (click)="action(p,'qr')">Show QR</button><button (click)="action(p,'play')">+ Add paid chances</button>@if(p.available){<button (click)="action(p,'redeem')">Redeem photos</button>}</div>
+}</dialog>`})
+class PlayerCards{data=snapshot;selected=selectedPlayer;status=status;phase=phase;when=when;eventText=eventText;action=action;clearSelection(){selection.set(null);}close(){(document.getElementById('playerDetailsDialog') as HTMLDialogElement).close();}}
+@Component({selector:'moments-live-ribbon',standalone:true,changeDetection:ChangeDetectionStrategy.OnPush,template:`<div id="liveRibbon" class="live-ribbon" role="status"><strong>{{data()?.report.live.length?'LIVE KIOSKS':'NO ACTIVE PLAYERS'}}</strong>@for(r of data()?.report.live||[];track r.id){<span>{{r.name}} · {{r.kiosk}} · {{phase(r)}} · {{r.attempts}} shots / {{r.score}} points</span>}</div>`})
+class LiveRibbon{data=snapshot;phase=phase;}
+@Component({selector:'moments-game-report',standalone:true,changeDetection:ChangeDetectionStrategy.OnPush,template:`
+<div id="reportStats" class="report-grid">@for(stat of stats();track stat[1]){<div class="card"><strong>{{stat[0]}}</strong><span>{{stat[1]}}</span></div>}</div>
+<h2>Recent game attempts</h2><button class="secondary" (click)="export()">Export recent attempts CSV</button>
+<div class="table-scroll"><table><thead><tr><th>Player / kiosk</th><th>Status</th><th>Credit used at</th><th>Playing at</th><th>Result received at</th><th>Shots / baskets</th><th>Score</th></tr></thead><tbody id="reportRows">@for(r of data()?.report.recent||[];track r.id){<tr><td>{{r.name}} / {{r.kiosk}}</td><td>{{phase(r)}}</td><td>{{when(r.scanned_at)}}</td><td>{{when(r.started_at)}}</td><td>{{r.phase==='completed'?when(r.finished_at):'Not received'}}</td><td>{{r.attempts}} / {{r.made}}</td><td>{{r.score}}</td></tr>}</tbody></table></div>`})
+class GameReport{data=snapshot;phase=phase;when=when;stats=computed(()=>{const r=snapshot()?.report;if(!r)return [];return [[money(r.revenue),'Manual payments recorded'],[r.players,'Registered players'],[r.creditsGranted,'Chance credits sold'],[r.creditsReady,'Unused chance credits'],[r.extensionsSold,'Extensions sold'],[r.scans,'Accepted QR scans tracked'],[r.completedChances,'Completed base chances'],[r.completedRuns,'Completed attempts tracked'],[r.recovered,'Recovered attempts'],[r.averageScore,'Average score / tracked attempt'],[r.shots?Math.round(r.baskets/r.shots*100)+'%':'—','Basket accuracy / tracked attempts'],[r.earned,'Photos earned'],[r.redeemed,'Photos redeemed'],[r.available,'Photos available']];});export(){document.dispatchEvent(new Event('moments-export-report'));}}
+const identity=new Map<string,{signature:string,player:any}>();
+(window as any).momentsLive={update:(data:any)=>{if(!data){identity.clear();snapshot.set(null);selection.set(null);return;}const players=data.players.map((p:any)=>{const signature=JSON.stringify(p),old=identity.get(p.id);if(old?.signature===signature)return old.player;identity.set(p.id,{signature,player:p});return p;});const ids=new Set(players.map((p:any)=>p.id));for(const id of identity.keys())if(!ids.has(id))identity.delete(id);snapshot.set({...data,players});clock.set(Date.now());},tick:()=>clock.set(Date.now())};
+const providers=[provideExperimentalZonelessChangeDetection()];
+Promise.all([bootstrapApplication(PlayerCards,{providers}),bootstrapApplication(LiveRibbon,{providers}),bootstrapApplication(GameReport,{providers})]).then(()=>document.dispatchEvent(new Event('moments-angular-ready')));
