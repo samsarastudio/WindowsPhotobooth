@@ -230,10 +230,10 @@ single-process server uses in-process events; multiple replicas would require a
 shared pub/sub transport before scaling out.
 
 The updated Unity kiosk sends `/api/game/progress` with the reserved round/run IDs,
-phase, counted shots and score. Heartbeats establish connection freshness; unchanged
-heartbeats do not invalidate dashboard snapshots. Only the authenticated claim
+phase only. Status transitions send immediately, with a score-free heartbeat every 15 seconds. Final shot totals and score are sent only to `/api/game/result`. Heartbeats establish connection freshness; unchanged
+heartbeats do not invalidate dashboard snapshots; a small SSE presence event refreshes only connection timestamps. Only the authenticated claim
 consumes a chance, and only the durable result endpoint awards photos. Late/recovered
-attempt telemetry cannot overwrite the current run. A connection older than 20 seconds
+attempt telemetry cannot overwrite the current run. A connection older than 45 seconds
 is labelled unconfirmed rather than represented as reliably live.
 
 Player details include payment count/amount/time, credit-use time, game-start time,
