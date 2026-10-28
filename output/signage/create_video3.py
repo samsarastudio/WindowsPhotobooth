@@ -9,13 +9,20 @@ OUT=c.OUT/'video3'; OUT.mkdir(exist_ok=True)
 TOTAL=60; FPS=30
 
 def thumbnails(im,photo,x,y):
-    """Physical print and phone preview; QR is a labeled illustration, not a download link."""
+    """All three bundle items; QR is a labeled illustration, not a download link."""
     d=ImageDraw.Draw(im)
     d.rounded_rectangle((x,y,x+184,y+112),radius=3,fill=(250,246,234))
     image=ImageOps.fit(photo,(170,96),method=Image.Resampling.LANCZOS)
     im.paste(image,(x+7,y+7))
     r.display(im,(x,y+117),'POSTCARD PRINT',23,r.WHITE,max_width=190)
-    px=x+280
+    # Reuse the campaign physical magnet product preview, distinct from the print.
+    mx=x+280
+    magnet=ImageOps.contain(c.magnet_preview,(184,112),method=Image.Resampling.LANCZOS)
+    im.paste(magnet,(mx+(184-magnet.width)//2,y+(112-magnet.height)//2))
+    r.display(im,(mx,y+117),'PHOTO MAGNET',23,r.WHITE,max_width=200)
+    r.display(im,(x+220,y+34),'+',36,r.GOLD,max_width=40)
+    r.display(im,(mx+220,y+34),'+',36,r.GOLD,max_width=40)
+    px=x+560
     d.rounded_rectangle((px,y-4,px+74,y+112),radius=12,fill=(14,17,22),outline=r.WHITE,width=3)
     im.paste(ImageOps.fit(photo,(62,87)),(px+6,y+8))
     d.line((px+27,y+103,px+47,y+103),fill=r.WHITE,width=3)
@@ -43,7 +50,7 @@ def menu():
     r.display(im,(818,147),'$25',106,r.GOLD,max_width=185)
     r.txt(im,(78,229),'One postcard-sized print + one photo magnet',30,r.WHITE)
     r.txt(im,(78,272),'+ digital copy',30,r.WHITE)
-    thumbnails(im,c.scenes[0],280,323)
+    thumbnails(im,c.scenes[0],160,323)
     for y,title,price,detail in [(508,'CLASSIC PHOTO','$10','Your photo in a Halloween background'),(652,'AI PORTRAIT','$15','Your Halloween character transformation')]:
         r.display(im,(72,y),title,43,r.WHITE,max_width=700)
         r.display(im,(851,y),price,65,r.GOLD,max_width=158)
