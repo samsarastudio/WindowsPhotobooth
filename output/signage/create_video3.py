@@ -61,12 +61,35 @@ def menu():
     return im
 MENU=menu()
 
+def portrait_comparison():
+    im=Image.new('RGB',(1080,1080),(12,9,16))
+    r.display(im,(54,300),'YOUR PHOTO',32,r.GOLD,max_width=250)
+    r.display(im,(390,300),'YOUR HALLOWEEN POSSIBILITIES',32,r.GOLD,max_width=640)
+    sources=c.OUT.parent.parent/'live-qa-2026-10-23'
+    rows=[('man',[0,2,3]),('woman',[1,4,5])]
+    for row,(person,indices) in enumerate(rows):
+        y=350+row*330
+        original=Image.open(sources/(person+'.png')).convert('RGB')
+        original=ImageOps.fit(original,(210,280),method=Image.Resampling.LANCZOS)
+        im.paste(original,(54,y))
+        r.display(im,(54,y+285),'ORIGINAL',24,r.WHITE,max_width=210)
+        d=ImageDraw.Draw(im)
+        d.line((295,y+140,350,y+140),fill=r.GOLD,width=5)
+        d.line((335,y+125,350,y+140,335,y+155),fill=r.GOLD,width=5)
+        for col,index in enumerate(indices):
+            label,photo=c.cards[index]
+            im.paste(c.tile(photo,label,210,310),(390+col*220,y))
+    return im
+PORTRAIT_COMPARISON=portrait_comparison()
+
 def scene(t):
-    if t<12:i,u,title,sub=3,t,'KEEP THE FRIGHT. TAKE HOME THE FUN.','YOUR HALLOWEEN SOUVENIR SET'
-    elif t<24:i,u,title,sub=0,t-12,'STEP INTO HALLOWEEN. JUST $10.','POSTCARD-SIZED PRINT + DIGITAL COPY'
-    elif t<48:i,u,title,sub=1,t-24,'BECOME YOUR HALLOWEEN CHARACTER','POSTCARD-SIZED PRINT + DIGITAL COPY  $15'
+    # 32 seconds for the set, 20 for classic, one concise 8-second AI comparison.
+    if t<20:i,u,title,sub=3,t*12/20,'KEEP THE FRIGHT. TAKE HOME THE FUN.','YOUR HALLOWEEN SOUVENIR SET'
+    elif t<40:i,u,title,sub=0,(t-20)*12/20,'STEP INTO HALLOWEEN. JUST $10.','POSTCARD-SIZED PRINT + DIGITAL COPY'
+    elif t<48:i,u,title,sub=1,t-40,'YOUR PHOTO. YOUR HALLOWEEN LOOK.','POSTCARD-SIZED PRINT + DIGITAL COPY  $15'
     else:i,u,title,sub=3,t-48,'ONE NIGHT. A SOUVENIR TO KEEP.','PRINT IT. DISPLAY IT. SHARE IT.'
-    im=c.hero(i,u);d=ImageDraw.Draw(im)
+    im=PORTRAIT_COMPARISON.copy() if i==1 else c.hero(i,u)
+    d=ImageDraw.Draw(im)
     d.rectangle((0,0,1080,285),fill=(12,9,16))
     r.display(im,(54,35),'HALLOWEEN SOUVENIRS',75,c.accent,max_width=972)
     r.display(im,(54,137),title,46,r.WHITE,max_width=972)
@@ -75,7 +98,7 @@ def scene(t):
 
 def frame(t):
     t%=TOTAL;top=scene(t)
-    boundaries=[12,24,48,60]
+    boundaries=[20,40,48,60]
     end=next(x for x in boundaries if t<x)
     if t>end-.75:
         k=r.ease((t-end+.75)/.75);x=int(-300+k*1700)
@@ -94,7 +117,7 @@ def render(target):
     if encoder.wait():raise RuntimeError('Export failed')
 
 if __name__=='__main__':
-    for t in [5,17,25.5,29,32,35,38,41,45,54]:frame(t).save(OUT/f'preview-{t}.jpg',quality=93)
+    for t in [5,17,23,28,33,38,41,45,54]:frame(t).save(OUT/f'preview-{t}.jpg',quality=93)
     if '--stills' in sys.argv:sys.exit()
     target=OUT/'halloween-portrait.mp4'
     if '--pricing-only' in sys.argv:
