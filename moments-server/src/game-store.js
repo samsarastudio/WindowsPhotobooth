@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 
-const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 10, extraShots: 3, bonusScore: 60, currency: 'CAD' };
+const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 10, extraShots: 3, bonusScore: 99, currency: 'CAD' };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const integer = (value, min, max) => Number.isSafeInteger(value) && value >= min && value <= max;
 const hashPin = (pin, salt) => scryptSync(pin, salt, 32).toString('hex');
@@ -18,8 +18,17 @@ export function createGameStore(db) {
   `);
   if (!db.prepare('PRAGMA table_info(game_rounds)').all().some(c=>c.name==='reward_reason')) db.exec("ALTER TABLE game_rounds ADD COLUMN reward_reason TEXT NOT NULL DEFAULT ''");
   if (!db.prepare('PRAGMA table_info(game_rounds)').all().some(c=>c.name==='run_id')) db.exec("ALTER TABLE game_rounds ADD COLUMN run_id TEXT NOT NULL DEFAULT ''");
+  db.exec(`CREATE TABLE IF NOT EXISTS game_runs (id TEXT PRIMARY KEY, round_id TEXT NOT NULL, player_id TEXT NOT NULL, kiosk TEXT NOT NULL, extension INTEGER NOT NULL, phase TEXT NOT NULL, scanned_at TEXT NOT NULL, started_at TEXT, finished_at TEXT, last_seen TEXT, attempts INTEGER NOT NULL DEFAULT 0, made INTEGER NOT NULL DEFAULT 0, score INTEGER NOT NULL DEFAULT 0)`);
   const salt = randomBytes(16).toString('hex');
   db.prepare('INSERT OR IGNORE INTO game_settings VALUES (1,?,?,?)').run(JSON.stringify(defaults), salt, hashPin('0707', salt));
+  db.exec('CREATE TABLE IF NOT EXISTS game_migrations (id TEXT PRIMARY KEY)');
+  db.transaction(()=>{
+    if(!db.prepare("SELECT id FROM game_migrations WHERE id='reward-target-99'").get()){
+      const row=db.prepare('SELECT json FROM game_settings WHERE id=1').get(),old=JSON.parse(row.json);
+      if(old.baseShots===10 && old.bonusScore===60)db.prepare('UPDATE game_settings SET json=? WHERE id=1').run(JSON.stringify({...old,bonusScore:99}));
+      db.prepare("INSERT INTO game_migrations VALUES ('reward-target-99')").run();
+    }
+  }).immediate();
   const settings = () => JSON.parse(db.prepare('SELECT json FROM game_settings WHERE id=1').get().json);
   const audit = (player, kind, detail) => db.prepare('INSERT INTO game_audit VALUES (?,?,?,?,?)').run(randomUUID(), player, kind, JSON.stringify(detail), new Date().toISOString());
   function checkPin(pin) {
@@ -111,6 +120,7 @@ export function createGameStore(db) {
         db.prepare('UPDATE game_rounds SET run_id=? WHERE id=?').run(requestId,id);
       }
       const rules = JSON.parse(r.rules);
+      db.prepare("INSERT INTO game_runs(id,round_id,player_id,kiosk,extension,phase,scanned_at) VALUES (?,?,?,?,?,'scanned',?)").run(requestId,r.id,p.id,kiosk,extension?1:0,new Date().toISOString());
       audit(p.id,'started',{roundId:r.id,kiosk,extension});
       return { roundId:r.id, runId:requestId, name:p.name, extension, shots: extension ? rules.extraShots : rules.baseShots, rules, player:view(p.id) };
     });
@@ -137,6 +147,7 @@ export function createGameStore(db) {
         if(completed.length%2===1 && completed[completed.length-1].photos===1 && photos===1){photos=2;reason='two-play-guarantee';}
         db.prepare('UPDATE game_rounds SET base_score=?,base_made=?,photos=?,state=?,reward_reason=? WHERE id=?').run(score,made,photos,photos===2?'complete':'eligible',reason,roundId);
       }
+      db.prepare("UPDATE game_runs SET phase='completed',finished_at=?,last_seen=?,attempts=?,made=?,score=? WHERE id=?").run(new Date().toISOString(),new Date().toISOString(),attempts,made,score,runId);
       audit(r.player_id,'result',{roundId,extension,score});
       return roundView(db.prepare('SELECT * FROM game_rounds WHERE id=?').get(roundId));
     });
@@ -157,6 +168,7 @@ export function createGameStore(db) {
       // Operator confirms abandoned play. Device must be stopped before this action.
       if (r.state === 'active') { db.prepare("UPDATE game_rounds SET state='cancelled' WHERE id=?").run(r.id); db.prepare('UPDATE game_players SET credits=credits+1 WHERE id=?').run(r.player_id); }
       else db.prepare("UPDATE game_rounds SET state='extension_ready',run_id=? WHERE id=?").run(randomUUID(),r.id);
+      db.prepare("UPDATE game_runs SET phase='recovered',finished_at=? WHERE id=?").run(new Date().toISOString(),r.run_id);
       audit(r.player_id,'recovered',{roundId:r.id}); return view(r.player_id);
     });
   }
@@ -164,7 +176,7 @@ export function createGameStore(db) {
     checkPin(input.pin);
     const next = { ...settings() };
     for (const key of ['playPrice','extensionPrice','baseShots','extraShots','bonusScore']) if (input[key] !== undefined) next[key] = input[key];
-    if (!integer(next.playPrice,0,100000) || !integer(next.extensionPrice,0,100000) || !integer(next.baseShots,1,30) || !integer(next.extraShots,1,10) || !integer(next.bonusScore,10,next.baseShots*10) || next.bonusScore%10) fail('Check prices, shot counts and reward threshold.');
+    if (!integer(next.playPrice,0,100000) || !integer(next.extensionPrice,0,100000) || !integer(next.baseShots,1,30) || !integer(next.extraShots,1,10) || !integer(next.bonusScore,10,next.baseShots*10)) fail('Check prices, shot counts and reward threshold.');
     if (input.title !== undefined) { next.title=String(input.title).trim(); if (!next.title || next.title.length>60 || /[<>]/.test(next.title)) fail('Invalid game title.'); }
     if (input.newPin && !/^\d{4,8}$/.test(input.newPin)) fail('PIN must have 4–8 digits.');
     db.transaction(() => {
@@ -174,11 +186,36 @@ export function createGameStore(db) {
     }).immediate();
     return next;
   }
-  return { settings, register, grant, claim, result, redeem, recover, configure, view,
+  function progress(input) {
+    const {runId,roundId,kiosk,phase,attempts,made,score}=input;
+    return db.transaction(()=>{
+      const r=db.prepare('SELECT * FROM game_rounds WHERE id=?').get(roundId);
+      if(!r || r.kiosk!==kiosk || r.run_id!==runId || !['active','extension_active'].includes(r.state))fail('Game attempt is no longer active.',409);
+      const run=db.prepare('SELECT * FROM game_runs WHERE id=?').get(runId);
+      if(!run)fail('Game tracking unavailable for this older attempt.',409);
+      const rules=JSON.parse(r.rules),shots=run.extension?rules.extraShots:rules.baseShots;
+      if(!['preparing','playing','awaiting_result'].includes(phase) || !integer(attempts,0,shots) || !integer(made,0,attempts) || score!==made*10)fail('Invalid game progress.');
+      const rank={scanned:0,preparing:1,playing:2,awaiting_result:3};
+      if(rank[phase]<rank[run.phase] || attempts<run.attempts)return {tracked:true,changed:false};
+      const now=new Date().toISOString();
+      db.prepare('UPDATE game_runs SET phase=?,last_seen=?,started_at=COALESCE(started_at,?),attempts=?,made=?,score=? WHERE id=?').run(phase,now,phase==='playing'||phase==='awaiting_result'?now:null,attempts,made,score,runId);
+      if(phase!==run.phase)audit(r.player_id,'game-'+phase,{roundId,runId,kiosk});
+      return {tracked:true,changed:phase!==run.phase || attempts!==run.attempts || score!==run.score || Date.now()-Date.parse(run.last_seen||run.scanned_at)>20000};
+    }).immediate();
+  }
+  function report() {
+    const runs=db.prepare('SELECT g.*,p.name FROM game_runs g JOIN game_players p ON p.id=g.player_id ORDER BY g.scanned_at DESC').all();
+    const payments=db.prepare("SELECT detail FROM game_audit WHERE kind='manual-payment'").all().map(a=>JSON.parse(a.detail));
+    const totals=db.prepare('SELECT COUNT(*) players,COALESCE(SUM(credits),0) creditsReady,COALESCE(SUM(redeemed),0) redeemed FROM game_players').get();
+    const rewards=db.prepare('SELECT COALESCE(SUM(photos),0) earned,COUNT(*) completedChances FROM game_rounds WHERE base_score IS NOT NULL').get();
+    const done=runs.filter(r=>r.phase==='completed');
+    return {...totals,...rewards,available:rewards.earned-totals.redeemed,revenue:payments.reduce((n,p)=>n+p.amount,0),creditsGranted:payments.filter(p=>p.kind==='play').reduce((n,p)=>n+p.count,0),extensionsSold:payments.filter(p=>p.kind==='extension').reduce((n,p)=>n+p.count,0),scans:runs.length,completedRuns:done.length,recovered:runs.filter(r=>r.phase==='recovered').length,averageScore:done.length?Math.round(done.reduce((n,r)=>n+r.score,0)/done.length):0,baskets:done.reduce((n,r)=>n+r.made,0),shots:done.reduce((n,r)=>n+r.attempts,0),live:runs.filter(r=>!['completed','recovered'].includes(r.phase)),recent:runs.slice(0,200)};
+  }
+  return { settings, register, grant, claim, result, redeem, recover, configure, view, progress, report,
     list: (query='') => {
       query=String(query).trim().slice(0,254);
       const rows=query?db.prepare('SELECT id FROM game_players WHERE name LIKE ? OR email LIKE ? OR token=? ORDER BY rowid DESC LIMIT 500').all('%'+query+'%','%'+query+'%',query):db.prepare('SELECT id FROM game_players ORDER BY rowid DESC LIMIT 500').all();
-      return rows.map(p=>({...view(p.id,true),rounds:rounds(p.id).map(roundView)}));
+      return rows.map(p=>({...view(p.id,true),rounds:rounds(p.id).map(roundView),timeline:db.prepare('SELECT kind,detail,created FROM game_audit WHERE player_id=? ORDER BY rowid DESC').all(p.id),runs:db.prepare('SELECT * FROM game_runs WHERE player_id=? ORDER BY scanned_at DESC').all(p.id)}));
     },
     status: token => { const p=db.prepare('SELECT id FROM game_players WHERE token=?').get(token); if(!p) fail('Player not found.',404); return view(p.id); },
     history: () => db.prepare('SELECT * FROM game_audit ORDER BY rowid DESC LIMIT 100').all() };

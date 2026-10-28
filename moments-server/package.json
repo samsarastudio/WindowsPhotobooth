@@ -14,7 +14,8 @@
     "test:game": "node --test test/game.test.mjs",
     "test:game:browser": "node scripts/test-game-browser.cjs",
     "test:game:unity": "node scripts/test-game-unity.cjs",
-    "seed": "node -e \"import('./src/db.js').then(async m=>{m.initDb(); const {seedSampleGallery}=await import('./src/seed-samples.js'); console.log(JSON.stringify(seedSampleGallery(),null,2))})\""
+    "seed": "node -e \"import('./src/db.js').then(async m=>{m.initDb(); const {seedSampleGallery}=await import('./src/seed-samples.js'); console.log(JSON.stringify(seedSampleGallery(),null,2))})\"",
+    "build:game-admin": "node scripts/build-game-admin.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -32,5 +33,15 @@
     "qrcode": "^1.5.4",
     "selfsigned": "^5.5.0",
     "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@angular/common": "19.2.21",
+    "@angular/compiler": "19.2.21",
+    "@angular/compiler-cli": "19.2.21",
+    "@angular/core": "19.2.21",
+    "@angular/platform-browser": "19.2.21",
+    "@babel/core": "7.26.9",
+    "esbuild": "0.28.0",
+    "typescript": "5.7.3"
   }
 }
