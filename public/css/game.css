@@ -11,3 +11,13 @@
 #playerGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,350px),1fr));align-items:start}.player-history[open]{max-height:520px;overflow:auto}.player-history summary{position:sticky;top:0;background:#241a30;padding:8px 0}
 
 moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow:hidden;height:100%;display:flex;flex-direction:column}.card-details-trigger{display:block;text-align:left;border:0;border-radius:0;background:transparent;color:inherit;padding:24px;width:100%;flex:1;cursor:pointer}.card-details-trigger:hover{background:#ffffff06}.card-details-trigger h2{margin:18px 0 8px}.card-details-trigger p{overflow-wrap:anywhere}.details-hint{font-size:13px;color:#ffbc68}.card-score{font-size:14px}.card-actions{padding:18px 24px;border-top:1px solid #ffffff20;min-height:88px;align-content:start}#playerDetailsDialog{width:min(760px,94vw);max-height:88vh;overflow:auto}.detail-dialog-header{display:flex;justify-content:space-between;align-items:center}.detail-actions{position:sticky;bottom:-30px;background:#25182f;padding:20px 0;margin-top:20px}dl{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;font-size:14px}dt{color:#c3b3cf}dd{margin:0;overflow-wrap:anywhere}
+/* Two curated samples per reward card, with no layout movement while swapping. */
+.postcard-preview.rotating img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:rotate(-3deg);animation:postcard-front 12s infinite;}
+.postcard-preview.rotating img+img{opacity:0;transform:rotate(3deg);animation-name:postcard-back;}
+.reward>div:nth-child(2) .rotating img{animation-delay:-3s;}
+@keyframes postcard-front{0%,40%,100%{opacity:1}50%,90%{opacity:0}}
+@keyframes postcard-back{0%,40%,100%{opacity:0}50%,90%{opacity:1}}
+.samples-paused .rotating img{animation-play-state:paused;}
+.sample-pause{margin-top:18px;font-size:.8rem;}
+@media(prefers-reduced-motion:reduce){.rotating img{animation-duration:0s!important}.rotating img+img{display:none;}.sample-pause{display:none;}}
+.sample-pause{color:#171219;}
