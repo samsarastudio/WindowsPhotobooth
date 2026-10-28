@@ -535,9 +535,30 @@ function renderPhotoPreview(photo, slug) {
       <span class="photo-when">${when}</span>
       <a class="btn ghost" href="${shareHref}" target="_blank" rel="noopener" ${missing ? 'aria-disabled="true" tabindex="-1"' : ''}>Open</a>
       <button type="button" class="btn ghost" id="btnPreviewDownload" ${missing ? 'disabled' : ''}>Download</button>
+      <button type="button" class="btn" id="btnPreviewPrint" ${missing || ['processing', 'failed'].includes(photo.processStatus) ? 'disabled' : ''}>Print to kiosk${['original', 'magnet-source'].includes(photo.variant) ? ' — no frame' : ''}</button>
       <button type="button" class="btn ghost" id="btnPreviewDelete">Delete</button>
     </div>
+    <p class="photo-print-status" role="status" aria-live="polite"></p>
   `;
+  const printButton = photoPreview.querySelector('#btnPreviewPrint');
+  const printStatus = photoPreview.querySelector('.photo-print-status');
+  printButton?.addEventListener('click', async () => {
+    if (missing || printButton.disabled) return;
+    printButton.disabled = true;
+    printStatus.textContent = 'Sending this photo to the kiosk…';
+    try {
+      const result = await api(`/api/tablet/photos/${encodeURIComponent(photo.id)}/print`, {
+        method: 'POST', body: '{}',
+      });
+      printStatus.textContent = result.deduped
+        ? 'This photo is already in the kiosk print queue.'
+        : 'Sent to the kiosk print queue. The selected photo will print exactly as shown.';
+      printButton.textContent = 'Queued for printing';
+    } catch (error) {
+      printStatus.textContent = error.message || 'Could not queue this photo. Please try again.';
+      printButton.disabled = false;
+    }
+  });
   photoPreview.querySelector('#btnPreviewDownload')?.addEventListener('click', () => {
     if (missing) return;
     void downloadAdminPhoto(slug, photo);

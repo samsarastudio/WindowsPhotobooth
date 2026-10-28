@@ -389,6 +389,17 @@
   color: #f3ece3;
 }
 
+.photo-preview-bar .btn.ghost {
+  color: #f3ece3;
+  border-color: #71685e;
+}
+
+.photo-print-status {
+  color: #f3ece3;
+  text-align: center;
+  margin: 0.6rem 0 0;
+}
+
 .photo-toolbar {
   margin: 0.35rem 0 0.55rem;
 }
