@@ -187,20 +187,19 @@ export function createGameStore(db) {
     return next;
   }
   function progress(input) {
-    const {runId,roundId,kiosk,phase,attempts,made,score}=input;
+    const {runId,roundId,kiosk,phase}=input;
     return db.transaction(()=>{
       const r=db.prepare('SELECT * FROM game_rounds WHERE id=?').get(roundId);
       if(!r || r.kiosk!==kiosk || r.run_id!==runId || !['active','extension_active'].includes(r.state))fail('Game attempt is no longer active.',409);
       const run=db.prepare('SELECT * FROM game_runs WHERE id=?').get(runId);
       if(!run)fail('Game tracking unavailable for this older attempt.',409);
-      const rules=JSON.parse(r.rules),shots=run.extension?rules.extraShots:rules.baseShots;
-      if(!['preparing','playing','awaiting_result'].includes(phase) || !integer(attempts,0,shots) || !integer(made,0,attempts) || score!==made*10)fail('Invalid game progress.');
+      if(!['preparing','playing','awaiting_result'].includes(phase))fail('Invalid game progress.');
       const rank={scanned:0,preparing:1,playing:2,awaiting_result:3};
-      if(rank[phase]<rank[run.phase] || attempts<run.attempts)return {tracked:true,changed:false};
+      if(rank[phase]<rank[run.phase])return {tracked:true,changed:false};
       const now=new Date().toISOString();
-      db.prepare('UPDATE game_runs SET phase=?,last_seen=?,started_at=COALESCE(started_at,?),attempts=?,made=?,score=? WHERE id=?').run(phase,now,phase==='playing'||phase==='awaiting_result'?now:null,attempts,made,score,runId);
+      db.prepare('UPDATE game_runs SET phase=?,last_seen=?,started_at=COALESCE(started_at,?) WHERE id=?').run(phase,now,phase==='playing'||phase==='awaiting_result'?now:null,runId);
       if(phase!==run.phase)audit(r.player_id,'game-'+phase,{roundId,runId,kiosk});
-      return {tracked:true,changed:phase!==run.phase || attempts!==run.attempts || score!==run.score || Date.now()-Date.parse(run.last_seen||run.scanned_at)>20000};
+      return {tracked:true,changed:phase!==run.phase,presence:{runId,lastSeen:now}};
     }).immediate();
   }
   function report() {

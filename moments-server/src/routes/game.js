@@ -9,7 +9,7 @@ export const gameRouter = Router(), adminGameRouter = Router();
 let store;
 const get = () => store || (store=createGameStore(getDb()));
 const changes=new EventEmitter();changes.setMaxListeners(0);
-const action = fn => async (req,res) => { try { const value=await fn(req);res.set('Cache-Control','no-store'); res.json({ok:true,...value});if(req.method==='POST' && req.path!=='/status' && value?.changed!==false)changes.emit('change'); } catch(e) { if(!e.status) console.error('[game]',e); res.status(e.status||500).json({ok:false,error:e.status?e.message:'Unable to complete this action. Please retry with the same request.'}); } };
+const action = fn => async (req,res) => { try { const value=await fn(req);res.set('Cache-Control','no-store'); res.json({ok:true,...value});if(req.method==='POST' && req.path!=='/status' && value?.changed!==false)changes.emit('change');else if(value?.presence)changes.emit('presence',value.presence); } catch(e) { if(!e.status) console.error('[game]',e); res.status(e.status||500).json({ok:false,error:e.status?e.message:'Unable to complete this action. Please retry with the same request.'}); } };
 const rates = new Map();
 function rate(limit) { return (req,res,next) => {
   const key=req.ip+req.path, now=Date.now(); let row=rates.get(key);
@@ -31,9 +31,10 @@ adminGameRouter.get('/events',(req,res)=>{
   let queued=false;
   const send=()=>{if(!res.writableEnded){res.write('event: change\ndata: {}\n\n');res.flush?.();}};
   const changed=()=>{if(queued)return;queued=true;timer=setTimeout(()=>{queued=false;send();},150);};
-  let timer;changes.on('change',changed);send();
+  const presence=value=>{if(!res.writableEnded)res.write('event: presence\ndata: '+JSON.stringify(value)+'\n\n');};
+  let timer;changes.on('change',changed);changes.on('presence',presence);send();
   const heartbeat=setInterval(()=>{if(!res.writableEnded)res.write(': heartbeat\n\n');},15000);
-  req.on('close',()=>{clearTimeout(timer);clearInterval(heartbeat);changes.off('change',changed);});
+  req.on('close',()=>{clearTimeout(timer);clearInterval(heartbeat);changes.off('change',changed);changes.off('presence',presence);});
 });
 adminGameRouter.get('/',action(req=>({players:get().list(req.query.q),config:get().settings(),audit:get().history(),report:get().report()})));
 adminGameRouter.get('/players/:id/qr',async(req,res)=>{try{const player=get().view(req.params.id,true);res.set('Cache-Control','no-store').type('png').send(await QRCode.toBuffer(player.token,{width:480,margin:3}));}catch(e){res.sendStatus(e.status||500);}});
