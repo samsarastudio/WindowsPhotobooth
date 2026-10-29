@@ -262,3 +262,8 @@ The authenticated kiosk `POST /api/game/reset` handles F9. It restores an unfini
 Deployment: pull the **moments-server** branch on the Pi and restart `moments-gallery`, then replace the Unity player with the matching release. No new production dependencies are required. Schema migration is additive; default target 99 becomes 666 once, custom targets and prior round rules are preserved. The live server is not restarted by the development workstation.
 
 Validation: `npm run test:game`, `npm run build:game-admin`, `npm run test:game:browser`, and the matching Unity QA player with `npm run test:game:unity`. All test grants/redemptions are confined to isolated databases.
+
+### Game timers and test-account cleanup
+Moments Game Admin → System now sets **Results screen timeout** (default 5 seconds, range 1–60) and **Shot countdown** (default 3 seconds, range 1–10). New chances snapshot these settings. The kiosk accepts the same paid player QR directly on results after its previous result is saved; pending results remain visible until confirmation.
+
+Player details → **Delete registration** removes that registration, QR, unused credits, rewards and game history from the game reports. It requires the confirmation checkbox and confirmation PIN. Active games must first be stopped/reset on the kiosk. Repeated deletion requests are safe; this does not delete photobooth images.
