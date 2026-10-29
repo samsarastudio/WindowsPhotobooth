@@ -18,3 +18,31 @@ moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow
 @keyframes postcard-front{0%,40%,100%{opacity:1}50%,90%{opacity:0}}
 @keyframes postcard-back{0%,40%,100%{opacity:0}50%,90%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.rotating img{animation-duration:0s!important}.rotating img+img{display:none;}}
+
+/* Keep registration usable with narrow screens and the on-screen keyboard. */
+.game-guest .guest>*{min-width:0}
+.game-guest input{font-size:16px;min-width:0;max-width:100%}
+.game-guest button,.game-guest a{touch-action:manipulation}
+.game-guest #playerName{overflow-wrap:anywhere}
+.game-guest .qr{aspect-ratio:1;width:min(100%,260px);height:auto}
+.game-guest .stats>div{flex:1;min-width:0}
+.game-guest .secondary{color:#fff6e6;background:#ffffff0b}
+@media(max-width:900px){
+ .game-guest .guest{max-width:600px;display:flex;flex-direction:column;gap:16px;padding:24px 16px max(24px,env(safe-area-inset-bottom))}
+ .game-guest #promotion{display:contents}
+ .game-guest #promotion>.eyebrow{order:0;margin:0;font-size:10px;letter-spacing:.12em}
+ .game-guest #promotion>h1{order:1;font-size:clamp(44px,12vw,68px);line-height:1.05;margin:0}
+ .game-guest #promotion>.muted{order:2;margin:0}
+ .game-guest #promotion>.muted br{display:none}
+ .game-guest .guest>.card{order:3;width:100%;padding:22px 20px;border-radius:18px}
+ .game-guest #promotion>.steps{order:4;margin:12px 0 0;width:100%}
+ .game-guest #promotion>.reward{order:5;margin:0;width:100%;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .game-guest .reward>div{padding:14px 12px;font-size:14px}
+ .game-guest .reward strong{font-size:48px}
+ .game-guest .postcard-preview{margin:16px 3px 8px}
+ .game-guest #registration h2{font-size:30px;margin:18px 0!important}
+ .game-guest .badge{font-size:10px;line-height:1.5;padding:6px 10px}
+ .game-guest .steps li{gap:12px;margin-bottom:16px;font-size:14px}
+ .pass-visible.game-guest .guest{padding-top:16px}
+ .game-guest #ticket .stats{gap:12px}
+}
