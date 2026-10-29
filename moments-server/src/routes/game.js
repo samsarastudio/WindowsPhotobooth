@@ -25,6 +25,7 @@ gameRouter.post('/qr',rate(60),async(req,res)=> { try { const token=String(req.b
 gameRouter.post('/claim',requireUploadToken,action(req=>get().claim(req.body)));
 gameRouter.post('/progress',requireUploadToken,action(req=>get().progress(req.body)));
 gameRouter.post('/result',requireUploadToken,action(req=>({round:get().result(req.body)})));
+gameRouter.post('/reset',requireUploadToken,action(req=>get().resetRun(req.body)));
 adminGameRouter.use(rate(100),requireAdminPin);
 adminGameRouter.get('/events',(req,res)=>{
   res.set({'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();
