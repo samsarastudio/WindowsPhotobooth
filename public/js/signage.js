@@ -1,14 +1,10 @@
 const video = document.querySelector('#video');
 const status = document.querySelector('#status');
-const layout = document.querySelector('#layout');
-const campaign = document.querySelector('#campaign');
 const start = document.querySelector('#start');
+// Older bookmarks always open the current portrait campaign.
 const params = new URLSearchParams(location.search);
-let campaignNumber = /^[1-9][0-9]*$/.test(params.get('video') || '') ? params.get('video') : '';
-if (![...campaign.options].some(option => option.value === campaignNumber)) campaign.add(new Option(`Video ${campaignNumber}`, campaignNumber));
-campaign.value = campaignNumber;
-layout.value = ['portrait', 'landscape'].includes(params.get('layout')) ? params.get('layout') : 'auto';
-const screenShape = matchMedia('(orientation: portrait)');
+params.delete('video'); params.delete('layout');
+history.replaceState(null, '', location.pathname + (params.size ? '?' + params : ''));
 let currentUrl, idleTimer, wakeLock, requestId = 0, activeController;
 
 function openCache() {
@@ -25,6 +21,7 @@ async function cache(mode, key, value) {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction('videos', mode);
       const store = tx.objectStore('videos');
+      if (mode === 'readwrite') store.clear(); // Retire old campaign blobs after the latest download succeeds.
       const request = mode === 'readonly' ? store.get(key) : store.put(value, key);
       tx.oncomplete = () => resolve(request.result);
       tx.onerror = tx.onabort = () => reject(tx.error || Error('Cache unavailable'));
@@ -69,12 +66,9 @@ async function load() {
   activeController?.abort();
   activeController = new AbortController();
   const signal = activeController.signal;
-  const manifestUrl = `/assets/signage/${campaignNumber ? 'video' + campaignNumber : 'manifest'}.json`;
-  const orientation = campaignNumber === '3' ? 'portrait' : layout.value === 'auto' ? (screenShape.matches ? 'portrait' : 'landscape') : layout.value;
-  layout.disabled = campaignNumber === '3';
-  if (campaignNumber === '3') layout.value = 'portrait';
-  layout.title = campaignNumber === '3' ? 'Video 3 is portrait only' : '';
-  const cacheKey = campaignNumber ? `video${campaignNumber}:${orientation}` : orientation;
+  const manifestUrl = '/assets/signage/manifest.json';
+  const orientation = 'portrait';
+  const cacheKey = 'main-portrait';
   status.textContent = `Loading ${orientation} signage…`;
   let previous;
   try { previous = await cache('readonly', cacheKey); } catch { /* Memory playback works without persistent storage. */ }
@@ -111,7 +105,7 @@ async function load() {
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     video.dataset.layout = orientation;
     video.dataset.version = asset.version;
-    video.dataset.campaign = campaignNumber;
+    video.dataset.campaign = 'main';
     status.textContent = `${asset.title ? asset.title + ' · ' : ''}${orientation === 'portrait' ? 'Portrait' : 'Landscape'} · ${persistent ? 'Saved on this device' : 'Loaded in memory'} · Continuous loop`;
     await play();
   } catch (error) {
@@ -129,17 +123,6 @@ document.querySelector('#fullscreen').addEventListener('click', async () => {
   catch { status.textContent = 'Use your browser’s full-screen mode on this device.'; }
   document.activeElement?.blur(); showControls();
 });
-layout.addEventListener('change', () => {
-  params.set('layout', layout.value); history.replaceState(null, '', `${location.pathname}?${params}`);
-  layout.blur(); load();
-});
-campaign.addEventListener('change', () => {
-  campaignNumber = campaign.value;
-  if (campaignNumber) params.set('video', campaignNumber); else params.delete('video');
-  history.replaceState(null, '', `${location.pathname}?${params}`);
-  campaign.blur(); load();
-});
-screenShape.addEventListener('change', () => { if (layout.value === 'auto') load(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 for (const event of ['pointermove', 'pointerdown', 'keydown']) document.addEventListener(event, showControls);
 load();
