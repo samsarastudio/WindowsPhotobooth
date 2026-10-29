@@ -249,3 +249,16 @@ all 10 baskets qualify). A one-time migration updates the old 10-shot/60-point d
 to 99; customized targets and already-purchased round rules are preserved. The kiosk
 home copy reads the server rules, so deploy/restart Moments as well as updating the
 Windows game. Existing paid extension and two-chance photo guarantees remain.
+
+
+## Haunted Hoops admin update — 29 October 2026
+
+Game desk → System now controls the main-game difficulty (Easy / Normal / Hard; default Normal) and the points target (default **666**, up to 90 × base shots). The idle game attract screen refreshes the target automatically. Running rounds retain their purchased rules. Graded scoring awards 90 / 70 / 60 / 50 for perfect / nice / bank / other baskets, 20 for a rim-out, 10 for a backboard miss and zero for other misses. Results include grade evidence, validated against shot count, basket count and total. Legacy round snapshots continue to accept their original ten-point scoring.
+
+The player keeps one QR. Hosts can add a main chance, then one three-shot extension to an eligible one-photo round, then another main chance and its extension. The desk distinguishes main chances and extensions, automatically shows the QR after approval, and marks extensions ready. A home-screen scan always consumes a ready extension before full-game credits. Extensions have exactly three shots, no practice, temporarily use Easy and carry forward the stored base score. Completion guarantees the second photo. A round already at two photos cannot buy an extension.
+
+The authenticated kiosk `POST /api/game/reset` handles F9. It restores an unfinished base credit once or re-enables the paid extension. It never refunds a finished result. Requests are scoped to the kiosk, round and run and are idempotent. Reset events appear in the player history. The client journals uncertain resets and blocks further admissions until they are confirmed.
+
+Deployment: pull the **moments-server** branch on the Pi and restart `moments-gallery`, then replace the Unity player with the matching release. No new production dependencies are required. Schema migration is additive; default target 99 becomes 666 once, custom targets and prior round rules are preserved. The live server is not restarted by the development workstation.
+
+Validation: `npm run test:game`, `npm run build:game-admin`, `npm run test:game:browser`, and the matching Unity QA player with `npm run test:game:unity`. All test grants/redemptions are confined to isolated databases.
