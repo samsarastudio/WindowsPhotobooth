@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.resolve(process.argv[2] || path.join(root, '../output/signage/current-app'));
-const campaign = process.argv[3] || '';
+const campaign = process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : '';
 if (campaign && !/^video[1-9][0-9]*$/.test(campaign)) throw Error('Campaign must be video1, video2, etc.');
 const dest = path.join(root, 'public/assets/signage');
 const validation = JSON.parse(fs.readFileSync(path.join(source, 'video-validation.json'), 'utf8'));
