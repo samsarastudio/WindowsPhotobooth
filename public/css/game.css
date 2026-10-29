@@ -17,7 +17,4 @@ moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow
 .reward>div:nth-child(2) .rotating img{animation-delay:-3s;}
 @keyframes postcard-front{0%,40%,100%{opacity:1}50%,90%{opacity:0}}
 @keyframes postcard-back{0%,40%,100%{opacity:0}50%,90%{opacity:1}}
-.samples-paused .rotating img{animation-play-state:paused;}
-.sample-pause{margin-top:18px;font-size:.8rem;}
-@media(prefers-reduced-motion:reduce){.rotating img{animation-duration:0s!important}.rotating img+img{display:none;}.sample-pause{display:none;}}
-.sample-pause{color:#171219;}
+@media(prefers-reduced-motion:reduce){.rotating img{animation-duration:0s!important}.rotating img+img{display:none;}}
