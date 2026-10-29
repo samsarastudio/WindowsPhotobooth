@@ -43,3 +43,5 @@ adminGameRouter.post('/grant',action(req=>({player:get().grant(req.body)})));
 adminGameRouter.post('/redeem',action(req=>({player:get().redeem(req.body)})));
 adminGameRouter.post('/recover',action(req=>({player:get().recover(req.body)})));
 adminGameRouter.post('/settings',action(req=>({config:get().configure(req.body)})));
+
+adminGameRouter.post('/delete-player',action(req=>get().deletePlayer(req.body)));

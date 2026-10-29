@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 
-const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 10, extraShots: 3, bonusScore: 666, scoringVersion: 2, difficulty: 1, currency: 'CAD' };
+const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 10, extraShots: 3, bonusScore: 666, scoringVersion: 2, difficulty: 1, resultsTimeoutSeconds: 5, shotCountdownSeconds: 3, currency: 'CAD' };
 // Unity ShotGrade order: Swish, NiceShot, GoodThrow, BankShot, SoClose,
 // Brick, AirBall, Short, TooStrong, Miss, TooLow. Version is frozen per round.
 const gradePoints = [90,70,50,60,20,10,0,0,0,0,0];
@@ -40,7 +40,7 @@ export function createGameStore(db) {
       db.prepare("INSERT INTO game_migrations VALUES ('graded-scoring-v2')").run();
     }
   }).immediate();
-  const settings = () => ({difficulty:1,...JSON.parse(db.prepare('SELECT json FROM game_settings WHERE id=1').get().json)});
+  const settings = () => ({difficulty:1,resultsTimeoutSeconds:5,shotCountdownSeconds:3,...JSON.parse(db.prepare('SELECT json FROM game_settings WHERE id=1').get().json)});
   const audit = (player, kind, detail) => db.prepare('INSERT INTO game_audit VALUES (?,?,?,?,?)').run(randomUUID(), player, kind, JSON.stringify(detail), new Date().toISOString());
   function checkPin(pin) {
     const row = db.prepare('SELECT * FROM game_settings WHERE id=1').get();
@@ -93,6 +93,24 @@ export function createGameStore(db) {
       const id = randomUUID(), token = 'MOMENTS-' + randomBytes(24).toString('hex');
       db.prepare('INSERT INTO game_players(id,token,name,email,dob,created) VALUES (?,?,?,?,?,?)').run(id,token,name,email,dob,new Date().toISOString());
       audit(id,'registered',{}); return { ...view(id), token };
+    });
+  }
+  function deletePlayer(input) {
+    checkPin(input.pin);
+    if(input.confirmDelete!==true)fail('Confirm permanent deletion of this registration.');
+    return once(input.requestId,'delete-player',{playerId:input.playerId},()=>{
+      const p=player(input.playerId), owned=rounds(p.id);
+      if(owned.some(r=>['active','extension_active'].includes(r.state)))fail('Stop and reset the active game before deleting this registration.',409);
+      // Invalidate cached responses too, so old request retries cannot revive the deleted QR.
+      const references=[p.id,p.token,...owned.map(r=>r.id)].map(v=>JSON.stringify(v));
+      for(const a of db.prepare('SELECT id,response FROM game_actions').all())
+        if(references.some(v=>a.response.includes(v)))db.prepare('DELETE FROM game_actions WHERE id=?').run(a.id);
+      db.prepare('DELETE FROM game_runs WHERE player_id=?').run(p.id);
+      db.prepare('DELETE FROM game_rounds WHERE player_id=?').run(p.id);
+      db.prepare('DELETE FROM game_audit WHERE player_id=?').run(p.id);
+      db.prepare('DELETE FROM game_players WHERE id=?').run(p.id);
+      audit(null,'registration-deleted',{playerId:p.id});
+      return {deleted:true,playerId:p.id};
     });
   }
   function grant(input) {
@@ -192,7 +210,8 @@ export function createGameStore(db) {
   function configure(input) {
     checkPin(input.pin);
     const next = { ...settings() };
-    for (const key of ['playPrice','extensionPrice','baseShots','extraShots','bonusScore','difficulty']) if (input[key] !== undefined) next[key] = input[key];
+    for (const key of ['playPrice','extensionPrice','baseShots','extraShots','bonusScore','difficulty','resultsTimeoutSeconds','shotCountdownSeconds']) if (input[key] !== undefined) next[key] = input[key];
+    if(!integer(next.resultsTimeoutSeconds,1,60) || !integer(next.shotCountdownSeconds,1,10))fail('Results timeout must be 1–60 seconds and shot countdown 1–10 seconds.');
     if(!integer(next.difficulty,0,2))fail('Choose Easy, Normal or Hard difficulty.');
     if (!integer(next.playPrice,0,100000) || !integer(next.extensionPrice,0,100000) || !integer(next.baseShots,1,30) || next.extraShots!==3 || !integer(next.bonusScore,1,next.baseShots*90)) fail('Check prices, shot counts and reward threshold. Extensions are exactly 3 shots; the target cannot exceed 90 points per base shot.');
     if (input.title !== undefined) { next.title=String(input.title).trim(); if (!next.title || next.title.length>60 || /[<>]/.test(next.title)) fail('Invalid game title.'); }
@@ -243,7 +262,7 @@ export function createGameStore(db) {
     const done=runs.filter(r=>r.phase==='completed');
     return {...totals,...rewards,available:rewards.earned-totals.redeemed,revenue:payments.reduce((n,p)=>n+p.amount,0),creditsGranted:payments.filter(p=>p.kind==='play').reduce((n,p)=>n+p.count,0),extensionsSold:payments.filter(p=>p.kind==='extension').reduce((n,p)=>n+p.count,0),scans:runs.length,completedRuns:done.length,recovered:runs.filter(r=>r.phase==='recovered').length,averageScore:done.length?Math.round(done.reduce((n,r)=>n+r.score,0)/done.length):0,baskets:done.reduce((n,r)=>n+r.made,0),shots:done.reduce((n,r)=>n+r.attempts,0),live:runs.filter(r=>!['completed','recovered'].includes(r.phase)),recent:runs.slice(0,200)};
   }
-  return { settings, register, grant, claim, result, redeem, recover, resetRun, configure, view, progress, report,
+  return { settings, register, deletePlayer, grant, claim, result, redeem, recover, resetRun, configure, view, progress, report,
     list: (query='') => {
       query=String(query).trim().slice(0,254);
       const rows=query?db.prepare('SELECT id FROM game_players WHERE name LIKE ? OR email LIKE ? OR token=? ORDER BY rowid DESC LIMIT 500').all('%'+query+'%','%'+query+'%',query):db.prepare('SELECT id FROM game_players ORDER BY rowid DESC LIMIT 500').all();

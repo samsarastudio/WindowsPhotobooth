@@ -104,3 +104,26 @@ test('recovery and extension remain separate report attempts without duplicate s
 test('legacy default target migrates once while purchased rules and later settings remain intact',()=>{const {db,s,grant,claim}=fixture();s.configure({pin:'0707',bonusScore:60});grant();const c=claim();db.prepare("DELETE FROM game_migrations WHERE id='reward-target-99'").run();const updated=createGameStore(db);assert.equal(updated.settings().bonusScore,99);assert.equal(updated.list()[0].rounds[0].rules.bonusScore,60);updated.configure({pin:'0707',bonusScore:70});assert.equal(createGameStore(db).settings().bonusScore,70);assert.equal(c.rules.bonusScore,60);});
 
 test('status-only heartbeat never persists intermediate scores or invalidates cards',()=>{const {s,grant,claim,finish}=fixture();grant();const c=claim(),p={roundId:c.roundId,runId:c.runId,kiosk:'test-kiosk',phase:'playing'};assert.equal(s.progress(p).changed,true);const heartbeat=s.progress({...p,attempts:5,made:5,score:50});assert.equal(heartbeat.changed,false);assert(heartbeat.presence.lastSeen);const run=s.list()[0].runs[0];assert.equal(run.score,0);assert.equal(run.attempts,0);assert.equal(run.made,0);finish(c,5);assert.equal(s.list()[0].runs[0].score,450);});
+
+ test('game timers default correctly, validate and freeze with each chance',()=>{
+ const {s,grant,claim}=fixture();grant(2);const first=claim();
+ assert.equal(first.rules.resultsTimeoutSeconds,5);assert.equal(first.rules.shotCountdownSeconds,3);
+ for(const [field,values] of Object.entries({resultsTimeoutSeconds:[0,61,1.5],shotCountdownSeconds:[0,11,2.5]})) for(const value of values)assert.throws(()=>s.configure({pin:'0707',[field]:value}),/seconds/);
+ const changed=s.configure({pin:'0707',resultsTimeoutSeconds:8,shotCountdownSeconds:2});
+ assert.equal(changed.resultsTimeoutSeconds,8);assert.equal(changed.shotCountdownSeconds,2);
+ assert.equal(first.rules.resultsTimeoutSeconds,5);assert.equal(first.rules.shotCountdownSeconds,3);
+ });
+
+test('deleting a registration requires PIN and confirmation, clears history and invalidates QR',()=>{
+ const {s,p,grant,claim,finish}=fixture();grant(2);const c=claim();
+ const deletion={requestId:id(),playerId:p.id,pin:'0707',confirmDelete:true};
+ assert.throws(()=>s.deletePlayer({...deletion,pin:'bad'}),/PIN/);
+ assert.throws(()=>s.deletePlayer({...deletion,confirmDelete:false}),/Confirm/);
+ assert.throws(()=>s.deletePlayer(deletion),/active game/);
+ finish(c,1);assert.equal(s.report().completedRuns,1);
+ assert.equal(s.deletePlayer(deletion).deleted,true);
+ assert.equal(s.deletePlayer(deletion).deleted,true);
+ assert.equal(s.list().length,0);assert.equal(s.report().completedRuns,0);assert.equal(s.report().revenue,0);
+ assert.throws(()=>s.status(p.token),/not found/);
+ assert.throws(()=>s.claim({requestId:id(),token:p.token,kiosk:'test-kiosk'}));
+});
