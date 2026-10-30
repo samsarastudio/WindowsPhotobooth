@@ -46,3 +46,5 @@ moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow
  .pass-visible.game-guest .guest{padding-top:16px}
  .game-guest #ticket .stats{gap:12px}
 }
+
+#scanPlayer{margin-bottom:16px}#scanPlayerCode{font-size:16px}#playerScanVideo{display:block;width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-top:16px}#scanPlayerDialog{max-height:90dvh;overflow:auto}
