@@ -267,3 +267,6 @@ Validation: `npm run test:game`, `npm run build:game-admin`, `npm run test:game:
 Moments Game Admin → System now sets **Results screen timeout** (default 5 seconds, range 1–60) and **Shot countdown** (default 3 seconds, range 1–10). New chances snapshot these settings. The kiosk accepts the same paid player QR directly on results after its previous result is saved; pending results remain visible until confirmation.
 
 Player details → **Delete registration** removes that registration, QR, unused credits, rewards and game history from the game reports. It requires the confirmation checkbox and confirmation PIN. Active games must first be stopped/reset on the kiosk. Repeated deletion requests are safe; this does not delete photobooth images.
+
+### Scan a player at the game desk
+In **Players & rewards**, choose **Scan player QR**. Scan with a USB keyboard scanner (Enter suffix), paste the player pass code, or choose **Use camera** on an HTTPS device. The matching player card opens with main-chance, eligible extension and photo options. Scanning never grants credits: adding chances still requires the payment checkbox and Game confirmation PIN. Camera capture stops when the scan succeeds, the dialog closes, or the page is hidden.
