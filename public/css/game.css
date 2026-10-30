@@ -48,3 +48,5 @@ moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow
 }
 
 #scanPlayer{margin-bottom:16px}#scanPlayerCode{font-size:16px}#playerScanVideo{display:block;width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-top:16px}#scanPlayerDialog{max-height:90dvh;overflow:auto}
+
+.extension-score{margin:12px 0;padding:12px;border-radius:10px;background:#ffb34b12}.extension-score>strong{display:block;color:#ffd199;font-size:20px}.extension-score p{margin:6px 0 0}

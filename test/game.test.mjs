@@ -127,3 +127,15 @@ test('deleting a registration requires PIN and confirmation, clears history and 
  assert.throws(()=>s.status(p.token),/not found/);
  assert.throws(()=>s.claim({requestId:id(),token:p.token,kiosk:'test-kiosk'}));
 });
+
+test('extension history shows earned points and the total of its own main game',()=>{
+ const {s,p,grant,claim,finish}=fixture();grant(2);const main=claim();finish(main,5);
+ s.grant({requestId:id(),playerId:p.id,kind:'extension',count:1,roundId:main.roundId,pin:'0707',expectedPrice:500});
+ const extra=claim();let pending=s.list()[0].runs.find(r=>r.id===extra.runId);assert.equal(pending.combinedScore,null);
+ finish(extra,3);const next=claim();finish(next,1);
+ for(const runs of [s.list()[0].runs,s.report().recent]){
+  const r=runs.find(r=>r.id===extra.runId);assert.equal(r.score,270);assert.equal(r.baseScore,450);assert.equal(r.combinedScore,720);
+  assert.equal(runs.find(r=>r.id===main.runId).combinedScore,450);
+  assert.equal(runs.find(r=>r.id===next.runId).combinedScore,90);
+ }
+});

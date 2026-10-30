@@ -254,8 +254,10 @@ export function createGameStore(db) {
       return {tracked:true,changed:phase!==run.phase,presence:{runId,lastSeen:now}};
     }).immediate();
   }
+  const runScoreColumns = `CASE WHEN g.phase='completed' THEN CASE WHEN g.extension=1 THEN r.base_score ELSE g.score END END AS baseScore,
+    CASE WHEN g.phase='completed' THEN CASE WHEN g.extension=1 THEN r.base_score+g.score ELSE g.score END END AS combinedScore`;
   function report() {
-    const runs=db.prepare('SELECT g.*,p.name FROM game_runs g JOIN game_players p ON p.id=g.player_id ORDER BY g.scanned_at DESC').all();
+    const runs=db.prepare(`SELECT g.*,p.name,${runScoreColumns} FROM game_runs g JOIN game_players p ON p.id=g.player_id LEFT JOIN game_rounds r ON r.id=g.round_id ORDER BY g.scanned_at DESC`).all();
     const payments=db.prepare("SELECT detail FROM game_audit WHERE kind='manual-payment'").all().map(a=>JSON.parse(a.detail));
     const totals=db.prepare('SELECT COUNT(*) players,COALESCE(SUM(credits),0) creditsReady,COALESCE(SUM(redeemed),0) redeemed FROM game_players').get();
     const rewards=db.prepare('SELECT COALESCE(SUM(photos),0) earned,COUNT(*) completedChances FROM game_rounds WHERE base_score IS NOT NULL').get();
@@ -266,7 +268,7 @@ export function createGameStore(db) {
     list: (query='') => {
       query=String(query).trim().slice(0,254);
       const rows=query?db.prepare('SELECT id FROM game_players WHERE name LIKE ? OR email LIKE ? OR token=? ORDER BY rowid DESC LIMIT 500').all('%'+query+'%','%'+query+'%',query):db.prepare('SELECT id FROM game_players ORDER BY rowid DESC LIMIT 500').all();
-      return rows.map(p=>({...view(p.id,true),rounds:rounds(p.id).map(roundView),timeline:db.prepare('SELECT kind,detail,created FROM game_audit WHERE player_id=? ORDER BY rowid DESC').all(p.id),runs:db.prepare('SELECT * FROM game_runs WHERE player_id=? ORDER BY scanned_at DESC').all(p.id)}));
+      return rows.map(p=>({...view(p.id,true),rounds:rounds(p.id).map(roundView),timeline:db.prepare('SELECT kind,detail,created FROM game_audit WHERE player_id=? ORDER BY rowid DESC').all(p.id),runs:db.prepare(`SELECT g.*,${runScoreColumns} FROM game_runs g LEFT JOIN game_rounds r ON r.id=g.round_id WHERE g.player_id=? ORDER BY g.scanned_at DESC`).all(p.id)}));
     },
     status: token => { const p=db.prepare('SELECT id FROM game_players WHERE token=?').get(token); if(!p) fail('Player not found.',404); return view(p.id); },
     history: () => db.prepare('SELECT * FROM game_audit ORDER BY rowid DESC LIMIT 100').all() };
