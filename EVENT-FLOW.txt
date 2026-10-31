@@ -44,8 +44,11 @@ node scripts/test-game-event-browser.cjs
 node scripts/test-game-event-unity.cjs (requires the local development player)
 
 Artwork
-The three-step illustrations were generated with the built-in image generation
- tool. Source PNG: public/assets/game/three-steps.png; web delivery uses WebP.
+The first two instruction panels use built-in AI-generated artwork. The last
+panel displays the actual framed postcard photo directly, without regenerating
+it: public/assets/halloween/samples/curtain-group-manor-gates-20261028.jpg.
+The game uses the same photo as Resources/MomentsInstructionPostcard.jpg.
+Original concept PNG: public/assets/game/three-steps.png; web uses WebP.
 Prompt: Three equal Halloween game-art panels: phone scanning portrait kiosk,
 empty-hand shooting gesture from a floor marker, and two souvenir photo prints
 with an opening gold lock. Purple/orange palette; no text, prices or labels.
