@@ -254,6 +254,9 @@ export function createGameStore(db) {
     const {roundId,runId,kiosk}=input;
     return once(input.requestId,'kiosk-reset',{roundId,runId,kiosk},()=>{
       const r=db.prepare('SELECT * FROM game_rounds WHERE id=?').get(roundId);
+      // A recovered/completed historical run can be acknowledged without touching its replacement.
+      const previous=db.prepare('SELECT * FROM game_runs WHERE id=? AND round_id=? AND kiosk=?').get(runId,roundId,kiosk);
+      if(previous && ['recovered','completed'].includes(previous.phase))return {reset:true,refunded:false,alreadyResolved:true};
       if(!r || r.kiosk!==kiosk || r.run_id!==runId)fail('This attempt was already replaced. Ask the host to check recovery.',409);
       if(!['active','extension_active'].includes(r.state))return {reset:true,refunded:false,round:roundView(r)};
       if(r.state==='active'){

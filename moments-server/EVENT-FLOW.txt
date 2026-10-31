@@ -10,10 +10,13 @@ Guest flow
   scanner, then stand on the marker and follow the hand-selection instructions.
 - No queue, turn call or phone confirmation is required.
 - Play four scored shots. Below target: scan the same QR for a free retry from zero.
-- At the target the result offers a chance to get 2 photos for CAD $10.
-  Registration and attract instructions do not display pricing.
+- Play free. Score the target to unlock 2 photos at just CAD $10.
+  Registration, attract and results explain: visit the booth, pay $10, get photos.
 - Host payment confirmation is required before two photos are credited.
 - Presence controls idle signage / gameplay preview, not game admission.
+- Historical recovered/completed attempts can be acknowledged on reset without
+  affecting replacement games or refunding again. Unknown attempts remain blocked
+  for host review; the recovery record is not silently deleted.
 - F9 preserves result delivery and cancels unfinished free games without crediting money.
 - Existing paid balances and interrupted game recovery are retained.
 - Physical scanner, sensor placement and HDMI display require onsite acceptance.
