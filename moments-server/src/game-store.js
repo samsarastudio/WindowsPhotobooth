@@ -144,21 +144,22 @@ export function createGameStore(db) {
   function claim(input) {
     const { token, kiosk, requestId } = input;
     if (typeof kiosk !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(kiosk)) fail('Invalid kiosk ID.');
-    return once(requestId,'claim',{token,kiosk,...(input.queueId?{queueId:input.queueId}:{})},() => {
+    return once(requestId,'claim',{token,kiosk,...(input.queueId?{queueId:input.queueId}:{}),...(input.entryMode?{entryMode:input.entryMode}:{})},() => {
       const p = db.prepare('SELECT * FROM game_players WHERE token=?').get(String(token));
       if (!p) fail('Scan your Moments player QR.',404);
-      if(settings().eventMode && !input.queueId)fail('Use the updated game queue. No paid credit has been used.',409);
+      const scannerEntry=settings().eventMode && input.entryMode==='scanner';
+      if(settings().eventMode && !input.queueId && !scannerEntry)fail('Use the updated game scanner. No paid credit has been used.',409);
       if(input.queueId){
         const q=db.prepare("SELECT * FROM game_queue WHERE id=? AND player_id=? AND kiosk=? AND state='called' AND ready=1 AND expires>?").get(input.queueId,p.id,kiosk,Date.now());
         if(!q)fail('Turn is not ready or has expired.',409);
       }
       if (db.prepare("SELECT id FROM game_rounds WHERE (player_id=? OR kiosk=?) AND state IN ('active','extension_active')").get(p.id,kiosk)) fail('A chance is already in progress. Ask the host to recover it.',409);
       let r = db.prepare("SELECT * FROM game_rounds WHERE player_id=? AND state='extension_ready' ORDER BY rowid LIMIT 1").get(p.id);
-      if(settings().eventMode && input.queueId)r=null;
+      if(settings().eventMode)r=null;
       const extension = !!r;
       if (r) { db.prepare("UPDATE game_rounds SET state='extension_active',kiosk=?,run_id=? WHERE id=?").run(kiosk,requestId,r.id); }
       else {
-        const eventEntry=settings().eventMode && !!input.queueId;
+        const eventEntry=settings().eventMode && (!!input.queueId || scannerEntry);
         if(!eventEntry && p.credits<1)fail('Registered! Visit the photobooth host to purchase a chance.',402);
         if(!eventEntry)db.prepare('UPDATE game_players SET credits=credits-1 WHERE id=?').run(p.id);
         const id = randomUUID();
@@ -170,6 +171,7 @@ export function createGameStore(db) {
       if(extension && rules.extraShots!==3){rules.extraShots=3;db.prepare('UPDATE game_rounds SET rules=? WHERE id=?').run(JSON.stringify(rules),r.id);}
       db.prepare("INSERT INTO game_runs(id,round_id,player_id,kiosk,extension,phase,scanned_at) VALUES (?,?,?,?,?,'scanned',?)").run(requestId,r.id,p.id,kiosk,extension?1:0,new Date().toISOString());
       if(input.queueId)db.prepare("UPDATE game_queue SET state='playing' WHERE id=?").run(input.queueId);
+      else if(scannerEntry)db.prepare("UPDATE game_queue SET state='skipped',ready=0 WHERE player_id=? AND state IN ('waiting','called')").run(p.id);
       audit(p.id,'started',{roundId:r.id,kiosk,extension,eventMode:!!rules.eventMode});
       return { roundId:r.id, runId:requestId, name:p.name, extension, baseScore:extension?(r.base_score||0):0, shots: extension ? 3 : rules.baseShots, rules, player:view(p.id) };
     });

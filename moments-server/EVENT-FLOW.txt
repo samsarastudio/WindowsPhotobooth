@@ -5,38 +5,18 @@ Existing live settings are preserved (currently 4 shots, 200 points, Normal).
 New installations default to those values. The two-photo price is CAD $10.
 
 Guest flow
-- Scan the QR shown by the game, enter name and date of birth, and consent.
-  Email is optional. The page reserves a turn for that kiosk.
-- When called, stand on the shooting marker and confirm on the phone.
-  Put the phone away: the sensor starts the game when exactly one person is
-  stably inside the marker zone. Raise a shooting hand, then follow the demo.
-- Complete four scored shots. Below target: rejoin the queue free, starting at
-  zero. Reaching the target unlocks a purchase offer for two photos.
-- The host scans the existing private player pass, records the CAD $10 payment
-  with the same payment acknowledgement and Game PIN, then redeems the photos.
-  There are no paid extensions in event mode.
-
-Operations
-- Unclaimed invitations expire after 45 seconds; guests can rejoin from the
-  same phone. Waiting entries expire after 10 minutes. Arrival and signage
-  absence timers are configurable under Game admin > System.
-- F9 cancels an unfinished free game without creating a paid credit. Completed
-  results remain durable and are delivered before reset.
-- The game keeps the existing calibration, music and launcher settings.
-  Calibrate the shooting marker at the installation before opening the queue.
-  With no saved center, the fallback zone is centered 2.2 metres from the sensor,
-  +/-0.6 metres horizontally and +/-0.8 metres in depth.
-- Signage uses the live portrait manifest, with a verified local download and
-  a bundled video fallback. A missing/stale sensor keeps the game invitation
-  visible rather than assuming the space is empty.
-- Real sensor placement, multiple nearby spectators, HDMI display behaviour and
-  physical photo collection still require an onsite acceptance run.
-
-Compatibility
-- Existing rounds keep their original rules and existing paid balances/history
-  are retained. Older kiosks cannot spend credits under the new event rules.
-- Legacy paid extensions are retained only as historical data / already active
-  round recovery, not sold or carried into new free games.
+- Scan the game's registration QR and enter name, date of birth and consent.
+- Your phone immediately displays your player QR. Scan it at the physical game
+  scanner, then stand on the marker and follow the hand-selection instructions.
+- No queue, turn call or phone confirmation is required.
+- Play four scored shots. Below target: scan the same QR for a free retry from zero.
+- At the target the result offers a chance to get 2 photos for CAD $10.
+  Registration and attract instructions do not display pricing.
+- Host payment confirmation is required before two photos are credited.
+- Presence controls idle signage / gameplay preview, not game admission.
+- F9 preserves result delivery and cancels unfinished free games without crediting money.
+- Existing paid balances and interrupted game recovery are retained.
+- Physical scanner, sensor placement and HDMI display require onsite acceptance.
 
 Checks
 node --test test/game.test.mjs test/game-event.test.mjs
