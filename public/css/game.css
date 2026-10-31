@@ -71,3 +71,9 @@ moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow
 .event-guest .steps-art{position:relative;overflow:hidden}
 .event-guest .instruction-postcard{position:absolute;inset:0 0 0 auto;width:33.333333%;display:flex;align-items:center;justify-content:center;padding:5px;background:#1f0e2b}
 .event-guest .instruction-postcard img{display:block;width:100%;height:auto;border:3px solid #fff5df;border-bottom-width:5px;box-shadow:0 3px 12px #0008}
+
+/* The photo target is the visual reward headline, separate from entry details. */
+.event-guest .photo-target{margin:18px 0;padding:20px 12px;text-align:center;color:#24102f;background:linear-gradient(135deg,#ffe39b,#ffb33f);border:2px solid #fff0b9;border-radius:12px;box-shadow:0 0 24px #ffb33f30}
+.event-guest .photo-target strong{display:block;font-family:Halloween,Georgia,serif;font-size:clamp(26px,6.8vw,36px);font-weight:700;line-height:1.18;letter-spacing:.025em;text-shadow:0 1px 0 #fff0b980}
+.event-guest .photo-target span{display:block;margin-top:10px;font-family:Georgia,serif;font-size:14px;font-weight:700;line-height:1.4}
+.event-guest .event-steps strong{font-family:Halloween,Georgia,serif;font-size:22px;font-weight:700;line-height:1.2;letter-spacing:.02em}
