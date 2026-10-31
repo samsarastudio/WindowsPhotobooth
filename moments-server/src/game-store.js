@@ -1,6 +1,7 @@
+import {createEventQueue} from './game-event-queue.js';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 
-const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 10, extraShots: 3, bonusScore: 666, scoringVersion: 2, difficulty: 1, resultsTimeoutSeconds: 5, shotCountdownSeconds: 3, currency: 'CAD' };
+const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 4, extraShots: 3, bonusScore: 200, scoringVersion: 2, difficulty: 1, resultsTimeoutSeconds: 5, shotCountdownSeconds: 3, currency: 'CAD', eventMode: true, arrivalTimeoutSeconds: 45, absenceTimeoutSeconds: 15 };
 // Unity ShotGrade order: Swish, NiceShot, GoodThrow, BankShot, SoClose,
 // Brick, AirBall, Short, TooStrong, Miss, TooLow. Version is frozen per round.
 const gradePoints = [90,70,50,60,20,10,0,0,0,0,0];
@@ -40,7 +41,7 @@ export function createGameStore(db) {
       db.prepare("INSERT INTO game_migrations VALUES ('graded-scoring-v2')").run();
     }
   }).immediate();
-  const settings = () => ({difficulty:1,resultsTimeoutSeconds:5,shotCountdownSeconds:3,...JSON.parse(db.prepare('SELECT json FROM game_settings WHERE id=1').get().json)});
+  const settings = () => ({eventMode:true,arrivalTimeoutSeconds:45,absenceTimeoutSeconds:15,difficulty:1,resultsTimeoutSeconds:5,shotCountdownSeconds:3,...JSON.parse(db.prepare('SELECT json FROM game_settings WHERE id=1').get().json)});
   const audit = (player, kind, detail) => db.prepare('INSERT INTO game_audit VALUES (?,?,?,?,?)').run(randomUUID(), player, kind, JSON.stringify(detail), new Date().toISOString());
   function checkPin(pin) {
     const row = db.prepare('SELECT * FROM game_settings WHERE id=1').get();
@@ -74,7 +75,8 @@ export function createGameStore(db) {
   function view(id, privateDetails = false) {
     const p = player(id);
     const extensionReady=rounds(id).filter(r=>r.state==='extension_ready').length;
-    return { id: p.id, name: p.name, credits: p.credits, extensionReady, ...balance(id), ...(privateDetails ? { email: p.email, dob: p.dob, token: p.token, created: p.created } : {}) };
+    const offers=rounds(id).filter(r=>JSON.parse(r.rules).eventMode && r.reward_reason==='offer-unlocked').map(r=>({roundId:r.id,score:(r.base_score||0)+(r.extra_score||0),price:JSON.parse(r.rules).playPrice}));
+    return { offers, id: p.id, name: p.name, credits: p.credits, extensionReady, ...balance(id), ...(privateDetails ? { email: p.email, dob: p.dob, token: p.token, created: p.created } : {}) };
   }
   function roundView(r) {
     return { id: r.id, state: r.state, rules: JSON.parse(r.rules), score: (r.base_score || 0)+(r.extra_score || 0), photos: r.photos, rewardReason:r.reward_reason, player: view(r.player_id) };
@@ -82,17 +84,18 @@ export function createGameStore(db) {
   function register(input) {
     const name = String(input.name || '').trim(), email = String(input.email || '').trim().toLowerCase(), dob = String(input.dob || '');
     if (name.length < 1 || name.length > 80 || /[<>\x00-\x1f]/.test(name)) fail('Enter your name (up to 80 characters).');
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('Enter a valid email address.');
+    if ((email || !settings().eventMode) && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) fail('Enter a valid email address.');
+    if(settings().eventMode && input.consent!==true)fail('Please agree to use your details for game entry and photo rewards.');
     const date = new Date(dob + 'T00:00:00Z');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || !Number.isFinite(+date) || date.toISOString().slice(0,10) !== dob || dob < '1900-01-01' || dob > new Date().toISOString().slice(0,10)) fail('Enter a valid date of birth.');
-    return once(input.requestId, 'register', { name, email, dob }, () => {
+    return once(input.requestId, 'register', { name, email, dob, consent:input.consent===true }, () => {
       // Reuse the oldest matching pass without changing paid credits or rewards.
       const normalizeName = value => value.trim().replace(/\s+/g,' ').normalize('NFKC').toLowerCase();
-      const existing = db.prepare('SELECT id,token,name FROM game_players WHERE email=? AND dob=? ORDER BY rowid').all(email,dob).find(p=>normalizeName(p.name)===normalizeName(name));
+      const existing = email && db.prepare('SELECT id,token,name FROM game_players WHERE email=? AND dob=? ORDER BY rowid').all(email,dob).find(p=>normalizeName(p.name)===normalizeName(name));
       if (existing) return { ...view(existing.id), token: existing.token };
       const id = randomUUID(), token = 'MOMENTS-' + randomBytes(24).toString('hex');
       db.prepare('INSERT INTO game_players(id,token,name,email,dob,created) VALUES (?,?,?,?,?,?)').run(id,token,name,email,dob,new Date().toISOString());
-      audit(id,'registered',{}); return { ...view(id), token };
+      audit(id,'registered',{eventMode:settings().eventMode,consent:input.consent===true}); return { ...view(id), token };
     });
   }
   function deletePlayer(input) {
@@ -105,6 +108,7 @@ export function createGameStore(db) {
       const references=[p.id,p.token,...owned.map(r=>r.id)].map(v=>JSON.stringify(v));
       for(const a of db.prepare('SELECT id,response FROM game_actions').all())
         if(references.some(v=>a.response.includes(v)))db.prepare('DELETE FROM game_actions WHERE id=?').run(a.id);
+      db.prepare('DELETE FROM game_queue WHERE player_id=?').run(p.id);
       db.prepare('DELETE FROM game_runs WHERE player_id=?').run(p.id);
       db.prepare('DELETE FROM game_rounds WHERE player_id=?').run(p.id);
       db.prepare('DELETE FROM game_audit WHERE player_id=?').run(p.id);
@@ -116,11 +120,17 @@ export function createGameStore(db) {
   function grant(input) {
     checkPin(input.pin);
     const { playerId, count, kind, roundId, expectedPrice } = input;
-    if (!['play','extension'].includes(kind) || !integer(count,1,20)) fail('Select 1–20 chances or one extension.');
+    if(settings().eventMode && kind!=='photos')fail('Event games and retries are free. Only unlocked photo offers require payment.',409);
+    if (!['play','extension','photos'].includes(kind) || !integer(count,1,20)) fail('Select 1–20 chances or one extension.');
     return once(input.requestId, 'grant', { playerId, count, kind, roundId: roundId || null, expectedPrice }, () => {
       player(playerId);
       let unitPrice = settings().playPrice;
-      if (kind === 'extension') {
+      if(kind==='photos'){
+        const r=db.prepare('SELECT * FROM game_rounds WHERE id=? AND player_id=?').get(roundId,playerId);
+        if(count!==1 || !r || r.reward_reason!=='offer-unlocked' || !JSON.parse(r.rules).eventMode)fail('No unlocked photo offer is available.',409);
+        unitPrice=JSON.parse(r.rules).playPrice;
+        db.prepare("UPDATE game_rounds SET photos=2,reward_reason='offer-purchased' WHERE id=?").run(roundId);
+      } else if (kind === 'extension') {
         const r = db.prepare('SELECT * FROM game_rounds WHERE id=? AND player_id=?').get(roundId,playerId);
         if (count !== 1 || !r || r.state !== 'eligible' || r.photos >= 2) fail('This chance is not eligible for extra shots.',409);
         unitPrice = JSON.parse(r.rules).extensionPrice;
@@ -134,25 +144,33 @@ export function createGameStore(db) {
   function claim(input) {
     const { token, kiosk, requestId } = input;
     if (typeof kiosk !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(kiosk)) fail('Invalid kiosk ID.');
-    return once(requestId,'claim',{token,kiosk},() => {
+    return once(requestId,'claim',{token,kiosk,...(input.queueId?{queueId:input.queueId}:{})},() => {
       const p = db.prepare('SELECT * FROM game_players WHERE token=?').get(String(token));
       if (!p) fail('Scan your Moments player QR.',404);
+      if(settings().eventMode && !input.queueId)fail('Use the updated game queue. No paid credit has been used.',409);
+      if(input.queueId){
+        const q=db.prepare("SELECT * FROM game_queue WHERE id=? AND player_id=? AND kiosk=? AND state='called' AND ready=1 AND expires>?").get(input.queueId,p.id,kiosk,Date.now());
+        if(!q)fail('Turn is not ready or has expired.',409);
+      }
       if (db.prepare("SELECT id FROM game_rounds WHERE (player_id=? OR kiosk=?) AND state IN ('active','extension_active')").get(p.id,kiosk)) fail('A chance is already in progress. Ask the host to recover it.',409);
       let r = db.prepare("SELECT * FROM game_rounds WHERE player_id=? AND state='extension_ready' ORDER BY rowid LIMIT 1").get(p.id);
+      if(settings().eventMode && input.queueId)r=null;
       const extension = !!r;
       if (r) { db.prepare("UPDATE game_rounds SET state='extension_active',kiosk=?,run_id=? WHERE id=?").run(kiosk,requestId,r.id); }
       else {
-        if (p.credits < 1) fail('Registered! Visit the photobooth host to purchase a chance.',402);
-        db.prepare('UPDATE game_players SET credits=credits-1 WHERE id=?').run(p.id);
+        const eventEntry=settings().eventMode && !!input.queueId;
+        if(!eventEntry && p.credits<1)fail('Registered! Visit the photobooth host to purchase a chance.',402);
+        if(!eventEntry)db.prepare('UPDATE game_players SET credits=credits-1 WHERE id=?').run(p.id);
         const id = randomUUID();
-        db.prepare("INSERT INTO game_rounds(id,player_id,kiosk,state,rules,created) VALUES (?,?,?,'active',?,?)").run(id,p.id,kiosk,JSON.stringify(settings()),new Date().toISOString());
+        db.prepare("INSERT INTO game_rounds(id,player_id,kiosk,state,rules,created) VALUES (?,?,?,'active',?,?)").run(id,p.id,kiosk,JSON.stringify({...settings(),entryPaid:!eventEntry}),new Date().toISOString());
         r = db.prepare('SELECT * FROM game_rounds WHERE id=?').get(id);
         db.prepare('UPDATE game_rounds SET run_id=? WHERE id=?').run(requestId,id);
       }
       const rules = JSON.parse(r.rules);
       if(extension && rules.extraShots!==3){rules.extraShots=3;db.prepare('UPDATE game_rounds SET rules=? WHERE id=?').run(JSON.stringify(rules),r.id);}
       db.prepare("INSERT INTO game_runs(id,round_id,player_id,kiosk,extension,phase,scanned_at) VALUES (?,?,?,?,?,'scanned',?)").run(requestId,r.id,p.id,kiosk,extension?1:0,new Date().toISOString());
-      audit(p.id,'started',{roundId:r.id,kiosk,extension});
+      if(input.queueId)db.prepare("UPDATE game_queue SET state='playing' WHERE id=?").run(input.queueId);
+      audit(p.id,'started',{roundId:r.id,kiosk,extension,eventMode:!!rules.eventMode});
       return { roundId:r.id, runId:requestId, name:p.name, extension, baseScore:extension?(r.base_score||0):0, shots: extension ? 3 : rules.baseShots, rules, player:view(p.id) };
     });
   }
@@ -174,7 +192,11 @@ export function createGameStore(db) {
         return roundView(r);
       }
       if (r.state !== (extension ? 'extension_active' : 'active')) fail('Round is not active.',409);
-      if (extension) db.prepare("UPDATE game_rounds SET extra_score=?,extra_made=?,photos=2,reward_reason='extension',state='complete' WHERE id=?").run(score,made,roundId);
+      if(rules.eventMode){
+        const total=score+(extension?(r.base_score||0):0),unlocked=total>=rules.bonusScore;
+        const field=extension?'extra':'base';
+        db.prepare(`UPDATE game_rounds SET ${field}_score=?,${field}_made=?,photos=0,reward_reason=?,state=? WHERE id=?`).run(score,made,unlocked?'offer-unlocked':'below-target','complete',roundId);
+      } else if (extension) db.prepare("UPDATE game_rounds SET extra_score=?,extra_made=?,photos=2,reward_reason='extension',state='complete' WHERE id=?").run(score,made,roundId);
       else {
         let photos = score >= rules.bonusScore ? 2 : 1, reason=photos===2?'score':'minimum';
         const completed=rounds(r.player_id).filter(x=>x.base_score!==null);
@@ -183,6 +205,7 @@ export function createGameStore(db) {
         db.prepare('UPDATE game_rounds SET base_score=?,base_made=?,photos=?,state=?,reward_reason=? WHERE id=?').run(score,made,photos,photos===2?'complete':'eligible',reason,roundId);
       }
       db.prepare("UPDATE game_runs SET phase='completed',finished_at=?,last_seen=?,attempts=?,made=?,score=? WHERE id=?").run(new Date().toISOString(),new Date().toISOString(),attempts,made,score,runId);
+      db.prepare("UPDATE game_queue SET state='done' WHERE player_id=? AND state='playing'").run(r.player_id);
       audit(r.player_id,'result',{roundId,extension,score});
       return roundView(db.prepare('SELECT * FROM game_rounds WHERE id=?').get(roundId));
     });
@@ -201,16 +224,18 @@ export function createGameStore(db) {
       const r = db.prepare('SELECT * FROM game_rounds WHERE id=?').get(input.roundId);
       if (!r || !['active','extension_active'].includes(r.state)) fail('No active round to recover.',409);
       // Operator confirms abandoned play. Device must be stopped before this action.
-      if (r.state === 'active') { db.prepare("UPDATE game_rounds SET state='cancelled' WHERE id=?").run(r.id); db.prepare('UPDATE game_players SET credits=credits+1 WHERE id=?').run(r.player_id); }
+      if (r.state === 'active') { db.prepare("UPDATE game_rounds SET state='cancelled' WHERE id=?").run(r.id); if(!JSON.parse(r.rules).eventMode || JSON.parse(r.rules).entryPaid)db.prepare('UPDATE game_players SET credits=credits+1 WHERE id=?').run(r.player_id); }
       else db.prepare("UPDATE game_rounds SET state='extension_ready',run_id=? WHERE id=?").run(randomUUID(),r.id);
       db.prepare("UPDATE game_runs SET phase='recovered',finished_at=? WHERE id=?").run(new Date().toISOString(),r.run_id);
+      db.prepare("UPDATE game_queue SET state='skipped' WHERE player_id=? AND state='playing'").run(r.player_id);
       audit(r.player_id,'recovered',{roundId:r.id}); return view(r.player_id);
     });
   }
   function configure(input) {
     checkPin(input.pin);
     const next = { ...settings() };
-    for (const key of ['playPrice','extensionPrice','baseShots','extraShots','bonusScore','difficulty','resultsTimeoutSeconds','shotCountdownSeconds']) if (input[key] !== undefined) next[key] = input[key];
+    for (const key of ['playPrice','extensionPrice','baseShots','extraShots','bonusScore','difficulty','resultsTimeoutSeconds','shotCountdownSeconds','eventMode','arrivalTimeoutSeconds','absenceTimeoutSeconds']) if (input[key] !== undefined) next[key] = input[key];
+    if(typeof next.eventMode!=='boolean' || !integer(next.arrivalTimeoutSeconds,15,120) || !integer(next.absenceTimeoutSeconds,5,120))fail('Check event mode and arrival / absence timers.');
     if(!integer(next.resultsTimeoutSeconds,1,60) || !integer(next.shotCountdownSeconds,1,10))fail('Results timeout must be 1–60 seconds and shot countdown 1–10 seconds.');
     if(!integer(next.difficulty,0,2))fail('Choose Easy, Normal or Hard difficulty.');
     if (!integer(next.playPrice,0,100000) || !integer(next.extensionPrice,0,100000) || !integer(next.baseShots,1,30) || next.extraShots!==3 || !integer(next.bonusScore,1,next.baseShots*90)) fail('Check prices, shot counts and reward threshold. Extensions are exactly 3 shots; the target cannot exceed 90 points per base shot.');
@@ -231,11 +256,12 @@ export function createGameStore(db) {
       if(!['active','extension_active'].includes(r.state))return {reset:true,refunded:false,round:roundView(r)};
       if(r.state==='active'){
         db.prepare("UPDATE game_rounds SET state='cancelled' WHERE id=?").run(r.id);
-        db.prepare('UPDATE game_players SET credits=credits+1 WHERE id=?').run(r.player_id);
+        if(!JSON.parse(r.rules).eventMode || JSON.parse(r.rules).entryPaid)db.prepare('UPDATE game_players SET credits=credits+1 WHERE id=?').run(r.player_id);
       }else db.prepare("UPDATE game_rounds SET state='extension_ready',run_id=? WHERE id=?").run(randomUUID(),r.id);
       db.prepare("UPDATE game_runs SET phase='recovered',finished_at=? WHERE id=?").run(new Date().toISOString(),runId);
-      audit(r.player_id,'kiosk-reset',{roundId,runId,kiosk,restored:r.state==='active'?'base-credit':'extension'});
-      return {reset:true,refunded:r.state==='active',player:view(r.player_id)};
+      db.prepare("UPDATE game_queue SET state='skipped' WHERE player_id=? AND state='playing'").run(r.player_id);
+      audit(r.player_id,'kiosk-reset',{roundId,runId,kiosk,restored:JSON.parse(r.rules).eventMode && !JSON.parse(r.rules).entryPaid?'free-entry':r.state==='active'?'base-credit':'extension'});
+      return {reset:true,refunded:r.state==='active' && (!JSON.parse(r.rules).eventMode || !!JSON.parse(r.rules).entryPaid),player:view(r.player_id)};
     });
   }
   function progress(input) {
@@ -262,14 +288,17 @@ export function createGameStore(db) {
     const totals=db.prepare('SELECT COUNT(*) players,COALESCE(SUM(credits),0) creditsReady,COALESCE(SUM(redeemed),0) redeemed FROM game_players').get();
     const rewards=db.prepare('SELECT COALESCE(SUM(photos),0) earned,COUNT(*) completedChances FROM game_rounds WHERE base_score IS NOT NULL').get();
     const done=runs.filter(r=>r.phase==='completed');
-    return {...totals,...rewards,available:rewards.earned-totals.redeemed,revenue:payments.reduce((n,p)=>n+p.amount,0),creditsGranted:payments.filter(p=>p.kind==='play').reduce((n,p)=>n+p.count,0),extensionsSold:payments.filter(p=>p.kind==='extension').reduce((n,p)=>n+p.count,0),scans:runs.length,completedRuns:done.length,recovered:runs.filter(r=>r.phase==='recovered').length,averageScore:done.length?Math.round(done.reduce((n,r)=>n+r.score,0)/done.length):0,baskets:done.reduce((n,r)=>n+r.made,0),shots:done.reduce((n,r)=>n+r.attempts,0),live:runs.filter(r=>!['completed','recovered'].includes(r.phase)),recent:runs.slice(0,200)};
+    const offersUnlocked=db.prepare("SELECT COUNT(*) n FROM game_rounds WHERE reward_reason IN ('offer-unlocked','offer-purchased')").get().n;
+    const photoPurchases=payments.filter(p=>p.kind==='photos').length;
+    return {...totals,...rewards,offersUnlocked,photoPurchases,available:rewards.earned-totals.redeemed,revenue:payments.reduce((n,p)=>n+p.amount,0),creditsGranted:payments.filter(p=>p.kind==='play').reduce((n,p)=>n+p.count,0),extensionsSold:payments.filter(p=>p.kind==='extension').reduce((n,p)=>n+p.count,0),scans:runs.length,completedRuns:done.length,recovered:runs.filter(r=>r.phase==='recovered').length,averageScore:done.length?Math.round(done.reduce((n,r)=>n+r.score,0)/done.length):0,baskets:done.reduce((n,r)=>n+r.made,0),shots:done.reduce((n,r)=>n+r.attempts,0),live:runs.filter(r=>!['completed','recovered'].includes(r.phase)),recent:runs.slice(0,200)};
   }
-  return { settings, register, deletePlayer, grant, claim, result, redeem, recover, resetRun, configure, view, progress, report,
+  const queue=createEventQueue(db,{settings,view,claim,fail});
+  return { queue, settings, register, deletePlayer, grant, claim, result, redeem, recover, resetRun, configure, view, progress, report,
     list: (query='') => {
       query=String(query).trim().slice(0,254);
       const rows=query?db.prepare('SELECT id FROM game_players WHERE name LIKE ? OR email LIKE ? OR token=? ORDER BY rowid DESC LIMIT 500').all('%'+query+'%','%'+query+'%',query):db.prepare('SELECT id FROM game_players ORDER BY rowid DESC LIMIT 500').all();
-      return rows.map(p=>({...view(p.id,true),rounds:rounds(p.id).map(roundView),timeline:db.prepare('SELECT kind,detail,created FROM game_audit WHERE player_id=? ORDER BY rowid DESC').all(p.id),runs:db.prepare(`SELECT g.*,${runScoreColumns} FROM game_runs g LEFT JOIN game_rounds r ON r.id=g.round_id WHERE g.player_id=? ORDER BY g.scanned_at DESC`).all(p.id)}));
+      return rows.map(p=>({...view(p.id,true),queue:queue.status(p.id),rounds:rounds(p.id).map(roundView),timeline:db.prepare('SELECT kind,detail,created FROM game_audit WHERE player_id=? ORDER BY rowid DESC').all(p.id),runs:db.prepare(`SELECT g.*,${runScoreColumns} FROM game_runs g LEFT JOIN game_rounds r ON r.id=g.round_id WHERE g.player_id=? ORDER BY g.scanned_at DESC`).all(p.id)}));
     },
-    status: token => { const p=db.prepare('SELECT id FROM game_players WHERE token=?').get(token); if(!p) fail('Player not found.',404); return view(p.id); },
+    status: token => { const p=db.prepare('SELECT id FROM game_players WHERE token=?').get(token); if(!p) fail('Player not found.',404); return {...view(p.id),queue:queue.status(p.id),canJoin:queue.canJoin(p.id),latestRound:rounds(p.id).length?roundView(rounds(p.id).at(-1)):null}; },
     history: () => db.prepare('SELECT * FROM game_audit ORDER BY rowid DESC LIMIT 100').all() };
 }
