@@ -50,3 +50,20 @@ moments-player-card{display:block;height:100%}.compact-player{padding:0;overflow
 #scanPlayer{margin-bottom:16px}#scanPlayerCode{font-size:16px}#playerScanVideo{display:block;width:100%;max-height:280px;object-fit:cover;border-radius:12px;margin-top:16px}#scanPlayerDialog{max-height:90dvh;overflow:auto}
 
 .extension-score{margin:12px 0;padding:12px;border-radius:10px;background:#ffb34b12}.extension-score>strong{display:block;color:#ffd199;font-size:20px}.extension-score p{margin:6px 0 0}
+/* Event flow: registration first, with a compact illustrated guide below. */
+.event-guest .guest{max-width:980px;grid-template-columns:1fr 1fr;gap:24px;padding-top:32px}
+.event-guest .event-steps{grid-column:1/-1;width:100%;order:4}
+.event-guest .steps-art{background:url('/assets/game/three-steps.webp') center/contain no-repeat;aspect-ratio:8/3;width:100%;border-radius:16px}
+.event-guest .event-steps .steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.event-guest .steps li{margin:0;font-size:14px;gap:8px}
+.event-guest .steps b{width:28px;height:28px}
+.event-guest .consent{display:flex;align-items:flex-start;gap:10px;margin:8px 0 18px;font-size:13px}
+.event-guest .consent input{width:20px;height:20px;flex:none;margin:0}
+.event-guest #playerScore{font-size:32px;color:#ffbd61;display:block;margin-top:24px}
+.event-guest #hostPass{text-align:left;padding:16px 0}
+.event-guest summary{cursor:pointer;color:#ffd199}
+.event-guest #newPlayer{margin-top:12px;width:100%}
+.event-guest #readyButton,.event-guest #rejoinButton{margin:8px 0}
+.event-guest #resultPanel .postcard-preview{max-width:330px;margin:20px auto}
+.pass-visible.event-guest .guest{max-width:600px;grid-template-columns:1fr}
+@media(max-width:900px){.event-guest .guest{display:flex;max-width:600px;padding:20px 16px max(24px,env(safe-area-inset-bottom))}.event-guest .event-steps .steps{grid-template-columns:1fr;gap:16px}.event-guest #offerTerms{font-size:13px}.event-guest #registration h2{margin:14px 0!important}.event-guest .steps-art{aspect-ratio:8/3}}
