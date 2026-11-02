@@ -1,0 +1,197 @@
+/* MerryBooth — evergreen and gold. Offline-ready typography, editorial imagery,
+   one consistent border system, and accessible native controls. */
+html[data-pb-theme='christmas'] {
+  --pb-font-sans: 'Segoe UI', system-ui, sans-serif;
+  --pb-font-display: Georgia, 'Times New Roman', serif;
+  --pb-bg-base: #071f1a;
+  --pb-ink: #fff4df;
+  --pb-ink-muted: #c7d5c9;
+  --pb-card-bg: rgba(9, 36, 29, .94);
+  --pb-card-border: rgba(213, 174, 107, .25);
+  --pb-msg: #ffad9e;
+  --pb-leaf: #dfc18b;
+  --pb-btn-primary-top: #dfc18b;
+  --pb-btn-primary-bottom: #dfc18b;
+  --pb-btn-primary-text: #142c23;
+  --pb-radius-xl: 24px;
+  --pb-radius-lg: 18px;
+  --pb-kia-admin-ink: #e3e9dc;
+}
+html[data-pb-theme='christmas'] body {
+  background: linear-gradient(180deg, #071f1a66, #071f1aaa), url('./assets/winter-backdrop.png') center / cover fixed no-repeat;
+  background-color: #071f1a;
+  color: var(--pb-ink);
+}
+html[data-pb-theme='christmas'] .pb-doodle-paper,
+html[data-pb-theme='christmas'] .pb-doodle-circuit,
+html[data-pb-theme='christmas'] .pb-backdrop-wash,
+html[data-pb-theme='christmas'] .pb-backdrop-el { display: none !important; }
+html[data-pb-theme='christmas'] .pb-page {
+  min-height: 100dvh;
+  max-height: none;
+  overflow: visible;
+  padding: clamp(20px, 4vmin, 48px);
+  color: var(--pb-ink);
+}
+html[data-pb-theme='christmas'] .pb-title,
+html[data-pb-theme='christmas'] .pb-result-title,
+html[data-pb-theme='christmas'] .pb-thanks-title {
+  font-family: var(--pb-font-display);
+  font-weight: 400;
+  letter-spacing: -.025em;
+  text-transform: none;
+  text-shadow: none;
+  line-height: 1.12;
+}
+html[data-pb-theme='christmas'] .pb-sub,
+html[data-pb-theme='christmas'] .pb-hint { color: var(--pb-ink-muted); line-height: 1.55; }
+html[data-pb-theme='christmas'] .pb-card,
+html[data-pb-theme='christmas'] .pb-kiosk-surface,
+html[data-pb-theme='christmas'] .pb-portrait-select-inner,
+html[data-pb-theme='christmas'] .pb-scene-select-inner {
+  background: var(--pb-card-bg);
+  border: 1px solid var(--pb-card-border);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px #0005;
+  padding: clamp(24px, 4vmin, 48px);
+  overflow: visible;
+}
+html[data-pb-theme='christmas'] .pb-btn {
+  font-family: var(--pb-font-sans);
+  font-size: clamp(1rem, 2.2vmin, 1.2rem);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 650;
+  min-height: 56px;
+  border-radius: 12px;
+  padding: 14px 30px;
+  box-shadow: none;
+}
+html[data-pb-theme='christmas'] .pb-btn-primary {
+  background: #dfc18b;
+  color: #142c23;
+  border: 1px solid #dfc18b;
+}
+html[data-pb-theme='christmas'] .pb-btn-primary:hover { background: #f5deb1; transform: none; }
+html[data-pb-theme='christmas'] .pb-btn-ghost {
+  background: #ffffff05;
+  color: #fff4df;
+  border: 1px solid #ffffff36;
+}
+html[data-pb-theme='christmas'] .pb-btn-ghost:hover { background: #ffffff10; transform: none; }
+html[data-pb-theme='christmas'] .pb-kia-attract {
+  width: min(100%, 1000px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 48px;
+}
+html[data-pb-theme='christmas'] .pb-kia-attract-brand { display: grid; justify-items: center; gap: 16px; }
+html[data-pb-theme='christmas'] .pb-kia-logo { max-height: 80px; max-width: 280px; object-fit: contain; }
+html[data-pb-theme='christmas'] .pb-kia-tagline {
+  margin: 0 0 28px;
+  font: 600 13px var(--pb-font-sans);
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: #dfc18b;
+}
+html[data-pb-theme='christmas'] .pb-kia-hero-title {
+  font: 400 clamp(54px, 10vw, 132px)/1.05 var(--pb-font-display);
+  letter-spacing: -.045em;
+  color: #fff4df;
+  margin: 0;
+  text-shadow: 0 4px 40px #0006;
+}
+html[data-pb-theme='christmas'] .pb-kia-hero-streak { width: 48px; height: 1px; background: #dfc18b; margin: 30px auto; }
+html[data-pb-theme='christmas'] .pb-kia-hero-sub { font: 400 clamp(18px, 2.2vw, 24px)/1.5 var(--pb-font-sans); color: #e3e9dc; margin: 0; }
+/* No baked-in button image: one border, one label, a true touch target. */
+html[data-pb-theme='christmas'] .pb-kia-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 68px;
+  min-width: 280px;
+  max-width: 100%;
+  padding: 18px 36px;
+  border: 1px solid #dfc18b;
+  border-radius: 14px;
+  background: #dfc18b;
+  color: #142c23;
+  text-decoration: none;
+  font: 650 21px/1.2 var(--pb-font-sans);
+  box-shadow: 0 12px 40px #0004;
+  transition: background .15s ease;
+}
+html[data-pb-theme='christmas'] .pb-kia-cta:hover { background: #f5deb1; transform: none; }
+html[data-pb-theme='christmas'] .pb-kia-cta-divider { display: none; }
+html[data-pb-theme='christmas'] .pb-kia-cta-label,
+html[data-pb-theme='christmas'] .pb-kia-cta-icon { position: static; color: inherit; width: auto; height: auto; margin: 0; clip: auto; overflow: visible; }
+html[data-pb-theme='christmas'] .pb-kia-cta::before,
+html[data-pb-theme='christmas'] .pb-kia-cta::after { content: none; }
+html[data-pb-theme='christmas'] .pb-booth-mode-card { max-width: 1180px; gap: 12px; }
+html[data-pb-theme='christmas'] .pb-booth-mode-card > .pb-icon,
+html[data-pb-theme='christmas'] .pb-portrait-select-inner > .pb-icon,
+html[data-pb-theme='christmas'] .pb-scene-select-inner > .pb-icon { display: none; }
+html[data-pb-theme='christmas'] .pb-booth-mode-card .pb-title { font-size: clamp(30px, 4.6vmin, 48px); }
+html[data-pb-theme='christmas'] .pb-booth-mode-card .pb-sub { font-size: 17px; }
+html[data-pb-theme='christmas'] .pb-booth-mode-grid { gap: 20px; margin: 24px 0; }
+html[data-pb-theme='christmas'] .pb-exp-card {
+  border: 1px solid #b799662e;
+  border-radius: 16px;
+  padding: 10px 10px 20px;
+  background: #ffffff04;
+  gap: 14px;
+  box-shadow: none;
+  text-align: left;
+}
+html[data-pb-theme='christmas'] .pb-exp-card:hover,
+html[data-pb-theme='christmas'] .pb-portrait-card:hover { border-color: #dfc18b; transform: translateY(-2px); box-shadow: 0 12px 32px #0003; }
+html[data-pb-theme='christmas'] .pb-exp-card-media { aspect-ratio: 4 / 3; max-height: 34vh; border-radius: 10px; }
+html[data-pb-theme='christmas'] .pb-exp-card-media img { object-fit: cover; object-position: center; }
+html[data-pb-theme='christmas'] .pb-exp-card-label { font: 650 21px/1.3 var(--pb-font-sans); text-transform: none; letter-spacing: 0; padding: 0 10px; }
+html[data-pb-theme='christmas'] .pb-exp-card-hint { font: 400 16px/1.55 var(--pb-font-sans); color: #c7d5c9; padding: 0 10px; display: block; overflow: visible; }
+html[data-pb-theme='christmas'] .pb-portrait-grid { width: 100%; gap: 16px; }
+html[data-pb-theme='christmas'] .pb-portrait-card { border: 1px solid #b799662e; background: #ffffff04; box-shadow: none; }
+html[data-pb-theme='christmas'] .pb-portrait-card-label { font: 600 16px/1.4 var(--pb-font-sans); text-transform: none; letter-spacing: 0; }
+html[data-pb-theme='christmas'] .pb-attract-admin,
+html[data-pb-theme='christmas'] .pb-attract-history { opacity: .7; }
+html[data-pb-theme='christmas'] :is(button,a,input,select):focus-visible { outline: 3px solid #fff4df; outline-offset: 5px; }
+@media (max-width: 650px) {
+  html[data-pb-theme='christmas'] .pb-page { padding: 16px; }
+  html[data-pb-theme='christmas'] .pb-booth-mode-grid { grid-template-columns: 1fr; }
+  html[data-pb-theme='christmas'] .pb-exp-card-media { max-height: 220px; }
+  html[data-pb-theme='christmas'] .pb-portrait-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-pb-theme='christmas'] * { animation: none !important; transition: none !important; }
+}
+/* Review, processing and operator surfaces share the same seasonal palette. */
+html[data-pb-theme='christmas'] .prepare-card,
+html[data-pb-theme='christmas'] .pb-thanks-inner {
+  background: rgba(9,36,29,.97);
+  border-color: #dfc18b55;
+}
+html[data-pb-theme='christmas'] .pb-prepare :is(h1,label) { color: #faf1df; }
+html[data-pb-theme='christmas'] .pb-prepare :is(.lead,.muted) { color: #c7d5c9; }
+html[data-pb-theme='christmas'] .pb-prepare .eyebrow { color: #dfc18b; }
+html[data-pb-theme='christmas'] .pb-prepare select { background: #10352b; border-color: #dfc18b70; }
+html[data-pb-theme='christmas'] .pb-prepare input { accent-color: #dfc18b; }
+html[data-pb-theme='christmas'] .progress-orbit { border-color: #486250; border-top-color: #dfc18b; }
+html[data-pb-theme='christmas'] .pb-kia-attract-main {
+  padding: clamp(24px,4vw,48px);
+  border-radius: 28px;
+  background: radial-gradient(ellipse,#071f1ad9,#071f1a77 65%,transparent);
+}
+html[data-pb-theme='christmas'] .pb-exp-card--accent .pb-exp-card-media img { object-position: center 10%; }
+html[data-pb-theme='christmas'] :is(.pb-scene-select,.pb-portrait-select) { height: 100dvh; max-height: 100dvh; padding: 16px; overflow: hidden; }
+html[data-pb-theme='christmas'] :is(.pb-scene-select-inner,.pb-portrait-select-inner) {
+  max-height: calc(100dvh - 32px); min-height: 0; padding: clamp(20px,3vmin,32px); overflow: hidden;
+}
+html[data-pb-theme='christmas'] :is(.pb-scene-grid,.pb-portrait-grid) {
+  overflow-y: auto; align-content: start; min-height: 0; padding: 4px; scrollbar-color: #dfc18b #10352b;
+}
+html[data-pb-theme='christmas'] :is(.pb-scene-select-inner,.pb-portrait-select-inner) > :is(.pb-title,.pb-sub,.pb-row) { flex-shrink: 0; }
+html[data-pb-theme='christmas'] .pb-scene-card { background: #ffffff05; border-color: #dfc18b40; }
+html[data-pb-theme='christmas'] .pb-scene-card-label { font: 600 15px/1.4 var(--pb-font-sans); letter-spacing: 0; text-transform: none; }

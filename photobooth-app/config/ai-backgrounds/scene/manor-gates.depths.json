@@ -1,11 +1,11 @@
 {
   "version": 1,
   "scene": "manor-gates",
-  "displayName": "Moonlit Manor Gates",
+  "displayName": "Winter Palace",
+  "baseSha256": "3170a29082106db57840325fc6c51b06fd1fb80584329dc36d62f21b6769914d",
   "variants": {
     "close": "depths/manor-gates/close.webp",
     "medium": "depths/manor-gates/medium.webp",
     "wide": "depths/manor-gates/wide.webp"
-  },
-  "baseSha256": "05bc3450e87eead31a02457a6e307f5af9adb385e9dafc5fa164be4957e6e979"
+  }
 }

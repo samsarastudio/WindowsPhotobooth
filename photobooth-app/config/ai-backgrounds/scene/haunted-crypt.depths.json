@@ -1,11 +1,11 @@
 {
   "version": 1,
   "scene": "haunted-crypt",
-  "displayName": "Pumpkin Lantern Cottage",
+  "displayName": "Santa’s Sleigh",
+  "baseSha256": "e4acb21269136951f8158fd472f41329dbf46b9dc75f380c2535935f34e40b70",
   "variants": {
     "close": "depths/haunted-crypt/close.png",
     "medium": "depths/haunted-crypt/medium.png",
     "wide": "depths/haunted-crypt/wide.png"
-  },
-  "baseSha256": "99f14b8d03591b29d4d7284e440e953386d6aaedb70edf1c8abc6129babc84d0"
+  }
 }

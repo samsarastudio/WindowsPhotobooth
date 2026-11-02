@@ -1,0 +1,198 @@
+{
+  "generator": "built-in image_gen",
+  "baseline": "cb818f6 (1.1.64)",
+  "assets": [
+    {
+      "id": "moonlit-manor",
+      "label": "Elf Village",
+      "depth": "medium",
+      "prompt": "Use case: photorealistic-natural. Re-stage this exact Christmas physical photobooth set for a MEDIUM WAIST-UP family portrait, 50mm lens, guests at 2.5 metres. Same landscape 3:2 composition and Christmas story, same materials and blurred background characters. Correct adult EYE-LEVEL camera, level horizontal optical axis at 1.55m above ground, NOT a camera placed on the floor. CRITICAL: there is NO FLOOR, NO GROUND, NO PATH, NO STEPS visible ANYWHERE, including bottom center. Bottom edge cuts through vertical wall panels / tree trunks / raised architectural balcony at waist height, not down toward the floor. Fill background center with softly defocused VERTICAL architecture or snow-covered trees, never an expanse of sky or ground. The ornate Christmas arch and evergreens are a real physical frame: side uprights clipped at far edges, top garland only very top, lanterns hanging at side edges, corner decorations elevated on side plinths. Empty central 70% for guest faces and torsos. Blurred real Santa/elves/reindeer from the reference remain far behind the guest plane and off-center; crop their lower bodies naturally to maintain eye-level height. Moderate framing scale with clearly visible side ornaments and gentle distant bokeh. Preserve richness, joyful Christmas color, photorealism, natural soft front fill. Do not simply blur or digitally crop reference: create a correct matching camera-distance plate. No central foreground people, text, logos, watermark, graphic border or collage.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-025dec1e-8e2d-46e4-8b3d-a7a9885cdc5f.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/moonlit-manor/medium.png"
+    },
+    {
+      "id": "pumpkin-patch",
+      "label": "Santa’s Workshop",
+      "depth": "close",
+      "prompt": "Use case: photorealistic-natural. Re-stage this exact Christmas physical photobooth set for a CLOSE HEAD AND SHOULDERS portrait, 70mm lens, guests at 1.2 metres. Same landscape 3:2 composition and Christmas story, same materials and blurred background characters. Correct adult EYE-LEVEL camera, level horizontal optical axis at 1.55m above ground, NOT a camera placed on the floor. CRITICAL: there is NO FLOOR, NO GROUND, NO PATH, NO STEPS visible ANYWHERE, including bottom center. Bottom edge cuts through vertical wall panels / tree trunks / raised architectural balcony at waist height, not down toward the floor. Fill background center with softly defocused VERTICAL architecture or snow-covered trees, never an expanse of sky or ground. The ornate Christmas arch and evergreens are a real physical frame: side uprights clipped at far edges, top garland only very top, lanterns hanging at side edges, corner decorations elevated on side plinths. Empty central 70% for guest faces and torsos. Blurred real Santa/elves/reindeer from the reference remain far behind the guest plane and off-center; crop their lower bodies naturally to maintain eye-level height. Enlarge the framing uprights and crop more of the arch; strongly defocused background appropriate to large guest heads. Preserve richness, joyful Christmas color, photorealism, natural soft front fill. Do not simply blur or digitally crop reference: create a correct matching camera-distance plate. No central foreground people, text, logos, watermark, graphic border or collage.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-eeef12f0-b2a6-4747-887f-bda74985adf3.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/pumpkin-patch/close.png"
+    },
+    {
+      "id": "haunted-crypt",
+      "label": "Santa’s Sleigh",
+      "depth": "medium",
+      "prompt": "Use case: photorealistic-natural. Re-stage this exact Christmas physical photobooth set for a MEDIUM WAIST-UP family portrait, 50mm lens, guests at 2.5 metres. Same landscape 3:2 composition and Christmas story, same materials and blurred background characters. Correct adult EYE-LEVEL camera, level horizontal optical axis at 1.55m above ground, NOT a camera placed on the floor. CRITICAL: there is NO FLOOR, NO GROUND, NO PATH, NO STEPS visible ANYWHERE, including bottom center. Bottom edge cuts through vertical wall panels / tree trunks / raised architectural balcony at waist height, not down toward the floor. Fill background center with softly defocused VERTICAL architecture or snow-covered trees, never an expanse of sky or ground. The ornate Christmas arch and evergreens are a real physical frame: side uprights clipped at far edges, top garland only very top, lanterns hanging at side edges, corner decorations elevated on side plinths. Empty central 70% for guest faces and torsos. Blurred real Santa/elves/reindeer from the reference remain far behind the guest plane and off-center; crop their lower bodies naturally to maintain eye-level height. Moderate framing scale with clearly visible side ornaments and gentle distant bokeh. Preserve richness, joyful Christmas color, photorealism, natural soft front fill. Do not simply blur or digitally crop reference: create a correct matching camera-distance plate. No central foreground people, text, logos, watermark, graphic border or collage.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-493c8eef-cd15-4df3-ad32-8a780dbe7b06.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/haunted-crypt/medium.png"
+    },
+    {
+      "id": "moonlit-manor",
+      "label": "Elf Village",
+      "depth": "close",
+      "prompt": "Use case: photorealistic-natural. Re-stage this exact Christmas physical photobooth set for a CLOSE HEAD AND SHOULDERS portrait, 70mm lens, guests at 1.2 metres. Same landscape 3:2 composition and Christmas story, same materials and blurred background characters. Correct adult EYE-LEVEL camera, level horizontal optical axis at 1.55m above ground, NOT a camera placed on the floor. CRITICAL: there is NO FLOOR, NO GROUND, NO PATH, NO STEPS visible ANYWHERE, including bottom center. Bottom edge cuts through vertical wall panels / tree trunks / raised architectural balcony at waist height, not down toward the floor. Fill background center with softly defocused VERTICAL architecture or snow-covered trees, never an expanse of sky or ground. The ornate Christmas arch and evergreens are a real physical frame: side uprights clipped at far edges, top garland only very top, lanterns hanging at side edges, corner decorations elevated on side plinths. Empty central 70% for guest faces and torsos. Blurred real Santa/elves/reindeer from the reference remain far behind the guest plane and off-center; crop their lower bodies naturally to maintain eye-level height. Enlarge the framing uprights and crop more of the arch; strongly defocused background appropriate to large guest heads. Preserve richness, joyful Christmas color, photorealism, natural soft front fill. Do not simply blur or digitally crop reference: create a correct matching camera-distance plate. No central foreground people, text, logos, watermark, graphic border or collage.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-09ea684b-6ac5-4916-8d81-76b18a19262a.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/moonlit-manor/close.png"
+    },
+    {
+      "id": "haunted-crypt",
+      "label": "Santa’s Sleigh",
+      "depth": "close",
+      "prompt": "Use case: photorealistic-natural. Re-stage this exact Christmas physical photobooth set for a CLOSE HEAD AND SHOULDERS portrait, 70mm lens, guests at 1.2 metres. Same landscape 3:2 composition and Christmas story, same materials and blurred background characters. Correct adult EYE-LEVEL camera, level horizontal optical axis at 1.55m above ground, NOT a camera placed on the floor. CRITICAL: there is NO FLOOR, NO GROUND, NO PATH, NO STEPS visible ANYWHERE, including bottom center. Bottom edge cuts through vertical wall panels / tree trunks / raised architectural balcony at waist height, not down toward the floor. Fill background center with softly defocused VERTICAL architecture or snow-covered trees, never an expanse of sky or ground. The ornate Christmas arch and evergreens are a real physical frame: side uprights clipped at far edges, top garland only very top, lanterns hanging at side edges, corner decorations elevated on side plinths. Empty central 70% for guest faces and torsos. Blurred real Santa/elves/reindeer from the reference remain far behind the guest plane and off-center; crop their lower bodies naturally to maintain eye-level height. Enlarge the framing uprights and crop more of the arch; strongly defocused background appropriate to large guest heads. Preserve richness, joyful Christmas color, photorealism, natural soft front fill. Do not simply blur or digitally crop reference: create a correct matching camera-distance plate. No central foreground people, text, logos, watermark, graphic border or collage.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-6efe5b0f-85a7-415a-a27c-302f2b7dea6e.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/haunted-crypt/close.png"
+    },
+    {
+      "id": "pumpkin-patch",
+      "label": "Santa’s Workshop",
+      "depth": "medium",
+      "prompt": "Edit target: attached Christmas photobooth plate. REMOVE the entire family of four from the foreground completely. Reconstruct the EMPTY Christmas workshop behind them. Keep the small blurred Santa in background at far left. Keep the beautiful physical arch, garlands, ribbons and lantern framing. Output an EMPTY guest area in center for later photobooth compositing. Medium camera eye-level and waist-height bottom edge: NO floor or ground visible, only vertical workshop wall / cabinetry behind the missing family. There must be NO foreground people, faces, heads or bodies. The ONLY person is the distant blurred Santa on left. Same 3:2 landscape, no text or watermarks.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-004928b5-0bea-486f-91ed-56b1778d46f8.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/pumpkin-patch/medium.png"
+    },
+    {
+      "id": "pumpkin-patch",
+      "label": "Santa’s Workshop",
+      "depth": "wide",
+      "prompt": "Use case: photorealistic-natural. NEW professional Christmas photobooth background, landscape 3:2. Attached Halloween image is a reference ONLY for masterful physical framing composition and depth, completely replace its theme with Christmas. Richly Christmas Santa workshop. A realistic Santa Claus in red velvet and white beard works at a toy bench far behind the guest plane on the left, softly lens blurred but recognizable. Christmas tree, gifts, amber lights and warm timber interior. CRITICAL: tangible dimensional physical frame within the photograph, substantial carved timber or stone uprights at extreme left and right 10%, arch overhead only in top 12%, lush evergreen branches, holly, red velvet bows, champagne gold baubles following arch and edges, lanterns and gifts in bottom corners. Frame must look like a real decorated architectural entrance, NOT flat border overlay. Central 70% empty for composited guests, quiet softly defocused backdrop with generous headroom. Characters small, off-center, several metres BEHIND guest plane, blurred, not competing with guests. Medium waist-up 50mm portrait framing: almost NO floor, maximum bottom 5%. Do NOT create a wide room full of empty floor. Rich dimensional textures around outer edges, distant background softly fades. Unmistakable joyful luxurious Christmas, natural gentle frontal fill compatible with skin. No foreground people, Halloween motifs, pumpkins, text, logos, watermarks or illustration.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-a791252c-4d9a-43f8-9699-0cc8192a27b1.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/pumpkin-patch/wide.png"
+    },
+    {
+      "id": "moonlit-manor",
+      "label": "Elf Village",
+      "depth": "wide",
+      "prompt": "Use case: photorealistic-natural. NEW professional Christmas photobooth background, landscape 3:2. Attached Halloween image is a reference ONLY for masterful physical framing composition and depth, completely replace its theme with Christmas. Snowy Christmas village at twilight with gingerbread timber shops, candy cane lamps, richly decorated Christmas trees. Two realistic adult elves in red and green carry presents far behind the guest plane at the right, softly lens blurred but recognizable. Blue snow and gold lights. CRITICAL: tangible dimensional physical frame within the photograph, substantial carved timber or stone uprights at extreme left and right 10%, arch overhead only in top 12%, lush evergreen branches, holly, red velvet bows, champagne gold baubles following arch and edges, lanterns and gifts in bottom corners. Frame must look like a real decorated architectural entrance, NOT flat border overlay. Central 70% empty for composited guests, quiet softly defocused backdrop with generous headroom. Characters small, off-center, several metres BEHIND guest plane, blurred, not competing with guests. Medium waist-up 50mm portrait framing: almost NO floor, maximum bottom 5%. Do NOT create a wide room full of empty floor. Rich dimensional textures around outer edges, distant background softly fades. Unmistakable joyful luxurious Christmas, natural gentle frontal fill compatible with skin. No foreground people, Halloween motifs, pumpkins, text, logos, watermarks or illustration.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-e2342497-eb39-4d62-a8e4-67552117716a.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/moonlit-manor/wide.png"
+    },
+    {
+      "id": "haunted-crypt",
+      "label": "Santa’s Sleigh",
+      "depth": "wide",
+      "prompt": "Use case: photorealistic-natural. NEW professional Christmas photobooth background, landscape 3:2. Attached Halloween image is a reference ONLY for masterful physical framing composition and depth, completely replace its theme with Christmas. Snowy Christmas fir woodland at blue hour. Realistic reindeer beside an ornate red and gold sleigh loaded with gifts, Santa in red beside it, far behind the guest plane at the right, softly lens blurred. Cozy distant cabin, gold fairy lights and red bows. CRITICAL: tangible dimensional physical frame within the photograph, substantial carved timber or stone uprights at extreme left and right 10%, arch overhead only in top 12%, lush evergreen branches, holly, red velvet bows, champagne gold baubles following arch and edges, lanterns and gifts in bottom corners. Frame must look like a real decorated architectural entrance, NOT flat border overlay. Central 70% empty for composited guests, quiet softly defocused backdrop with generous headroom. Characters small, off-center, several metres BEHIND guest plane, blurred, not competing with guests. Medium waist-up 50mm portrait framing: almost NO floor, maximum bottom 5%. Do NOT create a wide room full of empty floor. Rich dimensional textures around outer edges, distant background softly fades. Unmistakable joyful luxurious Christmas, natural gentle frontal fill compatible with skin. No foreground people, Halloween motifs, pumpkins, text, logos, watermarks or illustration.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-eb1b98ca-dfb9-4f4f-9699-85a8f2349e03.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/haunted-crypt/wide.png"
+    },
+    {
+      "id": "graveyard",
+      "label": "Northern Lights",
+      "depth": "close",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Snow-laden fir trunks naturally framing left and right, aurora behind snowy forest, elevated lanterns and evergreen sprays on stone side posts, stars and restrained gold lights. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. CLOSE head-and-shoulders camera, 70mm at adult eye height. No floor or ground anywhere. Side uprights enlarged and cropped at edges; backdrop softly defocused vertical surfaces filling bottom edge. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-d58b0c66-49d7-4379-9d24-6bdde7a6430d.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/graveyard/close.webp"
+    },
+    {
+      "id": "evil-dead-cabin",
+      "label": "Fireside Lodge",
+      "depth": "close",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Rich warm timber chalet doorway, Christmas wreaths, fireplace off-center, red velvet stockings, green garlands and gold lanterns, distant Christmas tree. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. CLOSE head-and-shoulders camera, 70mm at adult eye height. No floor or ground anywhere. Side uprights enlarged and cropped at edges; backdrop softly defocused vertical surfaces filling bottom edge. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-a4f79795-c193-4d9a-8a6c-66b20901be49.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/evil-dead-cabin/close.webp"
+    },
+    {
+      "id": "graveyard",
+      "label": "Northern Lights",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Snow-laden fir trunks naturally framing left and right, aurora behind snowy forest, elevated lanterns and evergreen sprays on stone side posts, stars and restrained gold lights. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-965fe6ff-631e-4d69-bbac-e100bc6f06ca.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/graveyard/medium.webp"
+    },
+    {
+      "id": "graveyard",
+      "label": "Northern Lights",
+      "depth": "wide",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Snow-laden fir trunks naturally framing left and right, aurora behind snowy forest, elevated lanterns and evergreen sprays on stone side posts, stars and restrained gold lights. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. WIDE eye-level group camera, 35mm, small ground strip only bottom 10 percent. Level horizon and plausible standing area. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-c2609326-ce2d-4c8b-9755-565d099868f2.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/graveyard/wide.webp"
+    },
+    {
+      "id": "evil-dead-cabin",
+      "label": "Fireside Lodge",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Rich warm timber chalet doorway, Christmas wreaths, fireplace off-center, red velvet stockings, green garlands and gold lanterns, distant Christmas tree. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-28782121-82e9-47be-abc8-6ac7ded33ea5.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/evil-dead-cabin/medium.webp"
+    },
+    {
+      "id": "manor-gates",
+      "label": "Winter Palace",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Ivory stone palace arch, lush emerald Christmas garlands, champagne ornaments, red bows, distant illuminated palace facade and snow-dusted firs. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-e1978512-5b4d-40e5-8302-0e8855b59e0a.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/manor-gates/medium.webp"
+    },
+    {
+      "id": "evil-dead-cabin",
+      "label": "Fireside Lodge",
+      "depth": "wide",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Rich warm timber chalet doorway, Christmas wreaths, fireplace off-center, red velvet stockings, green garlands and gold lanterns, distant Christmas tree. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. WIDE eye-level group camera, 35mm, small ground strip only bottom 10 percent. Level horizon and plausible standing area. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-fdc1fb91-cdec-4bcb-8e5f-c42a0faf11b2.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/evil-dead-cabin/wide.webp"
+    },
+    {
+      "id": "manor-gates",
+      "label": "Winter Palace",
+      "depth": "wide",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Ivory stone palace arch, lush emerald Christmas garlands, champagne ornaments, red bows, distant illuminated palace facade and snow-dusted firs. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. WIDE eye-level group camera, 35mm, small ground strip only bottom 10 percent. Level horizon and plausible standing area. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-4ae511ca-6972-4c1c-8caf-e9a18b973431.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/manor-gates/wide.webp"
+    },
+    {
+      "id": "zombie-gates",
+      "label": "Gingerbread Cottage",
+      "depth": "close",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Carved warm wooden cottage porch with Christmas candy cane trim, fir garlands, red bows, gingerbread details, softly glowing cottage windows. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. CLOSE head-and-shoulders camera, 70mm at adult eye height. No floor or ground anywhere. Side uprights enlarged and cropped at edges; backdrop softly defocused vertical surfaces filling bottom edge. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-0d4edb72-ee04-493e-afd0-7b9e30714df0.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/zombie-gates/close.webp"
+    },
+    {
+      "id": "zombie-gates",
+      "label": "Gingerbread Cottage",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Carved warm wooden cottage porch with Christmas candy cane trim, fir garlands, red bows, gingerbread details, softly glowing cottage windows. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-c06d0e26-2dd2-42c7-a725-d7fa48f74ea6.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/zombie-gates/medium.webp"
+    },
+    {
+      "id": "manor-gates",
+      "label": "Winter Palace",
+      "depth": "close",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Ivory stone palace arch, lush emerald Christmas garlands, champagne ornaments, red bows, distant illuminated palace facade and snow-dusted firs. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. CLOSE head-and-shoulders camera, 70mm at adult eye height. No floor or ground anywhere. Side uprights enlarged and cropped at edges; backdrop softly defocused vertical surfaces filling bottom edge. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-966e2eb6-c199-4fe6-a198-0c9be356332a.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/manor-gates/close.webp"
+    },
+    {
+      "id": "zombie-gates",
+      "label": "Gingerbread Cottage",
+      "depth": "wide",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Carved warm wooden cottage porch with Christmas candy cane trim, fir garlands, red bows, gingerbread details, softly glowing cottage windows. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. WIDE eye-level group camera, 35mm, small ground strip only bottom 10 percent. Level horizon and plausible standing area. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-2e6e4360-8c66-4ba2-9935-168cd756b5ef.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/depths/zombie-gates/wide.webp"
+    },
+    {
+      "id": "vampire-candlelit-ballroom",
+      "label": "Christmas Ballroom",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Elegant ballroom through an ivory and gold grand doorway, Christmas garlands, jewel red ribbons, distant chandeliers and decorated Christmas trees. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-d361482d-a3c2-4cb1-afde-3b7aab2f2610.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/vampire-candlelit-ballroom.webp"
+    },
+    {
+      "id": "haunted-harvest-carnival",
+      "label": "Christmas Carousel",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Vintage red and gold fairground carousel behind Christmas fir boughs and candy cane entry posts, colorful warm festive bokeh. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-4167f812-515c-4847-8b21-18c6f1f4fd4b.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/haunted-harvest-carnival.webp"
+    },
+    {
+      "id": "witch-lantern-garden",
+      "label": "Starlight Garden",
+      "depth": "medium",
+      "prompt": "Photorealistic professional Christmas photobooth background plate 3:2. Snowy botanical conservatory seen through an intricate wrought iron arch adorned with evergreen, hanging illuminated golden stars, red ribbons and side lanterns. Masterful physical framing integrated into the photographed scenery: rich dimensional vertical side decorations at extreme edges, overhead garland at very top, quiet open center 70% for composited guests. MEDIUM waist-up group camera, 50mm at adult eye height. No visible floor or ground. Bottom frame cuts through vertical background architecture, no looking downward. Premium realistic rich festive red, evergreen and gold, warm flattering neutral frontal fill, optical background bokeh. Distinct compelling Christmas atmosphere. No people, characters, faces, text, logos, watermark, illustration or flat graphic border.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-bdfcf112-9842-48a4-a275-76a88816ea7f.png",
+      "asset": "photobooth-app/config/ai-backgrounds/scene/witch-lantern-garden.webp"
+    }
+  ]
+}

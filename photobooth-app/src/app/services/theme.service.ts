@@ -15,6 +15,11 @@ export class ThemeService {
     elOld?.remove();
 
     if (!window.pbApi?.adminGetThemeStylesheetUrl) {
+      const link = document.createElement('link');
+      link.id = LINK_ID;
+      link.rel = 'stylesheet';
+      link.href = `themes/${encodeURIComponent(id)}/styles.css`;
+      document.head.appendChild(link);
       return;
     }
     const r = await window.pbApi.adminGetThemeStylesheetUrl();

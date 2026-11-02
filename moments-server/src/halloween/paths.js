@@ -26,7 +26,7 @@ export const SAMPLE_DEFS = [
   {
     id: 'portrait',
     title: 'AI Portrait',
-    subtitle: 'Vampire costume · 4×6 print',
+    subtitle: 'Father Christmas costume · 4×6 print',
     pipeline: 'head-swap',
     modeId: 'vampire',
     originalFile: 'portrait-original.png',
@@ -35,7 +35,7 @@ export const SAMPLE_DEFS = [
   {
     id: 'scene',
     title: 'Scene Addition',
-    subtitle: 'Family in pumpkin patch · 6×4 print',
+    subtitle: 'Family in Santa’s Workshop · 6×4 print',
     pipeline: 'scene',
     modeId: 'scene',
     originalFile: 'scene-original.png',

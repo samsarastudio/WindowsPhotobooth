@@ -30,7 +30,7 @@ export class BoothModePageComponent implements OnInit {
   /** Photo Print — framed digital original; magnet optional at the end. */
   readonly showPhotoPrint = computed(() => this.booth.guestModes().defaultEnabled !== false);
 
-  /** AI Halloween Portrait — Choose your haunt. */
+  /** AI Christmas Portrait — Choose your Christmas character. */
   readonly showAiPortrait = computed(
     () => this.booth.aiGenerationEnabled() && this.booth.portraitAiModes().length > 0,
   );
@@ -65,6 +65,10 @@ export class BoothModePageComponent implements OnInit {
 
   private async loadThumbs(): Promise<void> {
     // UI artwork is bundled with the app, independent of editable capture assets.
+    if (this.booth.activeThemeId() === 'christmas') {
+      this.thumbs.set({ photo: 'christmas/classic.png', portrait: 'christmas/portrait.png', scene: 'christmas/scene.png' });
+      return;
+    }
     if (this.booth.activeThemeId() === 'halloween') {
       this.thumbs.set({ photo: 'halloween/classic.png', portrait: 'halloween/portrait.png', scene: 'halloween/scene.png' });
       return;

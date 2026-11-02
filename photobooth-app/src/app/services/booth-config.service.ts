@@ -144,7 +144,7 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
     }
   }
   if (out.length === 0) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
-  // Ensure new Halloween portrait characters appear even on older saved configs.
+  // Ensure new Christmas portrait characters appear even on older saved configs.
   const have = new Set(out.map((m) => m.id));
   for (const def of PHOTOBOOTH_DEFAULT_AI_MODES) {
     if ((def.pipeline === 'head-swap' || def.portraitOnly) && !have.has(def.id)) {
@@ -545,7 +545,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     typeof rest['openAiConfigured'] === 'boolean' ? rest['openAiConfigured'] : false;
 
   return {
-    activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'inmoment',
+    activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'christmas',
     branding,
     camera,
     photoFrames,
@@ -628,7 +628,7 @@ export class BoothConfigService {
   });
   readonly shouldShowBoothModeStep = computed(() => this.offeredBoothModes().length > 1);
   readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
-  readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'inmoment');
+  readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'christmas');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
   readonly defaultAiModeId = computed(() => this.state()?.defaultAiModeId ?? null);
   /** Resolved default mode when configured; null means guest picks on the style screen. */
@@ -669,7 +669,7 @@ export class BoothConfigService {
     const res = await fetch('/config/photobooth-config.default.json');
     if (!res.ok) {
       this.state.set({
-        activeThemeId: 'inmoment',
+        activeThemeId: 'christmas',
         branding: PHOTOBOOTH_DEFAULT_BRANDING,
         camera: { ...PHOTOBOOTH_DEFAULT_CAMERA },
         photoFrames: { ...PHOTOBOOTH_DEFAULT_PHOTO_FRAMES },

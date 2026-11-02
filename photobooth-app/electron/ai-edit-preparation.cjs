@@ -8,6 +8,19 @@ const {resolveDepthBackground}=require('./background-depth.cjs');
 async function prepareScene(source,background,modelDir) {
   let original=await sharp(source).rotate().resize(1536,1024,{fit:'cover',position:'centre'}).removeAlpha().png().toBuffer();
   let faces=await detectFaces(original,path.join(modelDir,'yunet.onnx'));
+  const modelPath=path.join(modelDir,'birefnet-lite.onnx');
+  let alpha=await subjectMask(original,modelPath);
+  // Frame the guests first. Cropping a completed composite also crops away the
+  // physical arch and incorrectly keeps the pre-crop background distance.
+  let crop=/_crop\.(?:jpe?g|png)$/i.test(String(source)) ? null : require('./subject-framing.cjs').subjectCrop(alpha,1536,1024);
+  // Protect every detected head, including shorter children below the tallest
+  // silhouette band used by subjectCrop. A safe wider photo beats a clipped face.
+  if(crop && faces.some(f=>f.x<crop.left || f.y<crop.top || f.x+f.w>crop.left+crop.width || f.y+f.h>crop.top+crop.height)) crop=null;
+  if(crop){
+    original=await sharp(original).extract(crop).resize(1536,1024).png().toBuffer();
+    alpha=await sharp(alpha,{raw:{width:1536,height:1024,channels:1}}).extract(crop).resize(1536,1024).greyscale().raw().toBuffer();
+    faces=faces.map(f=>({...f,x:(f.x-crop.left)*1536/crop.width,y:(f.y-crop.top)*1024/crop.height,w:f.w*1536/crop.width,h:f.h*1024/crop.height}));
+  }
   // Costumes and full-face masks are valid subjects; segmentation does not require a human face.
   const faceRatio=faces.length ? faces.reduce((sum,f)=>sum+f.w/1536,0)/faces.length : .15;
   // Optical depth treatment, without changing the chosen scene's geometry/artwork.
@@ -16,14 +29,7 @@ async function prepareScene(source,background,modelDir) {
   let plate=sharp(selected.path).rotate().resize(1536,1024,{fit:'cover'});
   if(blur>0)plate=plate.blur(blur);
   let reference=await plate.png().toBuffer();
-  const composed=await replaceBackground(original,reference,path.join(modelDir,'birefnet-lite.onnx'));
-  // A guest-approved source crop must not be automatically reframed again.
-  const crop=/_crop\.(?:jpe?g|png)$/i.test(String(source)) ? null : require('./subject-framing.cjs').subjectCrop(composed.alpha,1536,1024);
-  if(crop){
-    const reframe=buf=>sharp(buf).extract(crop).resize(1536,1024).png().toBuffer();
-    [original,reference,composed.output]=await Promise.all([reframe(original),reframe(reference),reframe(composed.output)]);
-    for(const key of ['alpha','lightingWeights','faceProtection']) composed[key]=await sharp(composed[key],{raw:{width:1536,height:1024,channels:1}}).extract(crop).resize(1536,1024).raw().toBuffer();
-  }
+  const composed=await replaceBackground(original,reference,modelPath,alpha);
   // Scene replacement never exposes guest pixels to a generative image editor.
   return {image:composed.output,original,reference,alpha:composed.alpha,lightingWeights:composed.lightingWeights,faceProtection:composed.faceProtection,crop,blur,depth:selected.depth,backgroundPath:selected.path,
     width:1536,height:1024,strictScene:true,model:'birefnet-lite'};
@@ -70,6 +76,6 @@ const PORTRAIT_MAKEUP = {
 function buildPortraitPrompt(characterId) {
  return HEAD_PROMPT + ' COSTUME MAKEUP: ' + (PORTRAIT_MAKEUP[characterId] || 'Use subtle theatrical makeup appropriate to the supplied costume.') + ' Makeup is cosmetic pigment only, not a different face: retain exact eye spacing, facial width, nose shape, jaw, mouth, age, expression, hairline and distinctive marks. Integrate scene lighting and makeup in this generated image; it is the final portrait and will receive no face replacement or makeup overlays afterward.';
 }
-const SCENE_PROMPT="Image 1 is the exact photographic layout to finish, with the original guests already placed in the selected Halloween setting. Image 2 is the same selected background for reference. Edit ONLY the transparent boundary band, which includes both sides of the hair and clothing silhouette. Remove ALL remnants of the original gray studio backdrop, including gray wedges behind heads, gray outlines embedded between curls and the pale rim around hair. Reconstruct fine individual hair strands against the selected scene. The hair must meet the new background naturally without a pasted-on cutout edge. Blend the adjacent background into a coherent photograph. Do not move, resize, recolor or regenerate any person. Keep faces, expressions, skin texture, eyewear, clothing, hands, handbag and all accessories absolutely unchanged. Keep the background architecture, objects and composition unchanged. Preserve the existing camera viewpoint and foreground scale: guests are near the camera at the gate and the manor is far behind them. No extra glow, halos, outlines, duplicate edges or double exposures. No changes outside the mask.";
+const SCENE_PROMPT="Image 1 is the exact photographic layout to finish, with the original guests already placed in the selected Christmas setting. Image 2 is the same selected background for reference. Edit ONLY the transparent boundary band, which includes both sides of the hair and clothing silhouette. Remove ALL remnants of the original gray studio backdrop, including gray wedges behind heads, gray outlines embedded between curls and the pale rim around hair. Reconstruct fine individual hair strands against the selected scene. The hair must meet the new background naturally without a pasted-on cutout edge. Blend the adjacent background into a coherent photograph. Do not move, resize, recolor or regenerate any person. Keep faces, expressions, skin texture, eyewear, clothing, hands, handbag and all accessories absolutely unchanged. Keep the background architecture, objects and composition unchanged. Preserve the existing camera viewpoint and foreground scale: guests are near the camera at the gate and the manor is far behind them. No extra glow, halos, outlines, duplicate edges or double exposures. No changes outside the mask.";
 const HEAD_PROMPT='Image 1 is the costume portrait template. Image 2 is the original guest photo and sole identity reference. Replace ONLY the template head inside the mask with the exact guest head: same face, expression, eyes, nose, mouth, beard, skin texture, age and hair. Do not blend their identity with the template model. Preserve facial proportions and distinctive details. Match the existing template head size, position, angle and collar connection naturally. No elongated neck, floating head, oval cutout, doubled hair, or extra face. Keep all costume, body, pose, props and scenery outside the head mask unchanged. The result must look like the same guest wearing the costume, not a similar person.';
 module.exports={prepareScene,prepareHead,preserveSceneSubjects,preservePortraitPlate,SCENE_PROMPT,HEAD_PROMPT,buildPortraitPrompt,PORTRAIT_MAKEUP};

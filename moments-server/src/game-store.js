@@ -1,7 +1,7 @@
 import {createEventQueue} from './game-event-queue.js';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 
-const defaults = { title: 'HAUNTED HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 4, extraShots: 3, bonusScore: 200, scoringVersion: 2, difficulty: 1, resultsTimeoutSeconds: 5, shotCountdownSeconds: 3, currency: 'CAD', eventMode: true, arrivalTimeoutSeconds: 45, absenceTimeoutSeconds: 15 };
+const defaults = { title: 'JINGLE HOOPS', playPrice: 1000, extensionPrice: 500, baseShots: 4, extraShots: 3, bonusScore: 200, scoringVersion: 2, difficulty: 1, resultsTimeoutSeconds: 5, shotCountdownSeconds: 3, currency: 'CAD', eventMode: true, arrivalTimeoutSeconds: 45, absenceTimeoutSeconds: 15 };
 // Unity ShotGrade order: Swish, NiceShot, GoodThrow, BankShot, SoClose,
 // Brick, AirBall, Short, TooStrong, Miss, TooLow. Version is frozen per round.
 const gradePoints = [90,70,50,60,20,10,0,0,0,0,0];
@@ -26,6 +26,13 @@ export function createGameStore(db) {
   const salt = randomBytes(16).toString('hex');
   db.prepare('INSERT OR IGNORE INTO game_settings VALUES (1,?,?,?)').run(JSON.stringify(defaults), salt, hashPin('0707', salt));
   db.exec('CREATE TABLE IF NOT EXISTS game_migrations (id TEXT PRIMARY KEY)');
+  db.transaction(()=>{
+    if(!db.prepare("SELECT id FROM game_migrations WHERE id='christmas-brand-2026'").get()){
+      const old=JSON.parse(db.prepare('SELECT json FROM game_settings WHERE id=1').get().json);
+      if(old.title==='HAUNTED HOOPS')db.prepare('UPDATE game_settings SET json=? WHERE id=1').run(JSON.stringify({...old,title:defaults.title}));
+      db.prepare("INSERT INTO game_migrations VALUES ('christmas-brand-2026')").run();
+    }
+  }).immediate();
   db.transaction(()=>{
     if(!db.prepare("SELECT id FROM game_migrations WHERE id='reward-target-99'").get()){
       const row=db.prepare('SELECT json FROM game_settings WHERE id=1').get(),old=JSON.parse(row.json);

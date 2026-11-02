@@ -1355,12 +1355,12 @@ export class AdminDashboardComponent implements OnInit {
     ];
   }
 
-  /** Restore the Halloween Scene Addition + 5 AI Portrait characters (does not auto-enable AI). */
+  /** Restore the Christmas Scene Addition + 5 AI Portrait characters (does not auto-enable AI). */
   loadHalloweenAiPack(): void {
     this.draftAiModes = structuredClone(PHOTOBOOTH_DEFAULT_AI_MODES);
     this.draftDefaultAiModeId = null;
     this.status.set(
-      'Halloween AI pack loaded (Scene Addition + 5 portraits). Enable AI above and Save to turn it on for guests. Photocapture stays available on the style screen.',
+      'Christmas AI pack loaded (Scene Addition + 5 portraits). Enable AI above and Save to turn it on for guests. Photocapture stays available on the style screen.',
     );
   }
 

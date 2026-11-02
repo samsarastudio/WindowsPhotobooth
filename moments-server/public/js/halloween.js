@@ -87,7 +87,7 @@ function renderSamples(samples) {
         </figure>
         <figure class="shot ${aspect}">
           <img class="ai-img" src="${s.aiUrl}" alt="${s.title} AI result" />
-          <figcaption class="label">Finished print</figcaption>
+          <figcaption class="label">${s.id === 'portrait' ? 'Character template · your face replaces the model' : 'Finished print'}</figcaption>
         </figure>
       </div>
     `;

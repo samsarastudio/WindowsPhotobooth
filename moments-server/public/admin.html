@@ -10,8 +10,9 @@
     />
     <link rel="stylesheet" href="/css/gallery.css?v=20260831-32" />
     <link rel="stylesheet" href="/css/admin.css?v=20261022-png-filmstrip" />
-  </head>
-  <body class="admin-body">
+  <link rel="stylesheet" href="/css/christmas.css?v=1.2.0">
+</head>
+  <body class="admin-body christmas-paper">
     <div class="admin-shell">
       <header class="admin-topbar">
         <div class="brand">
@@ -486,9 +487,9 @@
             <p id="tokenMeta" class="meta"></p>
             <p class="meta">Admin PIN still lives in the server <code>.env</code> (<code>ADMIN_PIN</code>).</p>
 
-            <h3 class="admin-subhead">Halloween demo (/halloween)</h3>
+            <h3 class="admin-subhead">Christmas demo (/halloween)</h3>
             <p class="meta">
-              OpenAI key for the public HauntBooth sample page. Live regenerations are capped
+              OpenAI key for the public MerryBooth sample page. Live regenerations are capped
               (default 5). Showcase samples are static.
             </p>
             <form id="halloweenSettingsForm" autocomplete="off" onsubmit="return false;">
@@ -511,13 +512,13 @@
                   max="100"
                   value="5"
                 />
-                <button type="button" class="btn primary" id="btnSaveHalloween">Save Halloween</button>
+                <button type="button" class="btn primary" id="btnSaveHalloween">Save Christmas</button>
                 <button type="button" class="btn ghost" id="btnResetHalloweenCount">Reset used count</button>
               </div>
             </form>
             <p id="halloweenMeta" class="meta"></p>
 
-            <h3 class="admin-subhead">Halloween analytics (/halloween)</h3>
+            <h3 class="admin-subhead">Christmas analytics (/halloween)</h3>
             <p class="meta">
               Page visits and traffic source (UTM <code>utm_source</code>, or referrer host, or
               <code>direct</code>). Same browser within 30 minutes counts once.

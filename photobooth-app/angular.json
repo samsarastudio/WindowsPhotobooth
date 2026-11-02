@@ -50,6 +50,11 @@
             "assets": [
               {
                 "glob": "**/*",
+                "input": "themes",
+                "output": "/themes"
+              },
+              {
+                "glob": "**/*",
                 "input": "public"
               },
               {

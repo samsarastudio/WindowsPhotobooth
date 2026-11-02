@@ -13,3 +13,17 @@ applyReleaseProfile(bundle,config);const upgraded=JSON.parse(fs.readFileSync(pat
 assert.deepEqual(upgraded.guestFlow,{boothId:'existing-booth',thanksAutoReturnSec:8,skipAiPreviewToThanks:true});
 assert(fs.existsSync(path.join(config,'.release-1.1.53')));assert(fs.existsSync(path.join(config,'.ota-backups/1.1.53/photobooth-config.json')));
 console.log('PASS 1.1.53 tablet default migration preserves booth identity, timeout and credentials');
+
+const christmasProfile={version:'1.2.0-christmas',settings:{activeThemeId:'christmas',copy:{attract:{title:'MerryBooth'}}}};
+fs.writeFileSync(path.join(bundle,'release-profile.json'),JSON.stringify(christmasProfile));
+upgraded.branding={brandName:'HauntBooth',logoFile:'operator-logo.png'};
+fs.writeFileSync(path.join(config,'photobooth-config.json'),JSON.stringify(upgraded));
+applyReleaseProfile(bundle,config);
+const christmas=JSON.parse(fs.readFileSync(path.join(config,'photobooth-config.json')));
+assert.equal(christmas.activeThemeId,'christmas');assert.equal(christmas.branding.brandName,'MerryBooth');
+assert.equal(christmas.branding.logoFile,'operator-logo.png');
+for(const key of ['gallery','adminPin','print','camera','guestFlow'])assert.deepEqual(christmas[key],upgraded[key]);
+assert(fs.existsSync(path.join(config,'.ota-backups/1.2.0-christmas/photobooth-config.json')));
+christmas.branding.brandName='Custom Christmas Event';fs.writeFileSync(path.join(config,'photobooth-config.json'),JSON.stringify(christmas));
+applyReleaseProfile(bundle,config);assert.equal(JSON.parse(fs.readFileSync(path.join(config,'photobooth-config.json'))).branding.brandName,'Custom Christmas Event');
+console.log('PASS Christmas migration: theme, stock branding, backup, credentials, identity and idempotency');

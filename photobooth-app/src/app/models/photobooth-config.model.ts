@@ -344,7 +344,7 @@ export interface PhotoboothAiMode {
   /** Prompt sent after compositing guest onto background; overrides `prompt` when inpainting. */
   inpaintPrompt?: string;
   /**
-   * `scene` — keep guests, inpaint Halloween scenery around them (face locked).
+   * `scene` — keep guests, inpaint Christmas scenery around them (face locked).
    * `head-swap` — Zyn-style character plate + guest head (face locked).
    * `prompt` — full-image edit (legacy).
    */
@@ -372,19 +372,19 @@ export const DJ_PROMPT_ONLY =
 export const NEWSPAPER_AI_PROMPT =
   'Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject\'s face remains recognizable but stylized to match the printed newspaper aesthetic.';
 
-/** Custom Backdrops — keep cropped guests, paint Halloween scenery around them. */
+/** Custom Backdrops — keep cropped guests, paint Christmas scenery around them. */
 export const HALLOWEEN_SCENE_PROMPT =
-  `Place the guests exactly as captured into this Halloween environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged — never alter identity or invent extra limbs. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
+  `Place the guests exactly as captured into this Christmas environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged — never alter identity or invent extra limbs. Only invent cinematic Christmas scenery around them (evergreens, fairy lights, warm winter light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
 
 export const HALLOWEEN_SCENE_INPAINT =
-  `BLEND the guests into this Halloween scene — do not recreate them. CRITICAL: keep every person exactly as placed (faces, bodies, legs, feet, clothing, pose, count). NEVER invent extra legs, limbs, or people. Only replace the indoor room/booth background around them with matching Halloween atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup, no identity change, no body regeneration.`;
+  `BLEND the guests into this Christmas scene — do not recreate them. CRITICAL: keep every person exactly as placed (faces, bodies, legs, feet, clothing, pose, count). NEVER invent extra legs, limbs, or people. Only replace the indoor room/booth background around them with matching Christmas atmosphere, lighting, and depth. Soft natural contact shadows under feet. Photorealistic. No face filters, no costume makeup, no identity change, no body regeneration.`;
 
-/** Shared head-swap prompts for Halloween AI Portrait — aligned with Zyn Photobooth-AICore. */
+/** Shared head-swap prompts for Christmas AI Portrait — aligned with Zyn Photobooth-AICore. */
 export const HEAD_SWAP_PROMPT =
-  'Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Halloween scene.';
+  'Clean seamless head replacement: guest likeness at natural size matching the original character head. Keep a natural short adult neck for portrait mode — chin nestled into the costume collar with almost no throat gap. Do not elongate the neck or float the head. No oval outline. Keep the costume body and Christmas scene.';
 
 export const HEAD_SWAP_INPAINT =
-  "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Halloween character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face.";
+  "CLEAN SEAMLESS HEAD REPLACEMENT WITH NATURAL PORTRAIT ANATOMY. Image 1 is this Christmas character scene with a small guest-head reference on the character. Image 2 is a tight crop of the guest's real head. Replace the character head with the guest at NATURAL PROPORTION — the head must match the original character head size relative to the shoulders (do not enlarge or float the head higher). Exact guest likeness: eyes, nose, mouth, jaw, skin, hair. ANATOMY (critical for portrait): Keep a natural, short adult neck. Preserve the original Image-1 vertical distance from chin to shoulders/collar — if anything, sit the chin slightly closer to the collar. The chin must sit nestled into / immediately above the costume collar — no tall gap of neck skin, no elongated or stretched neck, no floating head. Do not raise the head above the original character head position. Completely erase the old character head/hair. NO oval outline, cutout edge, mask ring, or halo. Softly blend only that short neck into the collar. Keep the costume body, pose, props, camera angle, and lighting unchanged. Do not copy guest clothing or booth background. NEVER alter the guest face.";
 
 export const HALLOWEEN_PORTRAIT_IDS = [
   'vampire',
@@ -642,7 +642,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'vampire',
-    label: 'Vampire',
+    label: 'Father Christmas',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -652,7 +652,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'witch',
-    label: 'Witch',
+    label: 'Christmas Elf',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -662,7 +662,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'werewolf',
-    label: 'Werewolf',
+    label: 'Nutcracker',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -672,7 +672,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'reaper',
-    label: 'Reaper',
+    label: 'Winter King',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -682,7 +682,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'phantom',
-    label: 'Phantom',
+    label: 'Christmas Conductor',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -692,7 +692,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'bride',
-    label: 'Pirate',
+    label: 'Snow Queen',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -702,7 +702,7 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   },
   {
     id: 'morticia',
-    label: 'Raven Countess',
+    label: 'Christmas Belle',
     prompt: HEAD_SWAP_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -714,12 +714,12 @@ export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
 
 export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
   attract: {
-    icon: '🎃',
-    tagline: 'Enter if you dare',
+    icon: '🎄',
+    tagline: 'A little Christmas magic',
     mainScale: 1,
     topScale: 1,
-    title: 'HauntBooth',
-    subtitle: 'Your Halloween photo starts here.',
+    title: 'MerryBooth',
+    subtitle: 'Your Christmas photo starts here.',
     ctaLabel: 'Tap to Start',
     startAria: 'Tap to Start',
     adminLink: 'Admin',
@@ -828,17 +828,17 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     back: 'Back',
     plainPhotoLabel: 'Classic photo',
     portraitEntryLabel: 'AI Portrait',
-    portraitEntryHint: 'Choose a Halloween character for your portrait.',
-    sceneEntryHint: 'Add a Halloween background to your group photo.',
+    portraitEntryHint: 'Choose a Christmas character for your portrait.',
+    sceneEntryHint: 'Add a Christmas background to your group photo.',
   },
   portraitSelect: {
     title: 'Choose your character',
-    subtitle: 'Choose a Halloween look for your portrait.',
+    subtitle: 'Choose a Christmas look for your portrait.',
     back: 'Back',
   },
   sceneSelect: {
     title: 'Choose your scene',
-    subtitle: 'Pick the Halloween backdrop for your group',
+    subtitle: 'Pick the Christmas backdrop for your group',
     back: 'Back',
   },
   boothMode: {
@@ -847,9 +847,9 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     defaultLabel: 'Classic photo',
     defaultHint: 'Capture the moment, just as you are.',
     aiPortraitLabel: 'AI portrait',
-    aiPortraitHint: 'See yourself as a Halloween character.',
+    aiPortraitHint: 'See yourself as a Christmas character.',
     sceneLabel: 'Custom Backdrops',
-    sceneHint: 'Give your group photo a Halloween setting.',
+    sceneHint: 'Give your group photo a Christmas setting.',
     magnetNote: 'Ask our team about photo prints and glow magnets.',
     physicalLabel: 'Glow magnet',
     physicalHint: 'Create a keepsake photo magnet.',

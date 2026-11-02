@@ -1,11 +1,11 @@
 {
   "version": 1,
   "scene": "evil-dead-cabin",
-  "displayName": "Cabin in the Woods",
+  "displayName": "Fireside Lodge",
+  "baseSha256": "48871186134552ff796a055a38b231a3cbde2ad749cca95b3e8e4dafc31f0160",
   "variants": {
     "close": "depths/evil-dead-cabin/close.webp",
     "medium": "depths/evil-dead-cabin/medium.webp",
     "wide": "depths/evil-dead-cabin/wide.webp"
-  },
-  "baseSha256": "575132dca187c11cfc043787447b669b10a8e11162fb334ede366af42e539a9e"
+  }
 }

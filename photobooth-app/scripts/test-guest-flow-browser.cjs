@@ -3,6 +3,7 @@ const {chromium}=require('C:/Users/Unity/.cache/codex-runtimes/codex-primary-run
 const root=path.resolve(__dirname,'..'),qa=path.resolve(root,'../builds/ai-flow-qa');
 const config=JSON.parse(fs.readFileSync(path.join(root,'config/photobooth-config.default.json')));
 delete config.openAiApiKey;delete config.adminPin;
+const frameFixture='data:image/png;base64,'+fs.readFileSync(path.join(root,'config/photo-frames/halloween-haunt.png')).toString('base64');
 const fixture='data:image/png;base64,'+fs.readFileSync(path.join(qa,'family-kids.png')).toString('base64');
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,'http://localhost');let base=path.join(root,'dist/photobooth-app/browser'),rel=url.pathname;
@@ -16,13 +17,14 @@ const server=http.createServer((req,res)=>{
  try{
  for(const c of [{id:'ai-retake',kind:'ai',pipeline:'scene',retake:true},{id:'standard-no-frame',kind:'standard',frame:false},{id:'standard-frame',kind:'standard',frame:true},{id:'scene-preview',kind:'ai',pipeline:'scene'},{id:'portrait-preview',kind:'ai',pipeline:'head-swap'},{id:'scene-tablet',kind:'ai',pipeline:'scene',skip:true},{id:'portrait-tablet',kind:'ai',pipeline:'head-swap',skip:true},{id:'ai-retry',kind:'ai',pipeline:'scene',fail:true}]){
   const page=await browser.newPage({viewport:{width:1366,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.addInitScript(({config,fixture,c})=>{
-   const cfg={...config,openAiConfigured:true,aiGenerationEnabled:true,activeThemeId:'halloween',gallery:{enabled:true,apiBaseUrl:'https://example.test',uploadToken:'test-only',uploadOriginal:true,uploadAi:true,uploadFramed:true,uploadPhysical:true},debug:{enabled:false},print:{enabled:true},guestModes:{physicalFrameEnabled:true},guestFlow:{skipAiPreviewToThanks:!!c.skip,thanksAutoReturnSec:0},photoFrames:{enabled:c.frame!==false,autoApplyFrame:true,defaultFrameFile:'test.png',guestFrameFiles:['test.png'],photoScale:1},aiModes:[{id:'test-ai',label:'Halloween',prompt:'test',pipeline:c.pipeline||'scene',useInpainting:true,enabled:true}]};
+  await page.addInitScript(({config,fixture,frameFixture,c})=>{
+   const cfg={...config,openAiConfigured:true,aiGenerationEnabled:true,activeThemeId:config.activeThemeId,gallery:{enabled:true,apiBaseUrl:'https://example.test',uploadToken:'test-only',uploadOriginal:true,uploadAi:true,uploadFramed:true,uploadPhysical:true},debug:{enabled:false},print:{enabled:true},guestModes:{physicalFrameEnabled:true},guestFlow:{skipAiPreviewToThanks:!!c.skip,thanksAutoReturnSec:0},photoFrames:{enabled:c.frame!==false,autoApplyFrame:true,defaultFrameFile:'test.png',guestFrameFiles:['test.png'],photoScale:1},aiModes:[{id:'test-ai',label:'Halloween',prompt:'test',pipeline:c.pipeline||'scene',useInpainting:true,enabled:true}]};
    window.calls=[];window.saved={};
    history.replaceState({path:'C:/capture/test.jpg',kind:c.kind,modeId:'test-ai'},'',location.pathname+'#/prepare');
    window.pbApi={
-    adminGetConfig:async()=>({ok:true,config:cfg}),adminGetThemeStylesheetUrl:async()=>({ok:true,url:'/themes/halloween/styles.css'}),
+    adminGetConfig:async()=>({ok:true,config:cfg}),adminGetThemeStylesheetUrl:async()=>({ok:true,url:'/themes/'+config.activeThemeId+'/styles.css'}),
     readFileBase64:async p=>window.saved[p]||fixture,
+    photoFramePreview:async()=>({ok:true,url:frameFixture,hole:{left:48,top:48,width:1704,height:992}}),
     listPhotoFrames:async()=>({ok:true,frames:[{filename:'test.png',label:'Halloween',orientation:'landscape'}]}),
     saveJpeg:async(p,b)=>{window.calls.push(['save',p]);window.saved[p]='data:image/jpeg;base64,'+b;return {ok:true,path:p};},
     applyPhotoFrame:async p=>{window.calls.push(['frame',p]);return {ok:true,path:'C:/capture/test_crop_framed.png'};},
@@ -32,7 +34,7 @@ const server=http.createServer((req,res)=>{
     printPhoto:async p=>{window.calls.push(['print',p]);return {ok:true};},
     log:async()=>({ok:true}),cameraInvoke:async()=>({ok:true}),
    };
-  },{config,fixture,c});
+  },{config,fixture,frameFixture,c});
   await page.goto(url);await page.getByRole('heading',{name:c.kind==='standard'?'Adjust your photo':'Check your photo'}).waitFor().catch(async e=>{if(!c.skip)throw e;});
   if(c.kind==='standard'){
    await page.getByRole('button',{name:'Use this photo'}).waitFor();
@@ -66,14 +68,14 @@ const server=http.createServer((req,res)=>{
     await page.getByRole('button',{name:'Create sheet',exact:true}).click();
     await page.getByRole('button',{name:'Print magnet sheet',exact:true}).click();
     const magnetCalls=await page.evaluate(()=>window.calls);
-    assert.equal(magnetCalls.find(x=>x[0]==='magnet')[1].imagePath,'C:/capture/test_crop_framed.png');
+    assert.equal(magnetCalls.find(x=>x[0]==='magnet')[1].imagePath,'C:/capture/test_crop.jpg');
     assert.equal(magnetCalls.filter(x=>x[0]==='print').at(-1)[1].layoutMode,'physicalFrame');
    }
   }
   await page.screenshot({path:path.join(qa,'flow-'+c.id+'-final.png')});
   const calls=await page.evaluate(()=>window.calls);
   if(c.kind==='standard'){assert.equal(calls.filter(x=>x[0]==='ai').length,0);assert.equal(calls.filter(x=>x[0]==='frame').length,c.frame?1:0);}
-  else{assert.equal(calls.filter(x=>x[0]==='ai').length,c.fail?2:1);assert.equal(calls.find(x=>x[0]==='ai')[1].imagePath,'C:/capture/test.jpg');}
+  else{assert.equal(calls.filter(x=>x[0]==='ai').length,c.fail?2:1);assert.equal(calls.find(x=>x[0]==='ai')[1].imagePath,c.pipeline==='scene'?'C:/capture/test_crop.jpg':'C:/capture/test.jpg');}
   assert.deepEqual(errors,[]);results.push({case:c.id,pass:true});console.log('PASS',c.id);
   if(c.id==='standard-frame'){
    await page.setViewportSize({width:768,height:1024});await page.screenshot({path:path.join(qa,'flow-tablet-result.png')});

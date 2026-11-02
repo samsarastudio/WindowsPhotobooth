@@ -1,10 +1,10 @@
 {
   "id": "witch",
-  "label": "Witch",
+  "label": "Christmas Elf",
   "face": {
-    "xPercent": 39,
-    "yPercent": 30,
-    "widthPercent": 22,
-    "heightPercent": 21
+    "xPercent": 38.28081384197854,
+    "yPercent": 15.654797552778984,
+    "widthPercent": 23.675840201060307,
+    "heightPercent": 20.668349566549725
   }
 }

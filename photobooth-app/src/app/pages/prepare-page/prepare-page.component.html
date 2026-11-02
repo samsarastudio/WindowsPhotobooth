@@ -1,6 +1,6 @@
 <main class="pb-page pb-prepare">
  <section class="pb-kiosk-surface prepare-card" [class.processing]="kind()==='ai' && approved()" [class.scene-crop]="sceneCrop() && !approved()">
-  <p class="eyebrow">{{ kind()==='ai' ? 'A little Halloween magic' : 'Make it yours' }}</p>
+  <p class="eyebrow">{{ kind()==='ai' ? 'A little Christmas magic' : 'Make it yours' }}</p>
   <h1>{{ kind()==='ai' ? (error() ? 'Let’s try that again' : approved() ? 'Creating your photo' : 'Check your photo') : 'Adjust your photo' }}</h1>
   <p class="lead">{{ kind()==='ai' ? (approved() ? 'Your photo will appear here when it’s ready.' : 'Check that everyone is clear and in focus. Retake if needed, or use this photo to start AI processing.') : 'Keep everyone in the picture. Adjust the crop, then continue.' }}</p>
   <canvas #preview [hidden]="!ready() || (kind()==='ai' && approved())" aria-label="Drag photo to adjust crop" (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)" (pointercancel)="onPointerUp($event)"></canvas>
@@ -15,7 +15,7 @@
   }
   @if(kind()==='ai' && busy()){
    <div class="progress-orbit" aria-hidden="true"></div>
-   <p role="status" aria-live="polite">Finishing your Halloween photo…</p>
+   <p role="status" aria-live="polite">Finishing your Christmas photo…</p>
    <p class="muted">{{elapsed()}} seconds elapsed · Please stay on this screen</p>
   }
   @if(error()){<p class="error" role="alert">{{error()}}</p>}

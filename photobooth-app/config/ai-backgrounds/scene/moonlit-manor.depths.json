@@ -1,11 +1,11 @@
 {
   "version": 1,
   "scene": "moonlit-manor",
-  "displayName": "Enchanted Harvest Garden",
+  "displayName": "Elf Village",
+  "baseSha256": "9ff7a0581028c326f6734bfa44125af0eec839def502880ee17d34044d86b8c8",
   "variants": {
     "close": "depths/moonlit-manor/close.png",
     "medium": "depths/moonlit-manor/medium.png",
     "wide": "depths/moonlit-manor/wide.png"
-  },
-  "baseSha256": "581f0036ba8027c8e75cc1b9e51270a9648ca6a04868814f355bf324722c47be"
+  }
 }

@@ -39,10 +39,11 @@ async function subjectMask(image, modelPath) {
   return alpha;
 }
 
-async function replaceBackground(source, background, modelPath) {
+async function replaceBackground(source, background, modelPath, preparedAlpha) {
   const normalized = await sharp(source).rotate().removeAlpha().png().toBuffer();
   const { width, height } = await sharp(normalized).metadata();
-  const alpha = await subjectMask(normalized, modelPath);
+  const alpha = preparedAlpha || await subjectMask(normalized, modelPath);
+  if (alpha.length !== width * height) throw new Error('Subject mask dimensions do not match the photograph.');
   const sourceRgb = await sharp(normalized).raw().toBuffer();
   const foregroundRgb = /birefnet/i.test(modelPath) ? removeEdgeSpill(sourceRgb, alpha, width, height) : sourceRgb;
   const plate = await sharp(background).rotate().resize(width, height, { fit: 'cover', position: 'centre' }).removeAlpha().png().toBuffer();

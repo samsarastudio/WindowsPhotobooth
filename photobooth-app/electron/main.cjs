@@ -532,7 +532,7 @@ async function prepareFrameOverlay(sharpMod, framePath) {
 
   const hasUsableAlpha = meta.hasAlpha === true && alphaHoles > total * 0.05;
   if (hasUsableAlpha) {
-    // The shipped Halloween overlays contain an opaque black matte beyond
+    // The shipped Christmas overlays contain an opaque black matte beyond
     // their rectangular alpha window. Key only those exact legacy assets;
     // custom transparent frames must retain all their original artwork.
     const stockMattes = new Set([
@@ -1623,11 +1623,11 @@ function buildEditPrompt(rawPrompt, options = {}) {
   const suffixParts = [];
   if (pipeline === 'head-swap') {
     suffixParts.push(
-      "Image 1 is the Halloween character scene to edit (head region only, per mask). Image 2 (guest-face.png) is the guest IDENTITY reference — copy that person exactly. CRITICAL IDENTITY LOCK: preserve exact facial features, skin tone, eye shape/color, nose, lips, jawline, freckles, wrinkles, and all facial hair exactly as in image 2. Match hair from image 2. NATURAL HEAD SIZE: match the original character head size relative to the shoulders — do not enlarge, shrink oddly, or float the head higher. ANATOMY (portrait-critical): keep a natural short adult neck. Chin must sit immediately above / nestled into the costume collar with almost no visible throat gap — never elongate, stretch, or float the head. Softly blend only that short neck into the collar. Completely remove the old character head/hair with no oval outline, halo, or mask ring. Keep the costume body, pose, props, and scene identical to image 1. NEVER alter the guest face.",
+      "Image 1 is the Christmas character scene to edit (head region only, per mask). Image 2 (guest-face.png) is the guest IDENTITY reference — copy that person exactly. CRITICAL IDENTITY LOCK: preserve exact facial features, skin tone, eye shape/color, nose, lips, jawline, freckles, wrinkles, and all facial hair exactly as in image 2. Match hair from image 2. NATURAL HEAD SIZE: match the original character head size relative to the shoulders — do not enlarge, shrink oddly, or float the head higher. ANATOMY (portrait-critical): keep a natural short adult neck. Chin must sit immediately above / nestled into the costume collar with almost no visible throat gap — never elongate, stretch, or float the head. Softly blend only that short neck into the collar. Completely remove the old character head/hair with no oval outline, halo, or mask ring. Keep the costume body, pose, props, and scene identical to image 1. NEVER alter the guest face.",
     );
   } else if (inpainting || pipeline === 'scene') {
     suffixParts.push(
-      'BLEND ONLY — do not regenerate people. Preserve every guest exactly as placed: faces, bodies, arms, legs, feet, clothing, pose, and count. NEVER invent extra legs, limbs, torsos, or people. Only replace the indoor booth/room background around them with Halloween scenery. Softly match lighting on clothing edges. Photorealistic.',
+      'BLEND ONLY — do not regenerate people. Preserve every guest exactly as placed: faces, bodies, arms, legs, feet, clothing, pose, and count. NEVER invent extra legs, limbs, torsos, or people. Only replace the indoor booth/room background around them with Christmas scenery. Softly match lighting on clothing edges. Photorealistic.',
     );
   } else {
     suffixParts.push(
@@ -2533,7 +2533,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
     const outPath = path.join(dir, `${base}_ai.png`);
     fs.writeFileSync(rawPath, outBuf);
 
-    // HauntBooth: wrap AI result in matching Halloween frame (portrait vs landscape).
+    // MerryBooth: wrap AI result in matching Christmas frame (portrait vs landscape).
     const pf = loadMergedConfig().photoFrames || {};
     const frameName = isPortraitOut
       ? pf.defaultPortraitFrameFile || 'halloween-haunt-portrait.png'

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="450" viewBox="0 0 1200 450">
+<rect width="1200" height="450" rx="24" fill="#10352b"/>
+<g fill="none" stroke="#dfc18b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+<rect x="120" y="58" width="160" height="238" rx="22"/><path d="M168 80h64M184 274h32"/>
+<path d="M151 118h37v37h-37zM213 118h37v37h-37zM151 180h37v37h-37zM213 180h15v15h22v22h-37z"/>
+<path d="M477 84h246v148H477zM554 147h92v68h-92"/><ellipse cx="600" cy="230" rx="82" ry="15"/><path d="M524 233l24 73h104l24-73M549 240l26 66M576 243l26 63M603 244l27 62M629 242l24 46"/>
+<path d="M357 204h43m-16-16 17 16-17 16M757 204h43m-16-16 17 16-17 16"/>
+<rect x="865" y="98" width="270" height="190" rx="6"/><path d="m887 260 56-62 42 33 45-59 83 88M900 126h200"/>
+</g>
+<g fill="#f8f1e3" font-family="Segoe UI,Arial,sans-serif" font-size="32" font-weight="600" text-anchor="middle"><text x="200" y="375">1 · Scan your QR</text><text x="600" y="375">2 · Play &amp; score</text><text x="1000" y="375">3 · Your photo</text></g>
+</svg>

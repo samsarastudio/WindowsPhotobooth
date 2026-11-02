@@ -107,7 +107,7 @@ export function publicHalloweenMeta() {
   }
   return {
     ok: true,
-    brand: 'HauntBooth',
+    brand: 'MerryBooth',
     assetVersion,
     samples: SAMPLE_DEFS.map((s) => ({
       id: s.id,

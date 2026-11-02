@@ -1,11 +1,11 @@
 {
   "version": 1,
   "scene": "graveyard",
-  "displayName": "Blood Moon Graveyard",
+  "displayName": "Northern Lights",
+  "baseSha256": "41588d2002399e6c0e6491a2d40cbf879052c501ada69259eb28309f408dc4f6",
   "variants": {
     "close": "depths/graveyard/close.webp",
     "medium": "depths/graveyard/medium.webp",
     "wide": "depths/graveyard/wide.webp"
-  },
-  "baseSha256": "5ba721ebc421f3c738a3c780c44fb6e10c4569d088ca17c567962c8244ae79a1"
+  }
 }
