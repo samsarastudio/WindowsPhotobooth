@@ -5,14 +5,15 @@ from functools import lru_cache
 import json, math, subprocess, sys
 ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'output/christmas/marketing'; OUT.mkdir(parents=True,exist_ok=True)
-SAMPLES=ROOT/'output/christmas/samples-depth'
-ROWS=json.loads((SAMPLES/'report.json').read_text())['results']
+SAMPLES=ROOT/'output/christmas/samples-centered'
+ROWS=json.loads((SAMPLES/'report.json').read_text(encoding='utf-8'))['results']
 GOLD=(150,36,48); WHITE=(44,35,36); GREEN=(250,241,229)
 @lru_cache(None)
 def font(n,bold=False):return ImageFont.truetype('C:/Windows/Fonts/'+('segoeuib.ttf' if bold else 'segoeui.ttf'),n)
 @lru_cache(None)
 def pic(depth,scene,kind='framed'):
-    row=next(x for x in ROWS if x['depth']==depth and x['scene']==scene)
+    # Each setting owns a unique centered capture; optical depth is selected by the app.
+    row=next(x for x in ROWS if x['scene']==scene)
     return Image.open(row[kind]).convert('RGB')
 def text(im,xy,s,size=50,color=WHITE,bold=False,maxwidth=None):
     while maxwidth and font(size,bold).getlength(s)>maxwidth:size-=1
@@ -55,14 +56,14 @@ def scene_frame(t,v):
         text(im,(p,1460 if v else 980),'NO GREEN SCREEN NEEDED',31,GOLD,True)
     elif t<10:
         u=t-5;heading(im,'10 festive|destinations.' if v else '10 festive destinations.','North Pole. Christmas Express. And more.',v)
-        choices=[('wide','haunted-crypt'),('medium','moonlit-manor'),('close','graveyard'),('wide','zombie-gates')]
-        k=min(3,int(u/1.25));dep,sc=choices[k]
+        choices=[('wide','haunted-crypt'),('medium','moonlit-manor'),('close','graveyard'),('wide','zombie-gates'),('medium','manor-gates'),('medium','vampire-candlelit-ballroom'),('medium','haunted-harvest-carnival'),('medium','pumpkin-patch'),('close','witch-lantern-garden'),('wide','evil-dead-cabin')]
+        k=min(4,int(u))*2;dep,sc=choices[k]
         if v:
-            photo(im,pic(dep,sc),(60,500,960,640));photo(im,pic(*choices[(k+1)%4]),(200,1190,680,454))
+            photo(im,pic(dep,sc),(60,500,960,640));photo(im,pic(*choices[k+1]),(200,1190,680,454))
         else:
-            photo(im,pic(dep,sc),(80,350,850,567));photo(im,pic(*choices[(k+1)%4]),(990,350,850,567))
-        label=next(x['label'] for x in ROWS if x['scene']==sc)
-        text(im,(p,1700 if v else 960),label,36,GOLD,True)
+            photo(im,pic(dep,sc),(80,350,850,567));photo(im,pic(*choices[k+1]),(990,350,850,567))
+        label=' / '.join(next(x['label'] for x in ROWS if x['scene']==scene) for scene in [sc,choices[k+1][1]])
+        text(im,(p,1700 if v else 960),label,36,GOLD,True,maxwidth=w-2*p)
     elif t<15:
         heading(im,'Framed for|the season.' if v else 'Framed for the season.','Festive photo frames for every Christmas smile.',v)
         if v:
@@ -115,7 +116,7 @@ if __name__=='__main__':
     sheet.save(OUT/f'30s-{name}-storyboard.jpg',quality=94)
     if '--preview' in sys.argv:sys.exit()
     w,h=(1080,1920) if v else (1920,1080)
-    target=OUT/f'InMoment-Christmas-{name}-30s-1080p.mp4'
+    target=OUT/f'InMoment-Christmas-{name}-30s-centered-1080p.mp4'
     cmd=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{w}x{h}','-r','30','-i','-','-i',str(OUT/'original-christmas-score.wav'),'-t','30','-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-af','afade=t=out:st=28:d=2,loudnorm=I=-16:TP=-1.5:LRA=8','-ar','48000','-movflags','+faststart',str(target)]
     enc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     for n in range(900):
