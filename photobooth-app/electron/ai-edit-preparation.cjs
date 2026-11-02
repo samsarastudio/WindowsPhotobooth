@@ -8,19 +8,6 @@ const {resolveDepthBackground}=require('./background-depth.cjs');
 async function prepareScene(source,background,modelDir) {
   let original=await sharp(source).rotate().resize(1536,1024,{fit:'cover',position:'centre'}).removeAlpha().png().toBuffer();
   let faces=await detectFaces(original,path.join(modelDir,'yunet.onnx'));
-  const modelPath=path.join(modelDir,'birefnet-lite.onnx');
-  let alpha=await subjectMask(original,modelPath);
-  // Frame the guests first. Cropping a completed composite also crops away the
-  // physical arch and incorrectly keeps the pre-crop background distance.
-  let crop=/_crop\.(?:jpe?g|png)$/i.test(String(source)) ? null : require('./subject-framing.cjs').subjectCrop(alpha,1536,1024);
-  // Protect every detected head, including shorter children below the tallest
-  // silhouette band used by subjectCrop. A safe wider photo beats a clipped face.
-  if(crop && faces.some(f=>f.x<crop.left || f.y<crop.top || f.x+f.w>crop.left+crop.width || f.y+f.h>crop.top+crop.height)) crop=null;
-  if(crop){
-    original=await sharp(original).extract(crop).resize(1536,1024).png().toBuffer();
-    alpha=await sharp(alpha,{raw:{width:1536,height:1024,channels:1}}).extract(crop).resize(1536,1024).greyscale().raw().toBuffer();
-    faces=faces.map(f=>({...f,x:(f.x-crop.left)*1536/crop.width,y:(f.y-crop.top)*1024/crop.height,w:f.w*1536/crop.width,h:f.h*1024/crop.height}));
-  }
   // Costumes and full-face masks are valid subjects; segmentation does not require a human face.
   const faceRatio=faces.length ? faces.reduce((sum,f)=>sum+f.w/1536,0)/faces.length : .15;
   // Optical depth treatment, without changing the chosen scene's geometry/artwork.
@@ -29,7 +16,14 @@ async function prepareScene(source,background,modelDir) {
   let plate=sharp(selected.path).rotate().resize(1536,1024,{fit:'cover'});
   if(blur>0)plate=plate.blur(blur);
   let reference=await plate.png().toBuffer();
-  const composed=await replaceBackground(original,reference,modelPath,alpha);
+  const composed=await replaceBackground(original,reference,path.join(modelDir,'birefnet-lite.onnx'));
+  // A guest-approved source crop must not be automatically reframed again.
+  const crop=/_crop\.(?:jpe?g|png)$/i.test(String(source)) ? null : require('./subject-framing.cjs').subjectCrop(composed.alpha,1536,1024);
+  if(crop){
+    const reframe=buf=>sharp(buf).extract(crop).resize(1536,1024).png().toBuffer();
+    [original,reference,composed.output]=await Promise.all([reframe(original),reframe(reference),reframe(composed.output)]);
+    for(const key of ['alpha','lightingWeights','faceProtection']) composed[key]=await sharp(composed[key],{raw:{width:1536,height:1024,channels:1}}).extract(crop).resize(1536,1024).raw().toBuffer();
+  }
   // Scene replacement never exposes guest pixels to a generative image editor.
   return {image:composed.output,original,reference,alpha:composed.alpha,lightingWeights:composed.lightingWeights,faceProtection:composed.faceProtection,crop,blur,depth:selected.depth,backgroundPath:selected.path,
     width:1536,height:1024,strictScene:true,model:'birefnet-lite'};

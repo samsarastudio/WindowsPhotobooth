@@ -77,7 +77,9 @@ export class GalleryUploadService implements OnDestroy {
           apiBaseUrl,
           uploadToken: undefined,
           pushLocal: false,
-          pruneLocal: true,
+          // Background refresh must retain bundled event frames. Only the
+          // explicit admin library-sync action may prune local-only files.
+          pruneLocal: false,
           timeoutMs: 20000,
         });
         if (r.ok) {

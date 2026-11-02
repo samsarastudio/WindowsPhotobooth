@@ -4083,7 +4083,9 @@ async function syncFramesOnStartup() {
     apiBaseUrl: g.apiBaseUrl,
     uploadToken: undefined,
     pushLocal: false,
-    pruneLocal: true,
+    // Automatic refresh must not remove bundled/configured frames merely
+    // because Moments has a different library. Pruning stays an admin action.
+    pruneLocal: false,
     timeoutMs: 20000,
   });
   if (r.ok) {
