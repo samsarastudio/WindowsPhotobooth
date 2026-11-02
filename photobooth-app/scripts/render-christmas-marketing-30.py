@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'output/christmas/marketing'; OUT.mkdir(parents=True,exist_ok=True)
 SAMPLES=ROOT/'output/christmas/samples-depth'
 ROWS=json.loads((SAMPLES/'report.json').read_text())['results']
-GOLD=(234,198,133); WHITE=(252,247,233); GREEN=(7,33,28)
+GOLD=(150,36,48); WHITE=(44,35,36); GREEN=(250,241,229)
 @lru_cache(None)
 def font(n,bold=False):return ImageFont.truetype('C:/Windows/Fonts/'+('segoeuib.ttf' if bold else 'segoeui.ttf'),n)
 @lru_cache(None)
@@ -22,11 +22,16 @@ def photo(im,p,box):
     # Preserve the complete photograph and center it in its assigned layout slot.
     x,y,w,h=map(int,box);tile=ImageOps.contain(p,(w,h),Image.Resampling.LANCZOS)
     im.paste(tile,(x+(w-tile.width)//2,y+(h-tile.height)//2))
+@lru_cache(2)
+def festive_background(w,h):
+    source=Image.open(ROOT/'photobooth-app/themes/christmas/artwork/marketing-champagne-background.png').convert('RGB')
+    return ImageOps.fit(source,(w+32,h+32),Image.Resampling.LANCZOS,centering=(.88 if h>w else .5,.5))
 def layout(t,v):
-    w,h=(1080,1920) if v else (1920,1080);im=Image.new('RGB',(w,h),GREEN);d=ImageDraw.Draw(im)
-    for n in range(44):
-        x=(n*131.1+math.sin(t*.3+n)*15)%w;y=(n*179.7+t*(8+n%5))%h
-        d.ellipse((x,y,x+2+n%3,y+2+n%3),fill=(87,97,73))
+    w,h=(1080,1920) if v else (1920,1080)
+    bg=festive_background(w,h)
+    # Slow optical drift keeps the festive surroundings alive; photos stay fixed and centered.
+    ox=16+int(12*math.sin(t*.19));oy=16+int(10*math.cos(t*.15))
+    im=bg.crop((ox,oy,ox+w,oy+h));d=ImageDraw.Draw(im)
     pad=64 if v else 80
     text(im,(pad,40),'I N M O M E N T',24,GOLD,True)
     text(im,(pad,h-66),'inmomentservices.com',25,GOLD)
@@ -84,7 +89,7 @@ def scene_frame(t,v):
         heading(im,'Scan. Save.|Share the joy.' if v else 'Scan. Save. Share the joy.','Digital photos delivered by QR code.',v)
         photo(im,pic('medium','moonlit-manor'),(60,520,960,640) if v else (240,340,900,600))
         x,y,pw,ph=(330,1220,420,500) if v else (1320,340,360,600)
-        d.rounded_rectangle((x,y,x+pw,y+ph),35,fill=(32,43,38),outline=GOLD,width=4)
+        d.rounded_rectangle((x,y,x+pw,y+ph),35,fill=(255,249,240),outline=GOLD,width=4)
         photo(im,pic('close','graveyard'),(x+15,y+55,pw-30,(pw-30)*2/3))
         text(im,(x+25,y+ph-110),'YOUR PHOTO',26,GOLD,True,maxwidth=pw-50)
         text(im,(x+25,y+ph-65),'Ready to share',23,WHITE,maxwidth=pw-50)
