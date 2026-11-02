@@ -2,7 +2,7 @@
   "version": 1,
   "scene": "zombie-gates",
   "displayName": "Gingerbread Cottage",
-  "baseSha256": "45952ec4e52f1c9ac41ca8a1af4376088b3ce9ab16800dba8257c8245b0eb070",
+  "baseSha256": "1bd226f6e3e5e7f1770a9fad193a784586ef0a86ab8fe2f914020af52170800d",
   "variants": {
     "close": "depths/zombie-gates/close.webp",
     "medium": "depths/zombie-gates/medium.webp",

@@ -27,3 +27,14 @@ assert(fs.existsSync(path.join(config,'.ota-backups/1.2.0-christmas/photobooth-c
 christmas.branding.brandName='Custom Christmas Event';fs.writeFileSync(path.join(config,'photobooth-config.json'),JSON.stringify(christmas));
 applyReleaseProfile(bundle,config);assert.equal(JSON.parse(fs.readFileSync(path.join(config,'photobooth-config.json'))).branding.brandName,'Custom Christmas Event');
 console.log('PASS Christmas migration: theme, stock branding, backup, credentials, identity and idempotency');
+
+fs.writeFileSync(path.join(bundle,'release-profile.json'),JSON.stringify({...christmasProfile,version:'1.2.2-christmas'}));
+fs.writeFileSync(path.join(bundle,'ai-backgrounds/scene/scene.png'),'distinct-depth-art');
+applyReleaseProfile(bundle,config);
+const revised=JSON.parse(fs.readFileSync(path.join(config,'photobooth-config.json')));
+assert.equal(fs.readFileSync(path.join(config,'ai-backgrounds/scene/scene.png'),'utf8'),'distinct-depth-art');
+assert.equal(revised.branding.brandName,'Custom Christmas Event');
+for(const key of ['gallery','adminPin','print','camera','guestFlow'])assert.deepEqual(revised[key],christmas[key]);
+assert(fs.existsSync(path.join(config,'.ota-backups/1.2.2-christmas/ai-backgrounds/scene/scene.png')));
+assert(fs.existsSync(path.join(config,'ai-backgrounds/scene/custom.png')));
+console.log('PASS 1.2.2 upgrades existing Christmas artwork, backs up prior assets and preserves operator settings');

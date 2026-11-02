@@ -2,7 +2,7 @@
   "version": 1,
   "scene": "graveyard",
   "displayName": "Northern Lights",
-  "baseSha256": "41588d2002399e6c0e6491a2d40cbf879052c501ada69259eb28309f408dc4f6",
+  "baseSha256": "b2640590b403d54453772d285c6d5c4fec4299b2d29435377b29060e97ae77e1",
   "variants": {
     "close": "depths/graveyard/close.webp",
     "medium": "depths/graveyard/medium.webp",

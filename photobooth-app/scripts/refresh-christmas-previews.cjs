@@ -5,12 +5,12 @@ async function framed(source,portrait=false){const w=portrait?1200:1800,h=portra
 (async()=>{
  const classic=await framed(path.join(samples,'scene-original.png'));
  fs.writeFileSync(path.join(root,'photobooth-app/public/christmas/classic.png'),classic);
- const scene=await framed(path.join(root,'output/christmas/qa/family-pumpkin-patch.png'));
+ const scene=await framed(path.join(root,'output/christmas/samples-depth/medium-pumpkin-patch.png'));
  fs.writeFileSync(path.join(samples,'scene-ai.png'),scene);
  const portrait=await framed(path.join(root,'photobooth-app/config/compositions/vampire/composition.png'),true);
  fs.writeFileSync(path.join(samples,'portrait-ai.png'),portrait);
- for(const [name,source]of [['curtain-group-manor-gates-20261028.jpg','family-pumpkin-patch.png'],['curtain-group-zombie-gates-20261028.jpg','family-haunted-crypt.png'],['curtain-couple-graveyard-20261028.jpg','family-moonlit-manor.png'],['curtain-couple-evil-dead-cabin-20261028.jpg','family-pumpkin-patch.png']]){
-  const image=await framed(path.join(root,'output/christmas/qa',source));await sharp(image).resize(720,480).jpeg({quality:90}).toFile(path.join(samples,name));
+ for(const [name,source]of [['curtain-group-manor-gates-20261028.jpg','wide-manor-gates.png'],['curtain-group-zombie-gates-20261028.jpg','wide-haunted-crypt.png'],['curtain-couple-graveyard-20261028.jpg','medium-moonlit-manor.png'],['curtain-couple-evil-dead-cabin-20261028.jpg','medium-evil-dead-cabin.png']]){
+  const image=await framed(path.join(root,'output/christmas/samples-depth',source));await sharp(image).resize(720,480).jpeg({quality:90}).toFile(path.join(samples,name));
  }
  await sharp(scene).resize(720,480).webp({quality:88}).toFile(path.join(samples,'game-postcard-family.webp'));
  await sharp(classic).resize(720,480).webp({quality:88}).toFile(path.join(samples,'game-postcard-solo.webp'));

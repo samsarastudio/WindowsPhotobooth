@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scene": "haunted-crypt",
-  "displayName": "Santa’s Sleigh",
-  "baseSha256": "e4acb21269136951f8158fd472f41329dbf46b9dc75f380c2535935f34e40b70",
+  "displayName": "North Pole",
+  "baseSha256": "2d9889c1e9ead549872ec28025696aadae5e0a9d106255d3be20c15035e4e87e",
   "variants": {
     "close": "depths/haunted-crypt/close.png",
     "medium": "depths/haunted-crypt/medium.png",

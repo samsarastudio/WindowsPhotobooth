@@ -2,7 +2,7 @@
   "version": 1,
   "scene": "pumpkin-patch",
   "displayName": "Santa’s Workshop",
-  "baseSha256": "b2ca77c614b493ae38d756d28fbeea21c4e5c7b1de121912c872c929e64b9244",
+  "baseSha256": "11eed897679efbb0f80b42275966a36dbd0b01f970ccbde7815d87a786df2c53",
   "variants": {
     "close": "depths/pumpkin-patch/close.png",
     "medium": "depths/pumpkin-patch/medium.png",

@@ -1,8 +1,8 @@
 {
   "version": 1,
   "scene": "moonlit-manor",
-  "displayName": "Elf Village",
-  "baseSha256": "9ff7a0581028c326f6734bfa44125af0eec839def502880ee17d34044d86b8c8",
+  "displayName": "Christmas Express",
+  "baseSha256": "fe1b7bb65677f1916fe599d88c8d77e0b301d1f5a3eb4f971ffe07440c8c6d3f",
   "variants": {
     "close": "depths/moonlit-manor/close.png",
     "medium": "depths/moonlit-manor/medium.png",

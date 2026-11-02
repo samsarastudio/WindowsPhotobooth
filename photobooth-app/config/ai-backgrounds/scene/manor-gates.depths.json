@@ -2,7 +2,7 @@
   "version": 1,
   "scene": "manor-gates",
   "displayName": "Winter Palace",
-  "baseSha256": "3170a29082106db57840325fc6c51b06fd1fb80584329dc36d62f21b6769914d",
+  "baseSha256": "97e59e9c8810777ec18e342cf2f1c766b56431b38cc985fa8009ae5ec60bbeed",
   "variants": {
     "close": "depths/manor-gates/close.webp",
     "medium": "depths/manor-gates/medium.webp",

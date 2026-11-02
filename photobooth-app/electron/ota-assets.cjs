@@ -28,7 +28,7 @@ function applyReleaseProfile(bundled, config) {
   const profilePath = path.join(bundled, 'release-profile.json');
   if (!fs.existsSync(profilePath)) return;
   const profile = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-  if (!['1.1.48', '1.1.53', '1.2.0-christmas'].includes(profile.version)) throw Error('Unsupported release profile');
+  if (!['1.1.48', '1.1.53', '1.2.0-christmas', '1.2.2-christmas'].includes(profile.version)) throw Error('Unsupported release profile');
   const marker = path.join(config, '.release-' + profile.version);
   if (fs.existsSync(marker)) return;
   const backup = path.join(config, '.ota-backups', profile.version);
@@ -58,7 +58,7 @@ function applyReleaseProfile(bundled, config) {
   for (const key of ['activeThemeId', 'aiModes', 'defaultAiModeId', 'aiGenerationEnabled', 'guestModes', 'photoFrames', 'copy']) {
     if (profile.settings[key] !== undefined) settings[key] = profile.settings[key];
   }
-  if (profile.version === '1.2.0-christmas' && (!settings.branding?.brandName || settings.branding.brandName === 'HauntBooth')) {
+  if (profile.version.endsWith('-christmas') && (!settings.branding?.brandName || settings.branding.brandName === 'HauntBooth')) {
     settings.branding = { ...settings.branding, brandName: 'MerryBooth' };
   }
   if (typeof profile.settings.guestFlow?.skipAiPreviewToThanks === 'boolean') {
