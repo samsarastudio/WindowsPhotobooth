@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const SCENES = ['graveyard', 'evil-dead-cabin'];
+const SCENES = ['graveyard', 'evil-dead-cabin', 'manor-gates', 'zombie-gates'];
 function seedCinematicScenes(bundled, config) {
-  const marker = path.join(config, '.cinematic-scenes-v1');
+  const marker = path.join(config, '.cinematic-scenes-v3');
   if (fs.existsSync(marker)) return;
   const source = path.join(bundled, 'ai-backgrounds/scene');
   const target = path.join(config, 'ai-backgrounds/scene');

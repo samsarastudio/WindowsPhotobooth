@@ -228,7 +228,7 @@ export interface PhotoboothCopyBoothMode {
   /** AI portrait experience */
   aiPortraitLabel: string;
   aiPortraitHint: string;
-  /** Optional AI background */
+  /** Optional Custom Backdrops */
   sceneLabel: string;
   sceneHint: string;
   /** Note that magnet/physical is offered at the end of every path */
@@ -372,7 +372,7 @@ export const DJ_PROMPT_ONLY =
 export const NEWSPAPER_AI_PROMPT =
   'Create a newspaper cutting style front page with the main title exactly: HAPPENING NOW! Transform the person in the uploaded photo into a whimsical black-and-white vintage newspaper front page. Place them as the main portrait in the center, styled like an old engraved photograph. Preserve the overall scene framing from the source image (whole room/context), not a tighter zoom—only use a close portrait crop if the source is already cropped that way. Surround them with bold, exaggerated headline text, narrow newspaper columns, and playful subheadings. Use high-contrast black ink on pure white background, subtle paper texture, and classic serif fonts. Add quirky, magical or humorous headlines to create a charming, slightly surreal tone. Keep the layout dense, editorial, and reminiscent of an old fantasy newspaper. Ensure the subject\'s face remains recognizable but stylized to match the printed newspaper aesthetic.';
 
-/** AI background — keep cropped guests, paint Halloween scenery around them. */
+/** Custom Backdrops — keep cropped guests, paint Halloween scenery around them. */
 export const HALLOWEEN_SCENE_PROMPT =
   `Place the guests exactly as captured into this Halloween environment. Keep every face, body, arm, leg, foot, skin tone, hair, clothing, pose, and likeness 100% unchanged — never alter identity or invent extra limbs. Only invent cinematic Halloween scenery around them (fog, lanterns, autumn light). Match scene lighting on clothing edges only. Photorealistic event photo.`;
 
@@ -633,7 +633,7 @@ export const PHOTOBOOTH_DEFAULT_BRANDING: PhotoboothBranding = {
 export const PHOTOBOOTH_DEFAULT_AI_MODES: PhotoboothAiMode[] = [
   {
     id: 'scene',
-    label: 'AI background',
+    label: 'Custom Backdrops',
     prompt: HALLOWEEN_SCENE_PROMPT,
     useInpainting: true,
     randomizeBackground: false,
@@ -824,7 +824,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
   },
   aiMode: {
     title: 'Choose your photo style',
-    subtitle: 'Choose a classic photo, a character portrait, or an AI background.',
+    subtitle: 'Choose a classic photo, a character portrait, or a custom backdrop.',
     back: 'Back',
     plainPhotoLabel: 'Classic photo',
     portraitEntryLabel: 'AI Portrait',
@@ -848,7 +848,7 @@ export const PHOTOBOOTH_DEFAULT_COPY: PhotoboothCopy = {
     defaultHint: 'Capture the moment, just as you are.',
     aiPortraitLabel: 'AI portrait',
     aiPortraitHint: 'See yourself as a Halloween character.',
-    sceneLabel: 'AI background',
+    sceneLabel: 'Custom Backdrops',
     sceneHint: 'Give your group photo a Halloween setting.',
     magnetNote: 'Ask our team about photo prints and glow magnets.',
     physicalLabel: 'Glow magnet',

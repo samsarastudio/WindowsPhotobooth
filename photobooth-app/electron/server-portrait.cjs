@@ -24,7 +24,9 @@ async function generateServerPortrait({base,token,originalPhotoId,prepared,promp
  if(job.status!=='ready'||!job.photo?.url)throw Error(job.error||'Portrait generation failed on Moments.');
  const url=new URL(job.photo.url,base);if(url.origin!==new URL(base).origin)throw Error('Unexpected portrait download host');
  const response=await fetch(url,{signal:AbortSignal.timeout(60000)});if(!response.ok)throw Error('Portrait finished on Moments but could not download to kiosk. Check the tablet.');
- const buffer=Buffer.from(await response.arrayBuffer());await require('sharp')(buffer).metadata();fs.writeFileSync(outputPath,buffer);
+ const buffer=Buffer.from(await response.arrayBuffer());
+ // The server distributes JPEG; retain the local .png contract used by gallery/magnet routing.
+ const local=await require('sharp')(buffer).png().toBuffer();fs.writeFileSync(outputPath,local);
  return {ok:true,path:outputPath,model:job.model,pipeline:'head-swap',serverGenerated:true};
 }
 module.exports={generateServerPortrait,retrySubmission};

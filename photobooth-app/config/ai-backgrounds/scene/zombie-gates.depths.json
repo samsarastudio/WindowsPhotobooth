@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "zombie-gates",
+  "displayName": "Zombie Cemetery Gates",
+  "variants": {
+    "close": "depths/zombie-gates/close.webp",
+    "medium": "depths/zombie-gates/medium.webp",
+    "wide": "depths/zombie-gates/wide.webp"
+  },
+  "baseSha256": "1d72d72b8a1b15987d6a2f3171d96f750e2114ddd192d07ffae54a54ccae847d"
+}

@@ -3546,14 +3546,12 @@ async function uploadPhotoOnce(payload, signal) {
   if (!slug) return { ok: false, error: 'No session slug returned' };
 
   const FormData = require('form-data');
-  const buf = fs.readFileSync(abs);
-  const ext = path.extname(abs).toLowerCase();
-  const mime =
-    ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+  const upload = await require('./upload-photo.cjs').prepareUploadPhoto(abs);
+  const buf = upload.buffer;
   const form = new FormData();
   form.append('photo', buf, {
-    filename: path.basename(abs),
-    contentType: mime,
+    filename: upload.filename,
+    contentType: upload.contentType,
     knownLength: buf.length,
   });
   form.append('variant', variant);

@@ -85,7 +85,7 @@
   "aiModes": [
     {
       "id": "scene",
-      "label": "AI background",
+      "label": "Custom Backdrops",
       "pipeline": "scene",
       "useInpainting": true,
       "randomizeBackground": false,
@@ -248,7 +248,7 @@
     },
     "aiMode": {
       "title": "Choose your photo style",
-      "subtitle": "Choose a classic photo, a character portrait, or an AI background.",
+      "subtitle": "Choose a classic photo, a character portrait, or a custom backdrop.",
       "back": "Back",
       "plainPhotoLabel": "Classic photo",
       "portraitEntryLabel": "AI Portrait",

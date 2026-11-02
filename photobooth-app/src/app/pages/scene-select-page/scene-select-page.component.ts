@@ -63,6 +63,12 @@ export class SceneSelectPageComponent implements OnInit {
           label: b.displayName || this.labelFor(b.filename),
           url: b.url,
         }));
+      // Keep the home-screen manor as the seventh choice without dropping custom sets.
+      const manorIndex = items.findIndex((item) => item.filename === 'manor-gates.webp');
+      if (manorIndex >= 0) {
+        const [manor] = items.splice(manorIndex, 1);
+        items.splice(Math.min(6, items.length), 0, manor);
+      }
       this.scenes.set(items);
       const mode = this.booth.primaryAiModes().find((m) => m.id === modeId);
       if (items.length === 1) this.choose(items[0].filename);
