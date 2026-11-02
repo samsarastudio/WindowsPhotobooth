@@ -154,7 +154,7 @@ if __name__=='__main__':
     if '--preview' in sys.argv:sys.exit()
     if not (OUT/'original-christmas-score.wav').exists():score()
     w,h=(1080,1920) if vertical else (1920,1080)
-    cmd=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{w}x{h}','-r',str(FPS),'-i','-','-i',str(OUT/'original-christmas-score.wav'),'-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-af','loudnorm=I=-16:TP=-1.5:LRA=8','-movflags','+faststart','-shortest',str(OUT/f'InMoment-Christmas-{name}-1080p.mp4')]
+    cmd=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{w}x{h}','-r',str(FPS),'-i','-','-i',str(OUT/'original-christmas-score.wav'),'-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-af','loudnorm=I=-16:TP=-1.5:LRA=8','-ar','48000','-movflags','+faststart','-shortest',str(OUT/f'InMoment-Christmas-{name}-1080p.mp4')]
     p=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     for n in range(DURATION*FPS):
         p.stdin.write(frame(n/FPS,vertical).tobytes())
