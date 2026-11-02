@@ -22,19 +22,18 @@ def text(im,xy,s,size=40,color=IVORY,style='sans',width=None):
 def read_results(kind):
     r=json.loads((QA/(kind+'-report.json')).read_text(encoding='utf-8'))
     return [x for x in r['results'] if x['status']=='passed' and 'history' in x]
-family=read_results('family'); people=read_results('single')
+family=read_results('family')
 scenes=[x for x in family if x['scenario'].startswith('scene-')]
-portraits=[x for x in people if x['scenario'].startswith('portrait-')]
-if len(scenes)!=10 or len(portraits)!=7:raise RuntimeError('Campaign requires 10 verified scene outputs and all 7 verified portrait outputs')
+if len(scenes)!=10:raise RuntimeError('Campaign requires 10 verified scene outputs')
 def photo(entry):return Image.open(entry['history']['displayPath']).convert('RGB')
-SCENES=[photo(x) for x in scenes]; PORTRAITS=[photo(x) for x in portraits]
+SCENES=[photo(x) for x in scenes]
 CLASSIC=photo(next(x for x in family if x['scenario']=='classic'))
-ORIGINAL=Image.open(portraits[0]['history']['originalPath']).convert('RGB')
-UI=[Image.open(QA/n).convert('RGB') for n in ['family-menu.png','family-classic-result.png','family-share-qr.png']]
+ORIGINAL=Image.open(scenes[0]['history']['originalPath']).convert('RGB')
+UI=[Image.open(QA/n).convert('RGB') for n in ['solo-scenes-scene-menu.png','family-classic-result.png','family-share-qr.png']]
 LABELS=[x['scenario'].split('-',2)[-1] for x in scenes]
 @lru_cache(100)
 def card(which,index,w,h,border=12):
-    img=({'scene':SCENES,'portrait':PORTRAITS,'ui':UI,'classic':[CLASSIC],'original':[ORIGINAL]})[which][index]
+    img=({'scene':SCENES,'ui':UI,'classic':[CLASSIC],'original':[ORIGINAL]})[which][index]
     canvas=Image.new('RGBA',(w,h),(0,0,0,0))
     ImageDraw.Draw(canvas).rounded_rectangle((0,0,w-1,h-1),radius=6,fill=IVORY)
     fitted=ImageOps.contain(img,(w-border*2,h-border*2),Image.Resampling.LANCZOS)
@@ -62,7 +61,7 @@ def title(im,chapter,u,vertical,light):
     w,h=im.size;ink=INK if light else IVORY;pad=72 if vertical else 90
     text(im,(pad,48),'I N M O M E N T',24,GOLD if not light else RED,'bold')
     text(im,(w-pad-245,52),'CHRISTMAS EXPERIENCES',17,ink,width=245)
-    captions=[('Christmas,','captured.','Make your next event unforgettable.'),('Choose. Pose.','Keep the magic.','A guest experience that feels effortless.'),('One photo.','A world of wonder.','Ten festive settings for your guests.'),('A little magic.','A whole new you.','Seven personalised Christmas characters.'),('Made in a moment.','Kept for years.','Photo prints, magnets and digital memories.'),('Bring the magic','to your next event.','Corporate celebrations. Winter markets. Private parties.')]
+    captions=[('Christmas,','captured.','Make your next event unforgettable.'),('Choose. Pose.','Keep the magic.','A guest experience that feels effortless.'),('One photo.','A world of wonder.','Ten festive settings for your guests.'),('Your people.','A festive setting.','Familiar faces. Beautiful Christmas memories.'),('Made in a moment.','Kept for years.','Photo prints, magnets and digital memories.'),('Bring the magic','to your next event.','Corporate celebrations. Winter markets. Private parties.')]
     a,b,c=captions[chapter];y=(160 if vertical else 265)+int((1-ease(u/.8))*35)
     size=76 if vertical else 81;maxw=w-pad*2 if vertical else 690
     text(im,(pad,y),a,size,ink,'serif',maxw);text(im,(pad,y+size*1.2),b,size,GOLD if not light else RED,'italic',maxw)
@@ -99,17 +98,15 @@ def chapter_frame(i,u,vertical):
         place(im,card('scene',k,cw,ch),cx+int((1-ease(v/.38))*210),cy, -2+math.sin(v)*1.5,1)
         text(im,(100 if vertical else 930,1570 if vertical else 955),LABELS[k],31,GOLD,'serif',900)
     elif i==3:
-        k=min(4,int(u/2.4));v=u-k*2.4
-        if vertical:
-            place(im,card('original',0,310,445),235,1020,-4)
-            place(im,card('portrait',k,565,840),700,1190+offset,2,.97+.03*ease(v/.6))
-            text(im,(105,1270),'YOUR PHOTO',19,GOLD,'bold')
-        else:
-            place(im,card('original',0,300,450),975,590,-4)
-            place(im,card('portrait',k,490,745),1505,570+offset,2,.97+.03*ease(v/.6))
-            text(im,(850,855),'YOUR PHOTO',21,GOLD,'bold')
-        label=portraits[k]['scenario'].split('-',2)[-1]
-        text(im,(105 if vertical else 1260,1700 if vertical else 965),label,30,GOLD,'serif',700)
+        # Real source capture and real background-replacement result only.
+        k=min(2,int(u/4));v=u-k*4
+        cw,ch=(940,640) if vertical else (980,660)
+        before=card('original',0,cw,ch)
+        after=card('scene',[0,4,2][k],cw,ch)
+        mix=ease((v-.65)/1.0)
+        place(im,Image.blend(before,after,mix),cx,cy+offset,-2+math.sin(u*.4),.98+.012*math.sin(u*.3))
+        label='YOUR PHOTO' if mix<.5 else LABELS[[0,4,2][k]]
+        text(im,(105 if vertical else 960,1590 if vertical else 965),label,30,GOLD,'serif',850)
     elif i==4:
         cw,ch=(870,590) if vertical else (940,640)
         place(im,card('scene',5,cw,ch),cx-30,cy+offset,-8,.95)
