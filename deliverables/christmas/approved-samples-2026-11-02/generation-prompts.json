@@ -1,0 +1,86 @@
+{
+  "generator": "built-in image_gen",
+  "purpose": "One distinct, centered source capture for each Christmas background",
+  "samples": [
+    {
+      "id": "evil-dead-cabin",
+      "label": "Fireside Lodge",
+      "people": "A Black family of three: father in cream knitwear, mother in deep red sweater, school-age daughter in navy. WIDE three-quarter family portrait.",
+      "prompt": "Use case: photorealistic-natural. Generate a distinct photobooth SOURCE photograph, landscape 1536x1024. A Black family of three: father in cream knitwear, mother in deep red sweater, school-age daughter in navy. WIDE three-quarter family portrait. CRITICAL: entire person/group is centered horizontally on x=768, with equal empty space to left and right of the combined body silhouette. Group occupies only central 50 percent of image width (solo 35 percent), leaving at least 25 percent empty space on EACH side. Tallest head starts at y=150 to 200. Natural upright standing posture; bodies extend through bottom edge, no feet visible. All heads and outer arms fully inside image. Professional eye-level camera, realistic skin texture, joyful candid warmth, soft frontal studio flash. Plain seamless neutral medium-gray studio backdrop with no objects, no props. No background scenery, no furniture, no text, no photo frame. Guest image will later be processed by real background-removal software; keep hair edges distinct and no blur on people. Do not place subjects left of center. This is a unique source for Fireside Lodge.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-c3aed71b-680d-4a2a-a6a9-4ab8a2f4c486.png",
+      "asset": "output/christmas/samples-centered/evil-dead-cabin_crop.png"
+    },
+    {
+      "id": "graveyard",
+      "label": "Northern Lights",
+      "people": "A smiling South Asian woman with shoulder-length wavy hair, wearing an ivory sweater. CLOSE waist-up solo portrait.",
+      "prompt": "Use case: photorealistic-natural. Generate a distinct photobooth SOURCE photograph, landscape 1536x1024. A smiling South Asian woman with shoulder-length wavy hair, wearing an ivory sweater. CLOSE waist-up solo portrait. CRITICAL: entire person/group is centered horizontally on x=768, with equal empty space to left and right of the combined body silhouette. Group occupies only central 50 percent of image width (solo 35 percent), leaving at least 25 percent empty space on EACH side. Tallest head starts at y=150 to 200. Natural upright standing posture; bodies extend through bottom edge, no feet visible. All heads and outer arms fully inside image. Professional eye-level camera, realistic skin texture, joyful candid warmth, soft frontal studio flash. Plain seamless neutral medium-gray studio backdrop with no objects, no props. No background scenery, no furniture, no text, no photo frame. Guest image will later be processed by real background-removal software; keep hair edges distinct and no blur on people. Do not place subjects left of center. This is a unique source for Northern Lights.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-e4e300de-be07-450e-ac8b-0298394ab883.png",
+      "asset": "output/christmas/samples-centered/graveyard_crop.png"
+    },
+    {
+      "id": "haunted-crypt",
+      "label": "North Pole",
+      "people": "An East Asian family of four, two parents and two school-age children, wearing varied cranberry, navy, cream and forest-green winter knitwear. WIDE three-quarter family portrait.",
+      "prompt": "Use case: photorealistic-natural. Generate a distinct photobooth SOURCE photograph, landscape 1536x1024. An East Asian family of four, two parents and two school-age children, wearing varied cranberry, navy, cream and forest-green winter knitwear. WIDE three-quarter family portrait. CRITICAL: entire person/group is centered horizontally on x=768, with equal empty space to left and right of the combined body silhouette. Group occupies only central 50 percent of image width (solo 35 percent), leaving at least 25 percent empty space on EACH side. Tallest head starts at y=150 to 200. Natural upright standing posture; bodies extend through bottom edge, no feet visible. All heads and outer arms fully inside image. Professional eye-level camera, realistic skin texture, joyful candid warmth, soft frontal studio flash. Plain seamless neutral medium-gray studio backdrop with no objects, no props. No background scenery, no furniture, no text, no photo frame. Guest image will later be processed by real background-removal software; keep hair edges distinct and no blur on people. Do not place subjects left of center. This is a unique source for North Pole.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-7fead7e2-1e56-4878-87fd-79cb029b615b.png",
+      "asset": "output/christmas/samples-centered/haunted-crypt_crop.png"
+    },
+    {
+      "id": "moonlit-manor",
+      "label": "Christmas Express",
+      "people": "A smiling Black couple in their early thirties, woman with natural curls in elegant burgundy blouse and man with short hair in navy blazer. MEDIUM waist-up couple portrait.",
+      "prompt": "Use case: photorealistic-natural. Distinct photobooth SOURCE photograph, landscape 1536x1024. A smiling Black couple in their early thirties, woman with natural curls in elegant burgundy blouse and man with short hair in navy blazer. MEDIUM waist-up couple portrait. CRITICAL: combined body silhouette centered horizontally at x=768, equal empty margin on each side. Couple/group spans central 50 percent width only; at least 25 percent empty space on EACH side. Tallest hair begins around y=160. Upright standing posture, torsos extend naturally through bottom, no feet. Heads and arms fully inside image. Eye-level camera, natural detailed skin, soft frontal studio flash, warm authentic smiles. Plain seamless neutral medium-gray studio backdrop. No scenery, no objects, no furniture, no text or frames. Crisp people and hair edges for actual software background removal. Unique people and wardrobe for Christmas Express, not the same identities as previous samples.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-63b9ba66-c8d1-4acd-b7a2-6c3ad1e62c23.png",
+      "asset": "output/christmas/samples-centered/moonlit-manor_crop.png"
+    },
+    {
+      "id": "pumpkin-patch",
+      "label": "Santa’s Workshop",
+      "people": "A Latino father and his school-age son, warm smiles, father in blue knitwear and son in rust sweater. MEDIUM waist-up portrait.",
+      "prompt": "Use case: photorealistic-natural. Distinct photobooth SOURCE photograph, landscape 1536x1024. A Latino father and his school-age son, warm smiles, father in blue knitwear and son in rust sweater. MEDIUM waist-up portrait. CRITICAL: combined body silhouette centered horizontally at x=768, equal empty margin on each side. Couple/group spans central 50 percent width only; at least 25 percent empty space on EACH side. Tallest hair begins around y=160. Upright standing posture, torsos extend naturally through bottom, no feet. Heads and arms fully inside image. Eye-level camera, natural detailed skin, soft frontal studio flash, warm authentic smiles. Plain seamless neutral medium-gray studio backdrop. No scenery, no objects, no furniture, no text or frames. Crisp people and hair edges for actual software background removal. Unique people and wardrobe for Santa’s Workshop, not the same identities as previous samples.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-4e471d8f-72c3-4504-90a3-cd136ca63c6d.png",
+      "asset": "output/christmas/samples-centered/pumpkin-patch_crop.png"
+    },
+    {
+      "id": "manor-gates",
+      "label": "Winter Palace",
+      "people": "A stylish South Asian couple in their forties, woman in elegant teal festive dress and man in charcoal jacket. MEDIUM waist-up couple portrait.",
+      "prompt": "Use case: photorealistic-natural. Distinct photobooth SOURCE photograph, landscape 1536x1024. A stylish South Asian couple in their forties, woman in elegant teal festive dress and man in charcoal jacket. MEDIUM waist-up couple portrait. CRITICAL: combined body silhouette centered horizontally at x=768, equal empty margin on each side. Couple/group spans central 50 percent width only; at least 25 percent empty space on EACH side. Tallest hair begins around y=160. Upright standing posture, torsos extend naturally through bottom, no feet. Heads and arms fully inside image. Eye-level camera, natural detailed skin, soft frontal studio flash, warm authentic smiles. Plain seamless neutral medium-gray studio backdrop. No scenery, no objects, no furniture, no text or frames. Crisp people and hair edges for actual software background removal. Unique people and wardrobe for Winter Palace, not the same identities as previous samples.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-63ec0b8a-fb09-46fa-965d-c4cd5623054b.png",
+      "asset": "output/christmas/samples-centered/manor-gates_crop.png"
+    },
+    {
+      "id": "zombie-gates",
+      "label": "Gingerbread Cottage",
+      "people": "A multigenerational Black family of three: grandmother in cranberry knitwear and two school-age grandchildren in cream and blue. WIDE three-quarter portrait.",
+      "prompt": "Use case: photorealistic-natural. Unique photobooth SOURCE photograph, landscape 1536x1024. A multigenerational Black family of three: grandmother in cranberry knitwear and two school-age grandchildren in cream and blue. WIDE three-quarter portrait. Entire person/group centered horizontally at x=768, equal empty gray space left and right of combined body silhouette. Group only central 50 percent width, solo central 35 percent. At least 25 percent empty margin EACH side. Top of tallest hair at y150 to200. Upright standing, eye-level camera, three-quarter/waist-up framing with bodies extending through bottom edge and NO feet. Every head and outer arm fully inside image. Realistic skin detail, natural joyful smiles, soft frontal studio flash. Plain seamless neutral medium-gray studio background for actual background-removal processing. No scenery, props, furniture, text, frames. Distinct people and wardrobe for Gingerbread Cottage; no reused identities.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-ac2c0568-800c-4344-bf7d-af01ec07b37d.png",
+      "asset": "output/christmas/samples-centered/zombie-gates_crop.png"
+    },
+    {
+      "id": "haunted-harvest-carnival",
+      "label": "Christmas Carousel",
+      "people": "Two smiling East Asian adult women friends in their twenties, one with short hair in red knitwear, one with long hair in cream blouse. MEDIUM waist-up friends portrait.",
+      "prompt": "Use case: photorealistic-natural. Unique photobooth SOURCE photograph, landscape 1536x1024. Two smiling East Asian adult women friends in their twenties, one with short hair in red knitwear, one with long hair in cream blouse. MEDIUM waist-up friends portrait. Entire person/group centered horizontally at x=768, equal empty gray space left and right of combined body silhouette. Group only central 50 percent width, solo central 35 percent. At least 25 percent empty margin EACH side. Top of tallest hair at y150 to200. Upright standing, eye-level camera, three-quarter/waist-up framing with bodies extending through bottom edge and NO feet. Every head and outer arm fully inside image. Realistic skin detail, natural joyful smiles, soft frontal studio flash. Plain seamless neutral medium-gray studio background for actual background-removal processing. No scenery, props, furniture, text, frames. Distinct people and wardrobe for Christmas Carousel; no reused identities.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-4230189e-c836-4dca-866b-72192f542cf8.png",
+      "asset": "output/christmas/samples-centered/haunted-harvest-carnival_crop.png"
+    },
+    {
+      "id": "witch-lantern-garden",
+      "label": "Starlight Garden",
+      "people": "A smiling Latina woman in her thirties with shoulder-length dark curls and a deep emerald blouse. CLOSE waist-up solo portrait.",
+      "prompt": "Use case: photorealistic-natural. Unique photobooth SOURCE photograph, landscape 1536x1024. A smiling Latina woman in her thirties with shoulder-length dark curls and a deep emerald blouse. CLOSE waist-up solo portrait. Entire person/group centered horizontally at x=768, equal empty gray space left and right of combined body silhouette. Group only central 50 percent width, solo central 35 percent. At least 25 percent empty margin EACH side. Top of tallest hair at y150 to200. Upright standing, eye-level camera, three-quarter/waist-up framing with bodies extending through bottom edge and NO feet. Every head and outer arm fully inside image. Realistic skin detail, natural joyful smiles, soft frontal studio flash. Plain seamless neutral medium-gray studio background for actual background-removal processing. No scenery, props, furniture, text, frames. Distinct people and wardrobe for Starlight Garden; no reused identities.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-ccfa79f3-f99c-4da1-8886-41f36fa43601.png",
+      "asset": "output/christmas/samples-centered/witch-lantern-garden_crop.png"
+    },
+    {
+      "id": "vampire-candlelit-ballroom",
+      "label": "Christmas Ballroom",
+      "people": "An elegant older Black couple in their sixties, woman in a ruby dress and man in a navy suit, joyful natural expressions. MEDIUM waist-up couple portrait.",
+      "prompt": "Use case: photorealistic-natural. Unique photobooth SOURCE photograph, landscape 1536x1024. An elegant older Black couple in their sixties, woman in a ruby dress and man in a navy suit, joyful natural expressions. MEDIUM waist-up couple portrait. Entire person/group centered horizontally at x=768, equal empty gray space left and right of combined body silhouette. Group only central 50 percent width, solo central 35 percent. At least 25 percent empty margin EACH side. Top of tallest hair at y150 to200. Upright standing, eye-level camera, three-quarter/waist-up framing with bodies extending through bottom edge and NO feet. Every head and outer arm fully inside image. Realistic skin detail, natural joyful smiles, soft frontal studio flash. Plain seamless neutral medium-gray studio background for actual background-removal processing. No scenery, props, furniture, text, frames. Distinct people and wardrobe for Christmas Ballroom; no reused identities.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-1b5c2588-2f2d-40f0-a969-02db5d5182e6.png",
+      "asset": "output/christmas/samples-centered/vampire-candlelit-ballroom_crop.png"
+    }
+  ]
+}

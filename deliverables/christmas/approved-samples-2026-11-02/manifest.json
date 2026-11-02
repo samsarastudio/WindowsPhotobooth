@@ -1,0 +1,187 @@
+{
+  "approvedOn": "2026-11-02",
+  "purpose": "User-approved samples. Preserve these originals; make future edits in a separate folder.",
+  "generator": "Built-in image generation for source photos; production app background compositor for results.",
+  "samples": [
+    {
+      "scene": "evil-dead-cabin",
+      "label": "Fireside Lodge",
+      "files": {
+        "source": {
+          "path": "01-source-photos/evil-dead-cabin.png",
+          "sha256": "b3fc33445e907a528664aa1a03351e528302c5403a640a7d953a9828cb205850"
+        },
+        "result": {
+          "path": "02-background-results/evil-dead-cabin.png",
+          "sha256": "7237b1acd8e95cca00766bb8a80b47d696267dc10ccce6916bc436274204e2c3"
+        },
+        "framed": {
+          "path": "03-framed-photos/evil-dead-cabin.png",
+          "sha256": "e63a024fd515b84668a75856fc5992966770e0caac043f679dbfc08e669263f2"
+        }
+      }
+    },
+    {
+      "scene": "graveyard",
+      "label": "Northern Lights",
+      "files": {
+        "source": {
+          "path": "01-source-photos/graveyard.png",
+          "sha256": "a89bf0ec8d23b739d94dd5d0d26f999b3115961902b3ee7baa1679d27aa4f53a"
+        },
+        "result": {
+          "path": "02-background-results/graveyard.png",
+          "sha256": "a84b07f7411d2a6b2ccdd14ca7c8fea9dff5396acc8324d2be8781b81ba28ce4"
+        },
+        "framed": {
+          "path": "03-framed-photos/graveyard.png",
+          "sha256": "8d9309aa8e5d18d7a0cb350f215412eeee617512492426a2539f85b2f58ff7c7"
+        }
+      }
+    },
+    {
+      "scene": "haunted-crypt",
+      "label": "North Pole",
+      "files": {
+        "source": {
+          "path": "01-source-photos/haunted-crypt.png",
+          "sha256": "5b717f13d32081b0eaf944e5d955b90f3535e44811ced11fb072429820293688"
+        },
+        "result": {
+          "path": "02-background-results/haunted-crypt.png",
+          "sha256": "13fa8ec6388d8b1122b3f100fe13aae4fe9b0a6bd590e569e4bfe51e0307f4a3"
+        },
+        "framed": {
+          "path": "03-framed-photos/haunted-crypt.png",
+          "sha256": "ec79d66f97ddadf6b9c240232c72382bb63f560ebc56b865a96cbb2b11540c49"
+        }
+      }
+    },
+    {
+      "scene": "haunted-harvest-carnival",
+      "label": "Christmas Carousel",
+      "files": {
+        "source": {
+          "path": "01-source-photos/haunted-harvest-carnival.png",
+          "sha256": "ba778a014ef373667dd99a21931166165533d71b82590ed657a29632df2c69da"
+        },
+        "result": {
+          "path": "02-background-results/haunted-harvest-carnival.png",
+          "sha256": "47e156206df7a2ca2326353d50f8a4809e922626921bb9679e492a6fa006fb36"
+        },
+        "framed": {
+          "path": "03-framed-photos/haunted-harvest-carnival.png",
+          "sha256": "a782f9d657bb0d3996423a6a70f43cebe313f57e42d4c2ab6f5daff0637c0342"
+        }
+      }
+    },
+    {
+      "scene": "manor-gates",
+      "label": "Winter Palace",
+      "files": {
+        "source": {
+          "path": "01-source-photos/manor-gates.png",
+          "sha256": "b9fbc4b8c1b57ab34584be98a48200ed463da761e9e182667c8dadd2de47cbec"
+        },
+        "result": {
+          "path": "02-background-results/manor-gates.png",
+          "sha256": "4c0e7b83e1dfe014ccf2b868dd5481313d9590f484888b0fa4c1059c6e61d79d"
+        },
+        "framed": {
+          "path": "03-framed-photos/manor-gates.png",
+          "sha256": "d4a8af44e9c02c232fcb6d931c293bfe93d50a843c63080c0168ed6dff2da0fe"
+        }
+      }
+    },
+    {
+      "scene": "moonlit-manor",
+      "label": "Christmas Express",
+      "files": {
+        "source": {
+          "path": "01-source-photos/moonlit-manor.png",
+          "sha256": "ce278b977d3e1ce9405e01705a5bbc9234d0ca4af22491f4e5ede802603bf3c7"
+        },
+        "result": {
+          "path": "02-background-results/moonlit-manor.png",
+          "sha256": "984d32fefac60ce5aec36cb7445370ebfcd968881b34c190e2b14e7518aa4862"
+        },
+        "framed": {
+          "path": "03-framed-photos/moonlit-manor.png",
+          "sha256": "47a5ecfdd36f3af5229be01fe2d74622467db3fb5381e14744e139d0ac020de5"
+        }
+      }
+    },
+    {
+      "scene": "pumpkin-patch",
+      "label": "Santa’s Workshop",
+      "files": {
+        "source": {
+          "path": "01-source-photos/pumpkin-patch.png",
+          "sha256": "30adb67bc77dab57941d4388f112e12257da02e0c59a5967d8cfa217c15c2d4b"
+        },
+        "result": {
+          "path": "02-background-results/pumpkin-patch.png",
+          "sha256": "fb478e604f6c2715c9a8e8f8e050c02bd6435ffd5a992974542f65cb4d4d93db"
+        },
+        "framed": {
+          "path": "03-framed-photos/pumpkin-patch.png",
+          "sha256": "ee00caeba101eef511330a4d3af17b872a7042c31c3745caeb1b90bf51aeee36"
+        }
+      }
+    },
+    {
+      "scene": "vampire-candlelit-ballroom",
+      "label": "Christmas Ballroom",
+      "files": {
+        "source": {
+          "path": "01-source-photos/vampire-candlelit-ballroom.png",
+          "sha256": "df7ebf58a2d5d8b685497f0a14ad6d8db06d77c70a968de530075f1d54d29a2e"
+        },
+        "result": {
+          "path": "02-background-results/vampire-candlelit-ballroom.png",
+          "sha256": "8230ba402fbe8ef85792c4c877c8925c4be44c75e82c329060fcba1b64da4aef"
+        },
+        "framed": {
+          "path": "03-framed-photos/vampire-candlelit-ballroom.png",
+          "sha256": "359d96311816ab9429175ddebfa9d4df2e39bb9b103fbee86b6ed4a617106ef4"
+        }
+      }
+    },
+    {
+      "scene": "witch-lantern-garden",
+      "label": "Starlight Garden",
+      "files": {
+        "source": {
+          "path": "01-source-photos/witch-lantern-garden.png",
+          "sha256": "5edf4b57292c4046bf9289866ff89b906ca771ac06b8e636b8bf75aa01b5a67e"
+        },
+        "result": {
+          "path": "02-background-results/witch-lantern-garden.png",
+          "sha256": "1f1602d34a3c73e0afc39272a09f0a77b1603adcafdd57b9c2b9ee477d1638a2"
+        },
+        "framed": {
+          "path": "03-framed-photos/witch-lantern-garden.png",
+          "sha256": "9e6b83c3111e4f0c860844cca5b03d37cce4c012d8230ae67d679f34328e54dd"
+        }
+      }
+    },
+    {
+      "scene": "zombie-gates",
+      "label": "Gingerbread Cottage",
+      "files": {
+        "source": {
+          "path": "01-source-photos/zombie-gates.png",
+          "sha256": "de35c7bc7dcbe77bfec64aea3563c56332db5942124a669ec34d67d1f071d09a"
+        },
+        "result": {
+          "path": "02-background-results/zombie-gates.png",
+          "sha256": "43f49f72785efb33642a66463c77ec1a9d4e33d1306838997aa9b090ae4a6cd8"
+        },
+        "framed": {
+          "path": "03-framed-photos/zombie-gates.png",
+          "sha256": "a526836c4d0d1d12892d510cf324277fd1ccadd2197cded4dcc90db7e592d263"
+        }
+      }
+    }
+  ]
+}
