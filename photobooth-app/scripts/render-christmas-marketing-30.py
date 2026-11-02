@@ -18,12 +18,10 @@ def text(im,xy,s,size=50,color=WHITE,bold=False,maxwidth=None):
     while maxwidth and font(size,bold).getlength(s)>maxwidth:size-=1
     ImageDraw.Draw(im).text(xy,s,font=font(size,bold),fill=color)
 def ease(x):return 1-(1-max(0,min(1,x)))**3
-def photo(im,p,box,angle=0):
+def photo(im,p,box):
+    # Preserve the complete photograph and center it in its assigned layout slot.
     x,y,w,h=map(int,box);tile=ImageOps.contain(p,(w,h),Image.Resampling.LANCZOS)
-    if angle:
-        tile=tile.convert('RGBA').rotate(angle,Image.Resampling.BICUBIC,expand=True)
-        im.paste(tile,(x+(w-tile.width)//2,y+(h-tile.height)//2),tile)
-    else:im.paste(tile,(x+(w-tile.width)//2,y+(h-tile.height)//2))
+    im.paste(tile,(x+(w-tile.width)//2,y+(h-tile.height)//2))
 def layout(t,v):
     w,h=(1080,1920) if v else (1920,1080);im=Image.new('RGB',(w,h),GREEN);d=ImageDraw.Draw(im)
     for n in range(44):
@@ -55,43 +53,48 @@ def scene_frame(t,v):
         choices=[('wide','haunted-crypt'),('medium','moonlit-manor'),('close','graveyard'),('wide','zombie-gates')]
         k=min(3,int(u/1.25));dep,sc=choices[k]
         if v:
-            photo(im,pic(dep,sc),(46,500,988,660));photo(im,pic(*choices[(k+1)%4]),(200,1190,680,454),-3)
+            photo(im,pic(dep,sc),(60,500,960,640));photo(im,pic(*choices[(k+1)%4]),(200,1190,680,454))
         else:
-            photo(im,pic(dep,sc),(110,320,930,620));photo(im,pic(*choices[(k+1)%4]),(1160,410,650,434),-4)
+            photo(im,pic(dep,sc),(80,350,850,567));photo(im,pic(*choices[(k+1)%4]),(990,350,850,567))
         label=next(x['label'] for x in ROWS if x['scene']==sc)
         text(im,(p,1700 if v else 960),label,36,GOLD,True)
     elif t<15:
         heading(im,'Framed for|the season.' if v else 'Framed for the season.','Festive photo frames for every Christmas smile.',v)
         if v:
-            photo(im,pic('close','witch-lantern-garden'),(58,510,960,640),-2)
-            photo(im,pic('wide','evil-dead-cabin'),(100,1190,880,587),2)
+            photo(im,pic('close','witch-lantern-garden'),(60,510,960,640))
+            photo(im,pic('wide','evil-dead-cabin'),(100,1190,880,587))
         else:
-            photo(im,pic('close','witch-lantern-garden'),(70,360,870,580),-2)
-            photo(im,pic('wide','evil-dead-cabin'),(980,360,870,580),2)
+            photo(im,pic('close','witch-lantern-garden'),(80,350,850,567))
+            photo(im,pic('wide','evil-dead-cabin'),(990,350,850,567))
     elif t<21:
         heading(im,'Keep the|Christmas glow.' if v else 'Keep the Christmas glow.','Photo prints + glow magnets',v)
-        photo(im,pic('medium','pumpkin-patch'),(70,500,940,627) if v else (90,330,900,600),-2)
-        x,y,bw,bh=(155,1210,770,360) if v else (1290,360,500,460)
-        text(im,(x,y+20),'PHOTO PRINTS',44,GOLD,True,maxwidth=bw)
-        text(im,(x,y+100),'Beautiful keepsakes.',32,WHITE,maxwidth=bw)
-        text(im,(x,y+205),'GLOW MAGNETS',44,GOLD,True,maxwidth=bw)
-        text(im,(x,y+285),'Memories that shine.',32,WHITE,maxwidth=bw)
-        text(im,(p,1710 if v else 960),'A LITTLE JOY TO TAKE HOME',32,GOLD,True)
+        photo(im,pic('medium','pumpkin-patch'),(60,500,960,640) if v else (560,300,800,534))
+        if v:
+            x,y,bw=155,1210,770
+            text(im,(x,y+20),'PHOTO PRINTS',44,GOLD,True,maxwidth=bw)
+            text(im,(x,y+100),'Beautiful keepsakes.',32,WHITE,maxwidth=bw)
+            text(im,(x,y+205),'GLOW MAGNETS',44,GOLD,True,maxwidth=bw)
+            text(im,(x,y+285),'Memories that shine.',32,WHITE,maxwidth=bw)
+            text(im,(p,1710),'A LITTLE JOY TO TAKE HOME',32,GOLD,True)
+        else:
+            for cx,title,sub in [(510,'PHOTO PRINTS','Beautiful keepsakes.'),(1410,'GLOW MAGNETS','Memories that shine.')]:
+                text(im,(cx-font(38,True).getlength(title)/2,860),title,38,GOLD,True)
+                text(im,(cx-font(28).getlength(sub)/2,915),sub,28,WHITE)
     elif t<26:
         heading(im,'Scan. Save.|Share the joy.' if v else 'Scan. Save. Share the joy.','Digital photos delivered by QR code.',v)
-        photo(im,pic('medium','moonlit-manor'),(55,520,970,647) if v else (90,330,900,600))
-        x,y,pw,ph=(330,1220,420,500) if v else (1360,335,360,590)
+        photo(im,pic('medium','moonlit-manor'),(60,520,960,640) if v else (240,340,900,600))
+        x,y,pw,ph=(330,1220,420,500) if v else (1320,340,360,600)
         d.rounded_rectangle((x,y,x+pw,y+ph),35,fill=(32,43,38),outline=GOLD,width=4)
         photo(im,pic('close','graveyard'),(x+15,y+55,pw-30,(pw-30)*2/3))
         text(im,(x+25,y+ph-110),'YOUR PHOTO',26,GOLD,True,maxwidth=pw-50)
         text(im,(x+25,y+ph-65),'Ready to share',23,WHITE,maxwidth=pw-50)
     else:
         heading(im,'Bring Christmas|to your event.' if v else 'Bring Christmas to your event.','Corporate celebrations. Winter markets. Private parties.',v)
-        photo(im,pic('wide','haunted-crypt'),(60,550,960,640) if v else (90,330,900,600))
-        x,y=(64,1360) if v else (1260,440)
+        photo(im,pic('wide','haunted-crypt'),(60,550,960,640) if v else (570,300,780,520))
+        x,y=(64,1360) if v else (80,840)
         text(im,(x,y),'INMOMENT',62,GOLD,True,maxwidth=w-x-60)
-        text(im,(x,y+100),'Make it memorable.',35,WHITE,maxwidth=w-x-60)
-        text(im,(x,y+180),'inmomentservices.com',35,GOLD,True,maxwidth=w-x-60)
+        text(im,(x,y+100 if v else y+80),'Make it memorable.',35,WHITE,maxwidth=w-x-60)
+        text(im,(x,y+180) if v else (1210,895),'inmomentservices.com',35,GOLD,True,maxwidth=w-x-60)
     return im
 def frame(t,v):
     im=scene_frame(t,v)
