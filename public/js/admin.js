@@ -908,7 +908,7 @@ document.getElementById('btnSaveHalloween')?.addEventListener('click', async () 
       body: JSON.stringify(body),
     });
     applyHalloweenSettings(r.settings);
-    setStatus('Halloween demo settings saved');
+    setStatus('Christmas demo settings saved');
   } catch (e) {
     setStatus(String(e.message || e));
   }
@@ -921,7 +921,7 @@ document.getElementById('btnResetHalloweenCount')?.addEventListener('click', asy
       body: JSON.stringify({ halloweenResetGenerationCount: true }),
     });
     applyHalloweenSettings(r.settings);
-    setStatus('Halloween generation counter reset');
+    setStatus('Christmas generation counter reset');
   } catch (e) {
     setStatus(String(e.message || e));
   }
@@ -930,21 +930,21 @@ document.getElementById('btnResetHalloweenCount')?.addEventListener('click', asy
 document.getElementById('btnRefreshHalloweenAnalytics')?.addEventListener('click', async () => {
   try {
     await refreshHalloweenAnalytics();
-    setStatus('Halloween analytics refreshed');
+    setStatus('Christmas analytics refreshed');
   } catch (e) {
     setStatus(String(e.message || e));
   }
 });
 
 document.getElementById('btnResetHalloweenAnalytics')?.addEventListener('click', async () => {
-  if (!confirm('Reset all Halloween visit analytics?')) return;
+  if (!confirm('Reset all Christmas visit analytics?')) return;
   try {
     const r = await api('/api/admin/halloween/analytics/reset', {
       method: 'POST',
       body: '{}',
     });
     renderHalloweenAnalytics(r.analytics);
-    setStatus('Halloween analytics reset');
+    setStatus('Christmas analytics reset');
   } catch (e) {
     setStatus(String(e.message || e));
   }

@@ -1,0 +1,32 @@
+/* Shared Christmas presentation. All operational controls and routes remain native. */
+:root{--ink:#f8f1e3;--cream:#f8f1e3;--muted:#bccfc4;--gold:#dfc18b;--ember:#dfc18b;--line:#dfc18b40;--panel:#0e3028ed;--font-display:Georgia,'Times New Roman',serif;--font-body:'Segoe UI',system-ui,sans-serif;--bg:#09251f;--surface:#10352b;--text:#f8f1e3;--accent:#dfc18b}
+:root{--card:#10352b;--accent-soft:#164437;--display:Georgia,'Times New Roman',serif;--sans:'Segoe UI',system-ui,sans-serif;--tb-bg:#09251f;--tb-ink:#f8f1e3;--tb-muted:#bccfc4;--tb-card:#10352b;--tb-accent:#dfc18b}
+body{background-color:#09251f;background-image:radial-gradient(ellipse at 0 0,#426c4a44,transparent 60%),linear-gradient(145deg,#09251f,#071b17);color:#f8f1e3;font-family:'Segoe UI',system-ui,sans-serif}
+h1,h2,h3,.game-guest h1,.game-guest h2,.game-guest .reward strong,.event-guest .photo-target strong,.event-guest .event-steps strong{font-family:Georgia,'Times New Roman',serif;letter-spacing:-.02em;text-shadow:none}
+.game-guest{background-color:#09251f;background-image:radial-gradient(ellipse at 90% 0,#866b3033,transparent 55%)}
+.game-guest h1,.game-guest .eyebrow,.game-guest .reward strong,.eyebrow,.stats strong,.report-grid strong,.details-hint{color:#dfc18b}
+.card,.card-panel,.game-guest .card,dialog,.detail-actions,.player-history summary{background:#10352b;color:#f8f1e3;border-color:#dfc18b40}
+.game-guest .reward>div{background:#153b2f;border-color:#dfc18b80}
+.muted,.meta,.hint,.lede,.stats span,.report-grid span,dt{color:#bccfc4}
+.game-guest button,button.primary,.btn.primary{background:#dfc18b;color:#142c23;border-color:#dfc18b}
+.game-guest .secondary,.btn.ghost,button.secondary{background:#ffffff09;color:#f8f1e3;border-color:#dfc18b60}
+.game-guest .badge,.game-guest .steps b{color:#dfc18b;border-color:#dfc18b60}
+input,select,textarea,.fg-controls input,.fg-controls select{background:#09251f;color:#f8f1e3;border-color:#8da997}
+a{color:#efce94}
+button,a,input,select,textarea{accent-color:#dfc18b}
+:is(button,a,input,select,textarea):focus-visible{outline:3px solid #f8f1e3;outline-offset:4px}
+.haze{background-image:none}
+.event-guest .photo-target{background:linear-gradient(135deg,#f5e4bf,#dfc18b);color:#142c23;border-color:#f5e4bf;box-shadow:0 8px 28px #0002}
+.event-guest .instruction-postcard{background:#10352b}
+.event-guest .steps-art{background-image:url('/assets/game/christmas-steps.svg')}
+body.christmas-paper{--bg:#f5f1e6;--ink:#173d31;--muted:#526c5c;--line:#bba67555;--card:#fffdf8;--accent:#20543f;--accent-soft:#e1eade;--text:#173d31;background:#f5f1e6;color:#173d31}
+.christmas-paper :is(.card,dialog){background:#fffdf8;color:#173d31;border-color:#bba67555}
+.christmas-paper :is(.meta,.hint,.muted,.lede){color:#526c5c}
+.christmas-paper :is(a,.eyebrow){color:#20543f}
+.christmas-paper :is(input,select,textarea){background:#fffdf8;color:#173d31;border-color:#9bad99}
+.christmas-paper :is(.btn.ghost,button.secondary){background:transparent;color:#20543f;border-color:#9bad99}
+.christmas-paper .leaf{display:none}
+.christmas-paper .brand{border-left:3px solid #b89a61;padding-left:18px}
+.christmas-paper :is(button,a,input,select):focus-visible{outline-color:#20543f}
+body.christmas-paper{min-height:100dvh}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}

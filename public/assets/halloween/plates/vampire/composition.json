@@ -1,10 +1,10 @@
 {
   "id": "vampire",
-  "label": "Vampire",
+  "label": "Father Christmas",
   "face": {
-    "xPercent": 40,
-    "yPercent": 4,
-    "widthPercent": 17,
-    "heightPercent": 18
+    "xPercent": 38.71911285041282,
+    "yPercent": 11.826588873049193,
+    "widthPercent": 23.726674959689174,
+    "heightPercent": 18.024386189419875
   }
 }
