@@ -48,11 +48,8 @@ def scene_frame(t,v):
         heading(im,'Your photo.|Christmas magic.' if v else 'Your photo. Christmas magic.','Beautiful background changes. Real smiles.',v)
         box=(50,580,980,654) if v else (240,315,1440,960)
         if not v:box=(480,295,960,640)
-        # Result is visible on frame one; a short source-to-result wipe demonstrates the feature.
-        after=pic('medium','moonlit-manor','result');before=pic('medium','moonlit-manor','source')
-        if 1.15<t<3.2:
-            mix=ease((t-1.45)/1.15);im2=before.copy();cut=int(im2.width*mix);im2.paste(after.crop((0,0,cut,after.height)),(0,0));photo(im,im2,box)
-        else:photo(im,after,box)
+        # Present the completed photograph throughout; no source reveal or background wipe.
+        photo(im,pic('medium','moonlit-manor','result'),box)
         text(im,(p,1460 if v else 980),'NO GREEN SCREEN NEEDED',31,GOLD,True)
     elif t<10:
         u=t-5;heading(im,'10 festive|destinations.' if v else '10 festive destinations.','North Pole. Christmas Express. And more.',v)
@@ -116,7 +113,7 @@ if __name__=='__main__':
     sheet.save(OUT/f'30s-{name}-storyboard.jpg',quality=94)
     if '--preview' in sys.argv:sys.exit()
     w,h=(1080,1920) if v else (1920,1080)
-    target=OUT/f'InMoment-Christmas-{name}-30s-centered-1080p.mp4'
+    target=OUT/f'InMoment-Christmas-{name}-30s-finished-photos-1080p.mp4'
     cmd=['ffmpeg','-y','-v','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{w}x{h}','-r','30','-i','-','-i',str(OUT/'original-christmas-score.wav'),'-t','30','-c:v','libx264','-threads','3','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-af','afade=t=out:st=28:d=2,loudnorm=I=-16:TP=-1.5:LRA=8','-ar','48000','-movflags','+faststart',str(target)]
     enc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     for n in range(900):
