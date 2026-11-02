@@ -521,8 +521,9 @@ async function prepareFrameOverlay(sharpMod, framePath) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const a = data[(y * w + x) * channels + 3];
-      if (a >= 16) continue;
-      alphaHoles += 1;
+      if (a < 16) alphaHoles += 1;
+      // Every translucent edge needs photograph behind it, not black backing.
+      if (a === 255) continue;
       if (x < minX) minX = x;
       if (y < minY) minY = y;
       if (x > maxX) maxX = x;

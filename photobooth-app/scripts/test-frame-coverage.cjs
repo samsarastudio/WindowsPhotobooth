@@ -9,9 +9,14 @@ vm.runInContext('const FRAME_HOLE_BLACK_MAX=18;'+['isChromaHolePixel','floodFill
  for(const file of ['halloween-haunt.png','halloween-haunt-portrait.png']){
   const frame=path.resolve(__dirname,'../config/photo-frames',file);const prepared=await context.prepareFrameOverlay(sharp,frame);
   const overlay=await sharp(prepared.overlay).ensureAlpha().raw().toBuffer();
+  const frameMeta=await sharp(frame).metadata();
+  const expected=await sharp({create:{width:frameMeta.width,height:frameMeta.height,channels:4,background:'#ffffff'}}).composite([{input:prepared.overlay}]).raw().toBuffer();
+  const serverPrepared=await require('../../moments-server/src/frame-overlay.cjs').prepareFrameOverlay(sharp,frame);
+  assert.equal(JSON.stringify(serverPrepared.hole),JSON.stringify(prepared.hole),'Booth/server frame bounds differ');
   for(const scale of [1,.8]){
    const result=await context.compositePhotoIntoFrame(sharp,frame,white,scale);const pixels=await sharp(result).ensureAlpha().raw().toBuffer();let checked=0;
    for(let i=0;i<overlay.length;i+=4)if(overlay[i+3]===0){assert.equal(pixels[i],255,'Uncovered opening');checked++;}
+   for(let i=0;i<overlay.length;i+=4)if(overlay[i+3]<255)for(let c=0;c<3;c++)assert(Math.abs(pixels[i+c]-expected[i+c])<=1,'Black backing under translucent edge');
    assert(checked>100000);console.log('PASS full opening coverage',file,scale,checked);
   }
   const photo=path.resolve(__dirname,'../../moments-server/public/assets/halloween/samples',file.includes('portrait')?'portrait-original.png':'scene-original.png');

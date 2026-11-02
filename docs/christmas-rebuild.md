@@ -102,5 +102,31 @@ remain operator-owned; the OTA migration only renames the stock HauntBooth name.
 Rebuild with `npm run electron:build:folder` in `photobooth-app`. The resulting
 folder and OTA zip are staged under the repository's `builds` directory.
 
-Validated Windows folder: `builds/PhotoBooth-Folder-1.2.0-20261101-233045`.
-Matching OTA ZIP: `builds/PhotoBooth-Folder-1.2.0-20261101-233045.zip`.
+Validated Windows folder: `builds/PhotoBooth-Folder-1.2.0-20261102-001555`.
+Matching OTA ZIP: `builds/PhotoBooth-Folder-1.2.0-20261102-001555.zip`.
+
+## Illustrated Christmas print frames
+
+The default landscape and portrait overlays use soft blended snowy edges,
+snowflakes and warm lights. Small Santa and sleigh/cottage arrangements occupy
+the lower corners; the fabric ribbon at the bottom reads **Merry Christmas**.
+There are no garlands or rigid picture-frame rails. Each orientation has a
+transparent guest-photo opening. The six other optional overlays remain available.
+
+Canonical PNG masters live in `photobooth-app/themes/christmas/artwork/` as
+`christmas-frame-landscape.png` and `christmas-frame-portrait.png`. Prompt and
+reference provenance is recorded in the neighboring `frame-prompts.json`.
+`node photobooth-app/scripts/build-christmas-frames.cjs` installs these at
+1800×1200 and 1200×1800 into the booth, server seeds and public frame library.
+The existing `halloween-haunt` aliases are retained for configuration compatibility.
+
+Frame update validation: eight browser guest-flow cases passed, both orientations
+passed full transparent-opening coverage at photo scales 1.0 and 0.8, and packaged
+frame hashes match source. Updated preview photos and signage use the new frames.
+The booth and companion now compute the photo fill bounds from every nonopaque
+pixel, including translucent snow and light edges. Previously only alpha below
+16 expanded the opening, leaving black backing visible as straight side seams.
+Coverage regression checks compare every translucent pixel against a full-photo
+reference at both photo scales; booth and server bounds must agree. Central
+guest-area alpha is checked across a rectangle (at most 1/255 after resampling),
+so a tinted generated background cannot silently ship.

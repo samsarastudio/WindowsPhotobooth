@@ -1,5 +1,5 @@
 'use strict';
-// Editable vector artwork, rasterized to the existing transparent PNG print contract.
+// Illustrated default frames plus optional vector styles, all using the PNG print contract.
 const fs=require('node:fs'),path=require('node:path'),sharp=require('sharp');
 const root=path.resolve(__dirname,'../..');
 const designs=[['halloween-haunt','Evergreen','#103c30','#dfc18b',false],['halloween-horror','Winter Ivory','#f8f2e6','#9c2935',false],['screampark-logo-halloween-2026','Christmas Gold','#132d25','#e9c980',false],['screampark-logo-halloween-2026-slim','Christmas Minimal','#13372c','#e9c980',true]];
@@ -12,6 +12,13 @@ function artwork(w,h,bg,gold,slim,text=true){
  const sourceDir=path.join(root,'photobooth-app/themes/christmas/artwork');fs.mkdirSync(sourceDir,{recursive:true});
  for(const [id,label,bg,gold,slim]of designs)for(const portrait of [false,true]){
   const w=portrait?1200:1800,h=portrait?1800:1200,name=id+(portrait?'-portrait':'');
+  if(id==='halloween-haunt'){
+   const master=path.join(sourceDir,'christmas-frame-'+(portrait?'portrait':'landscape')+'.png');
+   const png=await sharp(master).resize(w,h,{fit:'fill'}).png().toBuffer();
+   const raw=await sharp(png).ensureAlpha().raw().toBuffer();assertTransparentCenter(raw,w,h);
+   for(const dir of ['photobooth-app/config/photo-frames','moments-server/seed-frames','moments-server/public/assets/halloween/frames'])fs.writeFileSync(path.join(root,dir,name+'.png'),png);
+   console.log('Illustrated Christmas',portrait?'portrait':'landscape');continue;
+  }
   const svg=artwork(w,h,bg,gold,slim);fs.writeFileSync(path.join(sourceDir,name+'.svg'),svg);
   const png=await sharp(Buffer.from(svg)).png().toBuffer();
   for(const dir of ['photobooth-app/config/photo-frames','moments-server/seed-frames','moments-server/public/assets/halloween/frames']){const dest=path.join(root,dir);fs.mkdirSync(dest,{recursive:true});fs.writeFileSync(path.join(dest,name+'.png'),png);}
@@ -19,4 +26,10 @@ function artwork(w,h,bg,gold,slim,text=true){
   const raw=await sharp(png).raw().toBuffer();assertTransparentCenter(raw,w,h);console.log(label,portrait?'portrait':'landscape');
  }
 })().catch(e=>{console.error(e);process.exitCode=1});
-function assertTransparentCenter(raw,w,h){if(raw[(Math.floor(h/2)*w+Math.floor(w/2))*4+3]!==0)throw Error('Photo window must be transparent');}
+function assertTransparentCenter(raw,w,h){
+ // Allow one alpha level from resampling feathered edges, but reject a tinted
+ // photo opening. Check the central guest area, not just a single lucky pixel.
+ for(let y=Math.floor(h*.25);y<Math.floor(h*.65);y++)for(let x=Math.floor(w*.25);x<Math.floor(w*.75);x++){
+  if(raw[(y*w+x)*4+3]>1)throw Error('Photo window must be transparent');
+ }
+}

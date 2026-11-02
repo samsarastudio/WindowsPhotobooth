@@ -12,19 +12,22 @@ const server=http.createServer((req,res)=>{
  try{const data=fs.readFileSync(file);res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.png')?'image/png':'text/html');res.end(data);}catch{res.writeHead(404).end();}
 });
 (async()=>{
+ const {prepareFrameOverlay}=require('../../moments-server/src/frame-overlay.cjs');
+ const prepared=await prepareFrameOverlay(require('sharp'),path.join(root,'config/photo-frames/halloween-haunt.png'));
+ const frameHole=prepared.hole;
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({channel:'chrome',headless:true});const results=[];
  try{
  for(const c of [{id:'ai-retake',kind:'ai',pipeline:'scene',retake:true},{id:'standard-no-frame',kind:'standard',frame:false},{id:'standard-frame',kind:'standard',frame:true},{id:'scene-preview',kind:'ai',pipeline:'scene'},{id:'portrait-preview',kind:'ai',pipeline:'head-swap'},{id:'scene-tablet',kind:'ai',pipeline:'scene',skip:true},{id:'portrait-tablet',kind:'ai',pipeline:'head-swap',skip:true},{id:'ai-retry',kind:'ai',pipeline:'scene',fail:true}]){
   const page=await browser.newPage({viewport:{width:1366,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.addInitScript(({config,fixture,frameFixture,c})=>{
+  await page.addInitScript(({config,fixture,frameFixture,frameHole,c})=>{
    const cfg={...config,openAiConfigured:true,aiGenerationEnabled:true,activeThemeId:config.activeThemeId,gallery:{enabled:true,apiBaseUrl:'https://example.test',uploadToken:'test-only',uploadOriginal:true,uploadAi:true,uploadFramed:true,uploadPhysical:true},debug:{enabled:false},print:{enabled:true},guestModes:{physicalFrameEnabled:true},guestFlow:{skipAiPreviewToThanks:!!c.skip,thanksAutoReturnSec:0},photoFrames:{enabled:c.frame!==false,autoApplyFrame:true,defaultFrameFile:'test.png',guestFrameFiles:['test.png'],photoScale:1},aiModes:[{id:'test-ai',label:'Halloween',prompt:'test',pipeline:c.pipeline||'scene',useInpainting:true,enabled:true}]};
    window.calls=[];window.saved={};
    history.replaceState({path:'C:/capture/test.jpg',kind:c.kind,modeId:'test-ai'},'',location.pathname+'#/prepare');
    window.pbApi={
     adminGetConfig:async()=>({ok:true,config:cfg}),adminGetThemeStylesheetUrl:async()=>({ok:true,url:'/themes/'+config.activeThemeId+'/styles.css'}),
     readFileBase64:async p=>window.saved[p]||fixture,
-    photoFramePreview:async()=>({ok:true,url:frameFixture,hole:{left:48,top:48,width:1704,height:992}}),
+    photoFramePreview:async()=>({ok:true,url:frameFixture,hole:frameHole}),
     listPhotoFrames:async()=>({ok:true,frames:[{filename:'test.png',label:'Halloween',orientation:'landscape'}]}),
     saveJpeg:async(p,b)=>{window.calls.push(['save',p]);window.saved[p]='data:image/jpeg;base64,'+b;return {ok:true,path:p};},
     applyPhotoFrame:async p=>{window.calls.push(['frame',p]);return {ok:true,path:'C:/capture/test_crop_framed.png'};},
@@ -34,7 +37,7 @@ const server=http.createServer((req,res)=>{
     printPhoto:async p=>{window.calls.push(['print',p]);return {ok:true};},
     log:async()=>({ok:true}),cameraInvoke:async()=>({ok:true}),
    };
-  },{config,fixture,frameFixture,c});
+  },{config,fixture,frameFixture,frameHole,c});
   await page.goto(url);await page.getByRole('heading',{name:c.kind==='standard'?'Adjust your photo':'Check your photo'}).waitFor().catch(async e=>{if(!c.skip)throw e;});
   if(c.kind==='standard'){
    await page.getByRole('button',{name:'Use this photo'}).waitFor();
