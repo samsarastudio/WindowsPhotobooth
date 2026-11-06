@@ -1,0 +1,6 @@
+# Merge this entry into the existing tunnel, before its catch-all rule.
+# Do not replace the existing moments.inmomentservices.com or other hostnames.
+ingress:
+  - hostname: live.inmomentservices.com
+    service: http://127.0.0.1:3021
+  - service: http_status:404

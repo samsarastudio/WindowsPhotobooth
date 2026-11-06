@@ -1,5 +1,13 @@
 # Moments Gallery Server
 
+## Moments Live event cameras
+
+The independent **Moments Live** service for `live.inmomentservices.com` runs on port
+**3021**, with administrator-invited email owners, guest QR/link joining, mobile capture,
+private event galleries and native mobile projects. Start with `npm run start:live`.
+See [manual deployment](docs/live-deployment.md) and [Apple / Google Play setup](docs/mobile-release.md).
+The existing gallery service below remains on port **3020**.
+
 Live session galleries for InMoment photobooths. Guests open `https://moments.inmomentservices.com/{session}` to view photos as they arrive.
 
 ## Pi port note

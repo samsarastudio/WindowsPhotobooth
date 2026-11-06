@@ -1,0 +1,30 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.inmomentservices.live'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.inmomentservices.live'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+    }
+    signingConfigs {
+        release {
+            if (System.getenv('MOMENTS_KEYSTORE')) {
+                storeFile file(System.getenv('MOMENTS_KEYSTORE'))
+                storePassword System.getenv('MOMENTS_STORE_PASSWORD')
+                keyAlias System.getenv('MOMENTS_KEY_ALIAS')
+                keyPassword System.getenv('MOMENTS_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (System.getenv('MOMENTS_KEYSTORE')) signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+dependencies { implementation 'androidx.core:core:1.15.0' }
