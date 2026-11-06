@@ -314,7 +314,15 @@ export function createLiveApp(options = {}) {
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
   app.use(express.static(path.join(root, 'live-public'), { index: false }));
-  app.get(['/', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print'], (_req, res) => res.sendFile(path.join(root, 'live-public/index.html')));
+  app.get(['/', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print'], (req, res) => {
+    const storeId = process.env.LIVE_APPLE_APP_STORE_ID || '';
+    const bundle = process.env.LIVE_IOS_BUNDLE_ID || 'com.inmomentservices.live';
+    if (req.path.startsWith('/e/') && /^\d+$/.test(storeId) && /^[a-zA-Z0-9.-]+$/.test(bundle)) {
+      const html = fs.readFileSync(path.join(root, 'live-public/index.html'), 'utf8');
+      return res.type('html').send(html.replace('</head>', `<meta name="apple-itunes-app" content="app-id=${storeId}, app-clip-bundle-id=${bundle}.Clip"></head>`));
+    }
+    res.sendFile(path.join(root, 'live-public/index.html'));
+  });
   app.use((err, _req, res, _next) => {
     const status = err.status || (err instanceof multer.MulterError ? 400 : 500);
     if (status === 500) console.error('[moments-live]', err.message);
