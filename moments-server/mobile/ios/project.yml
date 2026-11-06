@@ -10,6 +10,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0.0
+    TARGETED_DEVICE_FAMILY: '1,2'
 targets:
   MomentsLive:
     type: application
@@ -24,6 +25,8 @@ targets:
       properties:
         CFBundleDisplayName: Moments Live
         UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         NSCameraUsageDescription: Capture photos to share with your event.
         NSPhotoLibraryAddUsageDescription: Save event photos to your library.
         NSUserActivityTypes: [NSUserActivityTypeBrowsingWeb]
@@ -31,6 +34,7 @@ targets:
       path: generated/App.entitlements
       properties:
         com.apple.developer.associated-domains: ['applinks:live.inmomentservices.com', 'appclips:live.inmomentservices.com']
+        com.apple.developer.associated-appclip-app-identifiers: ['$(AppIdentifierPrefix)com.inmomentservices.live.Clip']
     dependencies:
       - target: MomentsClip
         embed: true
@@ -47,6 +51,8 @@ targets:
       properties:
         CFBundleDisplayName: Moments Live
         UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         NSCameraUsageDescription: Capture photos to share with your event.
         NSPhotoLibraryAddUsageDescription: Save event photos to your library.
         NSUserActivityTypes: [NSUserActivityTypeBrowsingWeb]

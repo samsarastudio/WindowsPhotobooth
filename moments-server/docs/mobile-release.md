@@ -27,6 +27,8 @@ WebView wrapper. Owner administration is linked to the browser studio.
 Use a Mac with current Xcode. Register both bundle identifiers in Apple Developer,
 enable Associated Domains for both, and associate the App Clip with its parent app.
 Use your real 10-character team ID in `LIVE_APPLE_TEAM_ID` on the server.
+Set `LIVE_APPLE_APP_STORE_ID` to the numeric App Store Connect app ID to enable
+the Safari App Clip banner on event pages.
 
 ```bash
 brew install xcodegen

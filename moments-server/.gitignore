@@ -1,7 +1,16 @@
+# Also protects standalone server-only deployment checkouts.
 node_modules/
-data/
 .env
+.env.live
+data/
+live-data/
+output/
 *.log
-.DS_Store
-
-game-admin-ui/compiled/
+*.jks
+*.keystore
+mobile/android/.gradle/
+mobile/android/**/build/
+mobile/android/local.properties
+mobile/ios/*.xcodeproj/
+mobile/ios/generated/
+mobile/ios/build/

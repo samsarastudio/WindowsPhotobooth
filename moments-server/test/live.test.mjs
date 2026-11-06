@@ -68,6 +68,10 @@ test('Moments Live account isolation, private media, moderation, capacity and up
   assert.equal((await call(`/api/guest/${slug}/photos`, { method: 'POST', cookie: g2.cookie, body: payload('closed') })).status, 403);
   assert.equal((await call('/.well-known/apple-app-site-association')).status, 503, 'no fabricated Apple association');
   assert.equal((await call('/.well-known/assetlinks.json')).status, 503);
+  const oldStore = process.env.LIVE_APPLE_APP_STORE_ID;
+  process.env.LIVE_APPLE_APP_STORE_ID = '123456789';
+  try { assert.match((await call(`/e/${slug}`)).body.toString(), /apple-itunes-app/); }
+  finally { if (oldStore === undefined) delete process.env.LIVE_APPLE_APP_STORE_ID; else process.env.LIVE_APPLE_APP_STORE_ID = oldStore; }
   await call(`/api/events/${slug}/photos/${photo.id}`, { method: 'DELETE', cookie: a });
   assert.equal((await call(imagePath, { cookie: a })).status, 404);
   assert.equal((await call(`/api/events/${slug}`, { method: 'DELETE', cookie: b })).status, 404);
