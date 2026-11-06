@@ -12,6 +12,16 @@ photobooth-app/config/ai-models/*.onnx
 moments-server/node_modules/
 moments-server/data/
 moments-server/.env
+moments-server/.env.live
+moments-server/live-data/
+moments-server/mobile/android/.gradle/
+moments-server/mobile/android/**/build/
+moments-server/mobile/android/local.properties
+moments-server/mobile/ios/*.xcodeproj/
+moments-server/mobile/ios/build/
+moments-server/mobile/ios/generated/
+*.jks
+*.keystore
 
 # Native bridge CMake output
 photobooth-app/native/edsdk-bridge/build/

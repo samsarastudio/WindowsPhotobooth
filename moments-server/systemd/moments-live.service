@@ -1,0 +1,25 @@
+[Unit]
+Description=InMoment Live event cameras and galleries
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=moments-live
+Group=moments-live
+WorkingDirectory=/opt/moments-live
+EnvironmentFile=/etc/moments-live.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/moments-live/src/live/index.js
+Restart=on-failure
+RestartSec=5
+StateDirectory=moments-live
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/moments-live
+
+[Install]
+WantedBy=multi-user.target

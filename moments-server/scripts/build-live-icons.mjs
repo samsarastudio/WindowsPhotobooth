@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#173e35"/><circle cx="512" cy="512" r="256" fill="none" stroke="#efe5cd" stroke-width="60"/><circle cx="512" cy="512" r="80" fill="#e4a97b"/><circle cx="806" cy="220" r="40" fill="#e4a97b"/></svg>');
+const assets = path.join(root, 'mobile/ios/Shared/Assets.xcassets');
+const icon = path.join(assets, 'AppIcon.appiconset');
+fs.mkdirSync(icon, { recursive: true });
+fs.writeFileSync(path.join(assets, 'Contents.json'), JSON.stringify({ info: { author: 'xcode', version: 1 } }, null, 2));
+fs.writeFileSync(path.join(icon, 'Contents.json'), JSON.stringify({ images: [{ filename: 'AppIcon.png', idiom: 'universal', platform: 'ios', size: '1024x1024' }], info: { author: 'xcode', version: 1 } }, null, 2));
+await sharp(svg).resize(1024).png().toFile(path.join(icon, 'AppIcon.png'));
+const store = path.join(root, 'mobile/store-assets'); fs.mkdirSync(store, { recursive: true });
+await sharp(svg).resize(512).png().toFile(path.join(store, 'google-play-icon.png'));
+for (const size of [192, 512]) await sharp(svg).resize(size).png().toFile(path.join(root, `live-public/icon-${size}.png`));
+console.log('Generated native and web app icons.');

@@ -1,0 +1,70 @@
+name: MomentsLive
+options:
+  bundleIdPrefix: com.inmomentservices
+  deploymentTarget:
+    iOS: '16.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: ${MOMENTS_APPLE_TEAM_ID}
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.0
+targets:
+  MomentsLive:
+    type: application
+    platform: iOS
+    sources: [Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.inmomentservices.live
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: generated/App-Info.plist
+      properties:
+        CFBundleDisplayName: Moments Live
+        UILaunchScreen: {}
+        NSCameraUsageDescription: Capture photos to share with your event.
+        NSPhotoLibraryAddUsageDescription: Save event photos to your library.
+        NSUserActivityTypes: [NSUserActivityTypeBrowsingWeb]
+    entitlements:
+      path: generated/App.entitlements
+      properties:
+        com.apple.developer.associated-domains: ['applinks:live.inmomentservices.com', 'appclips:live.inmomentservices.com']
+    dependencies:
+      - target: MomentsClip
+        embed: true
+  MomentsClip:
+    type: application.on-demand-install-capable
+    platform: iOS
+    sources: [Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.inmomentservices.live.Clip
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: generated/Clip-Info.plist
+      properties:
+        CFBundleDisplayName: Moments Live
+        UILaunchScreen: {}
+        NSCameraUsageDescription: Capture photos to share with your event.
+        NSPhotoLibraryAddUsageDescription: Save event photos to your library.
+        NSUserActivityTypes: [NSUserActivityTypeBrowsingWeb]
+        NSAppClip:
+          NSAppClipRequestEphemeralUserNotification: false
+          NSAppClipRequestLocationConfirmation: false
+    entitlements:
+      path: generated/Clip.entitlements
+      properties:
+        com.apple.developer.on-demand-install-capable: true
+        com.apple.developer.parent-application-identifiers: ['$(AppIdentifierPrefix)com.inmomentservices.live']
+        com.apple.developer.associated-domains: ['appclips:live.inmomentservices.com']
+schemes:
+  MomentsLive:
+    build:
+      targets:
+        MomentsLive: all
+  MomentsClip:
+    build:
+      targets:
+        MomentsClip: all
