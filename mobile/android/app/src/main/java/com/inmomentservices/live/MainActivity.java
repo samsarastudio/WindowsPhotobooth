@@ -26,6 +26,8 @@ public class MainActivity extends Activity {
     private String guestToken = "";
     private Uri captureUri;
     private boolean uploading;
+    private final ArrayList<CountDownTimer> countdowns = new ArrayList<>();
+    private boolean wasWaiting;
     private final Runnable poll = new Runnable() { public void run() { if (!slug.isEmpty() && !guestToken.isEmpty() && !uploading) loadEvent(); handler.postDelayed(this, 15000); } };
 
     @Override public void onCreate(Bundle state) {
@@ -38,10 +40,11 @@ public class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); if (intent.getData() != null) openLink(intent.getData()); }
     @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); if (captureUri != null) out.putString("capture", captureUri.toString()); }
     @Override protected void onResume() { super.onResume(); handler.postDelayed(poll, 15000); }
-    @Override protected void onPause() { super.onPause(); handler.removeCallbacks(poll); }
+    @Override protected void onPause() { super.onPause(); handler.removeCallbacks(poll); for(CountDownTimer timer:countdowns)timer.cancel(); countdowns.clear(); }
     @Override protected void onDestroy() { handler.removeCallbacks(poll); network.shutdown(); super.onDestroy(); }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private void layout() {
+        for(CountDownTimer timer:countdowns)timer.cancel(); countdowns.clear();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(Color.rgb(247,245,239));
         content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(24),dp(36),dp(24),dp(36)); scroll.addView(content); setContentView(scroll);
         scroll.setOnApplyWindowInsetsListener((v, insets) -> { v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom()); return insets; });
@@ -87,8 +90,10 @@ public class MainActivity extends Activity {
     }
     private void render(JSONObject state,JSONArray photos,String current,String auth) {
         JSONObject e=state.optJSONObject("event"); if(e==null)return;
+        JSONObject flags=state.optJSONObject("features");
+        boolean uploads=state.optBoolean("uploads_enabled",true), downloads=flags==null||flags.optBoolean("downloads",true), revealExperience=flags==null||flags.optBoolean("revealExperience",true);
         layout(); label(e.optString("title"),34); label(e.optString("description"),16);
-        if(!state.optBoolean("joined")&&"published".equals(e.optString("status"))) {
+        if(!state.optBoolean("joined")&&"published".equals(e.optString("status"))&&uploads) {
             label("Your photos are shared with the event owner"+("all".equals(e.optString("visibility"))?" and event guests.":".")+" Only upload photos you have permission to share.",14);
             EditText name=input("Your display name"); button("Join this event",()-> { final String display=name.getText().toString(); network.execute(()-> {try {
                 JSONObject joined=json("POST","/api/guest/"+current+"/join",new JSONObject().put("name",display),auth);
@@ -97,18 +102,34 @@ public class MainActivity extends Activity {
             }catch(Exception ex){error(ex);} }); });
         } else if(state.optBoolean("joined")) {
             label(state.optInt("remaining")+" photos left",16);
-            if("published".equals(e.optString("status"))&&state.optInt("remaining")>0){button("Take a photo",this::camera);button("Choose a photo",()-> {Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);pick.setType("image/*");pick.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(pick,11);});}
+            if("published".equals(e.optString("status"))&&state.optInt("remaining")>0&&uploads){button("Take a photo",this::camera);button("Choose a photo",()-> {Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);pick.setType("image/*");pick.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(pick,11);});}
         }
-        if(!state.optBoolean("revealed"))label("Gallery reveals "+new java.text.SimpleDateFormat("MMM d, yyyy h:mm a",Locale.getDefault()).format(new Date(e.optLong("reveal"))),16);
+        if(!uploads&&"published".equals(e.optString("status")))label("Photo submissions are paused by the administrator.",16);
+        if("host".equals(e.optString("visibility")))label("This is a private collection for your event host.",16);
+        if(revealExperience&&"published".equals(e.optString("status"))&&e.optLong("closes_at")>0)countdown("Camera closes in",e.optLong("closes_at")-state.optLong("server_time",System.currentTimeMillis()));
+        if(!state.optBoolean("revealed")&&!"host".equals(e.optString("visibility"))) {
+            if(revealExperience)countdown("Your moments reveal in",e.optLong("reveal")-state.optLong("server_time",System.currentTimeMillis()));
+            else label("Photos appear at the host's scheduled reveal time.",16);
+        }
+        if(wasWaiting&&state.optBoolean("revealed")&&revealExperience&&!"host".equals(e.optString("visibility")))label("The wait is over. Your moments are ready.",24);
+        wasWaiting=!state.optBoolean("revealed");
         label("The gallery",26);
         if(photos.length()==0)label("Photos appear here when shared, approved and revealed.",16);
         for(int i=0;i<photos.length();i++) {
             JSONObject photo=photos.optJSONObject(i);String imagePath=photo.optString("url");
             ImageView image=new ImageView(this);image.setAdjustViewBounds(true);image.setContentDescription("Photo by "+photo.optString("guest_name"));content.addView(image,new LinearLayout.LayoutParams(-1,dp(300)));
             network.execute(()-> {try {byte[] bytes=request("GET",imagePath+"?thumb=1",null,null,auth);Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length);runOnUiThread(()->image.setImageBitmap(bitmap));}catch(Exception ignored){}});
-            button("Save / share photo",()-> sharePhoto(imagePath,auth));
+            if(downloads)button("Save / share photo",()-> sharePhoto(imagePath+"?download=1",auth));
         }
         button("Refresh gallery",this::loadEvent);button("Share event link",()-> {Intent share=new Intent(Intent.ACTION_SEND);share.setType("text/plain");share.putExtra(Intent.EXTRA_TEXT,BASE+"/e/"+current);startActivity(Intent.createChooser(share,"Share event"));});button("Open another event",this::home);
+    }
+    private void countdown(String title,long remaining) {
+        if(remaining<=0)return;
+        TextView display=new TextView(this); display.setTextSize(22); content.addView(display);
+        CountDownTimer timer=new CountDownTimer(remaining,1000) {
+            public void onTick(long ms){long seconds=(ms+999)/1000;display.setText(title+"\n"+String.format(Locale.getDefault(),"%dd %02d:%02d:%02d",seconds/86400,(seconds/3600)%24,(seconds/60)%60,seconds%60));}
+            public void onFinish(){display.setText(title+"\n00:00:00");if(!uploading)loadEvent();}
+        };countdowns.add(timer);timer.start();
     }
     private void camera() {
         try {File dir=new File(getCacheDir(),"captures");dir.mkdirs();File file=File.createTempFile("capture-",".jpg",dir);captureUri=FileProvider.getUriForFile(this,getPackageName()+".files",file);

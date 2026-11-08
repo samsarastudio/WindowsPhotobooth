@@ -1,7 +1,9 @@
+import { applyCapabilities, mountFeatureAdmin, countdown } from './features.js';
 const app = document.querySelector('#app');
 const nav = document.querySelector('#nav');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let user, stream, refreshTimer, slideTimer, noticeTimer;
+let capabilities = {}, clearCountdown = () => {}, capabilityTimer;
 const parts = location.pathname.split('/').filter(Boolean);
 const slug = parts[1];
 const api = async (url, options = {}) => {
@@ -49,21 +51,28 @@ function fields(e) {
 async function host() {
   if (!user) return home();
   const e = await api(`/events/${slug}`);
+  capabilities = e.features;
   if (parts[2] === 'print') {
     app.innerHTML = `<div class="print-card"><p class="eyebrow">CAPTURE YOUR POINT OF VIEW</p><h1>${escape(e.title)}</h1><p>Scan. Snap. Share the moment.</p><img class="qr" src="/api/events/${slug}/qr" alt="Scan to join ${escape(e.title)}"><p>No app download needed.</p><p class="share-url">${escape(e.url)}</p><button class="no-print" id="print">Print invitation</button></div>`;
     action('#print', () => window.print()); return;
   }
   if (parts[2] === 'slideshow') return slideshow(e);
   app.innerHTML = `<div class="toolbar"><div><p class="eyebrow">EVENT STUDIO</p><h2>${escape(e.title)}</h2></div><div class="actions"><a class="button secondary" href="${e.url}" target="_blank" rel="noopener">Guest view ↗</a><a class="button secondary" href="/host/${slug}/slideshow">Live slideshow</a></div></div><div class="workspace"><div class="settings card"><h3>Make it yours.</h3><form id="settings">${fields(e)}<button type="submit">Save event settings</button></form><hr><h3>Cover & branding</h3><p class="muted">Cover: JPEG/PNG. Overlay: transparent PNG. Branding applies to new photos.</p><form id="assets"><label>Asset type<select name="kind"><option value="cover">Event cover</option><option value="overlay">Photo graphic overlay</option></select></label><label>Image<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><button type="submit" class="secondary">Upload image</button></form></div><section><div class="card"><span class="pill">${escape(e.status)}</span><div class="stats"><div class="stat">${e.photo_count}<span>PHOTOS</span></div><div class="stat">${e.guest_count} / ${e.guest_limit}<span>GUESTS</span></div></div><div class="split"><div><h3>Invite your people.</h3><p class="share-url">${escape(e.url)}</p><div class="actions"><button id="copy" class="small">Copy link</button><button id="share" class="small secondary">Share</button><a href="/host/${slug}/print" class="button small secondary">Print QR</a></div></div><a href="/api/events/${slug}/qr" download="${slug}-qr.png"><img class="qr" src="/api/events/${slug}/qr" alt="Event invitation QR"></a></div></div><div class="toolbar"><h3>Every perspective.</h3><div class="actions"><select id="sort" aria-label="Sort photos"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="favorites">Favorites</option><option value="pending">Awaiting approval</option></select><a class="button small secondary" href="/api/events/${slug}/download">Download all</a></div></div><div id="photos" class="gallery"></div></section></div>`;
+  const schedule = document.createElement('label'); schedule.textContent = 'Close camera and uploads at';
+  const deadline = document.createElement('input'); deadline.type = 'datetime-local'; deadline.name = 'closes_at'; deadline.value = datetime(e.closes_at); schedule.append(deadline);
+  document.querySelector('#settings [name=reveal]').closest('label').before(schedule);
+  const hostOnly = new Option('Only the event owner', 'host'); hostOnly.selected = e.visibility === 'host'; document.querySelector('#settings [name=visibility]').append(hostOnly);
+  document.querySelector('#settings [name=status]').value = e.configured_status;
   const book = document.createElement('a'); book.className = 'button small secondary'; book.href = `/api/events/${slug}/photobook`; book.textContent = 'Photobook PDF'; document.querySelector('#sort').parentElement.append(book);
   const deleteEvent = document.createElement('button'); deleteEvent.className = 'small danger'; deleteEvent.id = 'delete-event'; deleteEvent.textContent = 'Delete event'; document.querySelector('.settings').append(deleteEvent);
   action('#delete-event', async () => { if (prompt('This permanently deletes the event and all its photos. Type the event name to confirm:') !== e.title) return; await send(`/events/${slug}`, {}, 'DELETE'); location.href = '/'; });
-  form('#settings', async b => { b.reveal = b.reveal ? new Date(b.reveal).getTime() : 0; b.moderation = b.moderation ? 1 : 0; await send(`/events/${slug}`, b, 'PATCH'); notice('Event settings saved'); });
+  form('#settings', async b => { for (const name of ['reveal', 'closes_at']) if (name in b) b[name] = b[name] ? new Date(b[name]).getTime() : 0; b.moderation = b.moderation ? 1 : 0; await send(`/events/${slug}`, b, 'PATCH'); notice('Event settings saved'); });
   form('#assets', async (_b, f) => { await api(`/events/${slug}/assets/${f.kind.value}`, { method: 'POST', body: new FormData(f) }); notice('Event image saved'); });
   action('#copy', async () => { await navigator.clipboard.writeText(e.url); notice('Event link copied'); });
   action('#share', async () => { if (navigator.share) await navigator.share({ title: e.title, url: e.url }); else { await navigator.clipboard.writeText(e.url); notice('Event link copied'); } });
   document.querySelector('#sort').addEventListener('change', () => loadPhotos(true).catch(err => notice(err.message, true)));
   await loadPhotos(true); refreshTimer = setInterval(() => { if (!document.hidden) loadPhotos(true).catch(() => {}); }, 8000);
+  applyCapabilities(capabilities);
 }
 async function loadPhotos(isHost = false) {
   let photos = await api(`/guest/${slug}/photos`);
@@ -83,17 +92,36 @@ async function loadPhotos(isHost = false) {
     const d = document.createElement('dialog'); d.innerHTML = `<img src="${el.dataset.preview}" alt="Event photo"><div><button class="secondary">Close</button></div>`;
     document.body.append(d); d.querySelector('button').onclick = () => d.close(); d.addEventListener('close', () => d.remove()); d.showModal();
   });
+  applyCapabilities(capabilities);
 }
 async function guestView() {
   const data = await api(`/guest/${slug}`); const e = data.event;
+  clearCountdown(); capabilities = data.features;
+  if (!capabilities.webApp) { stopCamera(); location.reload(); return; }
   app.innerHTML = `<section class="guest"><div class="guest-head">${e.cover_url ? `<img class="cover" src="${e.cover_url}" alt="Event cover">` : ''}<p class="eyebrow">YOU'RE PART OF THE PICTURE</p><h1>${escape(e.title)}</h1><p>${escape(e.description || 'The best moments happen between the poses. Share yours here.')}</p><span class="pill">${e.status === 'closed' ? 'Event gallery' : `${data.remaining} photos left for you`}</span></div>${!data.joined && e.status === 'published' ? `<div class="card"><h3>Come on in.</h3><form id="join"><label>Your display name<input name="name" maxlength="60" required autocomplete="given-name" placeholder="How should we call you?"></label><p class="muted">Photos are shared with the event owner${e.visibility === 'all' ? ' and other event guests' : ''}. Only upload photos you have permission to share. Your place is remembered on this device.</p><button type="submit">Join the moment ↗</button></form></div>` : ''}${data.joined && e.status === 'published' ? `<div class="capture-box"><div class="toolbar"><div><h3>Make a memory.</h3><p class="muted">${e.style === 'mono' ? 'Black & white' : e.style === 'warm' ? 'Warm film' : 'Natural'} · ${e.moderation ? 'Host approval before reveal' : 'Automatic upload'}</p></div><div class="actions"><button id="camera" ${!data.remaining ? 'disabled' : ''}>Open camera</button><label class="button secondary file-button">Choose photos<input id="upload" type="file" accept="image/*" multiple ${!data.remaining ? 'disabled' : ''}></label></div></div><div id="camera-area"></div><p id="upload-status" role="status"></p></div>` : ''}${!data.revealed ? `<div class="empty">A little anticipation.<br>The gallery opens ${escape(new Date(e.reveal).toLocaleString())}.</div>` : ''}${!data.joined && e.status === 'closed' ? '<p class="empty">This event has closed. Use the device you joined with to view its gallery.</p>' : ''}<div id="photos" class="gallery"></div></section>`;
   form('#join', async b => { await send(`/guest/${slug}/join`, b); await guestView(); });
+  if (!data.uploads_enabled) {
+    document.querySelector('#join')?.remove(); document.querySelector('.capture-box')?.remove(); stopCamera();
+    if (e.status === 'published') { const pause = document.createElement('p'); pause.className = 'empty'; pause.textContent = 'Photo submissions are paused by the administrator.'; document.querySelector('.guest-head').after(pause); }
+  }
+  if (e.visibility === 'host') {
+    const privacy = document.createElement('p'); privacy.className = 'empty'; privacy.textContent = 'This is a private collection for your host. Thank you for sharing your perspective.';
+    document.querySelector('#photos').before(privacy);
+    document.querySelectorAll('.guest > .empty').forEach(el => { if (el.textContent.includes('gallery opens')) el.remove(); });
+  }
+  const revealKey = `moments-reveal-${slug}-${e.reveal}`;
+  if (!data.revealed && e.visibility !== 'host') sessionStorage.setItem(revealKey, 'waiting');
+  if (data.revealed && e.visibility !== 'host' && capabilities.revealExperience && sessionStorage.getItem(revealKey) === 'waiting') {
+    sessionStorage.setItem(revealKey, 'revealed');
+    const banner = document.createElement('div'); banner.className = 'reveal-banner'; banner.setAttribute('role', 'status'); banner.textContent = 'The wait is over. Your moments are ready.'; document.querySelector('#photos').before(banner);
+  }
+  clearCountdown = countdown(data, async () => { stopCamera(); await guestView(); });
   action('#camera', openCamera);
   document.querySelector('#upload')?.addEventListener('change', event => uploadFiles([...event.target.files]));
   if (data.joined) await loadPhotos();
   clearInterval(refreshTimer); refreshTimer = setInterval(async () => {
-    if (document.hidden || !data.joined) return;
-    try { const next = await api(`/guest/${slug}`); if (next.revealed !== data.revealed || next.event.status !== e.status) { stopCamera(); await guestView(); } else await loadPhotos(); } catch { /* Preserve current view on temporary network loss. */ }
+    if (document.hidden) return;
+    try { const next = await api(`/guest/${slug}`); if (next.revealed !== data.revealed || JSON.stringify(next.features) !== JSON.stringify(data.features) || JSON.stringify(next.event) !== JSON.stringify(e)) { stopCamera(); await guestView(); } else if (data.joined) await loadPhotos(); } catch { /* Preserve current view on temporary network loss. */ }
   }, 8000);
 }
 async function uploadFiles(files) {
@@ -129,9 +157,9 @@ async function slideshow(e) {
   let photos = [], index = 0;
   app.innerHTML = `<div class="slideshow"><div class="actions"><button id="fullscreen" class="secondary">Fullscreen</button><a class="button" href="/host/${slug}">Exit</a></div><div id="slide"><h2>Waiting for the first moment…</h2></div><p>${escape(e.title)}</p></div>`;
   action('#fullscreen', () => document.documentElement.requestFullscreen());
-  const refresh = async () => { photos = (await api(`/guest/${slug}/photos`)).filter(p => p.approved); };
+  const refresh = async () => { photos = await api(`/events/${slug}/slideshow`); };
   const draw = () => { if (photos.length) { const p = photos[index++ % photos.length]; document.querySelector('#slide').innerHTML = `<img src="${p.url}" alt="Event slideshow photo">`; } };
-  await refresh(); draw(); slideTimer = setInterval(draw, 5000); refreshTimer = setInterval(() => refresh().catch(() => {}), 8000);
+  await refresh(); draw(); slideTimer = setInterval(draw, 5000); refreshTimer = setInterval(() => refresh().catch(err => { photos = []; document.querySelector('#slide').textContent = err.message; }), 8000);
 }
 async function admin() {
   app.innerHTML = '<section class="guest"><p class="eyebrow">MOMENTS ADMINISTRATION</p><h1>Invite an owner.</h1><div class="card"><form id="invite"><label>Administrator key<input type="password" name="key" required autocomplete="off"></label><label>Owner name<input name="name" required maxlength="120"></label><label>Owner email<input type="email" name="email" required></label><button type="submit">Create account & invitation</button></form><div id="invitation"></div></div><p class="muted">Owners can create and manage their own events. This key is never saved by this page. Invitations expire in 30 minutes and can be used once.</p></section>';
@@ -140,10 +168,15 @@ async function admin() {
     document.querySelector('#invitation').innerHTML = `<h3>Invitation ready.</h3><p>${result.delivery === 'sent' ? 'Email sent.' : result.delivery === 'failed' ? 'Email delivery failed. Share the link securely with the owner.' : 'Email delivery is not configured. Share the link securely with the owner.'}</p><label>One-time access link<input id="invite-url" readonly value="${escape(result.url)}"></label><p class="muted">Expires in 30 minutes.</p><button class="secondary" id="copy-invite">Copy invitation</button>`;
     action('#copy-invite', async () => { await navigator.clipboard.writeText(result.url); notice('Invitation copied'); });
   });
+  mountFeatureAdmin({ api, send, notice, form });
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopCamera(); });
-window.addEventListener('pagehide', () => { stopCamera(); clearInterval(refreshTimer); clearInterval(slideTimer); });
+window.addEventListener('pagehide', () => { stopCamera(); clearCountdown(); clearInterval(refreshTimer); clearInterval(slideTimer); clearInterval(capabilityTimer); });
 try {
+  capabilities = (await api('/config')).features;
+  if (parts[0] !== 'admin' && parts[0] !== 'e') capabilityTimer = setInterval(async () => {
+    try { capabilities = (await api('/config')).features; if (!capabilities.webApp) location.reload(); else applyCapabilities(capabilities); } catch { /* Retry on the next refresh. */ }
+  }, 8000);
   const access = new URLSearchParams(location.hash.slice(1)).get('access');
   if (access) { history.replaceState(null, '', location.pathname); await send('/auth/accept', { token: access }); notice('Welcome to Moments Live'); }
   try { user = await api('/me'); } catch { user = null; }
