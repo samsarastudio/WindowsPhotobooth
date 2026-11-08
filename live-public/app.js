@@ -7,6 +7,7 @@ let user, stream, refreshTimer, slideTimer, noticeTimer;
 let capabilities = {}, clearCountdown = () => {}, capabilityTimer;
 const parts = location.pathname.split('/').filter(Boolean);
 const slug = parts[1];
+document.body.dataset.screen = parts[0] === 'e' ? 'guest' : parts[0] === 'host' ? 'studio' : 'home';
 const api = async (url, options = {}) => {
   const response = await fetch(`/api${url}`, { ...options, headers: { ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...options.headers } });
   const body = await response.json();
@@ -131,8 +132,19 @@ async function guestView() {
   const data = await api(`/guest/${slug}`); const e = data.event;
   clearCountdown(); capabilities = data.features;
   if (!capabilities.webApp) { stopCamera(); location.reload(); return; }
-  app.innerHTML = `<section class="guest"><div class="guest-head">${e.cover_url ? `<img class="cover" src="${e.cover_url}" alt="Event cover">` : ''}<p class="eyebrow">EVENT PHOTOS</p><h1>${escape(e.title)}</h1><p>${escape(e.description || 'Take a photo or upload from your phone to share it with this event.')}</p><span class="pill">${e.status === 'closed' ? 'Event gallery' : `${data.remaining} photos left for you`}</span></div>${!data.joined && e.status === 'published' ? `<div class="card"><h3>Join to share photos</h3><form id="join"><label>Your name<input name="name" maxlength="60" required autocomplete="given-name" placeholder="Enter your name"></label><p class="muted">Photos are shared with the event owner${e.visibility === 'all' ? ' and other event guests' : ''}. Only upload photos you have permission to share. Your place is remembered on this device.</p><button type="submit">Join event</button></form></div>` : ''}${data.joined && e.status === 'published' ? `<div class="capture-box"><div class="toolbar"><div><h3>Add your photos</h3><p class="muted">${e.moderation ? 'Your host reviews photos before they appear.' : 'Photos are shared as soon as you upload.'}</p></div><div class="actions"><button id="camera" ${!data.remaining ? 'disabled' : ''}>Take a photo</button><label class="button secondary file-button">Upload photos<input id="upload" type="file" accept="image/*" multiple ${!data.remaining ? 'disabled' : ''}></label></div></div><div id="camera-area"></div><p id="upload-status" role="status"></p></div>` : ''}${!data.revealed ? `<div class="empty">Photos will be visible on ${escape(new Date(e.reveal).toLocaleString())}.</div>` : ''}${!data.joined && e.status === 'closed' ? '<p class="empty">This event has closed. Use the device you joined with to view its gallery.</p>' : ''}<div id="photos" class="gallery"></div></section>`;
+  app.innerHTML = `<section class="guest"><div class="guest-head">${e.cover_url ? `<img class="cover" src="${e.cover_url}" alt="Event cover">` : ''}<p class="eyebrow">EVENT PHOTOS</p><h1>${escape(e.title)}</h1><p>${escape(e.description || 'Take a photo or upload from your phone to share it with this event.')}</p><span class="pill">${e.status === 'closed' ? 'Event gallery' : `${data.remaining} photos left for you`}</span></div>${!data.joined && e.status === 'published' ? `<div class="card"><h3>Join to share photos</h3><form id="join"><label>Your name<input name="name" maxlength="60" required autocomplete="given-name" placeholder="Enter your name"></label><p class="muted">Photos are shared with the event owner${e.visibility === 'all' ? ' and other event guests' : ''}. Only upload photos you have permission to share. Your place is remembered on this device.</p><button type="submit">Join event</button></form></div>` : ''}${data.joined && e.status === 'published' ? `<div class="capture-box" id="capture"><div class="toolbar"><div><h3>Add your photos</h3><p class="muted">${e.moderation ? 'Your host reviews photos before they appear.' : 'Photos are shared as soon as you upload.'}</p></div><div class="actions"><button id="camera" ${!data.remaining ? 'disabled' : ''}>Take a photo</button><label class="button secondary file-button">Upload photos<input id="upload" type="file" accept="image/*" multiple ${!data.remaining ? 'disabled' : ''}></label></div></div><div id="camera-area"></div><p id="upload-status" role="status"></p></div>` : ''}${!data.revealed ? `<div class="empty">Photos will be visible on ${escape(new Date(e.reveal).toLocaleString())}.</div>` : ''}${!data.joined && e.status === 'closed' ? '<p class="empty">This event has closed. Use the device you joined with to view its gallery.</p>' : ''}<div id="photos" class="gallery"></div></section>`;
+  document.querySelector('.guest-dock')?.remove();
+  if (data.joined) {
+    const dock = document.createElement('nav'); dock.className = 'guest-dock'; dock.setAttribute('aria-label', 'Event navigation');
+    dock.innerHTML = `${data.uploads_enabled && data.remaining > 0 ? '<a href="#capture"><span aria-hidden="true">＋</span>Add photos</a>' : ''}<a href="#photos"><span aria-hidden="true">▦</span>Gallery</a>`;
+    const updateDock = () => dock.querySelectorAll('a').forEach(a => { if (a.hash === (location.hash || (data.uploads_enabled && data.remaining > 0 ? '#capture' : '#photos'))) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); });
+    dock.querySelectorAll('a').forEach(a => a.addEventListener('click', () => { dock.querySelectorAll('a').forEach(link => link.removeAttribute('aria-current')); a.setAttribute('aria-current', 'location'); }));
+    updateDock(); document.body.append(dock);
+  }
   form('#join', async b => { await send(`/guest/${slug}/join`, b); await guestView(); });
+  if (data.joined) {
+    const heading = document.createElement('h2'); heading.className = 'gallery-title'; heading.textContent = e.visibility === 'host' ? 'Private collection' : 'Event gallery'; document.querySelector('#photos').before(heading);
+  }
   if (data.joined && data.remaining === 0 && e.status === 'published') {
     const done = document.createElement('p'); done.className = 'empty'; done.textContent = 'You’ve shared all your photos. Thank you!'; document.querySelector('.capture-box')?.replaceWith(done);
   }
@@ -142,9 +154,10 @@ async function guestView() {
   }
   if (e.visibility === 'host') {
     const privacy = document.createElement('p'); privacy.className = 'empty'; privacy.textContent = 'This is a private collection for your host. Thank you for sharing your perspective.';
-    document.querySelector('#photos').before(privacy); document.querySelector('#photos').hidden = true;
+    document.querySelector('#photos').append(privacy);
     document.querySelectorAll('.guest > .empty').forEach(el => { if (el.textContent.includes('Photos will be visible on')) el.remove(); });
   }
+  if (!data.revealed && e.visibility !== 'host') { const waiting = document.querySelector('.guest > .empty'); if (waiting) document.querySelector('#photos').append(waiting); }
   const revealKey = `moments-reveal-${slug}-${e.reveal}`;
   if (!data.revealed && e.visibility !== 'host') sessionStorage.setItem(revealKey, 'waiting');
   if (data.revealed && e.visibility !== 'host' && capabilities.revealExperience && sessionStorage.getItem(revealKey) === 'waiting') {
