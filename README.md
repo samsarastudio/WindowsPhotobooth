@@ -8,6 +8,11 @@ private event galleries and native mobile projects. Start with `npm run start:li
 See [manual deployment](docs/live-deployment.md) and [Apple / Google Play setup](docs/mobile-release.md).
 The existing gallery service below remains on port **3020**.
 
+Live administrators sign in at `/admin` with email and password after a one-time
+setup using `LIVE_ADMIN_KEY`. The dashboard manages owners, creates event links
+directly, opens any event studio, and controls features. Owner suspension revokes
+owner access without deleting galleries. See the deployment guide for recovery.
+
 Live session galleries for InMoment photobooths. Guests open `https://moments.inmomentservices.com/{session}` to view photos as they arrive.
 
 ## Pi port note

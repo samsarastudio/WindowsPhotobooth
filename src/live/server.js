@@ -1,3 +1,4 @@
+import { adminAuth } from './admin-auth.js';
 import express from 'express';
 import Database from 'better-sqlite3';
 import multer from 'multer';
@@ -46,6 +47,7 @@ export function createLiveApp(options = {}) {
     CREATE TABLE IF NOT EXISTS live_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
   `);
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
+  if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
   const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: true, slideshow: true, downloads: true, photobooks: true };
   const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}') });
   const requireFeature = key => { if (!features()[key]) throw fail(403, 'This feature is disabled by the administrator'); };
@@ -79,16 +81,17 @@ export function createLiveApp(options = {}) {
   const owner = req => {
     const bearer = req.headers.authorization?.replace(/^Bearer /, '');
     const raw = cookies(req).live_owner || bearer || '';
-    return db.prepare('SELECT o.* FROM owners o JOIN credentials c ON o.id=c.owner WHERE c.hash=? AND c.expires>?').get(hash(raw), now());
+    return db.prepare('SELECT o.* FROM owners o JOIN credentials c ON o.id=c.owner WHERE c.hash=? AND c.expires>? AND o.disabled=0').get(hash(raw), now());
   };
+  const admin = adminAuth({ app, db, now, cookie, cookies, limit, adminKey });
   const mustOwner = req => { const o = owner(req); if (!o) throw fail(401, 'Sign in to manage your events'); return o; };
-  const mustAdmin = req => { limit(req, 'admin', 100); if (!safeEqual(req.headers['x-live-admin-key'], adminKey)) throw fail(401, 'Administrator access required'); };
+  const mustAdmin = req => { if (admin(req)) return; limit(req, 'admin', 100); if (!safeEqual(req.headers['x-live-admin-key'], adminKey)) throw fail(401, 'Administrator access required'); };
   const event = req => { const e = db.prepare('SELECT * FROM events WHERE slug=?').get(req.params.slug); if (!e) throw fail(404, 'Event not found'); return e; };
-  const owned = req => { const o = mustOwner(req); const e = event(req); if (e.owner !== o.id) throw fail(404, 'Event not found'); return e; };
+  const owned = req => { const e = event(req); if (admin(req)) return e; const o = mustOwner(req); if (e.owner !== o.id) throw fail(404, 'Event not found'); return e; };
   const guest = (req, e) => db.prepare('SELECT * FROM guests WHERE event=? AND hash=?').get(e.id, hash(req.headers['x-guest-token'] || cookies(req)[`live_guest_${e.id}`] || ''));
   const summary = e => ({ ...e, configured_status: e.status, status: statusOf(e), features: features(), url: `${base}/e/${e.slug}`, photo_count: db.prepare('SELECT count(*) n FROM photos WHERE event=?').get(e.id).n, guest_count: db.prepare('SELECT count(*) n FROM guests WHERE event=?').get(e.id).n });
   const canSee = (req, e, p) => {
-    if (owner(req)?.id === e.owner) return true;
+    if (admin(req) || owner(req)?.id === e.owner) return true;
     const g = guest(req, e);
     return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && Boolean(g) && (e.visibility === 'all' || (e.visibility === 'own' && p.guest === g.id));
   };
@@ -100,6 +103,7 @@ export function createLiveApp(options = {}) {
     return true;
   });
   async function invite(o) {
+    if (o.disabled) throw fail(403, 'Enable this owner before issuing an invitation');
     const raw = token();
     db.prepare('DELETE FROM invitations WHERE owner=? OR expires<?').run(o.id, now());
     db.prepare('INSERT INTO invitations VALUES(?,?,?)').run(hash(raw), o.id, now() + 30 * 60000);
@@ -123,15 +127,15 @@ export function createLiveApp(options = {}) {
     const email = text(req.body.email, 254).toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail(400, 'Enter a valid email address');
     let o = db.prepare('SELECT * FROM owners WHERE email=?').get(email);
-    if (!o) { o = { id: id(), email, name: text(req.body.name) || email }; db.prepare('INSERT INTO owners VALUES(?,?,?,?)').run(o.id, o.email, o.name, now()); }
+    if (!o) { o = { id: id(), email, name: text(req.body.name) || email }; db.prepare('INSERT INTO owners(id,email,name,created) VALUES(?,?,?,?)').run(o.id, o.email, o.name, now()); }
     res.status(201).json({ owner: o, ...await invite(o) });
   }));
-  app.get('/api/admin/owners', wrap((req, res) => { mustAdmin(req); res.json(db.prepare('SELECT id,email,name,created FROM owners ORDER BY created DESC').all()); }));
+  app.get('/api/admin/owners', wrap((req, res) => { mustAdmin(req); res.json(db.prepare('SELECT id,email,name,created,disabled,(SELECT count(*) FROM events WHERE owner=owners.id) AS event_count FROM owners ORDER BY created DESC').all()); }));
   app.post('/api/auth/request', wrap(async (req, res) => {
     limit(req, 'login', 8);
     if (!process.env.LIVE_SMTP_URL && !options.sendMail) throw fail(503, 'Ask your Moments administrator for a new access link. Email delivery is not configured.');
     const o = db.prepare('SELECT * FROM owners WHERE email=?').get(text(req.body.email, 254).toLowerCase());
-    if (o) await invite(o);
+    if (o && !o.disabled) await invite(o);
     res.json({ message: 'If your email has been invited, an access link will be sent.' });
   }));
   app.post('/api/auth/accept', wrap((req, res) => {
@@ -139,6 +143,7 @@ export function createLiveApp(options = {}) {
     const o = db.transaction(() => {
       const row = db.prepare('SELECT * FROM invitations WHERE hash=? AND expires>?').get(hash(String(req.body.token || '')), now());
       if (!row) throw fail(401, 'This access link has expired or has already been used');
+      if (db.prepare('SELECT disabled FROM owners WHERE id=?').get(row.owner)?.disabled) throw fail(401, 'Owner access is disabled');
       db.prepare('DELETE FROM invitations WHERE hash=?').run(row.hash);
       return db.prepare('SELECT * FROM owners WHERE id=?').get(row.owner);
     })();
@@ -149,7 +154,7 @@ export function createLiveApp(options = {}) {
     res.json({ owner: o });
   }));
   app.post('/api/auth/logout', wrap((req, res) => { db.prepare('DELETE FROM credentials WHERE hash=?').run(hash(cookies(req).live_owner || '')); cookie(res, 'live_owner', '', 0); res.json({ ok: true }); }));
-  app.get('/api/me', wrap((req, res) => res.json(mustOwner(req))));
+  app.get('/api/me', wrap((req, res) => res.json(admin(req) || mustOwner(req))));
   app.get('/api/events', wrap((req, res) => res.json(db.prepare('SELECT * FROM events WHERE owner=? ORDER BY created DESC').all(mustOwner(req).id).map(summary))));
   function settings(b, previous = {}) {
     const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', style: 'filters', overlay: 'branding' };
@@ -162,10 +167,32 @@ export function createLiveApp(options = {}) {
     return value;
   }
   app.post('/api/events', wrap((req, res) => {
-    const o = mustOwner(req); const s = settings(req.body);
+    const o = mustOwner(req); res.status(201).json(createEvent(o.id, req.body));
+  }));
+  function createEvent(ownerId, body) {
+    const s = settings(body);
     const slug = `${s.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'event'}-${crypto.randomBytes(9).toString('hex')}`;
-    db.prepare(`INSERT INTO events(id,owner,slug,${Object.keys(s).join(',')},created) VALUES(${Array(4 + Object.keys(s).length).fill('?').join(',')})`).run(id(), o.id, slug, ...Object.values(s), now());
-    res.status(201).json(summary(db.prepare('SELECT * FROM events WHERE slug=?').get(slug)));
+    db.prepare(`INSERT INTO events(id,owner,slug,${Object.keys(s).join(',')},created) VALUES(${Array(4 + Object.keys(s).length).fill('?').join(',')})`).run(id(), ownerId, slug, ...Object.values(s), now());
+    return summary(db.prepare('SELECT * FROM events WHERE slug=?').get(slug));
+  }
+  app.get('/api/admin/events', wrap((req, res) => { mustAdmin(req); res.json(db.prepare('SELECT * FROM events ORDER BY created DESC').all().map(summary)); }));
+  app.post('/api/admin/events', wrap((req, res) => {
+    mustAdmin(req); const o = db.prepare('SELECT * FROM owners WHERE id=? AND disabled=0').get(String(req.body.owner || ''));
+    if (!o) throw fail(400, 'Choose an active event owner');
+    res.status(201).json(createEvent(o.id, req.body));
+  }));
+  app.patch('/api/admin/owners/:id', wrap((req, res) => {
+    mustAdmin(req); const o = db.prepare('SELECT * FROM owners WHERE id=?').get(req.params.id);
+    if (!o) throw fail(404, 'Owner not found');
+    const name = text(req.body.name ?? o.name); const email = text(req.body.email ?? o.email, 254).toLowerCase();
+    const disabled = req.body.disabled ?? Boolean(o.disabled);
+    if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof disabled !== 'boolean') throw fail(400, 'Provide a name, valid email and boolean access setting');
+    if (db.prepare('SELECT 1 FROM owners WHERE email=? AND id<>?').get(email, o.id)) throw fail(409, 'This email belongs to another owner');
+    db.transaction(() => {
+      db.prepare('UPDATE owners SET name=?,email=?,disabled=? WHERE id=?').run(name, email, Number(disabled), o.id);
+      if (disabled || email !== o.email) { db.prepare('DELETE FROM credentials WHERE owner=?').run(o.id); db.prepare('DELETE FROM invitations WHERE owner=?').run(o.id); }
+    })();
+    res.json({ ok: true });
   }));
   app.patch('/api/events/:slug', wrap((req, res) => {
     const e = owned(req); const s = settings(req.body, e);
@@ -176,7 +203,7 @@ export function createLiveApp(options = {}) {
   app.get('/api/events/:slug/qr', wrap(async (req, res) => { const e = owned(req); res.type('png').send(await QRCode.toBuffer(`${base}/e/${e.slug}`, { width: 1000, margin: 3, errorCorrectionLevel: 'M' })); }));
   app.get('/api/guest/:slug', wrap((req, res) => {
     const e = event(req);
-    if (e.status === 'draft' && owner(req)?.id !== e.owner) throw fail(404, 'Event not published yet');
+    if (e.status === 'draft' && !admin(req) && owner(req)?.id !== e.owner) throw fail(404, 'Event not published yet');
     const g = guest(req, e);
     res.json({ event: publicEvent(e), features: features(), server_time: now(), uploads_enabled: features().guestUploads && statusOf(e) === 'published', joined: Boolean(g), remaining: g ? Math.max(0, e.shot_limit - g.shots) : e.shot_limit, revealed: e.reveal <= now(), guest_name: g?.name });
   }));
@@ -219,7 +246,7 @@ export function createLiveApp(options = {}) {
   }));
   app.get('/api/guest/:slug/cover', wrap((req, res) => {
     requireFeature('branding');
-    const e = event(req); if (e.status === 'draft' && owner(req)?.id !== e.owner) throw fail(404, 'Event not found');
+    const e = event(req); if (e.status === 'draft' && !admin(req) && owner(req)?.id !== e.owner) throw fail(404, 'Event not found');
     const asset = db.prepare("SELECT * FROM assets WHERE event=? AND kind='cover'").get(e.id);
     if (!asset) throw fail(404, 'No event cover');
     res.sendFile(path.resolve(data, 'assets', asset.filename));
@@ -269,7 +296,7 @@ export function createLiveApp(options = {}) {
     res.status(201).json({ id: photoId });
   }));
   app.get('/api/guest/:slug/photos', wrap((req, res) => {
-    const e = event(req); if (!guest(req, e) && owner(req)?.id !== e.owner) throw fail(401, 'Join the event first');
+    const e = event(req); if (!guest(req, e) && !admin(req) && owner(req)?.id !== e.owner) throw fail(401, 'Join the event first');
     const photos = db.prepare('SELECT p.*,g.name guest_name FROM photos p JOIN guests g ON p.guest=g.id WHERE p.event=? ORDER BY p.created DESC').all(e.id);
     res.json(photos.filter(p => canSee(req, e, p)).map(p => ({ id: p.id, approved: p.approved, favorite: p.favorite, created: p.created, guest_name: p.guest_name, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
@@ -347,7 +374,7 @@ export function createLiveApp(options = {}) {
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
   app.use((req, res, next) => {
     if (/^\/index\.html\/?$/i.test(req.path) || req.path === '/' || /^\/(e|host)(\/|$)/i.test(req.path)) {
-      if (!features().webApp) return res.status(503).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moments Live</title><body><h1>The web experience is currently unavailable.</h1><p>Your event data is retained. Contact your event host or use the Moments app.</p></body></html>');
+      if (!features().webApp && !(admin(req) && /^\/host(\/|$)/i.test(req.path))) return res.status(503).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moments Live</title><body><h1>The web experience is currently unavailable.</h1><p>Your event data is retained. Contact your event host or use the Moments app.</p></body></html>');
       if (/\/slideshow\/?$/.test(req.path) && !features().slideshow) return res.status(403).send('Slideshow disabled by administrator');
     }
     next();

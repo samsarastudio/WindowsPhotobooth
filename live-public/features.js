@@ -1,5 +1,5 @@
 export const featureLabels = {
-  webApp: ['Web app', 'Owner and guest browser pages. Admin and native APIs remain available.'],
+  webApp: ['Web app', 'Owner and guest browser pages. Administrator studio access and native APIs remain available.'],
   guestUploads: ['Guest participation', 'Allow new guests and photo uploads from web, iOS, App Clip and Android.'],
   scheduledClosing: ['Scheduled closing editor', 'Allow owners to set or change upload deadlines. Existing deadlines remain enforced.'],
   scheduledReveal: ['Scheduled reveal editor', 'Allow owners to set or change reveal times. Existing hidden photos stay hidden.'],
@@ -24,24 +24,6 @@ export function applyCapabilities(flags) {
   for (const [key, selector] of Object.entries({ downloads: 'a[href*="?download="],a[href$="/download"]', photobooks: 'a[href$="/photobook"]', slideshow: 'a[href$="/slideshow"]' })) {
     document.querySelectorAll(selector).forEach(el => { el.hidden = flags[key] === false; });
   }
-}
-
-export function mountFeatureAdmin({ api, send, notice, form }) {
-  const section = document.createElement('section'); section.className = 'guest feature-admin';
-  section.innerHTML = '<div class="card"><h2>Feature controls</h2><p>Changes take effect immediately and survive server restarts.</p><form id="unlock-features"><label>Administrator key<input name="key" type="password" required autocomplete="off"></label><button type="submit">Load feature settings</button></form><div id="feature-controls"></div></div>';
-  document.querySelector('#app').append(section);
-  let key = '';
-  form('#unlock-features', async (body, unlock) => {
-    const values = await api('/admin/features', { headers: { 'X-Live-Admin-Key': body.key } });
-    key = body.key; unlock.reset();
-    const controls = section.querySelector('#feature-controls');
-    controls.innerHTML = `<form id="features-form">${Object.entries(featureLabels).map(([name, [label, hint]]) => `<label class="feature-switch"><span class="check"><input type="checkbox" name="${name}" ${values[name] ? 'checked' : ''}>${label}</span><span class="muted">${hint}</span></label>`).join('')}<button type="submit">Save feature settings</button><button type="button" class="secondary" id="lock-features">Lock controls</button></form>`;
-    form('#features-form', async (_body, f) => {
-      const patch = Object.fromEntries(Object.keys(featureLabels).map(name => [name, f.elements[name].checked]));
-      await send('/admin/features', patch, 'PATCH', { 'X-Live-Admin-Key': key }); notice('Feature settings saved');
-    });
-    controls.querySelector('#lock-features').onclick = () => { key = ''; controls.replaceChildren(); };
-  });
 }
 
 export function countdown(data, refresh) {

@@ -112,24 +112,59 @@ Leave existing hostname mappings in place. Bypass caching for `/api/*`, includin
 images, because visibility can change. Do not put interactive Cloudflare Access login
 in front of guest routes or `/.well-known/*`. The origin is bound to loopback.
 
-Verify `https://live.inmomentservices.com/api/health`, then open `/admin` and create
-your first owner invitation. Owners open the one-time link, create an event, set
+Verify `https://live.inmomentservices.com/api/health`, then open `/admin`, set up your
+administrator login as described below, and create your first owner invitation. Owners open the one-time link, create an event, set
 its status to **published**, and share its `/e/<slug>` URL or QR.
 
 SMTP is optional for initial setup: `/admin` always returns a copyable invitation.
 Once SMTP is configured, invitations are mailed and existing owners can request
 fresh links from the homepage. Configure SPF/DKIM/DMARC with your email provider.
 
+## Administrator login and dashboard
+
+On the first visit to `/admin`, enter the existing `LIVE_ADMIN_KEY` once, your admin
+email address, and a password of at least 12 characters. This creates one service-wide
+administrator account. No SMTP is required for admin login. Subsequent visits use
+email and password, with a seven-day HttpOnly session cookie (Secure under HTTPS).
+Passwords are stored as salted scrypt hashes; session tokens are stored as hashes.
+The administrator account and sessions survive service restarts.
+
+The dashboard lets you:
+
+- Create/invite owners and generate fresh one-time owner sign-in links.
+- List owners, edit their names/emails, and suspend or restore owner access.
+- Select an active owner and create a published event link or a draft directly.
+- Copy guest links, download QR codes, and open any event's studio for settings,
+  moderation, photo management and deletion.
+- Manage feature switches and change the administrator password.
+
+Suspending an owner invalidates their sessions and pending invitations; existing
+events, guest access and photos remain intact. Close or unpublish an event separately
+if guest participation should stop. Changing an owner's email also revokes their
+existing sessions/invitations. Restoring access requires issuing a fresh invitation.
+Admin-created published events default to 25 photos per guest, 250 guests and
+immediate reveal to joined guests; use the studio to change these before sharing.
+
+For forgotten passwords, use **Forgot your password?** on `/admin` and supply the
+server key to set new admin credentials. Password changes and recovery invalidate
+all previous admin sessions. Keep `LIVE_ADMIN_KEY` configured and private: it remains
+a recovery credential and supports existing authenticated admin API integrations.
+There is no public administrator registration or email password-reset endpoint.
+
+For an existing installation, pull the deployment branch and restart Live as below.
+Startup adds the administrator/session tables and owner access flag automatically;
+existing owners and events are preserved. Open `/admin` to complete the one-time setup.
+
 ## Administrator feature controls
 
-Open `https://live.inmomentservices.com/admin`, enter `LIVE_ADMIN_KEY` under
-**Feature controls**, then select **Load feature settings**. Change the switches
+Sign in at `https://live.inmomentservices.com/admin`, expand **Feature controls**,
+and change the switches
 and select **Save feature settings**. All switches default to on and are stored
 in the Live SQLite database. No restart is needed to change them.
 
 | Switch | Effect when off |
 | --- | --- |
-| Web app | Guest and owner browser pages return 503. `/admin`, native APIs and association files remain available. |
+| Web app | Guest and owner browser pages return 503. `/admin`, signed-in administrator studio access, native APIs and association files remain available. |
 | Guest participation | Rejects new guest admissions and uploads across web, iOS, App Clip and Android. |
 | Scheduled closing editor | Owners cannot change upload deadlines; existing deadlines still apply. |
 | Scheduled reveal editor | Owners cannot change reveal times; existing hidden photos remain hidden. |
@@ -145,7 +180,7 @@ Existing photo pixels are unchanged by branding/filter switches. Download contro
 are not DRM: anyone authorized to see an image can still save or screenshot it.
 The Web app switch controls browser pages, not API client identity. To stop all
 new guest uploads, also turn off Guest participation. If you disable the web app,
-return directly to `/admin` to enable it again. Admin key access remains required.
+return directly to `/admin` to enable it again. Administrator sign-in remains required.
 API enforcement is immediate; open clients refresh controls periodically.
 
 Owners set **Camera closes at** and the reveal time in their browser's local
