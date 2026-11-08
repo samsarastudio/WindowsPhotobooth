@@ -19,7 +19,49 @@ directory; it does not migrate or expose the existing booth galleries.
 
 No payments, subscriptions, printing/shipping fulfillment, NFC hardware sales, or 24/7 staffed support are connected. The photobook is a printable PDF, not an order placed with a printing company. Screen branding supports covers, photo styles, graphic overlays and captions; there is no freeform sticker/layout editor. UI is English. Native apps handle the guest journey; owners manage events in the web studio.
 
-## Deploy the server-only branch
+## Existing host: moments-server-live on port 3020
+
+The reported host has `/home/enn707/moments-server-live`, managed by
+`moments-gallery.service` on port 3020. That is the existing Gallery installation,
+not an installed Moments Live service. Its detached HEAD and local `.env`,
+`node_modules`, and lockfile do not need changing to install Live alongside it.
+
+Do **not** run the update commands below until Live has been installed. Do not
+switch/reset/stash the existing Gallery checkout or replace its service entrypoint.
+Live uses `src/live/index.js`, `.env.live` (or a systemd environment file), and
+`LIVE_PORT`; the old Gallery's `.env` and `PORT` are not Live configuration.
+
+Read-only checks on the host (inspect locally; environment files may contain secrets):
+
+```bash
+sudo systemctl status moments-gallery --no-pager
+sudo systemctl cat moments-gallery
+git -C /home/enn707/moments-server-live status --short --branch
+sudo ss -ltnp | grep -E ':(3020|3021)\b'
+command -v node
+node --version
+```
+
+Then follow **First installation** below. Those steps create `/opt/moments-live`
+and `moments-live.service`; neither is expected to exist beforehand. The new clone
+has its own lockfile and dependencies. The existing checkout, local files, service,
+and port 3020 remain untouched. Check that port 3021 is available before starting.
+Only the new `live.inmomentservices.com` hostname should point to port 3021;
+preserve all existing Gallery hostname routes.
+
+After installation, verify both services are active:
+
+```bash
+sudo systemctl is-active moments-gallery moments-live
+curl --fail http://127.0.0.1:3021/api/health
+# Expected: service "moments-live", version 2.
+```
+
+If instead you intend to retire Gallery and reuse its checkout, service name and
+port 3020, this is a replacement deployment requiring a migration/rollback plan;
+do not apply the parallel-install commands as an in-place conversion.
+
+## First installation: deploy the server-only branch
 
 Use **codex/moments-live-server** for a package-at-root checkout. The implementation
 branch **codex/moments-live-events** is the complete monorepo; its package is `moments-server/`.
