@@ -1,4 +1,5 @@
-import { applyCapabilities, mountFeatureAdmin, countdown } from './features.js';
+import { adminDashboard } from './admin.js';
+import { applyCapabilities, countdown } from './features.js';
 const app = document.querySelector('#app');
 const nav = document.querySelector('#nav');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -30,10 +31,15 @@ function form(selector, callback) {
   });
 }
 function navigation() {
+  if (user?.role === 'admin') {
+    nav.innerHTML = '<a href="/admin">Admin dashboard</a><button class="secondary small" id="logout">Sign out</button>';
+    action('#logout', async () => { await send('/admin/auth/logout'); location.href = '/admin'; }); return;
+  }
   nav.innerHTML = user ? `<a href="/">My events</a><span>${escape(user.name)}</span><button class="secondary small" id="logout">Sign out</button>` : '<span>Every perspective, together.</span>';
   action('#logout', async () => { await send('/auth/logout'); location.href = '/'; });
 }
 async function home() {
+  if (user?.role === 'admin') return admin();
   if (!user) {
     app.innerHTML = `<section class="hero"><div><p class="eyebrow">EVERY PERSPECTIVE, TOGETHER</p><h1>Your people.<br>Your moments.</h1><p>One shared gallery. All the little moments you might have missed.<br>Guests scan, snap and share — right from their phones.</p><div class="card"><h3>Welcome, event owner.</h3><p class="muted">Use the invitation from your Moments administrator, or request a fresh sign-in link below.</p><form id="login"><label>Email address<input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button type="submit">Send me an access link ↗</button></form></div><p class="muted">Joining an event? Open the link or scan the QR shared by your host.</p></div><div class="hero-art" aria-hidden="true"><div class="rings"></div><small>COLLECT THE UNPOSED.</small></div></section>`;
     form('#login', async b => notice((await send('/auth/request', b)).message)); return;
@@ -65,7 +71,7 @@ async function host() {
   document.querySelector('#settings [name=status]').value = e.configured_status;
   const book = document.createElement('a'); book.className = 'button small secondary'; book.href = `/api/events/${slug}/photobook`; book.textContent = 'Photobook PDF'; document.querySelector('#sort').parentElement.append(book);
   const deleteEvent = document.createElement('button'); deleteEvent.className = 'small danger'; deleteEvent.id = 'delete-event'; deleteEvent.textContent = 'Delete event'; document.querySelector('.settings').append(deleteEvent);
-  action('#delete-event', async () => { if (prompt('This permanently deletes the event and all its photos. Type the event name to confirm:') !== e.title) return; await send(`/events/${slug}`, {}, 'DELETE'); location.href = '/'; });
+  action('#delete-event', async () => { if (prompt('This permanently deletes the event and all its photos. Type the event name to confirm:') !== e.title) return; await send(`/events/${slug}`, {}, 'DELETE'); location.href = user?.role === 'admin' ? '/admin' : '/'; });
   form('#settings', async b => { for (const name of ['reveal', 'closes_at']) if (name in b) b[name] = b[name] ? new Date(b[name]).getTime() : 0; b.moderation = b.moderation ? 1 : 0; await send(`/events/${slug}`, b, 'PATCH'); notice('Event settings saved'); });
   form('#assets', async (_b, f) => { await api(`/events/${slug}/assets/${f.kind.value}`, { method: 'POST', body: new FormData(f) }); notice('Event image saved'); });
   action('#copy', async () => { await navigator.clipboard.writeText(e.url); notice('Event link copied'); });
@@ -162,20 +168,22 @@ async function slideshow(e) {
   await refresh(); draw(); slideTimer = setInterval(draw, 5000); refreshTimer = setInterval(() => refresh().catch(err => { photos = []; document.querySelector('#slide').textContent = err.message; }), 8000);
 }
 async function admin() {
-  app.innerHTML = '<section class="guest"><p class="eyebrow">MOMENTS ADMINISTRATION</p><h1>Invite an owner.</h1><div class="card"><form id="invite"><label>Administrator key<input type="password" name="key" required autocomplete="off"></label><label>Owner name<input name="name" required maxlength="120"></label><label>Owner email<input type="email" name="email" required></label><button type="submit">Create account & invitation</button></form><div id="invitation"></div></div><p class="muted">Owners can create and manage their own events. This key is never saved by this page. Invitations expire in 30 minutes and can be used once.</p></section>';
-  form('#invite', async (b, f) => {
-    const result = await send('/admin/invitations', { email: b.email, name: b.name }, 'POST', { 'X-Live-Admin-Key': b.key }); f.key.value = '';
-    document.querySelector('#invitation').innerHTML = `<h3>Invitation ready.</h3><p>${result.delivery === 'sent' ? 'Email sent.' : result.delivery === 'failed' ? 'Email delivery failed. Share the link securely with the owner.' : 'Email delivery is not configured. Share the link securely with the owner.'}</p><label>One-time access link<input id="invite-url" readonly value="${escape(result.url)}"></label><p class="muted">Expires in 30 minutes.</p><button class="secondary" id="copy-invite">Copy invitation</button>`;
-    action('#copy-invite', async () => { await navigator.clipboard.writeText(result.url); notice('Invitation copied'); });
-  });
-  mountFeatureAdmin({ api, send, notice, form });
+  return adminDashboard({ app, nav, api, send, form, action, notice, escape });
 }
+
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopCamera(); });
+window.addEventListener('hashchange', async () => {
+  const access = new URLSearchParams(location.hash.slice(1)).get('access');
+  if (!access) return;
+  history.replaceState(null, '', location.pathname);
+  try { await send('/auth/accept', { token: access }); location.reload(); }
+  catch (err) { notice(err.message, true); }
+});
 window.addEventListener('pagehide', () => { stopCamera(); clearCountdown(); clearInterval(refreshTimer); clearInterval(slideTimer); clearInterval(capabilityTimer); });
 try {
   capabilities = (await api('/config')).features;
   if (parts[0] !== 'admin' && parts[0] !== 'e') capabilityTimer = setInterval(async () => {
-    try { capabilities = (await api('/config')).features; if (!capabilities.webApp) location.reload(); else applyCapabilities(capabilities); } catch { /* Retry on the next refresh. */ }
+    try { capabilities = (await api('/config')).features; if (!capabilities.webApp && user?.role !== 'admin') location.reload(); else applyCapabilities(capabilities); } catch { /* Retry on the next refresh. */ }
   }, 8000);
   const access = new URLSearchParams(location.hash.slice(1)).get('access');
   if (access) { history.replaceState(null, '', location.pathname); await send('/auth/accept', { token: access }); notice('Welcome to Moments Live'); }
