@@ -12,6 +12,7 @@ struct Event: Decodable {
     let status: String
     let visibility: String
     let reveal: Double
+    let closes_at: Double?
     let cover_url: String?
 }
 struct EventState: Decodable {
@@ -19,7 +20,11 @@ struct EventState: Decodable {
     let joined: Bool
     let remaining: Int
     let revealed: Bool
+    let uploads_enabled: Bool?
+    let server_time: Double?
+    let features: LiveFeatures?
 }
+struct LiveFeatures: Decodable { let downloads: Bool; let revealExperience: Bool }
 struct Photo: Decodable, Identifiable {
     let id: String
     let url: String
@@ -83,6 +88,7 @@ enum GuestKeychain {
             let images: [Photo]
             if next.joined { images = try JSONDecoder().decode([Photo].self, from: await request("api/guest/\(current)/photos", guestToken: key)) } else { images = [] }
             guard current == slug else { return }
+            if state?.revealed == false && next.revealed && next.event.visibility != "host" && next.features?.revealExperience != false { message = "The wait is over. Your moments are ready." }
             state = next; photos = images
         } catch { self.error = error.localizedDescription }
     }
@@ -137,14 +143,14 @@ struct MomentsView: View {
                     if let state = model.state {
                         Text(state.event.title).font(.system(size: 38, design: .serif))
                         Text(state.event.description).foregroundStyle(.secondary)
-                        if !state.joined && state.event.status == "published" {
+                        if !state.joined && state.event.status == "published" && state.uploads_enabled != false {
                             Text("Your photos are shared with the host\(state.event.visibility == "all" ? " and event guests" : ""). Only upload photos you have permission to share.").font(.footnote)
                             TextField("Your display name", text: $name).textFieldStyle(.roundedBorder).textContentType(.givenName)
                             Button("Join this event") { Task { await model.join(name: name) } }.buttonStyle(.borderedProminent).disabled(model.busy || name.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
                         if state.joined {
                             Text("\(state.remaining) photos left for you").font(.headline)
-                            if state.event.status == "published" && state.remaining > 0 {
+                            if state.event.status == "published" && state.remaining > 0 && state.uploads_enabled != false {
                                 HStack {
                                     Button {
                                         if UIImagePickerController.isSourceTypeAvailable(.camera) { camera = true } else { model.error = "Camera is unavailable. Choose a photo instead." }
@@ -154,7 +160,12 @@ struct MomentsView: View {
                             }
                         }
                         if model.busy { ProgressView(model.message) } else if !model.message.isEmpty { Text(model.message).font(.footnote) }
-                        if !state.revealed { Text("Gallery reveals \(Date(timeIntervalSince1970: state.event.reveal / 1000).formatted())").padding().background(.white).clipShape(RoundedRectangle(cornerRadius: 12)) }
+                        if state.event.visibility == "host" { Text("This is a private collection for your event host.").font(.callout) }
+                        if state.uploads_enabled == false && state.event.status == "published" { Text("Photo submissions are paused by the administrator.") }
+                        if state.features?.revealExperience != false {
+                            if let end = state.event.closes_at, state.event.status == "published", end > (state.server_time ?? 0) { CountdownLabel(title: "Camera closes in", deadline: end, serverTime: state.server_time) }
+                            if !state.revealed && state.event.visibility != "host" { CountdownLabel(title: "Your moments reveal in", deadline: state.event.reveal, serverTime: state.server_time) }
+                        } else if !state.revealed && state.event.visibility != "host" { Text("Your photos will appear at the host’s scheduled reveal time.") }
                         Text("Every perspective.").font(.title2)
                         if model.photos.isEmpty { Text("Photos appear here when shared, approved and revealed.").foregroundStyle(.secondary) }
                         LazyVStack(spacing: 20) { ForEach(model.photos) { photo in PhotoCard(photo: photo).environmentObject(model) } }
@@ -192,11 +203,24 @@ struct PhotoCard: View {
     var body: some View {
         VStack(alignment: .leading) {
             if let image { Image(uiImage: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 12)) } else { ProgressView().frame(height: 180) }
-            HStack { Text(photo.guest_name).font(.caption); Spacer(); Button("Save / share") {
-                Task { do { let bytes = try await model.request(String(photo.url.dropFirst())); shareImage = UIImage(data: bytes); sharing = shareImage != nil } catch { model.error = error.localizedDescription } }
-            } }
+            HStack { Text(photo.guest_name).font(.caption); Spacer(); if model.state?.features?.downloads != false { Button("Save / share") {
+                Task { do { let bytes = try await model.request(String(photo.url.dropFirst()) + "?download=1"); shareImage = UIImage(data: bytes); sharing = shareImage != nil } catch { model.error = error.localizedDescription } }
+            } } }
         }.task(id: photo.id) { if let data = try? await model.request(String(photo.url.dropFirst()) + "?thumb=1") { image = UIImage(data: data) } }
             .sheet(isPresented: $sharing) { if let shareImage { ShareSheet(image: shareImage) } }
+    }
+}
+struct CountdownLabel: View {
+    let title: String
+    let deadline: Double
+    let serverTime: Double?
+    var body: some View {
+        let start = Date()
+        let remaining = max(0, (deadline - (serverTime ?? start.timeIntervalSince1970 * 1000)) / 1000)
+        VStack(alignment: .leading) {
+            Text(title).font(.caption)
+            Text(timerInterval: start...start.addingTimeInterval(remaining), countsDown: true).monospacedDigit().font(.title)
+        }
     }
 }
 struct ShareSheet: UIViewControllerRepresentable {

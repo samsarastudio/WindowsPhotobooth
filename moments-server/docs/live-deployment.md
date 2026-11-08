@@ -78,7 +78,48 @@ SMTP is optional for initial setup: `/admin` always returns a copyable invitatio
 Once SMTP is configured, invitations are mailed and existing owners can request
 fresh links from the homepage. Configure SPF/DKIM/DMARC with your email provider.
 
-## Updates, backups and rollback
+## Administrator feature controls
+
+Open `https://live.inmomentservices.com/admin`, enter `LIVE_ADMIN_KEY` under
+**Feature controls**, then select **Load feature settings**. Change the switches
+and select **Save feature settings**. All switches default to on and are stored
+in the Live SQLite database. No restart is needed to change them.
+
+| Switch | Effect when off |
+| --- | --- |
+| Web app | Guest and owner browser pages return 503. `/admin`, native APIs and association files remain available. |
+| Guest participation | Rejects new guest admissions and uploads across web, iOS, App Clip and Android. |
+| Scheduled closing editor | Owners cannot change upload deadlines; existing deadlines still apply. |
+| Scheduled reveal editor | Owners cannot change reveal times; existing hidden photos remain hidden. |
+| Host-only gallery option | Owners cannot newly select host-only visibility; existing private galleries remain private. |
+| Countdown and reveal experience | Hides countdowns and the gallery-opening announcement; timing rules still apply. |
+| Covers and branding | Hides covers and disables branding uploads/new photo overlays. |
+| Photo filters | New photos receive no style effect. |
+| Live slideshow | Blocks the slideshow page and feed. |
+| Download controls and ZIP export | Blocks explicit image-download requests and ZIP export. |
+| Photobook PDFs | Blocks PDF generation. |
+
+Existing photo pixels are unchanged by branding/filter switches. Download controls
+are not DRM: anyone authorized to see an image can still save or screenshot it.
+The Web app switch controls browser pages, not API client identity. To stop all
+new guest uploads, also turn off Guest participation. If you disable the web app,
+return directly to `/admin` to enable it again. Admin key access remains required.
+API enforcement is immediate; open clients refresh controls periodically.
+
+Owners set **Camera closes at** and the reveal time in their browser's local
+timezone. The server stores absolute timestamps and enforces deadlines without
+a scheduled job. Keep the server clock synchronized. A published event becomes
+effectively closed at its deadline; its saved publication setting remains published.
+To reopen it, extend/clear the deadline and ensure the saved status is published.
+Visibility choices are everyone, each guest's own photos, or host only. A reveal
+deadline never grants guests access to a host-only gallery.
+
+This update adds `live_settings` and `events.closes_at` automatically on startup.
+Existing events default to no closing deadline. Back up before updating as below;
+do not delete or recreate the existing Live database. Rebuild mobile apps using
+[mobile-release.md](mobile-release.md) to include the new controls/countdowns.
+
+## Updating an existing installation
 
 ```bash
 cd /opt/moments-live

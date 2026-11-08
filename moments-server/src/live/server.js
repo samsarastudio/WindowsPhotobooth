@@ -22,6 +22,7 @@ const safeEqual = (a, b) => Boolean(a && b) && crypto.timingSafeEqual(Buffer.fro
 const text = (value, max = 120) => String(value ?? '').trim().slice(0, max);
 
 export function createLiveApp(options = {}) {
+  const now = options.clock || Date.now;
   const base = (options.baseUrl || process.env.LIVE_BASE_URL || 'https://live.inmomentservices.com').replace(/\/$/, '');
   const secure = new URL(base).protocol === 'https:';
   const data = options.dataDir || process.env.LIVE_DATA_DIR || path.join(root, 'live-data');
@@ -42,7 +43,14 @@ export function createLiveApp(options = {}) {
     CREATE INDEX IF NOT EXISTS photos_event ON photos(event,created);
     CREATE INDEX IF NOT EXISTS guests_event ON guests(event);
     CREATE TABLE IF NOT EXISTS assets(event TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,kind TEXT NOT NULL,filename TEXT NOT NULL,PRIMARY KEY(event,kind));
+    CREATE TABLE IF NOT EXISTS live_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
   `);
+  if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
+  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: true, slideshow: true, downloads: true, photobooks: true };
+  const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}') });
+  const requireFeature = key => { if (!features()[key]) throw fail(403, 'This feature is disabled by the administrator'); };
+  // Existing privacy and timing rules stay enforced even when their editor is disabled.
+  const statusOf = e => e.status === 'published' && e.closes_at > 0 && e.closes_at <= now() ? 'closed' : e.status;
   const app = express();
   app.disable('x-powered-by');
   // Trust only the local reverse proxy, never arbitrary forwarded addresses.
@@ -78,13 +86,13 @@ export function createLiveApp(options = {}) {
   const event = req => { const e = db.prepare('SELECT * FROM events WHERE slug=?').get(req.params.slug); if (!e) throw fail(404, 'Event not found'); return e; };
   const owned = req => { const o = mustOwner(req); const e = event(req); if (e.owner !== o.id) throw fail(404, 'Event not found'); return e; };
   const guest = (req, e) => db.prepare('SELECT * FROM guests WHERE event=? AND hash=?').get(e.id, hash(req.headers['x-guest-token'] || cookies(req)[`live_guest_${e.id}`] || ''));
-  const summary = e => ({ ...e, url: `${base}/e/${e.slug}`, photo_count: db.prepare('SELECT count(*) n FROM photos WHERE event=?').get(e.id).n, guest_count: db.prepare('SELECT count(*) n FROM guests WHERE event=?').get(e.id).n });
+  const summary = e => ({ ...e, configured_status: e.status, status: statusOf(e), features: features(), url: `${base}/e/${e.slug}`, photo_count: db.prepare('SELECT count(*) n FROM photos WHERE event=?').get(e.id).n, guest_count: db.prepare('SELECT count(*) n FROM guests WHERE event=?').get(e.id).n });
   const canSee = (req, e, p) => {
     if (owner(req)?.id === e.owner) return true;
     const g = guest(req, e);
-    return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && Boolean(g) && (e.visibility === 'all' || p.guest === g.id);
+    return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && Boolean(g) && (e.visibility === 'all' || (e.visibility === 'own' && p.guest === g.id));
   };
-  const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: e.style, shot_limit: e.shot_limit, reveal: e.reveal, visibility: e.visibility, status: e.status, moderation: e.moderation, overlay: e.overlay, cover_url: db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
+  const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: features().filters ? e.style : 'classic', shot_limit: e.shot_limit, closes_at: e.closes_at, reveal: e.reveal, visibility: e.visibility, status: statusOf(e), moderation: e.moderation, overlay: features().branding ? e.overlay : '', cover_url: features().branding && db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
   const mail = options.sendMail || (async (email, url) => {
     if (!process.env.LIVE_SMTP_URL || !process.env.LIVE_MAIL_FROM) return false;
     const transport = nodemailer.createTransport(process.env.LIVE_SMTP_URL);
@@ -100,7 +108,16 @@ export function createLiveApp(options = {}) {
     try { if (await mail(o.email, url)) delivery = 'sent'; } catch { delivery = 'failed'; }
     return { url, delivery, expires_in_minutes: 30 };
   }
-  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'moments-live', version: 1 }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'moments-live', version: 2 }));
+  app.get('/api/config', (_req, res) => res.json({ features: features(), server_time: now() }));
+  app.get('/api/admin/features', wrap((req, res) => { mustAdmin(req); res.json(features()); }));
+  app.patch('/api/admin/features', wrap((req, res) => {
+    mustAdmin(req);
+    if (!req.body || Array.isArray(req.body) || Object.entries(req.body).some(([k, v]) => !Object.hasOwn(defaults, k) || typeof v !== 'boolean')) throw fail(400, 'Provide known feature names with boolean values');
+    const updated = { ...features(), ...req.body };
+    db.prepare("INSERT OR REPLACE INTO live_settings VALUES('features',?)").run(JSON.stringify(updated));
+    res.json(updated);
+  }));
   app.post('/api/admin/invitations', wrap(async (req, res) => {
     mustAdmin(req);
     const email = text(req.body.email, 254).toLowerCase();
@@ -135,8 +152,13 @@ export function createLiveApp(options = {}) {
   app.get('/api/me', wrap((req, res) => res.json(mustOwner(req))));
   app.get('/api/events', wrap((req, res) => res.json(db.prepare('SELECT * FROM events WHERE owner=? ORDER BY created DESC').all(mustOwner(req).id).map(summary))));
   function settings(b, previous = {}) {
+    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', style: 'filters', overlay: 'branding' };
+    for (const [field, flag] of Object.entries(controlled)) if (b[field] !== undefined && String(b[field]) !== String(previous[field] ?? (field === 'style' ? 'classic' : field === 'overlay' ? '' : 0))) requireFeature(flag);
+    if (b.visibility === 'host' && previous.visibility !== 'host') requireFeature('hostOnlyGallery');
     const value = { title: text(b.title ?? previous.title), description: text(b.description ?? previous.description, 1500), style: b.style ?? previous.style ?? 'warm', shot_limit: Number(b.shot_limit ?? previous.shot_limit ?? 25), guest_limit: Number(b.guest_limit ?? previous.guest_limit ?? 250), reveal: Number(b.reveal ?? previous.reveal ?? 0), visibility: b.visibility ?? previous.visibility ?? 'all', status: b.status ?? previous.status ?? 'draft', moderation: Number(b.moderation ?? previous.moderation ?? 0), overlay: text(b.overlay ?? previous.overlay, 80) };
-    if (!value.title || !['warm', 'mono', 'classic'].includes(value.style) || !['all', 'own'].includes(value.visibility) || !['draft', 'published', 'closed'].includes(value.status) || ![0, 1].includes(value.moderation) || !Number.isInteger(value.shot_limit) || value.shot_limit < 1 || value.shot_limit > 1000 || !Number.isInteger(value.guest_limit) || value.guest_limit < 1 || value.guest_limit > 10000 || !Number.isSafeInteger(value.reveal) || value.reveal < 0) throw fail(400, 'Check event settings: 1–1000 photos and 1–10000 guests');
+    value.closes_at = Number(b.closes_at ?? previous.closes_at ?? 0);
+    if (!features().filters && !previous.style) value.style = 'classic';
+    if (!value.title || !['warm', 'mono', 'classic'].includes(value.style) || !['all', 'own', 'host'].includes(value.visibility) || !['draft', 'published', 'closed'].includes(value.status) || ![0, 1].includes(value.moderation) || !Number.isInteger(value.shot_limit) || value.shot_limit < 1 || value.shot_limit > 1000 || !Number.isInteger(value.guest_limit) || value.guest_limit < 1 || value.guest_limit > 10000 || !Number.isSafeInteger(value.reveal) || value.reveal < 0 || !Number.isSafeInteger(value.closes_at) || value.closes_at < 0) throw fail(400, 'Check event settings: valid times, 1–1000 photos and 1–10000 guests');
     return value;
   }
   app.post('/api/events', wrap((req, res) => {
@@ -156,11 +178,12 @@ export function createLiveApp(options = {}) {
     const e = event(req);
     if (e.status === 'draft' && owner(req)?.id !== e.owner) throw fail(404, 'Event not published yet');
     const g = guest(req, e);
-    res.json({ event: publicEvent(e), joined: Boolean(g), remaining: g ? Math.max(0, e.shot_limit - g.shots) : e.shot_limit, revealed: e.reveal <= now(), guest_name: g?.name });
+    res.json({ event: publicEvent(e), features: features(), server_time: now(), uploads_enabled: features().guestUploads && statusOf(e) === 'published', joined: Boolean(g), remaining: g ? Math.max(0, e.shot_limit - g.shots) : e.shot_limit, revealed: e.reveal <= now(), guest_name: g?.name });
   }));
   app.post('/api/guest/:slug/join', wrap((req, res) => {
     limit(req, 'join', 100); const e = event(req);
-    if (e.status !== 'published') throw fail(403, 'This event is not accepting guests');
+    requireFeature('guestUploads');
+    if (statusOf(e) !== 'published') throw fail(403, 'This event is not accepting guests');
     const old = guest(req, e); if (old) return res.json({ joined: true, remaining: Math.max(0, e.shot_limit - old.shots) });
     const raw = token();
     db.transaction(() => {
@@ -182,9 +205,9 @@ export function createLiveApp(options = {}) {
     next();
   });
   app.post('/api/events/:slug/assets/:kind', (req, _res, next) => {
-    try { owned(req); if (!['cover', 'overlay'].includes(req.params.kind)) throw fail(400, 'Unknown asset type'); next(); } catch (err) { next(err); }
+    try { owned(req); requireFeature('branding'); if (!['cover', 'overlay'].includes(req.params.kind)) throw fail(400, 'Unknown asset type'); next(); } catch (err) { next(err); }
   }, upload, wrap(async (req, res) => {
-    const e = owned(req); if (!req.file) throw fail(400, 'Choose an image');
+    const e = owned(req); requireFeature('branding'); if (!req.file) throw fail(400, 'Choose an image');
     let bytes;
     try { bytes = await sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true }).png().toBuffer(); } catch { throw fail(400, 'Choose a valid image'); }
     const filename = `${id()}.png`;
@@ -195,6 +218,7 @@ export function createLiveApp(options = {}) {
     res.json({ ok: true });
   }));
   app.get('/api/guest/:slug/cover', wrap((req, res) => {
+    requireFeature('branding');
     const e = event(req); if (e.status === 'draft' && owner(req)?.id !== e.owner) throw fail(404, 'Event not found');
     const asset = db.prepare("SELECT * FROM assets WHERE event=? AND kind='cover'").get(e.id);
     if (!asset) throw fail(404, 'No event cover');
@@ -202,7 +226,7 @@ export function createLiveApp(options = {}) {
   }));
   // Authenticate before buffering any upload.
   app.post('/api/guest/:slug/photos', (req, res, next) => {
-    try { const e = event(req); if (!guest(req, e)) throw fail(401, 'Join the event first'); if (e.status !== 'published') throw fail(403, 'Uploads are closed'); limit(req, 'upload', 300); next(); } catch (err) { next(err); }
+    try { const e = event(req); if (!guest(req, e)) throw fail(401, 'Join the event first'); requireFeature('guestUploads'); if (statusOf(e) !== 'published') throw fail(403, 'Uploads are closed'); limit(req, 'upload', 300); next(); } catch (err) { next(err); }
   }, upload, wrap(async (req, res) => {
     const e = event(req); const g = guest(req, e); const requestId = text(req.body.request_id, 100);
     if (!requestId) throw fail(400, 'An upload request ID is required');
@@ -213,12 +237,12 @@ export function createLiveApp(options = {}) {
     let bytes;
     try {
       let pipeline = sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true });
-      if (e.style === 'mono') pipeline = pipeline.grayscale();
-      if (e.style === 'warm') pipeline = pipeline.modulate({ saturation: .85 }).tint({ r: 255, g: 237, b: 215 });
+      if (features().filters && e.style === 'mono') pipeline = pipeline.grayscale();
+      if (features().filters && e.style === 'warm') pipeline = pipeline.modulate({ saturation: .85 }).tint({ r: 255, g: 237, b: 215 });
       bytes = await pipeline.jpeg({ quality: 88 }).toBuffer();
     } catch { throw fail(400, 'Use a valid JPEG, PNG, WebP or supported phone photo'); }
     const graphic = db.prepare("SELECT * FROM assets WHERE event=? AND kind='overlay'").get(e.id);
-    if (graphic || e.overlay) {
+    if (features().branding && (graphic || e.overlay)) {
       const { width, height } = await sharp(bytes).metadata(); const layers = [];
       if (graphic) layers.push({ input: await sharp(fs.readFileSync(path.join(data, 'assets', graphic.filename))).resize(width, height, { fit: 'fill' }).png().toBuffer() });
       if (e.overlay) {
@@ -233,7 +257,8 @@ export function createLiveApp(options = {}) {
     try {
       db.transaction(() => {
         const current = db.prepare('SELECT * FROM events WHERE id=?').get(e.id);
-        if (current.status !== 'published') throw fail(403, 'Uploads are closed');
+        requireFeature('guestUploads');
+        if (statusOf(current) !== 'published') throw fail(403, 'Uploads are closed');
         const duplicate = db.prepare('SELECT id FROM photos WHERE guest=? AND request_id=?').get(g.id, requestId);
         if (duplicate) throw fail(409, 'This upload already completed. Refresh your gallery.');
         const changed = db.prepare('UPDATE guests SET shots=shots+1 WHERE id=? AND shots<?').run(g.id, current.shot_limit);
@@ -249,6 +274,7 @@ export function createLiveApp(options = {}) {
     res.json(photos.filter(p => canSee(req, e, p)).map(p => ({ id: p.id, approved: p.approved, favorite: p.favorite, created: p.created, guest_name: p.guest_name, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
   app.get('/api/guest/:slug/photos/:photo/image', wrap(async (req, res) => {
+    if (req.query.download) requireFeature('downloads');
     const e = event(req); const p = db.prepare('SELECT * FROM photos WHERE id=? AND event=?').get(req.params.photo, e.id);
     if (!p || !canSee(req, e, p)) throw fail(404, 'Photo not available');
     if (req.query.thumb === '1') return res.type('jpeg').send(await sharp(fs.readFileSync(path.join(data, 'photos', p.filename))).resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer());
@@ -269,6 +295,7 @@ export function createLiveApp(options = {}) {
     res.json({ ok: true });
   }));
   app.get('/api/events/:slug/download', wrap((req, res) => {
+    requireFeature('downloads');
     const e = owned(req); const photos = db.prepare('SELECT * FROM photos WHERE event=?').all(e.id);
     res.attachment(`${e.slug}.zip`);
     const zip = archiver('zip', { zlib: { level: 0 } });
@@ -277,6 +304,7 @@ export function createLiveApp(options = {}) {
     void zip.finalize();
   }));
   app.get('/api/events/:slug/photobook', wrap((req, res) => {
+    requireFeature('photobooks');
     const e = owned(req);
     const photos = db.prepare('SELECT * FROM photos WHERE event=? AND approved=1 ORDER BY favorite DESC,created ASC').all(e.id);
     const pdf = new PDFDocument({ size: [432, 648], margin: 30, autoFirstPage: false });
@@ -312,7 +340,18 @@ export function createLiveApp(options = {}) {
     if (!fingerprints.length) return res.status(503).json({ error: 'Android signing certificate has not been configured' });
     res.json([{ relation: ['delegate_permission/common.handle_all_urls'], target: { namespace: 'android_app', package_name: process.env.LIVE_ANDROID_PACKAGE || 'com.inmomentservices.live', sha256_cert_fingerprints: fingerprints } }]);
   });
+  app.get('/api/events/:slug/slideshow', wrap((req, res) => {
+    const e = owned(req); requireFeature('slideshow');
+    res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
+  }));
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
+  app.use((req, res, next) => {
+    if (/^\/index\.html\/?$/i.test(req.path) || req.path === '/' || /^\/(e|host)(\/|$)/i.test(req.path)) {
+      if (!features().webApp) return res.status(503).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moments Live</title><body><h1>The web experience is currently unavailable.</h1><p>Your event data is retained. Contact your event host or use the Moments app.</p></body></html>');
+      if (/\/slideshow\/?$/.test(req.path) && !features().slideshow) return res.status(403).send('Slideshow disabled by administrator');
+    }
+    next();
+  });
   app.use(express.static(path.join(root, 'live-public'), { index: false }));
   app.get(['/', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print'], (req, res) => {
     const storeId = process.env.LIVE_APPLE_APP_STORE_ID || '';

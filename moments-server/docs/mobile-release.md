@@ -22,6 +22,13 @@ The iOS full app and App Clip share native SwiftUI code. The Android app uses na
 Android controls, the system camera and the system document picker. Neither app is a
 WebView wrapper. Owner administration is linked to the browser studio.
 
+The clients also honor administrator upload/download controls, show scheduled
+closing/reveal countdowns, and explain host-only gallery privacy. Deploy the matching
+server before rebuilding the clients. Turning off the web app leaves native APIs
+available; turning off Guest participation blocks native joins/uploads too.
+Android build and lint have been checked on Windows. iOS/App Clip source changes
+must still be compiled, signed and tested with Xcode on a Mac before submission.
+
 ## Apple application and App Clip
 
 Use a Mac with current Xcode. Register both bundle identifiers in Apple Developer,
