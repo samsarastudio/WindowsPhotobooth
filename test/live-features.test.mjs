@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { createLiveApp } from '../src/live/server.js';
-
 test('Live feature controls enforce deadlines, preserve privacy and persist across restart', async t => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'moments-feature-'));
   const adminKey = 'test-administrator-key-longer-than-32-characters';
@@ -36,10 +35,14 @@ test('Live feature controls enforce deadlines, preserve privacy and persist acro
   const native = { 'X-Guest-Token': joined.body.guest_token };
   const bytes = await sharp({ create: { width: 20, height: 20, channels: 3, background: 'red' } }).jpeg().toBuffer();
   const photo = key => { const form = new FormData(); form.append('photo', new Blob([bytes]), 'picture.jpg'); form.append('request_id', key); return form; };
+  live.db.prepare("UPDATE events SET style='mono' WHERE slug=?").run(e.slug); // Legacy event setting must not recolor new uploads.
   const uploaded = await call(`${route}/photos`, 'POST', photo('first'), guest); assert.equal(uploaded.status, 201);
   const media = `${route}/photos/${uploaded.body.id}/image`;
   assert.equal((await call(media, 'GET', undefined, guest)).status, 404);
-  assert.equal((await call(media, 'GET', undefined, owner)).status, 200);
+  const originalColor = await call(media, 'GET', undefined, owner);
+  assert.equal(originalColor.status, 200);
+  const channels = (await sharp(originalColor.body).stats()).channels;
+  assert.ok(channels[0].mean > channels[1].mean + 100, 'Red capture stays red even for a legacy mono event');
   time += 1000; // Exact boundary: no cron job, client clock or browser tab required.
   assert.equal((await call(route, 'GET', undefined, guest)).body.event.status, 'closed');
   assert.equal((await call(`${route}/join`, 'POST', { name: 'Late' })).status, 403);
@@ -60,7 +63,8 @@ test('Live feature controls enforce deadlines, preserve privacy and persist acro
   assert.equal((await call(media + '?download=1', 'GET', undefined, owner)).status, 403);
   assert.equal((await call(media, 'GET', undefined, owner)).status, 200, 'display access is not DRM');
   assert.equal((await call(`/api/events/${e.slug}/assets/cover`, 'POST', photo('cover'), owner)).status, 403);
-  assert.equal((await call(`/api/events/${e.slug}`, 'PATCH', { style: 'mono' }, owner)).status, 403);
+  assert.equal((await call(`/api/events/${e.slug}`, 'PATCH', { style: 'mono' }, owner)).body.style, 'classic');
+  assert.equal((await flags({ filters: true })).body.filters, false, 'Legacy toggle cannot restore removed filters');
   const fresh = (await call('/api/events', 'POST', { title: 'Natural', status: 'published' }, owner)).body;
   assert.equal(fresh.style, 'classic');
   assert.equal((await call(`/api/guest/${fresh.slug}/join`, 'POST', { name: 'Paused' })).status, 403);

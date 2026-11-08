@@ -8,7 +8,7 @@ directory; it does not migrate or expose the existing booth galleries.
 
 - Admin-only owner creation/invitation by email; one-time 30-minute sign-in links.
 - Optional SMTP delivery and email sign-in requests for existing invited owners.
-- Owner dashboard, multiple events, cover images, photo filters, captions and transparent PNG overlays.
+- Owner dashboard, multiple events, cover images, natural-colour photos, captions and transparent PNG overlays.
 - Per-event guest capacity, per-guest lifetime shot allowance, publication/closure, reveal time and privacy.
 - Shareable unguessable event links, downloadable QR PNGs and printable invitations.
 - iOS/Android browser guest capture and camera-roll uploads without installation.
@@ -17,7 +17,7 @@ directory; it does not migrate or expose the existing booth galleries.
 - Host live slideshow and a downloadable 6×9-inch photobook PDF of approved photos.
 - AASA and Android Digital Asset Links endpoints configured with your real signing identities.
 
-No payments, subscriptions, printing/shipping fulfillment, NFC hardware sales, or 24/7 staffed support are connected. The photobook is a printable PDF, not an order placed with a printing company. Screen branding supports covers, photo styles, graphic overlays and captions; there is no freeform sticker/layout editor. UI is English. Native apps handle the guest journey; owners manage events in the web studio.
+No payments, subscriptions, printing/shipping fulfillment, NFC hardware sales, or 24/7 staffed support are connected. The photobook is a printable PDF, not an order placed with a printing company. Screen branding supports covers, graphic overlays and captions; there is no freeform sticker/layout editor. UI is English. Native apps handle the guest journey; owners manage events in the web studio.
 
 ## Existing host: moments-server-live on port 3020
 
@@ -171,12 +171,13 @@ in the Live SQLite database. No restart is needed to change them.
 | Host-only gallery option | Owners cannot newly select host-only visibility; existing private galleries remain private. |
 | Countdown and reveal experience | Hides countdowns and the gallery-opening announcement; timing rules still apply. |
 | Covers and branding | Hides covers and disables branding uploads/new photo overlays. |
-| Photo filters | New photos receive no style effect. |
 | Live slideshow | Blocks the slideshow page and feed. |
 | Download controls and ZIP export | Blocks explicit image-download requests and ZIP export. |
 | Photobook PDFs | Blocks PDF generation. |
 
-Existing photo pixels are unchanged by branding/filter switches. Download controls
+New uploads always use natural camera colour, without warm or black-and-white filters.
+The legacy filter flag is held off even if an older client tries to enable it.
+Existing photo pixels are unchanged by this update or branding switches. Download controls
 are not DRM: anyone authorized to see an image can still save or screenshot it.
 The Web app switch controls browser pages, not API client identity. To stop all
 new guest uploads, also turn off Guest participation. If you disable the web app,

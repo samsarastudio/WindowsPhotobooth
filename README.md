@@ -13,6 +13,11 @@ setup using `LIVE_ADMIN_KEY`. The dashboard manages owners, creates event links
 directly, opens any event studio, and controls features. Owner suspension revokes
 owner access without deleting galleries. See the deployment guide for recovery.
 
+The web experience puts guest capture and event sharing first. Optional timing,
+privacy and branding controls are collapsed; event creation and deletion use
+inline forms. New uploads preserve natural camera colour without selectable
+filters, including uploads to older events. Existing saved images are unchanged.
+
 Live session galleries for InMoment photobooths. Guests open `https://moments.inmomentservices.com/{session}` to view photos as they arrive.
 
 ## Pi port note
