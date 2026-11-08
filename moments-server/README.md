@@ -13,7 +13,10 @@ setup using `LIVE_ADMIN_KEY`. The dashboard manages owners, creates event links
 directly, opens any event studio, and controls features. Owner suspension revokes
 owner access without deleting galleries. See the deployment guide for recovery.
 
-The web experience puts guest capture and event sharing first. Optional timing,
+The web experience uses bold typography, a dark capture panel, bright primary
+actions and compact album cards. Guests have bottom navigation for capture and
+gallery access; administrators have Events, Owners and Settings sections with
+live event/photo totals. The web experience puts guest capture and event sharing first. Optional timing,
 privacy and branding controls are collapsed; event creation and deletion use
 inline forms. New uploads preserve natural camera colour without selectable
 filters, including uploads to older events. Existing saved images are unchanged.
