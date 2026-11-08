@@ -11,7 +11,6 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const token = () => crypto.randomBytes(32).toString('base64url');
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -21,7 +20,6 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
 const wrap = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
 const safeEqual = (a, b) => Boolean(a && b) && crypto.timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b)));
 const text = (value, max = 120) => String(value ?? '').trim().slice(0, max);
-
 export function createLiveApp(options = {}) {
   const now = options.clock || Date.now;
   const base = (options.baseUrl || process.env.LIVE_BASE_URL || 'https://live.inmomentservices.com').replace(/\/$/, '');
@@ -48,8 +46,8 @@ export function createLiveApp(options = {}) {
   `);
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
-  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: true, slideshow: true, downloads: true, photobooks: true };
-  const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}') });
+  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, downloads: true, photobooks: true };
+  const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}'), filters: false });
   const requireFeature = key => { if (!features()[key]) throw fail(403, 'This feature is disabled by the administrator'); };
   // Existing privacy and timing rules stay enforced even when their editor is disabled.
   const statusOf = e => e.status === 'published' && e.closes_at > 0 && e.closes_at <= now() ? 'closed' : e.status;
@@ -95,7 +93,7 @@ export function createLiveApp(options = {}) {
     const g = guest(req, e);
     return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && Boolean(g) && (e.visibility === 'all' || (e.visibility === 'own' && p.guest === g.id));
   };
-  const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: features().filters ? e.style : 'classic', shot_limit: e.shot_limit, closes_at: e.closes_at, reveal: e.reveal, visibility: e.visibility, status: statusOf(e), moderation: e.moderation, overlay: features().branding ? e.overlay : '', cover_url: features().branding && db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
+  const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: 'classic', shot_limit: e.shot_limit, closes_at: e.closes_at, reveal: e.reveal, visibility: e.visibility, status: statusOf(e), moderation: e.moderation, overlay: features().branding ? e.overlay : '', cover_url: features().branding && db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
   const mail = options.sendMail || (async (email, url) => {
     if (!process.env.LIVE_SMTP_URL || !process.env.LIVE_MAIL_FROM) return false;
     const transport = nodemailer.createTransport(process.env.LIVE_SMTP_URL);
@@ -118,7 +116,7 @@ export function createLiveApp(options = {}) {
   app.patch('/api/admin/features', wrap((req, res) => {
     mustAdmin(req);
     if (!req.body || Array.isArray(req.body) || Object.entries(req.body).some(([k, v]) => !Object.hasOwn(defaults, k) || typeof v !== 'boolean')) throw fail(400, 'Provide known feature names with boolean values');
-    const updated = { ...features(), ...req.body };
+    const updated = { ...features(), ...req.body, filters: false };
     db.prepare("INSERT OR REPLACE INTO live_settings VALUES('features',?)").run(JSON.stringify(updated));
     res.json(updated);
   }));
@@ -157,12 +155,11 @@ export function createLiveApp(options = {}) {
   app.get('/api/me', wrap((req, res) => res.json(admin(req) || mustOwner(req))));
   app.get('/api/events', wrap((req, res) => res.json(db.prepare('SELECT * FROM events WHERE owner=? ORDER BY created DESC').all(mustOwner(req).id).map(summary))));
   function settings(b, previous = {}) {
-    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', style: 'filters', overlay: 'branding' };
+    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding' };
     for (const [field, flag] of Object.entries(controlled)) if (b[field] !== undefined && String(b[field]) !== String(previous[field] ?? (field === 'style' ? 'classic' : field === 'overlay' ? '' : 0))) requireFeature(flag);
     if (b.visibility === 'host' && previous.visibility !== 'host') requireFeature('hostOnlyGallery');
-    const value = { title: text(b.title ?? previous.title), description: text(b.description ?? previous.description, 1500), style: b.style ?? previous.style ?? 'warm', shot_limit: Number(b.shot_limit ?? previous.shot_limit ?? 25), guest_limit: Number(b.guest_limit ?? previous.guest_limit ?? 250), reveal: Number(b.reveal ?? previous.reveal ?? 0), visibility: b.visibility ?? previous.visibility ?? 'all', status: b.status ?? previous.status ?? 'draft', moderation: Number(b.moderation ?? previous.moderation ?? 0), overlay: text(b.overlay ?? previous.overlay, 80) };
+    const value = { title: text(b.title ?? previous.title), description: text(b.description ?? previous.description, 1500), style: 'classic', shot_limit: Number(b.shot_limit ?? previous.shot_limit ?? 25), guest_limit: Number(b.guest_limit ?? previous.guest_limit ?? 250), reveal: Number(b.reveal ?? previous.reveal ?? 0), visibility: b.visibility ?? previous.visibility ?? 'all', status: b.status ?? previous.status ?? 'draft', moderation: Number(b.moderation ?? previous.moderation ?? 0), overlay: text(b.overlay ?? previous.overlay, 80) };
     value.closes_at = Number(b.closes_at ?? previous.closes_at ?? 0);
-    if (!features().filters && !previous.style) value.style = 'classic';
     if (!value.title || !['warm', 'mono', 'classic'].includes(value.style) || !['all', 'own', 'host'].includes(value.visibility) || !['draft', 'published', 'closed'].includes(value.status) || ![0, 1].includes(value.moderation) || !Number.isInteger(value.shot_limit) || value.shot_limit < 1 || value.shot_limit > 1000 || !Number.isInteger(value.guest_limit) || value.guest_limit < 1 || value.guest_limit > 10000 || !Number.isSafeInteger(value.reveal) || value.reveal < 0 || !Number.isSafeInteger(value.closes_at) || value.closes_at < 0) throw fail(400, 'Check event settings: valid times, 1–1000 photos and 1–10000 guests');
     return value;
   }
@@ -264,8 +261,6 @@ export function createLiveApp(options = {}) {
     let bytes;
     try {
       let pipeline = sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true });
-      if (features().filters && e.style === 'mono') pipeline = pipeline.grayscale();
-      if (features().filters && e.style === 'warm') pipeline = pipeline.modulate({ saturation: .85 }).tint({ r: 255, g: 237, b: 215 });
       bytes = await pipeline.jpeg({ quality: 88 }).toBuffer();
     } catch { throw fail(400, 'Use a valid JPEG, PNG, WebP or supported phone photo'); }
     const graphic = db.prepare("SELECT * FROM assets WHERE event=? AND kind='overlay'").get(e.id);

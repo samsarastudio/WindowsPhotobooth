@@ -6,14 +6,12 @@ export const featureLabels = {
   hostOnlyGallery: ['Host-only gallery option', 'Allow choosing host-only visibility. Existing host-only galleries remain private.'],
   revealExperience: ['Countdown and reveal experience', 'Show countdowns and the gallery-opening announcement.'],
   branding: ['Covers and branding', 'Enable cover display and branding on new photos. Existing photo pixels are unchanged.'],
-  filters: ['Photo filters', 'Enable photo styles for new uploads. Existing photos are unchanged.'],
   slideshow: ['Live slideshow', 'Enable the host slideshow page and feed.'],
   downloads: ['Download controls and ZIP export', 'Enable download buttons and ZIPs. Visible images can still be saved by the device.'],
   photobooks: ['Photobook PDFs', 'Enable printable PDF generation.']
 };
-
 export function applyCapabilities(flags) {
-  const fields = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', style: 'filters', overlay: 'branding' };
+  const fields = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding' };
   for (const [field, key] of Object.entries(fields)) {
     const input = document.querySelector(`#settings [name="${field}"]`);
     if (input) { input.disabled = flags[key] === false; input.title = input.disabled ? 'Disabled by administrator. Existing setting remains in effect.' : ''; }
@@ -25,7 +23,6 @@ export function applyCapabilities(flags) {
     document.querySelectorAll(selector).forEach(el => { el.hidden = flags[key] === false; });
   }
 }
-
 export function countdown(data, refresh) {
   const section = document.querySelector('.guest-head');
   if (!section || data.features.revealExperience === false) return () => {};
