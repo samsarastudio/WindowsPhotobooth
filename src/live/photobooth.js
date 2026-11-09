@@ -5,24 +5,29 @@ import sharp from 'sharp';
 
 // Read-only integration. Gallery credentials, database and original files are never touched.
 export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url}) {
-  const origin = url ? new URL(url) : null;
-  if(origin && (!['http:','https:'].includes(origin.protocol)||origin.username||origin.password||origin.pathname!=='/')) throw new Error('LIVE_GALLERY_URL must be an HTTP(S) origin without credentials or a path');
+  function parseOrigin(value){
+    let candidate;try{candidate=new URL(value);}catch{throw fail(400,'Enter the Moments Gallery server address');}
+    if(!['http:','https:'].includes(candidate.protocol)||candidate.username||candidate.password||candidate.pathname!=='/'||candidate.search||candidate.hash)throw fail(400,'Use an HTTP(S) server address without a path, query or credentials');
+    return candidate;
+  }
+  const saved=db.prepare("SELECT value FROM live_settings WHERE key='photoboothOrigin'").get()?.value;
+  let origin=(saved||url)?parseOrigin(saved||url):null;
   db.exec(`CREATE TABLE IF NOT EXISTS live_booth_links(event TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,slug TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,last_sync INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '');
     CREATE TABLE IF NOT EXISTS live_booth_imports(event TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,slug TEXT NOT NULL,source_id TEXT NOT NULL,photo TEXT REFERENCES photos(id) ON DELETE SET NULL,PRIMARY KEY(event,slug,source_id));`);
   let stopped=false;
   const busy=new Set();
   const enabled=()=>origin && features().photoboothGallery;
-  async function read(route,limit=8*1024*1024) {
-    const target=new URL(route,origin);
-    if(target.origin!==origin.origin) throw fail(502,'Invalid gallery media address');
+  async function read(route,limit=8*1024*1024,server=origin) {
+    const target=new URL(route,server);
+    if(target.origin!==server.origin) throw fail(502,'Invalid gallery media address');
     const response=await fetch(target,{redirect:'error',signal:AbortSignal.timeout(15000)});
     if(!response.ok) throw fail(502,'Photobooth gallery is unavailable or this album has expired');
     const chunks=[];let size=0;
     for await(const chunk of response.body) {size+=chunk.length;if(size>limit)throw fail(502,'Gallery response exceeds the import size limit');chunks.push(chunk);}
     return Buffer.concat(chunks);
   }
-  const json=async route=>JSON.parse((await read(route)).toString());
-  async function catalog(){const result=await json('/api/wall');if(!result.ok||!Array.isArray(result.sessions))throw fail(502,'Photobooth gallery is unavailable');return result.sessions.filter(s=>typeof s.slug==='string').map(s=>({slug:s.slug,title:String(s.title||s.slug)}));}
+  const json=async (route,server=origin)=>JSON.parse((await read(route,8*1024*1024,server)).toString());
+  async function catalog(server=origin){const result=await json('/api/wall',server);if(!result.ok||!Array.isArray(result.sessions))throw fail(502,'Photobooth gallery is unavailable');return result.sessions.filter(s=>typeof s.slug==='string').map(s=>({slug:s.slug,title:String(s.title||s.slug)}));}
   const link=e=>db.prepare('SELECT * FROM live_booth_links WHERE event=?').get(e.id)||null;
   async function sync(e) {
     if(!enabled())throw fail(503,'Photobooth connection is disabled or not configured');
@@ -63,10 +68,22 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     } finally {busy.delete(e.id);}
   }
   app.get('/api/admin/photobooth',wrap(async(req,res)=>{
-    mustAdmin(req);const links=db.prepare('SELECT * FROM live_booth_links').all();
-    if(!enabled())return res.json({configured:Boolean(origin),available:false,sessions:[],links});
-    try{res.json({configured:true,available:true,sessions:await catalog(),links});}
-    catch{res.json({configured:true,available:false,sessions:[],links});}
+    mustAdmin(req);const details={url:origin?.origin||'',enabled:Boolean(features().photoboothGallery)};const links=db.prepare('SELECT * FROM live_booth_links').all();
+    if(!enabled())return res.json({...details,configured:Boolean(origin),available:false,sessions:[],links});
+    try{res.json({...details,configured:true,available:true,sessions:await catalog(),links});}
+    catch{res.json({...details,configured:true,available:false,sessions:[],links});}
+  }));
+  app.put('/api/admin/photobooth',wrap(async(req,res)=>{
+    mustAdmin(req);const candidate=parseOrigin(req.body.url);
+    const check=()=>{
+      if(busy.size)throw fail(409,'Wait for current photo syncing to finish');
+      if(origin&&candidate.origin!==origin.origin&&db.prepare('SELECT 1 FROM live_booth_imports LIMIT 1').get())throw fail(409,'This server already has imported photos. Keep its address to preserve source identity and deletion records.');
+    };
+    check();let sessions;
+    try{sessions=await catalog(candidate);}catch{throw fail(502,'Cannot reach a Moments Gallery at this address. Check that its public gallery API is available from the Live server.');}
+    check();
+    db.prepare("INSERT INTO live_settings(key,value) VALUES('photoboothOrigin',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(candidate.origin);
+    origin=candidate;res.json({configured:true,available:true,url:origin.origin,sessions});
   }));
   app.put('/api/admin/events/:slug/photobooth',wrap(async(req,res)=>{
     mustAdmin(req);const e=event(req);
