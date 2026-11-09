@@ -416,3 +416,10 @@ Looks affect newly shared guest camera photos and phone uploads only. The select
 Design research: [VSCO Capture](https://www.vsco.co/capture/live-filters-effects) demonstrates live previews and adjustable effect strength; [POV](https://pov.camera/) demonstrates a focused event-camera experience. Live uses six curated looks and one strength control to keep the shutter easy to reach.
 
 Validation: automated image tests cover all looks, JPEG output, zero-strength identity, invalid input, event defaults and the administrator switch. Browser camera tests cover Chromium and WebKit phone viewport sizes, modal containment, rendered grayscale previews and saved grayscale JPEGs. These are desktop browser simulations, not physical-device certification.
+
+
+### Classic keepsake album (poster style)
+
+Open **Admin > Events > Design album**, choose **Classic keepsake · poster style**, then **Save & preview**. The preset selects warm ivory paper, paired-page compositions, fine rounded gold borders and Fill frame. It preserves your selected photos, order, captions, event type, title and logo. Existing saved designs are not automatically changed. Each landscape PDF page contains a complete open-book composition; it is not a print-imposition or binding file.
+
+Spreads alternate left/right, include up to four photos, and adapt to one, two or three photos on the final spread. Headings follow the event type, with custom subtitles and the existing caption library. Select **Fit full photo** to preserve photo edges (especially framed photobooth strips); the preset's **Fill frame** crops edges for the poster look. Preview and PDF share geometry, fine vector frames and leaf ornaments. Paper, layout and frame can also be changed individually. Approved Live and connected photobooth photos use the same album selection; moderation and source-visibility restrictions still apply. Digital PDF only; physical printing is not included. Deploy Live only, with no changes to moments-gallery.

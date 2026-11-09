@@ -68,6 +68,18 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     for(const size of [{width:390,height:844},{width:320,height:568},{width:844,height:390}]){await admin.setViewportSize(size);const overflow=await admin.evaluate(()=>({width:innerWidth,total:document.documentElement.scrollWidth,els:[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).map(el=>({tag:el.tagName,cls:el.className,id:el.id,width:el.getBoundingClientRect().width})).slice(0,15)}));assert.equal(overflow.total<=size.width,true,JSON.stringify(overflow));}
     await admin.setViewportSize({width:390,height:844});await admin.screenshot({path:path.join(out,'album-studio-mobile.png'),fullPage:true});
     download=admin.waitForEvent('download');await admin.getByRole('button',{name:'Download PDF',exact:true}).click();await (await download).saveAs(path.join(out,'browser-album.pdf'));
+    await admin.setViewportSize({width:1440,height:1000});
+    await admin.getByRole('button',{name:'Classic keepsake · poster style',exact:true}).click();
+    assert.equal(await admin.getByLabel('Photo frame',{exact:true}).inputValue(),'gold-line');
+    await admin.getByRole('button',{name:'Save & preview',exact:true}).click();await admin.locator('#design-status').filter({hasText:'Saved design'}).waitFor();
+    await admin.reload();await admin.locator('.design-page').waitFor();
+    assert.equal(await admin.getByLabel('Album paper',{exact:true}).inputValue(),'keepsake');
+    await admin.getByRole('button',{name:'Next page',exact:true}).click();await admin.getByRole('button',{name:'Next page',exact:true}).click();
+    assert.equal(await admin.locator('.design-page').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(248, 239, 221)');
+    assert.equal(await admin.locator('.design-page img[alt="Album photo"]').count(),2);
+    await admin.locator('.design-page').screenshot({path:path.join(out,'keepsake-browser-preview.png')});
+    download=admin.waitForEvent('download');await admin.getByRole('button',{name:'Download PDF',exact:true}).click();await (await download).saveAs(path.join(out,'browser-keepsake.pdf'));
+    for(const size of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){await admin.setViewportSize(size);assert.equal(await admin.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
     assert.deepEqual(errors,[]);console.log('PASS: ongoing photobooth capture sync and open wall updates, connect/pause/remove, QR custom sizes, logo upload, landscape album selection and order, previews, PDF downloads and responsive print studio.');
   }finally{if(browser)await browser.close();server.kill();if(server.exitCode===null)await new Promise(r=>server.once('exit',r));await new Promise(r=>booth.close(r));fs.rmSync(data,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

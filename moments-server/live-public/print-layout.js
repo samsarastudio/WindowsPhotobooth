@@ -1,12 +1,12 @@
 import {themes,phrases,qrSizes,albumSizes} from './print-catalog.js';
 // One layout plan drives both the browser preview and PDF export. Coordinates are PDF points.
 export function printPlan(kind,c,event,photos=[],logo=null){
-  const theme=c.theme==='auto'?c.eventType:c.theme,t=themes[theme];
+  const theme=c.theme==='auto'?c.eventType:c.theme,keepsake=kind==='album'&&c.albumStyle==='keepsake',t=keepsake?{ink:'#243d31',accent:'#a88d53',paper:'#f8efdd'}:themes[theme];
   let mm=kind==='qr'?(qrSizes[c.qrSize]||[c.qrWidth,c.qrHeight]):(albumSizes[c.albumSize]||[c.albumWidth,c.albumHeight]);
   if(kind==='qr'&&c.qrLandscape)mm=[mm[1],mm[0]];
   const [w,h]=mm.map(v=>v*72/25.4),pages=[];
   const background=`/print-themes/${theme}${kind==='album'||w>h?'-album':''}.jpg`;
-  function page(){const p={w,h,background,elements:[]};pages.push(p);if(c.border!=='none'){p.elements.push({kind:'border',x:w*.045,y:h*.045,w:w*.91,h:h*.91,color:t.accent,double:c.border==='double',rounded:c.border==='rounded'});}return p;}
+  function page(){const p={w,h,background:keepsake?null:background,paper:keepsake?t.paper:null,elements:[]};pages.push(p);if(c.border!=='none'){p.elements.push({kind:'border',x:w*.045,y:h*.045,w:w*.91,h:h*.91,color:t.accent,double:c.border==='double',rounded:c.border==='rounded'});}return p;}
   function text(p,value,x,y,bw,bh,size=18,font='serif',align='center',color=t.ink){if(value)p.elements.push({kind:'text',text:value,x:x*w,y:y*h,w:bw*w,h:bh*h,size:size*Math.min(w/595,h/595),font,align,color});}
   function img(p,url,x,y,bw,bh){p.elements.push({kind:'image',url,x:x*w,y:y*h,w:bw*w,h:bh*h});}
   function photo(p,item,x,y,bw,bh){const frame=c.photoFrame||'glass';p.elements.push({kind:'photo',url:item.url,x:x*w,y:y*h,w:bw*w,h:bh*h,frame,fit:c.photoFit||'contain',art:['glass','gold','botanical'].includes(frame)?`/album-frames/${frame}.png`:null,paper:t.paper,accent:t.accent});}
@@ -34,12 +34,29 @@ export function printPlan(kind,c,event,photos=[],logo=null){
   while(offset<photos.length){
     const p=page();let layout=c.layout==='editorial'?sequence[(index+(c.layoutOffset||0))%sequence.length]:c.layout;
     const remaining=photos.length-offset;
-    if(remaining===1&&!['hero','hero-right','panorama'].includes(layout))layout=index%2?'hero-right':'hero';
+    if(layout!=='keepsake'&&remaining===1&&!['hero','hero-right','panorama'].includes(layout))layout=index%2?'hero-right':'hero';
     else if(remaining===2&&['trio','gallery','grid'].includes(layout))layout='offset-duo';else if(remaining===3&&layout==='grid')layout='gallery';
-    const take={hero:1,'hero-right':1,panorama:1,duo:2,'offset-duo':2,trio:3,gallery:3,grid:4}[layout];const batch=photos.slice(offset,offset+take);p.layout=layout;
+    const take={keepsake:Math.min(4,remaining),hero:1,'hero-right':1,panorama:1,duo:2,'offset-duo':2,trio:3,gallery:3,grid:4}[layout];const batch=photos.slice(offset,offset+take);p.layout=layout;
     const wording=c.wording?(custom[index]||library[(index+c.wordingOffset)%library.length]):'';
     const kicker=`${String(index+1).padStart(2,'0')}  /  ${title}`;
-    if(layout==='hero'||layout==='hero-right'){
+    if(layout==='keepsake'){
+      // A landscape PDF sheet is a complete two-page composition, not two clipped pages.
+      p.elements.push({kind:'fold',x:w*.499,y:0,w:w*.002,h});
+      const mirrored=index%2===1;
+      const place=(item,x,y,bw,bh)=>photo(p,item,mirrored?1-x-bw:x,y,bw,bh);
+      const label=(value,x,y,bw,bh,size=22,font='serif',color=t.ink)=>text(p,value,mirrored?1-x-bw:x,y,bw,bh,size,font,'center',color);
+      const ornament=(x,y,bw)=>p.elements.push({kind:'ornament',x:(mirrored?1-x-bw:x)*w,y:y*h,w:bw*w,h:h*.025,color:t.accent});
+      const headings={wedding:'Our Wedding',birthday:'Birthday Celebration',celebration:'Our Celebration',family:'Our Family Story',corporate:'Together, We Celebrate'};
+      const subtitles={wedding:'A DAY TO REMEMBER',birthday:'ANOTHER BEAUTIFUL CHAPTER',celebration:'THE JOY OF BEING TOGETHER',family:'THE PEOPLE WE CALL HOME',corporate:'PEOPLE. MOMENTS. MILESTONES.'};
+      if(batch.length===1){place(batch[0],.055,.10,.39,.76);}
+      else {place(batch[0],.055,.09,.39,.40);place(batch[1],.055,.54,.19,.33);}
+      if(batch.length>=3){place(batch[2],.55,.09,.395,batch.length===3?.56:.32);}
+      if(batch.length===4)place(batch[3],.55,.45,.395,.32);
+      const captionX=batch.length>1?.265:.55,captionY=batch.length>1?.55:.28,captionW=batch.length>1?.18:.395;
+      if(c.wording){label(headings[c.eventType],captionX,captionY,captionW,.10,26);label(c.subtitle||subtitles[c.eventType],captionX,captionY+.105,captionW,.065,9,'sans',t.accent);ornament(captionX+.02,captionY+.185,captionW-.04);label(wording,captionX,captionY+.235,captionW,.10,15);}
+      if(batch.length>=3&&c.wording){label(title,.55,batch.length===4?.795:.70,.395,.085,25);ornament(.65,batch.length===4?.885:.81,.195);}
+      else if(batch.length===2&&c.wording){label(title,.56,.27,.37,.15,34);ornament(.66,.47,.17);label(details||'The people, the moments, the celebration.',.57,.55,.35,.13,19);}
+    }else if(layout==='hero'||layout==='hero-right'){
       const right=layout==='hero-right',tx=right?.09:.69;
       photo(p,batch[0],right?.39:.065,.13,.54,.72);
       if(wording){text(p,kicker,tx,.25,.23,.055,9,'sans','left',t.accent);rule(p,tx,.335,.09);text(p,wording,tx,.39,.23,.32,26,'serif','left');}
@@ -65,9 +82,12 @@ export function printPlan(kind,c,event,photos=[],logo=null){
 
 // Frames follow the actual photograph when Fit is selected; no empty rectangular image wells.
 export function photoGeometry(el,iw,ih){
-  const framed=el.frame!=='none',art=!!el.art,px=framed?(art?.085:.025):0,py=framed?(art?.13:.025):0;
+  const framed=el.frame!=='none',art=!!el.art,px=el.frame==='gold-line'?0:framed?(art?.085:.025):0,py=el.frame==='gold-line'?0:framed?(art?.13:.025):0;
   let w=el.w,h=el.h;
   if(el.fit==='contain'&&iw>0&&ih>0){const scale=Math.min(w*(1-2*px)/iw,h*(1-2*py)/ih);w=iw*scale/(1-2*px);h=ih*scale/(1-2*py);}
   const x=el.x+(el.w-w)/2,y=el.y+(el.h-h)/2;
   return {x,y,w,h,ix:x+w*px,iy:y+h*py,iw:w*(1-2*px),ih:h*(1-2*py),radius:framed?Math.min(w,h)*.065:0};
 }
+
+// Shared vector flourish keeps the browser and exported ornament identical.
+export const keepsakeFlourish='M0 7H100 M35 7Q28 -1 35 1Q41 2 35 7Z M43 7Q37 15 44 13Q49 11 43 7Z M51 7Q44 -1 51 1Q57 2 51 7Z M59 7Q53 15 60 13Q65 11 59 7Z M67 7Q60 -1 67 1Q73 2 67 7Z';

@@ -14,3 +14,20 @@ test('Fit follows portrait and landscape proportions; Fill uses the chosen frame
     const fill=photoGeometry({...el,fit:'cover'},iw,ih);assert.equal(fill.w,400);assert.equal(fill.h,250);
   }
 });
+
+test('Keepsake spreads preserve every photo, alternate sides and handle incomplete final spreads',()=>{
+  for(let count=1;count<=19;count++)for(const size of ['a4','letter','classic','large','custom']){
+    const photos=Array.from({length:count},(_,i)=>({url:`/photo/${i}`}));
+    const config={...printDefaults,albumStyle:'keepsake',layout:'keepsake',photoFrame:'gold-line',photoFit:'cover',border:'none',albumSize:size,albumWidth:300,albumHeight:180,eventType:'wedding'};
+    const pages=printPlan('album',config,{title:'Our wedding'},photos);
+    assert.ok(pages.every(p=>p.paper==='#f8efdd'&&p.background===null));
+    const rendered=pages.flatMap(p=>p.elements.filter(e=>e.kind==='photo'));
+    assert.deepEqual(rendered.map(p=>p.url),photos.map(p=>p.url));
+    for(const page of pages){
+      for(const el of page.elements)assert.ok(el.x>=0&&el.y>=0&&el.x+el.w<=page.w+.01&&el.y+el.h<=page.h+.01,JSON.stringify(el));
+      for(const text of page.elements.filter(e=>e.kind==='text'))for(const photo of page.elements.filter(e=>e.kind==='photo'))assert.ok(text.x+text.w<=photo.x+.01||photo.x+photo.w<=text.x+.01||text.y+text.h<=photo.y+.01||photo.y+photo.h<=text.y+.01,'Caption never overlaps a photograph');
+    }
+    if(count>4){const spread=pages.filter(p=>p.layout);assert.ok(spread[0].elements.find(e=>e.kind==='photo').x<spread[1].elements.find(e=>e.kind==='photo').x);}
+    const qr=printPlan('qr',config,{title:'Join',url:'https://example.com'});assert.ok(qr[0].background,'Album paper does not change QR artwork');
+  }
+});
