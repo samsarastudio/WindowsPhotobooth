@@ -1,10 +1,15 @@
 export async function photoboothControls(app,events,{api,send,notice,escape}) {
   const state=await api('/admin/photobooth');
+  app.querySelectorAll('[data-booth-controls]').forEach(el=>el.remove());
+  const setup=document.createElement('section');setup.className='card';setup.dataset.boothControls='setup';
+  setup.innerHTML=`<h2>Connect your photobooth gallery</h2><p>Bring photobooth and Live camera photos together on each event’s mosaic wall and in its album designer.</p><form><label>Gallery server address<input name="galleryServer" type="url" required placeholder="http://127.0.0.1:3020" value="${escape(state.url)}"></label><p class="muted">Use the address reachable from the Live server. For Gallery running on the same host, use http://127.0.0.1:3020. Save once, then choose an album below each event.</p><button type="submit">Save & test connection</button></form><p role="status">${!state.enabled?'Syncing is disabled in Settings.':state.available?`Connected · ${state.sessions.length} available albums`:state.configured?'Gallery unavailable. Check the address or retry when it is online.':'No gallery connected yet.'}</p>`;
+  app.querySelector('#panel-events').prepend(setup);
+  setup.querySelector('form').addEventListener('submit',async ev=>{ev.preventDefault();const button=setup.querySelector('button');button.disabled=true;try{await send('/admin/photobooth',{url:setup.querySelector('input').value},'PUT');await photoboothControls(app,events,{api,send,notice,escape});notice('Gallery connection saved. Choose a photobooth album under your event.');}catch(err){setup.querySelector('[role=status]').textContent=err.message;notice(err.message,true);}finally{button.disabled=false;}});
   if(!state.configured)return;
   for(const card of app.querySelectorAll('[data-wall]')) {
     const e=events.find(e=>e.slug===card.dataset.wall),linked=state.links.find(l=>l.event===e.id);
     if(!state.available&&!linked)continue;
-    const section=document.createElement('details');section.className='advanced-settings';
+    const section=document.createElement('details');section.className='advanced-settings';section.dataset.boothControls='event';
     section.innerHTML='<summary>Photobooth gallery</summary><div></div>';card.after(section);
     const content=section.querySelector('div');
     const render=link=>{

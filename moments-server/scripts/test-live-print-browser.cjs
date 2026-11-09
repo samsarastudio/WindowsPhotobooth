@@ -5,7 +5,7 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
   const base='http://127.0.0.1:3195',key='wall-browser-administrator-key-32-characters';
   const boothBytes=await sharp({create:{width:600,height:400,channels:3,background:'gold'}}).png().toBuffer();
   const booth=require('node:http').createServer((req,res)=>{if(req.url==='/media/booth/photo.png'){res.end(boothBytes);return;}res.setHeader('Content-Type','application/json');res.end(JSON.stringify(req.url==='/api/wall'?{ok:true,sessions:[{slug:'booth',title:'Reception photobooth'}]}:{ok:true,session:{slug:'booth',photos:[{id:'booth-photo',url:'/media/booth/photo.png',variant:'framed'}]}}));}).listen(0,'127.0.0.1');await new Promise(r=>booth.once('listening',r));
-  const server=spawn(process.execPath,['src/live/index.js'],{cwd:root,windowsHide:true,env:{...process.env,LIVE_GALLERY_URL:`http://127.0.0.1:${booth.address().port}`,LIVE_PORT:'3195',LIVE_BASE_URL:base,LIVE_DATA_DIR:data,LIVE_ADMIN_KEY:key},stdio:'pipe'});let browser;
+  const server=spawn(process.execPath,['src/live/index.js'],{cwd:root,windowsHide:true,env:{...process.env,LIVE_GALLERY_URL:'',LIVE_PORT:'3195',LIVE_BASE_URL:base,LIVE_DATA_DIR:data,LIVE_ADMIN_KEY:key},stdio:'pipe'});let browser;
   try{
     for(let i=0;i<100;i++){try{if((await fetch(base+'/api/health')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
     browser=await chromium.launch({channel:'chrome',headless:true});const admin=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];admin.on('pageerror',e=>errors.push(e.message));
@@ -23,6 +23,8 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     }
 
     await admin.goto(base+'/admin');
+    await admin.getByLabel('Gallery server address',{exact:true}).fill(`http://127.0.0.1:${booth.address().port}`);
+    await admin.getByRole('button',{name:'Save & test connection',exact:true}).click();
     await admin.getByText('Photobooth gallery',{exact:true}).click();
     await admin.getByLabel('Photobooth album',{exact:true}).selectOption('booth');
     await admin.getByRole('button',{name:'Connect & sync',exact:true}).click();

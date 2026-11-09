@@ -338,30 +338,19 @@ The default Editorial story sequence alternates eight layouts: left hero, offset
 
 ### Optional photobooth gallery connection
 
-This update does not change `moments-gallery`, its checkout, database or images. Live reads Gallery's public `/api/wall`, `/api/sessions/:slug` and `/media/:slug/:filename` endpoints. Only currently available, unexpired public albums can be selected. No Gallery admin PIN is required. Leave `LIVE_GALLERY_URL` unset to hide the connection UI.
+This update does not change `moments-gallery`, its checkout, database or images. Live reads Gallery's public `/api/wall`, `/api/sessions/:slug` and `/media/:slug/:filename` endpoints. Only currently available, unexpired public albums can be selected. No Gallery admin PIN is required.
 
-After deploying the `codex/moments-live-server` update to the separate `/opt/moments-live` installation, configure Live only:
+Configure everything from **Live Admin > Events > Connect your photobooth gallery**. Enter the Gallery server address and select **Save & test connection**. For the reported same-host installation use `http://127.0.0.1:3020`. The address must be reachable from the Live server, not from your browser. Saving checks the Gallery public API first; a failed check leaves the previous connection unchanged. No environment edit or service restart is needed to save the connection.
 
-```bash
-# Confirm the existing Gallery public API is available.
-curl --fail http://127.0.0.1:3020/api/wall -o /dev/null
+The address persists in Live's database across restarts and takes precedence over the optional `LIVE_GALLERY_URL` environment default. Use an HTTP(S) origin without a path, query, credentials or fragment. Redirects and media outside the configured origin/selected album are rejected. Once photos have been imported, changing to a different server origin is blocked to protect source identities and deletion records. Pause individual events or use the global feature switch to stop syncing.
 
-# Add the following line to Live's environment file (not the Gallery .env):
-sudoedit /etc/moments-live.env
-# LIVE_GALLERY_URL=http://127.0.0.1:3020
-
-sudo systemctl restart moments-live
-sudo systemctl is-active moments-live moments-gallery
-curl --fail http://127.0.0.1:3021/api/health
-```
-
-Use an HTTP(S) origin only, without a path or credentials. If Gallery is on another machine, use its reachable origin. Redirects and media outside that configured origin/selected album are rejected. No DNS or reverse-proxy change is needed for the same-host connection.
+Only deploy/restart `moments-live` for this update. Existing Moments Gallery versions exposing these public endpoints need no update. No DNS or reverse-proxy change is required.
 
 1. Sign in at `https://live.inmomentservices.com/admin` and create or select a Live event.
 2. Under its event card, open **Photobooth gallery**, select the source album, then **Connect & sync**. New connection controls appear only when the configured Gallery is available; existing connections retain status and pause controls while offline. Reload the dashboard after restoring availability.
 3. New source images sync every minute, up to 50 per event per cycle. **Sync now** imports the next batch immediately. Photos still processing are skipped. Gallery's public album filtering decides which original/framed/AI variants are eligible.
 4. Imports are separate JPEG copies, quality 88, up to 2400 pixels on the longest edge. They use the Live event's approval setting at import time. With moderation enabled, approve them in **Manage event / Review photos** before display/export.
-5. Use **Mosaic wall link** to enable/copy the wall URL, or **Design album** to select photos and export a landscape PDF. Both combine eligible guest-camera and photobooth photos. Wall publication, reveal and visibility rules still apply; album exports remain private to owner/admin.
+5. Live camera photos and linked photobooth photos form one combined collection. Use **Mosaic wall link** to enable/copy the wall URL, or **Design album** to select photos and export a landscape PDF. Both combine eligible guest-camera and photobooth photos. Wall publication, reveal and visibility rules still apply; album exports remain private to owner/admin.
 6. **Pause connection** stops importing and retains copies. Reconnecting the same album deduplicates prior imports, including copies removed in Live. Switching albums retains earlier copies. Source changes/deletions/expiry do not alter existing Live copies: remove or hide sensitive copies in Live separately. Already downloaded PDFs cannot be recalled.
 
 Admin Settings / **Photobooth gallery connection** disables new syncing globally while preserving copies. Moderation remains manual; no automatic content classification is added. A synthetic Photobooth guest groups imported photos (one guest record per event); imports do not consume a real guest's shot allowance. Additive `live_booth_links` and `live_booth_imports` tables preserve links and deletion records across restarts. Back up Live's complete data directory as usual. Tests: `test/live-photobooth.test.mjs` and `npm run test:live:print`.
