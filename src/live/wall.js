@@ -59,10 +59,10 @@ export function registerWall({ app, db, owned, features, now, base, data, root, 
   };
   app.get('/api/wall/:token', wrap((req, res) => {
     const e = access(req); const revealed = e.reveal <= now();
-    const photos = revealed ? db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 ORDER BY created DESC,id DESC LIMIT 200').all(e.id) : [];
+    const photos = revealed ? db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created DESC,id DESC LIMIT 200').all(e.id) : [];
     res.set('X-Robots-Tag', 'noindex, nofollow');
     const cfg=config(e);
-    res.json({ config:{...cfg,backdropUrl:asset(e,'backdrop')?`/api/wall/${req.params.token}/assets/backdrop?v=${asset(e,'backdrop').filename}`:null,logoUrl:asset(e,'logo')?`/api/wall/${req.params.token}/assets/logo?v=${asset(e,'logo').filename}`:null}, title: cfg.title || e.title, revealed, reveal: e.reveal, server_time: now(), total: revealed ? db.prepare('SELECT count(*) n FROM photos WHERE event=? AND approved=1').get(e.id).n : 0, photos: photos.map(p => ({ id: p.id, url: `/api/wall/${req.params.token}/photos/${p.id}/image` })) });
+    res.json({ config:{...cfg,backdropUrl:asset(e,'backdrop')?`/api/wall/${req.params.token}/assets/backdrop?v=${asset(e,'backdrop').filename}`:null,logoUrl:asset(e,'logo')?`/api/wall/${req.params.token}/assets/logo?v=${asset(e,'logo').filename}`:null}, title: cfg.title || e.title, revealed, reveal: e.reveal, server_time: now(), total: revealed ? db.prepare('SELECT count(*) n FROM photos WHERE event=? AND approved=1 AND source_visible=1').get(e.id).n : 0, photos: photos.map(p => ({ id: p.id, url: `/api/wall/${req.params.token}/photos/${p.id}/image` })) });
   }));
   app.get('/api/wall/:token/assets/:kind',wrap((req,res)=>{
     const e=access(req);if(!['backdrop','logo'].includes(req.params.kind))throw fail(404,'Image not found');
@@ -70,12 +70,12 @@ export function registerWall({ app, db, owned, features, now, base, data, root, 
   }));
   app.get('/api/wall/:token/photos/:photo/image', wrap(async (req, res) => {
     const e = access(req);
-    const p = db.prepare('SELECT * FROM photos WHERE id=? AND event=? AND approved=1').get(req.params.photo, e.id);
+    const p = db.prepare('SELECT * FROM photos WHERE id=? AND event=? AND approved=1 AND source_visible=1').get(req.params.photo, e.id);
     if (e.reveal > now() || !p) throw fail(404, 'Photo not available');
     const bytes = await sharp(fs.readFileSync(path.join(data, 'photos', p.filename))).resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
     // Recheck access after asynchronous image work in case the wall was revoked.
     const current = access(req);
-    if (current.reveal > now() || !db.prepare('SELECT 1 FROM photos WHERE id=? AND event=? AND approved=1').get(p.id, current.id)) throw fail(404, 'Photo not available');
+    if (current.reveal > now() || !db.prepare('SELECT 1 FROM photos WHERE id=? AND event=? AND approved=1 AND source_visible=1').get(p.id, current.id)) throw fail(404, 'Photo not available');
     res.set('X-Robots-Tag', 'noindex, nofollow').type('jpeg').send(bytes);
   }));
   app.get('/wall/:token', wrap((req, res) => {

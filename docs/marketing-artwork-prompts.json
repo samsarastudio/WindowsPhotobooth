@@ -1,0 +1,31 @@
+{
+  "generator": "Built-in image_gen",
+  "note": "Fictional AI lifestyle imagery, not customer testimonials or exact product screenshots. Typography composed separately with bundled Noto fonts.",
+  "assets": [
+    {
+      "slug": "live-every-perspective",
+      "prompt": "Create a premium editorial advertising photograph background, landscape 3:2, for an elegant wedding guest photo-sharing service. Candid joyful South Asian and mixed-ethnicity adult wedding friends in modern formalwear at a candlelit garden reception, one woman naturally taking a photograph on a smartphone, real believable hands and phone, no readable screen text. Crop intimate mid shot, tactile direct flash mixed with golden evening bokeh. Compose people on right two thirds, left third deep forest green soft shadows with generous empty space for typography to be added later. Palette warm ivory, forest green, champagne, tiny chartreuse accents. Luxurious film photography, authentic spontaneous laughter, sophisticated contemporary wedding magazine art direction. No text, no logos, no watermark, no photo booth hardware, no corporate scene. This is fictional lifestyle campaign artwork.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a1afb0-bd78-7c53-9dd5-e6a3038daf46\\exec-71049af7-2197-4a5a-9904-8e738598532a.png"
+    },
+    {
+      "slug": "live-one-wall",
+      "prompt": "Create a sophisticated editorial advertising background photograph landscape 3:2 for a shared event photo mosaic. Elegant wedding reception venue at blue hour, guests softly out of focus in foreground, large beautiful landscape display on right showing a believable collage of six DIFFERENT candid celebration photographs with generous spacing, friends laughing, couple dancing, family hug, cake moment. Pictures are imagery only with no words, no app interface or fake buttons. Left third dark forest green wall with generous clear negative space for later typography. Warm candlelight, champagne and warm ivory, subtle lime floral accent, upscale intimate celebration, optical realistic photograph, no business event, no kiosk or equipment sales vibe, no text, no logos, no watermark.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a1afb0-bd78-7c53-9dd5-e6a3038daf46\\exec-709a4c53-3b81-4aee-ad14-9e6326be1a18.png"
+    },
+    {
+      "slug": "moments-wedding",
+      "prompt": "Premium wedding editorial campaign photograph, landscape 3:2. Close-up of elegantly dressed wedding couple and friends at a beautiful garden party, a woman's natural hand holding two tasteful framed landscape photo prints with tiny gold borders showing joyful group portraits, no text on prints. On right side smiling couple softly focused beyond the prints, ivory florals, linen, candlelit bokeh, documentary direct flash meets fine-art wedding photography. Left third dark olive-green shadows and simple out-of-focus foliage creating clean negative space for advertising typography later. Warm ivory and champagne, authentic candid joy, elegant contemporary composition. No photo booth machine, no kiosk, no corporate scene, no text, no logos, no watermarks.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a1afb0-bd78-7c53-9dd5-e6a3038daf46\\exec-b811203c-bd5b-48c3-801c-55ef8bfa065a.png"
+    },
+    {
+      "slug": "moments-birthday",
+      "prompt": "Create an upscale editorial birthday celebration advertising photograph, landscape 3:2. Three joyful adult friends in their late twenties and thirties laughing together at an intimate birthday dinner, cake and tasteful candles at lower right, playful confetti frozen midair, velvet bows and warm blush florals, natural expressive faces, beautiful direct flash photography with subtle film grain. Composition people and cake in right two thirds; left third a dark wine-red curtain in shadow with ample empty space for later typography. Palette rich burgundy, blush, warm ivory, small chartreuse accent in decor. Professional luxury party magazine campaign, emotionally genuine, no text or numbers, no logos, no watermark, no business scene, no photo booth hardware.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a1afb0-bd78-7c53-9dd5-e6a3038daf46\\exec-44962104-c0a7-4413-b90a-148a07689cc0.png"
+    },
+    {
+      "slug": "moments-keepsakes",
+      "prompt": "Luxury celebration keepsake editorial still-life photograph, landscape 3:2. On right two thirds, an open landscape photo album with elegantly spaced candid wedding and birthday photographs, rounded fine gold frames, a few separate photo prints, ivory ribbon, champagne linen, small white flowers and soft afternoon window shadows. The album has absolutely no words or text, just photographs and deliberate blank cream spaces. Realistic premium paper texture, beautiful typography-ready composition, tactile and serene. Left third deep forest green fabric with generous uninterrupted negative space for advertising copy later. Palette ivory, forest green, champagne gold. Shot for high-end wedding magazine, no people outside photos, no logos, no watermark, no kiosk or corporate imagery.",
+      "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a1afb0-bd78-7c53-9dd5-e6a3038daf46\\exec-36c926ae-ad80-4b51-a650-dd02519bcb4d.png"
+    }
+  ]
+}

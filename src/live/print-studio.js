@@ -33,13 +33,13 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
     return c;
   }
   function selected(e,c){
-    const list=db.prepare('SELECT id,filename,favorite,created FROM photos WHERE event=? AND approved=1 ORDER BY created ASC,id ASC').all(e.id);
+    const list=db.prepare('SELECT id,filename,favorite,created FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created ASC,id ASC').all(e.id);
     let rows=c.favoritesOnly?list.filter(p=>p.favorite):list;
     if(c.selectedPhotos.length){const positions=new Map(c.selectedPhotos.map((id,i)=>[id,i]));rows=rows.filter(p=>positions.has(p.id));if(c.order==='manual')rows.sort((a,b)=>positions.get(a.id)-positions.get(b.id));}
     if(c.order==='favorites')rows.sort((a,b)=>b.favorite-a.favorite);
     return {total:rows.length,rows:rows.slice(0,c.photoLimit).map(p=>({...p,url:`/api/guest/${e.slug}/photos/${p.id}/image`}))};
   }
-  app.get('/api/events/:slug/print',wrap((req,res)=>{const e=owned(req),c=config(e),list=selected(e,c);res.json({config:c,logo:logoUrl(e),eligible:list.total,included:list.rows.length,photos:db.prepare('SELECT id,favorite FROM photos WHERE event=? AND approved=1 ORDER BY created ASC,id ASC').all(e.id).map(p=>({...p,url:`/api/guest/${e.slug}/photos/${p.id}/image?thumb=1`}))});}));
+  app.get('/api/events/:slug/print',wrap((req,res)=>{const e=owned(req),c=config(e),list=selected(e,c);res.json({config:c,logo:logoUrl(e),eligible:list.total,included:list.rows.length,photos:db.prepare('SELECT id,favorite FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created ASC,id ASC').all(e.id).map(p=>({...p,url:`/api/guest/${e.slug}/photos/${p.id}/image?thumb=1`}))});}));
   app.patch('/api/events/:slug/print',wrap((req,res)=>{const e=owned(req),c=validate(config(e),req.body);db.prepare('INSERT INTO live_print_designs VALUES(?,?) ON CONFLICT(event) DO UPDATE SET config=excluded.config').run(e.id,JSON.stringify(c));res.json({config:c});}));
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:8*1024*1024,files:1,fields:0}}).single('photo');
   app.post('/api/events/:slug/print/logo',(req,res,next)=>{try{owned(req);next();}catch(err){next(err);}},upload,wrap(async(req,res)=>{
@@ -62,7 +62,7 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
       const bytes=await renderPrintPDF(pages,{root,images,fail});
       owned(req);requireFeature(kind==='album'?'photobooks':'qrPrints');
       // Do not deliver a stale export if photos were hidden/deleted during rendering.
-      if(kind==='album'&&selection.rows.some(p=>!db.prepare('SELECT 1 FROM photos WHERE event=? AND id=? AND approved=1').get(e.id,p.id)))throw fail(409,'Photos changed during export. Please generate the album again.');
+      if(kind==='album'&&selection.rows.some(p=>!db.prepare('SELECT 1 FROM photos WHERE event=? AND id=? AND approved=1 AND source_visible=1').get(e.id,p.id)))throw fail(409,'Photos changed during export. Please generate the album again.');
       res.set('Content-Disposition',`${req.query.view==='1'?'inline':'attachment'}; filename="${e.slug}-${kind}.pdf"`);res.type('pdf').send(bytes);
     }finally{busy.delete(e.id);}
   }));

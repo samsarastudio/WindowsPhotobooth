@@ -23,10 +23,12 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     }
 
     await admin.goto(base+'/admin');
-    await admin.getByLabel('Gallery server address',{exact:true}).fill(`http://127.0.0.1:${booth.address().port}`);
+    await admin.getByLabel('Moments gallery link',{exact:true}).fill(`http://127.0.0.1:${booth.address().port}/booth`);
     await admin.getByRole('button',{name:'Save & test connection',exact:true}).click();
     await admin.getByText('Photobooth gallery',{exact:true}).click();
-    await admin.getByLabel('Photobooth album',{exact:true}).selectOption('booth');
+    assert.equal(await admin.getByLabel('Photobooth album',{exact:true}).inputValue(),'booth');
+    assert.equal(await admin.getByLabel('Framed',{exact:true}).isChecked(),true);
+    assert.equal(await admin.getByLabel('Original (unframed)',{exact:true}).isChecked(),false);
     await admin.getByRole('button',{name:'Connect & sync',exact:true}).click();
     await admin.getByRole('button',{name:'Pause connection',exact:true}).waitFor();
     await admin.screenshot({path:path.join(out,'photobooth-connection.png'),fullPage:true});
