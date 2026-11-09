@@ -1,0 +1,25 @@
+{
+  "tool": "Built-in image_gen",
+  "assets": {
+    "wedding": {
+      "file": "exec-85e8569c-4dd2-47be-b844-87b237d52172.png",
+      "prompt": "Create one production background artwork for elegant wedding event stationery and photo albums. Portrait 2:3 aspect ratio. Fine botanical watercolor olive foliage and tiny ivory flowers only along outer corners, handmade warm ivory paper texture, very restrained champagne gold details. The central 75 percent must be almost blank pale ivory negative space for independently typeset text, QR codes and photographs. Flat full-bleed artwork, no mockup, no shadows outside paper, no text, no letters, no QR code, no people, no logo. Premium quiet editorial wedding stationery. Save this generated asset for project use."
+    },
+    "birthday": {
+      "file": "exec-6a56c035-ad43-47a3-ba6f-8867bc3c84fc.png",
+      "prompt": "Use case: stylized-concept. Create a production background artwork for printed event QR stationery and photo album pages. Theme: playful sophisticated birthday: sparse watercolor coral, apricot and periwinkle confetti and curved ribbons at the extreme corners, pale warm cream paper. Portrait 2:3 aspect ratio. Center 75 percent must be empty low-contrast negative space for separate live typography, QR and photographs. Flat full-bleed page artwork, no mockup, no text, letters, QR, logo, photographs, or people. Tasteful premium stationery, elegant restraint."
+    },
+    "celebration": {
+      "file": "exec-47048f08-98ef-4a73-b769-6f5719988451.png",
+      "prompt": "Use case: stylized-concept. Create a production background artwork for printed event QR stationery and photo album pages. Theme: evening celebration: luxurious dark midnight navy paper, subtle fine gold art deco lines framing the outer edge, sparse tiny gold glints in corners, large dark navy empty center. Portrait 2:3 aspect ratio. Center 75 percent must be empty low-contrast negative space for separate live typography, QR and photographs. Flat full-bleed page artwork, no mockup, no text, letters, QR, logo, photographs, or people. Tasteful premium stationery, elegant restraint."
+    },
+    "corporate": {
+      "file": "exec-2290d1d2-5bfb-4f31-a32c-9a3cc7236e50.png",
+      "prompt": "Use case: stylized-concept. Create a production background artwork for printed event QR stationery and photo album pages. Theme: modern corporate gathering: pale pearl white paper, restrained cool blue and teal translucent architectural curves at outer corners, precise contemporary editorial style. Portrait 2:3 aspect ratio. Center 75 percent must be empty low-contrast negative space for separate live typography, QR and photographs. Flat full-bleed page artwork, no mockup, no text, letters, QR, logo, photographs, or people. Tasteful premium stationery, elegant restraint."
+    },
+    "family": {
+      "file": "exec-5b7bfd7f-eba4-4752-aa44-c9724cab8824.png",
+      "prompt": "Use case: stylized-concept. Create a production background artwork for printed event QR stationery and photo album pages. Theme: family gathering: soft pale oatmeal cotton paper with delicate terracotta and sage pressed wildflowers only at the outer corners, warm nostalgic handmade scrapbook sensibility. Portrait 2:3 aspect ratio. Center 75 percent must be empty low-contrast negative space for separate live typography, QR and photographs. Flat full-bleed page artwork, no mockup, no text, letters, QR, logo, photographs, or people. Tasteful premium stationery, elegant restraint."
+    }
+  }
+}

@@ -7,7 +7,7 @@
   "main": "src/index.js",
   "scripts": {
     "start:live": "node src/live/index.js",
-    "test:live": "node --test test/live.test.mjs test/live-features.test.mjs test/live-admin.test.mjs test/live-wall.test.mjs",
+    "test:live": "node --test test/live.test.mjs test/live-features.test.mjs test/live-admin.test.mjs test/live-wall.test.mjs test/live-print.test.mjs",
     "test:live:browser": "node scripts/test-live-browser.cjs",
     "test:live:wall": "node scripts/test-live-wall-browser.cjs",
     "test:live:camera": "node scripts/test-live-camera-layout.cjs",
@@ -21,7 +21,8 @@
     "test:game:browser": "node scripts/test-game-browser.cjs",
     "test:game:unity": "node scripts/test-game-unity.cjs",
     "seed": "node -e \"import('./src/db.js').then(async m=>{m.initDb(); const {seedSampleGallery}=await import('./src/seed-samples.js'); console.log(JSON.stringify(seedSampleGallery(),null,2))})\"",
-    "build:game-admin": "node scripts/build-game-admin.mjs"
+    "build:game-admin": "node scripts/build-game-admin.mjs",
+    "test:live:print": "node scripts/test-live-print-browser.cjs"
   },
   "engines": {
     "node": ">=20.9.0"
