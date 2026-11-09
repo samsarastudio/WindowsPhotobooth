@@ -6,6 +6,7 @@ export const featureLabels = {
   hostOnlyGallery: ['Host-only gallery option', 'Allow choosing host-only visibility. Existing host-only galleries remain private.'],
   revealExperience: ['Countdown and reveal experience', 'Show countdowns and the gallery-opening announcement.'],
   branding: ['Covers and branding', 'Enable cover display and branding on new photos. Existing photo pixels are unchanged.'],
+  mosaic: ['Shared mosaic walls', 'Allow enabled event walls to be viewed through a shareable link.'],
   slideshow: ['Live slideshow', 'Enable the host slideshow page and feed.'],
   downloads: ['Download controls and ZIP export', 'Enable download buttons and ZIPs. Visible images can still be saved by the device.'],
   photobooks: ['Photobook PDFs', 'Enable printable PDF generation.']
