@@ -1,3 +1,4 @@
+import {photoboothControls} from './photobooth-controls.js';
 import { wallControls } from './wall-controls.js';
 import { featureLabels } from './features.js';
 let activePanel;
@@ -77,6 +78,7 @@ export async function adminDashboard({ app, nav, api, send, form, action, notice
     document.querySelector('#created-event').scrollIntoView({ behavior: 'smooth' });
   });
   app.querySelectorAll('[data-wall]').forEach(d => d.addEventListener('toggle', () => { if(d.open) wallControls(d.querySelector('div'),d.dataset.wall,{api,send,notice}).catch(err=>notice(err.message,true)); }));
+  photoboothControls(app,events,{api,send,notice,escape}).catch(err=>notice(err.message,true));
   action('[data-copy]', async el => { await navigator.clipboard.writeText(el.dataset.copy); notice('Event link copied'); });
   form('#features-form', async (_b, f) => { await send('/admin/features', Object.fromEntries(Object.keys(featureLabels).map(k => [k, f.elements[k].checked])), 'PATCH'); notice('Feature settings saved'); });
   form('#admin-password', async (b, f) => { await send('/admin/auth/password', b); f.reset(); notice('Password changed. Other administrator sessions have been signed out.'); });

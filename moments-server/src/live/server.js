@@ -1,3 +1,4 @@
+import {registerPhotobooth} from './photobooth.js';
 import {registerPrintStudio} from './print-studio.js';
 import { registerWall } from './wall.js';
 import { adminAuth } from './admin-auth.js';
@@ -47,7 +48,7 @@ export function createLiveApp(options = {}) {
   `);
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
-  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, qrPrints: true, mosaic: true, downloads: true, photobooks: true };
+  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, qrPrints: true, mosaic: true, downloads: true, photobooks: true, photoboothGallery: true };
   const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}'), filters: false });
   const requireFeature = key => { if (!features()[key]) throw fail(403, 'This feature is disabled by the administrator'); };
   // Existing privacy and timing rules stay enforced even when their editor is disabled.
@@ -350,6 +351,7 @@ export function createLiveApp(options = {}) {
     const e = owned(req); requireFeature('slideshow');
     res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
+  const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL});
   registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail});
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
@@ -375,5 +377,5 @@ export function createLiveApp(options = {}) {
     if (status === 500) console.error('[moments-live]', err.message);
     res.status(status).json({ error: status === 500 ? 'Unable to complete this request' : err.message });
   });
-  return { app, db, close: () => db.close() };
+  return { app, db, close: () => { stopPhotobooth(); db.close(); } };
 }

@@ -7,6 +7,7 @@ test('Print studio validates dimensions, isolates owners and exports approved la
   const cookie=await owner('print@example.com'),other=await owner('other@example.com');const e=(await call('/api/events','POST',{title:'Emma & James',status:'published',moderation:1},cookie)).body;const endpoint=`/api/events/${e.slug}/print`;
   assert.equal((await call(endpoint)).status,401);assert.equal((await call(endpoint,'GET',null,other)).status,404);
   assert.equal((await call(endpoint,'PATCH',{qrWidth:-2},cookie)).status,400);assert.equal((await call(endpoint,'PATCH',{albumSize:'custom',albumWidth:180,albumHeight:250},cookie)).status,400);assert.equal((await call(endpoint,'PATCH',{theme:'../../secret'},cookie)).status,400);assert.equal((await call(endpoint,'PATCH',{showLogo:'yes'},cookie)).status,400);
+  assert.equal((await call(endpoint,'PATCH',{photoFrame:'invalid'},cookie)).status,400);
   assert.equal((await call(endpoint+'/album/pdf','GET',null,cookie)).status,400);
   const guest=(await call(`/api/guest/${e.slug}/join`,'POST',{name:'Guest'})).cookie,ids=[];
   for(let i=0;i<9;i++){
@@ -18,7 +19,7 @@ test('Print studio validates dimensions, isolates owners and exports approved la
   await call(endpoint,'PATCH',{selectedPhotos:[],eventType:'wedding',theme:'auto',subtitle:'A day held close',date:'12 December 2026',location:'The Garden House',intro:'A room full of love, a day full of little moments. These are the stories our people saw.',albumSize:'a4'},cookie);
   const out=path.resolve('output/live-print-qa');fs.mkdirSync(out,{recursive:true});
   for(const theme of ['wedding','birthday','celebration','corporate','family']){
-    await call(endpoint,'PATCH',{eventType:theme,theme:'auto'},cookie);
+    await call(endpoint,'PATCH',{eventType:theme,theme:'auto',photoFrame:{wedding:'rounded',birthday:'glass',celebration:'gold',corporate:'none',family:'botanical'}[theme]},cookie);
     for(const kind of ['qr','album']){const r=await call(endpoint+`/${kind}/pdf`,'GET',null,cookie);assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,`${theme}-${kind}.pdf`),r.body);}
   }
   await call(endpoint,'PATCH',{qrSize:'custom',qrWidth:90,qrHeight:130,qrLandscape:true},cookie);plan=(await call(endpoint+'/qr/preview','GET',null,cookie)).body;assert.ok(Math.abs(plan.pages[0].w-130*72/25.4)<.01);

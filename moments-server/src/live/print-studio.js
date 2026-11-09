@@ -6,14 +6,14 @@ import sharp from 'sharp';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import {themes,printDefaults,qrSizes,albumSizes} from '../../live-public/print-catalog.js';
-import {printPlan} from '../../live-public/print-layout.js';
+import {printPlan,photoGeometry} from '../../live-public/print-layout.js';
 
 export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail}){
   db.exec("CREATE TABLE IF NOT EXISTS live_print_designs(event TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,config TEXT NOT NULL)");
   const config=e=>({...printDefaults,...JSON.parse(db.prepare('SELECT config FROM live_print_designs WHERE event=?').get(e.id)?.config||'{}')});
   const logo=e=>db.prepare("SELECT filename FROM assets WHERE event=? AND kind='print-logo'").get(e.id);
   const logoUrl=e=>logo(e)?`/api/events/${e.slug}/print/logo?v=${logo(e).filename}`:null;
-  const choices={eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],layout:['editorial','hero','duo','trio','grid'],order:['chronological','favorites','manual']};
+  const choices={eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],layout:['editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
   function validate(old,patch){
     if(!patch||typeof patch!=='object'||Array.isArray(patch))throw fail(400,'Provide design settings');
     const c={...old};
@@ -23,8 +23,8 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
         if(!Array.isArray(v)||v.length>300||v.some(id=>typeof id!=='string'||! /^[a-f0-9-]{36}$/.test(id))||new Set(v).size!==v.length)throw fail(400,'Choose up to 300 unique photos');
       }else if(typeof v!==typeof printDefaults[k])throw fail(400,'Invalid design setting: '+k);
       if(choices[k]&&!choices[k].includes(v))throw fail(400,'Invalid choice: '+k);
-      const ranges={qrWidth:[70,420],qrHeight:[70,594],albumWidth:[180,420],albumHeight:[120,297],photoLimit:[1,300],wordingOffset:[0,149]};
-      if(ranges[k]&&(!Number.isFinite(v)||v<ranges[k][0]||v>ranges[k][1]||(['photoLimit','wordingOffset'].includes(k)&&!Number.isInteger(v))))throw fail(400,'Invalid range: '+k);
+      const ranges={qrWidth:[70,420],qrHeight:[70,594],albumWidth:[180,420],albumHeight:[120,297],photoLimit:[1,300],wordingOffset:[0,149],layoutOffset:[0,7]};
+      if(ranges[k]&&(!Number.isFinite(v)||v<ranges[k][0]||v>ranges[k][1]||(['photoLimit','wordingOffset','layoutOffset'].includes(k)&&!Number.isInteger(v))))throw fail(400,'Invalid range: '+k);
       if(typeof v==='string'&&v.length>({intro:1200,closing:400,customCaptions:12000,qrInstructions:160}[k]||120))throw fail(400,'Text is too long: '+k);
       if(k==='customCaptions'&&(v.split('\n').length>150||v.split('\n').some(line=>line.length>180)))throw fail(400,'Use up to 150 captions, each at most 180 characters');
       c[k]=v;
@@ -80,6 +80,16 @@ export async function renderPrintPDF(pages,{root,images=new Map(),fail=(s,m)=>Ob
         pdf.font(el.font).fillColor(el.color);let size=el.size;pdf.fontSize(size);while(pdf.heightOfString(el.text,{width:el.w,lineGap:1})>el.h&&size>4){size-=.5;pdf.fontSize(size);}if(pdf.heightOfString(el.text,{width:el.w,lineGap:1})>el.h)throw fail(400,'Shorten the text to fit this paper size');
         pdf.text(el.text,el.x,el.y,{width:el.w,height:el.h,align:el.align,lineGap:1});
       }
+      if(el.kind==='photo'){
+        const bytes=images.get(el.url);if(bytes){
+          const meta=await sharp(bytes).metadata(),g=photoGeometry(el,meta.width,meta.height);
+          pdf.save();if(el.frame!=='none'){pdf.fillColor('#14251c').fillOpacity(.10).roundedRect(g.x+2,g.y+3,g.w,g.h,g.radius).fill();pdf.fillOpacity(el.frame==='glass'?.28:.92).fillColor(el.paper).roundedRect(g.x,g.y,g.w,g.h,g.radius).fill();}pdf.restore();
+          pdf.save();pdf.roundedRect(g.ix,g.iy,g.iw,g.ih,el.frame==='none'?0:g.radius*.65).clip();pdf.image(bytes,g.ix,g.iy,{cover:[g.iw,g.ih],align:'center',valign:'center'});pdf.restore();
+          if(el.art)pdf.image(path.join(root,'live-public',el.art),g.x,g.y,{width:g.w,height:g.h});
+          else if(el.frame==='rounded')pdf.save().strokeColor(el.accent).strokeOpacity(.35).lineWidth(.6).roundedRect(g.x,g.y,g.w,g.h,g.radius).stroke().restore();
+        }
+      }
+      if(el.kind==='rule'){pdf.save().strokeColor(el.color).lineWidth(.7).moveTo(el.x,el.y).lineTo(el.x+el.w,el.y).stroke().restore();}
       if(el.kind==='image'){const bytes=images.get(el.url);if(bytes)pdf.image(bytes,el.x,el.y,{fit:[el.w,el.h],align:'center',valign:'center'});}
       if(el.kind==='qr'){
         const qr=QRCode.create(el.url,{errorCorrectionLevel:'M'}),n=qr.modules.size,unit=el.w/(n+8);pdf.rect(el.x,el.y,el.w,el.h).fill('#fff');
