@@ -10,6 +10,7 @@ export const featureLabels = {
   mosaic: ['Shared mosaic walls', 'Allow enabled event walls to be viewed through a shareable link.'],
   slideshow: ['Live slideshow', 'Enable the host slideshow page and feed.'],
   downloads: ['Download controls and ZIP export', 'Enable download buttons and ZIPs. Visible images can still be saved by the device.'],
+  photoboothGallery: ['Photobooth gallery connection', 'Sync connected photobooth albums when LIVE_GALLERY_URL is configured. Existing imported photos are retained.'],
   photobooks: ['Photobook PDFs', 'Enable printable PDF generation.']
 };
 export function applyCapabilities(flags) {

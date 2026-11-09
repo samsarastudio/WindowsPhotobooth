@@ -7,7 +7,7 @@
   "main": "src/index.js",
   "scripts": {
     "start:live": "node src/live/index.js",
-    "test:live": "node --test test/live.test.mjs test/live-features.test.mjs test/live-admin.test.mjs test/live-wall.test.mjs test/live-print.test.mjs",
+    "test:live": "node --test test/live.test.mjs test/live-features.test.mjs test/live-admin.test.mjs test/live-wall.test.mjs test/live-print.test.mjs test/live-album-layout.test.mjs test/live-photobooth.test.mjs",
     "test:live:browser": "node scripts/test-live-browser.cjs",
     "test:live:wall": "node scripts/test-live-wall-browser.cjs",
     "test:live:camera": "node scripts/test-live-camera-layout.cjs",

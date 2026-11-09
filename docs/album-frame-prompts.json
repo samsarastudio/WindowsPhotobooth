@@ -1,0 +1,17 @@
+{
+  "tool": "Built-in image_gen",
+  "assets": {
+    "glass": {
+      "file": "exec-3cd1098e-935c-4f0e-b9e4-22f9c9ebb680.png",
+      "prompt": "Production transparent PNG overlay for a photo album image frame. Landscape 3:2 ratio. One flat front-facing rounded rectangle frame, translucent frosted ivory glass with very subtle pearl highlights, delicate rounded bevel, no gold. Frame outer edges at 3 percent inset from the canvas, inner opening at 8 percent inset. Center opening must be completely transparent, as must the outside of the frame. Decoration occupies only the outer 8 percent band. No photo, no solid background, no text, no mockup, no perspective tilt. Fine premium material texture, restrained light and shadow, high resolution."
+    },
+    "gold": {
+      "file": "exec-6ba9f8f3-5fe6-44fe-bfc9-47362e6ae10c.png",
+      "prompt": "Production transparent PNG overlay for a photo album image frame. Landscape 3:2 ratio. One flat front-facing rounded rectangle frame, thin brushed champagne gold with delicate double hairline edge, softly rounded corners, understated editorial luxury. Frame outer edges at 3 percent inset from the canvas, inner opening at 8 percent inset. Center opening must be completely transparent, as must the outside of the frame. Decoration occupies only the outer 8 percent band. No photo, no solid background, no text, no mockup, no perspective tilt. Fine premium material texture, restrained light and shadow, high resolution."
+    },
+    "botanical": {
+      "file": "exec-41ce9c59-afb1-4cbb-b5d3-0893e83bbdf8.png",
+      "prompt": "Production transparent PNG overlay for a photo album image frame. Landscape 3:2 ratio. One flat front-facing rounded rectangle frame, thin antique gold rounded rectangle with tiny sculpted olive leaves at the top left and bottom right corners, restrained botanical luxury. Frame outer edges at 3 percent inset from the canvas, inner opening at 8 percent inset. Center opening must be completely transparent, as must the outside of the frame. Decoration occupies only the outer 8 percent band. No photo, no solid background, no text, no mockup, no perspective tilt. Fine premium material texture, restrained light and shadow, high resolution."
+    }
+  }
+}

@@ -4,7 +4,7 @@
 
 An independent Express/SQLite service in the Moments package, listening on **3021**.
 The current Moments Gallery continues on **3020**. Live uses its own database and photo
-directory; it does not migrate or expose the existing booth galleries.
+directory. An optional read-only photobooth connection imports selected galleries only after an administrator links them to a Live event.
 
 - Admin-only owner creation/invitation by email; one-time 30-minute sign-in links.
 - Optional SMTP delivery and email sign-in requests for existing invited owners.
@@ -14,7 +14,7 @@ directory; it does not migrate or expose the existing booth galleries.
 - iOS/Android browser guest capture and camera-roll uploads without installation.
 - Native iOS application + App Clip sources and native Android application.
 - Authorized galleries, host moderation/favorites/deletion, individual downloads and ZIP export.
-- Host live slideshow and a downloadable 6×9-inch photobook PDF of approved photos.
+- Host live slideshow and designed landscape photobook PDFs of approved photos.
 - AASA and Android Digital Asset Links endpoints configured with your real signing identities.
 
 No payments, subscriptions, printing/shipping fulfillment, NFC hardware sales, or 24/7 staffed support are connected. The photobook is a printable PDF, not an order placed with a printing company. Screen branding supports covers, graphic overlays and captions; there is no freeform sticker/layout editor. UI is English. Native apps handle the guest journey; owners manage events in the web studio.
@@ -315,7 +315,7 @@ Admin → Events → **QR print studio** or **Design album** opens the event's s
 - Five AI-generated QR stationery designs and five separate landscape album backgrounds: Botanical vows (wedding), Confetti wishes (birthday), Midnight celebration, Modern gathering (corporate), Gathered stories (family). Event type selects the matching artwork, with manual override.
 - QR PDF sizes: A3, A4, A5, A6, 4×6 and 5×7 inches, plus custom 70–420 mm width / 70–594 mm height. Landscape orientation optional. Vector QR with a four-module white quiet zone; logos never overlap the QR.
 - Editable titles, subtitle, instructions, printed date/location, footer, logo upload/visibility, URL visibility, and fine/double/rounded/no extra border. PNG/JPEG/WebP logos, up to 8 MB / 24 MP.
-- Landscape albums: A4, US Letter, 10×8, 12×9 inches, or custom landscape dimensions (180–420 mm width, 120–297 mm height). Cover, optional opening note, photo pages, closing page and page numbers. Editorial mix or fixed one/two/three/four-photo layouts. Images retain their aspect ratio without cropping.
+- Landscape albums: A4, US Letter, 10×8, 12×9 inches, or custom landscape dimensions (180–420 mm width, 120–297 mm height). Cover, optional opening note, photo pages, closing page and page numbers. Editorial mix or fixed one/two/three/four-photo layouts. Images retain their aspect ratio by default; optional Fill frame crops centrally.
 - Approved photos only. All eligible photos, favorites, or manual selection; chronological/favorites-first/selection ordering. Move selected images up/down to reorder. Default cap 100 photos; configurable up to 300. Preview shows the included count. Hidden/deleted photos are excluded at generation and rechecked before delivery. Downloaded PDFs cannot be recalled.
 - 150 original wording suggestions (30 per event type), optional captions, library starting offset, and up to 150 custom caption lines. Curated static phrases; no runtime AI generation or third-party quotations.
 - Page-by-page browser preview and PDF download. Save & preview applies changes; Download PDF saves before exporting. Designs and logos persist. Private to owner/admin; no new public album URL.
@@ -326,3 +326,42 @@ Admin → Events → **QR print studio** or **Design album** opens the event's s
 Artwork provenance and final prompts: `docs/print-artwork-prompts.json`, `docs/album-artwork-prompts.json`. Assets: `live-public/print-themes/`. Noto font license: `live-public/print-fonts/LICENSE.txt`; source https://github.com/notofonts/noto-fonts.
 
 Validation: `npm run test:live`, `npm run test:live:wall`, `npm run test:live:print`. Sample PDFs: ignored `output/live-print-qa`; screenshots: `output/live-qa`.
+
+
+### Album photo frames and editorial compositions
+
+Design album offers Photo frame: None, Soft rounded rectangle, Pearl glass, Champagne gold, or Botanical gold. The last three use transparent AI-generated artwork in `live-public/album-frames/`; prompts and provenance are in `docs/album-frame-prompts.json`. Browser previews and PDFs share the artwork; stored event photos remain JPEGs.
+
+Fit full photo (default) sizes the frame to each photo's aspect ratio and preserves its edges. Fill frame crops centrally. Preview before exporting, especially for faces near an edge. Logos and QR prints are not photo-framed.
+
+The default Editorial story sequence alternates eight layouts: left hero, offset pair, hero with two details, right hero, diptych, panorama, staggered gallery triptych and four-photo collection. Each places captions in dedicated space, with a small event/chapter line and selected accent rules. Text never sits over photographs. A starting-composition control changes the sequence; any layout can be chosen for the whole book. Incomplete last pages adapt to remaining photos. Captions, wording library and numbering remain optional.
+
+### Optional photobooth gallery connection
+
+This update does not change `moments-gallery`, its checkout, database or images. Live reads Gallery's public `/api/wall`, `/api/sessions/:slug` and `/media/:slug/:filename` endpoints. Only currently available, unexpired public albums can be selected. No Gallery admin PIN is required. Leave `LIVE_GALLERY_URL` unset to hide the connection UI.
+
+After deploying the `codex/moments-live-server` update to the separate `/opt/moments-live` installation, configure Live only:
+
+```bash
+# Confirm the existing Gallery public API is available.
+curl --fail http://127.0.0.1:3020/api/wall -o /dev/null
+
+# Add the following line to Live's environment file (not the Gallery .env):
+sudoedit /etc/moments-live.env
+# LIVE_GALLERY_URL=http://127.0.0.1:3020
+
+sudo systemctl restart moments-live
+sudo systemctl is-active moments-live moments-gallery
+curl --fail http://127.0.0.1:3021/api/health
+```
+
+Use an HTTP(S) origin only, without a path or credentials. If Gallery is on another machine, use its reachable origin. Redirects and media outside that configured origin/selected album are rejected. No DNS or reverse-proxy change is needed for the same-host connection.
+
+1. Sign in at `https://live.inmomentservices.com/admin` and create or select a Live event.
+2. Under its event card, open **Photobooth gallery**, select the source album, then **Connect & sync**. New connection controls appear only when the configured Gallery is available; existing connections retain status and pause controls while offline. Reload the dashboard after restoring availability.
+3. New source images sync every minute, up to 50 per event per cycle. **Sync now** imports the next batch immediately. Photos still processing are skipped. Gallery's public album filtering decides which original/framed/AI variants are eligible.
+4. Imports are separate JPEG copies, quality 88, up to 2400 pixels on the longest edge. They use the Live event's approval setting at import time. With moderation enabled, approve them in **Manage event / Review photos** before display/export.
+5. Use **Mosaic wall link** to enable/copy the wall URL, or **Design album** to select photos and export a landscape PDF. Both combine eligible guest-camera and photobooth photos. Wall publication, reveal and visibility rules still apply; album exports remain private to owner/admin.
+6. **Pause connection** stops importing and retains copies. Reconnecting the same album deduplicates prior imports, including copies removed in Live. Switching albums retains earlier copies. Source changes/deletions/expiry do not alter existing Live copies: remove or hide sensitive copies in Live separately. Already downloaded PDFs cannot be recalled.
+
+Admin Settings / **Photobooth gallery connection** disables new syncing globally while preserving copies. Moderation remains manual; no automatic content classification is added. A synthetic Photobooth guest groups imported photos (one guest record per event); imports do not consume a real guest's shot allowance. Additive `live_booth_links` and `live_booth_imports` tables preserve links and deletion records across restarts. Back up Live's complete data directory as usual. Tests: `test/live-photobooth.test.mjs` and `npm run test:live:print`.
