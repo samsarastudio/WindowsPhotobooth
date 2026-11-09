@@ -357,7 +357,7 @@ export function createLiveApp(options = {}) {
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
   app.use((req, res, next) => {
-    if (/^\/index\.html\/?$/i.test(req.path) || req.path === '/' || /^\/(e|host)(\/|$)/i.test(req.path)) {
+    if (/^\/index\.html\/?$/i.test(req.path) || req.path === '/' || req.path === '/access' || /^\/(e|host)(\/|$)/i.test(req.path)) {
       if (!features().webApp && !(admin(req) && /^\/host(\/|$)/i.test(req.path))) return res.status(503).type('html').send('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moments Live</title><body><h1>The web experience is currently unavailable.</h1><p>Your event data is retained. Contact your event host or use the Moments app.</p></body></html>');
       if (/\/slideshow\/?$/.test(req.path) && !features().slideshow) return res.status(403).send('Slideshow disabled by administrator');
     }
