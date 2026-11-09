@@ -69,6 +69,17 @@ const sizes = [
         assert.equal(await page.locator('body>header').isVisible(),false);
         const preview=await check('#camera-preview'); assert.ok(preview.width>100&&preview.height>100);
         for(const selector of ['#shutter','#open-gallery','#open-camera-settings','#quick-flip']) {const r=await check(selector);assert.ok(r.width>=44&&r.height>=44,`${selector} touch target`);}
+        await check('#open-photo-looks');
+        await page.locator('#open-photo-looks').click(); await check('#photo-looks-dialog');
+        await page.locator('[data-look=mono]').click();
+        await page.locator('#look-strength').evaluate(el=>{el.value='100';el.dispatchEvent(new Event('input',{bubbles:true}));});
+        const sample=await page.locator('.look-preview-box img').screenshot();
+        const pixels=await sharp(sample).removeAlpha().raw().toBuffer();
+        let colourError=0;for(let i=0;i<pixels.length;i+=3)colourError+=Math.abs(pixels[i]-pixels[i+1])+Math.abs(pixels[i+1]-pixels[i+2]);
+        assert.ok(colourError/(pixels.length/3)<3,`${engine}: Mono preview renders in grayscale`);
+        if(name==='standard')await page.screenshot({path:path.join(out,`${engine}-photo-looks.png`)});
+        await page.locator('[data-done]').click();
+        assert.equal(await page.locator('#open-photo-looks').innerText(),'Looks · Mono');
         const shutter=await check('#shutter'); const gallery=await check('#open-gallery');
         assert.ok(shutter.x+shutter.width<=gallery.x||gallery.x+gallery.width<=shutter.x||shutter.y+shutter.height<=gallery.y||gallery.y+gallery.height<=shutter.y,'Controls do not overlap');
         if(insets) assert.ok(gallery.x+gallery.width<=width-insets.right+1 && gallery.y+gallery.height<=height-insets.bottom+1,'Gallery clears safe area');
@@ -84,6 +95,10 @@ const sizes = [
         await page.locator('#open-gallery').click(); await page.locator('.photo img').waitFor();
         await check('#gallery-dialog'); await check('[data-close="gallery-dialog"]');
         const src=await page.locator('.photo img').last().getAttribute('src'); const photo=await context.request.get(base+src);const metadata=await sharp(await photo.body()).metadata();
+        assert.equal(metadata.format,'jpeg');
+        const savedPixels=await sharp(await photo.body()).removeAlpha().raw().toBuffer();
+        let savedError=0;for(let i=0;i<savedPixels.length;i+=3)savedError+=Math.abs(savedPixels[i]-savedPixels[i+1])+Math.abs(savedPixels[i+1]-savedPixels[i+2]);
+        assert.ok(savedError/(savedPixels.length/3)<3,'Saved photo matches Mono preview');
         if(engine==='chromium') assert.ok(Math.abs(metadata.width/metadata.height-preview.width/preview.height)<.015,'Captured frame matches viewfinder aspect');
         if(name==='standard') await page.screenshot({path:path.join(out,`${engine}-gallery.png`)});
         await page.getByRole('button',{name:'Close gallery',exact:true}).click();
