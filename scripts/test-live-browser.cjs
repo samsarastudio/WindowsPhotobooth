@@ -15,7 +15,7 @@ const sharp = require('sharp');
   let browser;
   try {
     for (let i = 0; i < 100; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 100)); }
-    browser = await chromium.launch({ channel: 'chrome', headless: true });
+    browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
     const host = await browser.newPage({ viewport: { width: 1440, height: 1000 } }); const errors = [];
     host.on('pageerror', e => errors.push(e.message));
     await host.goto(base); await host.getByRole('heading', { name: 'Your people. Your moments.' }).waitFor();
@@ -67,24 +67,53 @@ const sharp = require('sharp');
     const jpeg = await sharp({ create: { width: 1200, height: 900, channels: 3, background: '#adbc9a' } }).composite([{ input: Buffer.from('<svg width="1200" height="900"><circle cx="600" cy="360" r="180" fill="#eac7a1"/><rect x="300" y="570" width="600" height="330" rx="160" fill="#214e40"/></svg>') }]).jpeg().toBuffer();
     const guestContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const guest = await guestContext.newPage(); guest.on('pageerror', e => errors.push(e.message));
-    await guest.goto(base + '/e/' + slug); await guest.locator('[name=name]').fill('Jamie'); await guest.getByRole('button', { name: 'Join event' }).click(); await guest.locator('#upload').waitFor();
+    await guest.goto(base + '/e/' + slug); await guest.locator('[name=name]').fill('Jamie'); await guest.getByRole('button', { name: 'Join event' }).click();
+    await guest.locator('#camera').waitFor();
+    // A denied permission has an inline recovery path, without losing gallery access.
+    await guest.evaluate(() => { window.savedGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices); navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Denied', 'NotAllowedError'); }; });
+    await guest.locator('#camera').click(); await guest.locator('#camera-message').filter({ hasText: 'Camera access is blocked' }).waitFor();
+    await guest.evaluate(() => { navigator.mediaDevices.getUserMedia = window.savedGetUserMedia; });
+    await guest.locator('#camera').click(); await guest.locator('#camera-preview').waitFor();
+    for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+      await guest.setViewportSize(size);
+      assert.equal(await guest.evaluate(() => document.documentElement.scrollHeight <= innerHeight && document.documentElement.scrollWidth <= innerWidth), true, 'Camera fits viewport');
+      const shutter = await guest.locator('#shutter').boundingBox(); assert.ok(shutter.y >= 0 && shutter.y + shutter.height <= size.height, 'Shutter is always on screen');
+    }
+    await guest.setViewportSize({ width: 390, height: 844 });
+    await guest.screenshot({ path: path.join(output, 'camera-preview-mobile.png'), fullPage: true });
+    await guest.getByRole('button', { name: 'Camera settings', exact: true }).click(); await guest.locator('#upload').waitFor();
     await guest.locator('#upload').setInputFiles({ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: jpeg });
     await guest.locator('#notice').filter({ hasText: 'photo shared' }).waitFor();
     assert.equal(await guest.locator('.photo').count(), 0, 'moderation hides photo from guest');
     await host.reload(); await host.locator('[data-approve]').waitFor(); await host.locator('[data-approve]').click();
-    await guest.reload(); await guest.locator('.photo img').waitFor();
+    await guest.reload(); await guest.getByRole('button', { name: 'Gallery', exact: true }).click(); await guest.locator('.photo img').waitFor();
     for (const width of [320, 390, 768]) { await guest.setViewportSize({ width, height: 844 }); assert.equal(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `guest viewport ${width}`); }
     await guest.setViewportSize({ width: 390, height: 844 }); await guest.screenshot({ path: path.join(output, 'guest-mobile.png'), fullPage: true });
+    await guest.getByRole('button', { name: 'Close gallery', exact: true }).click();
+    await guest.locator('#camera').click(); await guest.locator('#camera-preview').waitFor();
+    await guest.evaluate(() => { window.captureTrack = document.querySelector('#camera-preview').srcObject.getVideoTracks()[0]; });
+    // Simulate a saved photo whose response is lost; retry must not spend another shot.
+    await guest.route(`**/api/guest/${slug}/photos`, async route => { await route.fetch(); await route.abort('failed'); }, { times: 1 });
+    await guest.locator('#shutter').click();
+    await guest.locator('#retry-upload').waitFor();
+    await guest.locator('#retry-upload').click();
+    await guest.locator('#notice').filter({ hasText: 'photo shared' }).waitFor();
+    await guest.waitForFunction(() => document.querySelector('.shot-count strong')?.textContent === '23');
+    assert.equal(await guest.evaluate(() => window.captureTrack.readyState === 'live' && document.querySelector('#camera-preview').srcObject.getVideoTracks()[0] === window.captureTrack), true, 'Capture retains the same camera stream');
+    await guest.getByRole('button', { name: 'Camera settings', exact: true }).click();
+    await guest.locator('#settings-camera').click();
+    assert.equal(await guest.evaluate(() => window.captureTrack.readyState), 'ended');
+    await guest.getByRole('button', { name: 'Close camera settings', exact: true }).click();
     await host.screenshot({ path: path.join(output, 'studio-desktop.png'), fullPage: true });
     await host.setViewportSize({ width: 390, height: 844 }); assert.equal(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'host mobile viewport');
     await host.goto(base + '/host/' + slug + '/print'); await host.locator('.print-card .qr').waitFor();
     await host.goto(base + '/host/' + slug + '/slideshow'); await host.locator('#slide img').waitFor();
     // Reveal on an already-open phone, based on the server clock.
     await host.request.patch(base + '/api/events/' + slug, { data: { reveal: Date.now() + 3500 } });
-    await guest.reload(); await guest.locator('.countdown').waitFor();
+    await guest.reload(); await guest.getByRole('button', { name: 'Gallery', exact: true }).click(); await guest.locator('.countdown').waitFor();
     await guest.locator('.reveal-banner').waitFor({ timeout: 15000 }); await guest.locator('.photo img').waitFor();
     await host.request.patch(base + '/api/events/' + slug, { data: { visibility: 'host', closes_at: Date.now() + 3500 } });
-    await guest.reload(); await guest.getByText('This is a private collection for your host.', { exact: false }).waitFor();
+    await guest.reload(); await guest.getByRole('button', { name: 'Gallery', exact: true }).click(); await guest.getByText('This is a private collection for your host.', { exact: false }).waitFor();
     assert.equal(await guest.locator('.photo').count(), 0);
     await guest.locator('#camera').waitFor({ state: 'detached', timeout: 15000 });
     await adminPage.goto(base + '/admin'); await adminPage.getByRole('button', { name: 'Settings', exact: true }).click(); await adminPage.getByText('Feature controls', { exact: true }).click();
