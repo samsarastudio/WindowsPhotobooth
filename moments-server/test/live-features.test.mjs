@@ -55,7 +55,7 @@ test('Live feature controls enforce deadlines, preserve privacy and persist acro
   assert.equal((await call(`${route}/photos`, 'GET', undefined, '', false, native)).body.length, 0, 'host-only remains hidden even after reveal and feature disabled');
   assert.equal((await call(media, 'GET', undefined, '', false, native)).status, 404);
   await flags({ webApp: false, downloads: false, photobooks: false, slideshow: false, branding: false, filters: false, guestUploads: false });
-  for (const page of ['/', '/index.html', `/e/${e.slug}`, `/host/${e.slug}`]) assert.equal((await call(page)).status, 503);
+  for (const page of ['/', '/access', '/index.html', `/e/${e.slug}`, `/host/${e.slug}`]) assert.equal((await call(page)).status, 503);
   assert.equal((await call('/admin')).status, 200, 'admin cannot lock themselves out');
   assert.equal((await call('/api/health')).status, 200);
   assert.equal((await call(route, 'GET', undefined, '', false, native)).status, 200, 'native API survives web switch');
