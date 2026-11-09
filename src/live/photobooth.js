@@ -122,6 +122,20 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
   }));
   app.post('/api/admin/events/:slug/photobooth/sync',wrap(async(req,res)=>{mustAdmin(req);res.json(await sync(event(req)));}));
   app.delete('/api/admin/events/:slug/photobooth',wrap((req,res)=>{mustAdmin(req);const e=event(req);db.prepare('UPDATE live_booth_links SET enabled=0 WHERE event=?').run(e.id);res.json({ok:true});}));
+  app.delete('/api/admin/events/:slug/photobooth/remove',wrap((req,res)=>{
+    mustAdmin(req);const e=event(req),source=link(e);
+    if(!source)return res.json({ok:true,removed:0});
+    const rows=db.prepare('SELECT p.id,p.filename FROM photos p JOIN live_booth_imports i ON i.photo=p.id WHERE i.event=? AND i.slug=? AND p.event=?').all(e.id,source.slug,e.id);
+    db.transaction(()=>{
+      // Removing the link also cancels an in-flight sync at its next current() check.
+      db.prepare('DELETE FROM live_booth_links WHERE event=?').run(e.id);
+      // Keep individual-deletion tombstones; a deliberate reconnect may reimport the other copies.
+      db.prepare('DELETE FROM live_booth_imports WHERE event=? AND slug=? AND photo IS NOT NULL').run(e.id,source.slug);
+      for(const row of rows)db.prepare('DELETE FROM photos WHERE id=? AND event=?').run(row.id,e.id);
+    })();
+    for(const row of rows){try{fs.rmSync(path.join(data,'photos',row.filename),{force:true});}catch(err){console.error('[moments-live] Unable to remove disconnected gallery file:',row.filename,err.code);}}
+    res.json({ok:true,removed:rows.length});
+  }));
   const timer=setInterval(async()=>{
     if(stopped||!enabled())return;
     for(const e of db.prepare('SELECT e.* FROM events e JOIN live_booth_links l ON e.id=l.event WHERE l.enabled=1').all()) {

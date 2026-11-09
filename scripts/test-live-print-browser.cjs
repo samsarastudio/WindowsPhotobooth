@@ -34,6 +34,10 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     await admin.screenshot({path:path.join(out,'photobooth-connection.png'),fullPage:true});
     await admin.getByRole('button',{name:'Pause connection',exact:true}).click();
     await admin.getByText('Paused:',{exact:false}).waitFor();
+    await admin.getByText('Remove connected gallery',{exact:true}).click();
+    await admin.getByRole('button',{name:'Remove gallery & imported photos',exact:true}).click();
+    await admin.locator('#notice').filter({hasText:'1 imported photos removed'}).waitFor();
+    assert.equal(await admin.getByText('Remove connected gallery',{exact:true}).count(),0);
     await admin.getByRole('link',{name:'QR print studio',exact:true}).click();
     await admin.locator('.design-page').waitFor();await admin.getByLabel('Event type',{exact:true}).selectOption('wedding');
     await admin.getByLabel('Paper size',{exact:true}).selectOption('custom');await admin.getByLabel('Custom width (mm)',{exact:true}).fill('100');await admin.getByLabel('Custom height (mm)',{exact:true}).fill('150');

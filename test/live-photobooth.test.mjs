@@ -10,10 +10,11 @@ import {createLiveApp} from '../src/live/server.js';
 test('Optional photobooth connection imports JPGs once, respects moderation and rejects foreign media',async t=>{
   const dataDir=fs.mkdtempSync(path.join(os.tmpdir(),'live-booth-')),key='booth-test-administrator-key-32-characters';
   const bytes=await sharp({create:{width:2800,height:1600,channels:3,background:'gold'}}).png().toBuffer();
+  let holdMedia=false,releaseMedia,mediaStarted;
   let available=true,photos=[{id:'capture-1',url:'/media/booth/one.png',variant:'framed',processStatus:'ready'}];
   const source=http.createServer((req,res)=>{
     if(!available){res.writeHead(503);return res.end();}
-    if(req.url==='/media/booth/one.png'){res.setHeader('Content-Type','image/png');return res.end(bytes);}
+    if(req.url==='/media/booth/one.png'){res.setHeader('Content-Type','image/png');if(holdMedia){mediaStarted();releaseMedia=()=>res.end(bytes);return;}return res.end(bytes);}
     res.setHeader('Content-Type','application/json');
     if(req.url==='/api/wall')return res.end(JSON.stringify({ok:true,sessions:[{slug:'booth',title:'Reception booth'}]}));
     if(req.url.startsWith('/api/sessions/booth'))return res.end(JSON.stringify({ok:true,session:{id:'booth-identity',slug:'booth',photos}}));
@@ -87,8 +88,26 @@ test('Optional photobooth connection imports JPGs once, respects moderation and 
   assert.equal(live.db.prepare('SELECT approved FROM photos WHERE id=?').get(ai.photo).approved,0);
   assert.equal((await call('/api/admin/photobooth','PUT',{url:aliasUrl+'/booth'},'',true)).status,200);
   assert.equal((await call('/api/admin/photobooth','PUT',{url:galleryUrl+'/booth'},'',true)).status,200);
+  const importedFiles=live.db.prepare('SELECT filename FROM photos WHERE id<>?').all(camera.id).map(p=>path.join(dataDir,'photos',p.filename));
+  assert.equal((await call(endpoint+'/remove','DELETE',{},owner)).status,401);
+  available=false; // Removal must work even when the source gallery is offline.
+  assert.equal((await call(endpoint+'/remove','DELETE',{},'',true)).body.removed,2);
+  assert.deepEqual((await call(feed)).body.photos.map(p=>p.id),[camera.id]);
+  assert.equal((await call(`/api/events/${e.slug}/print/album/preview`,'GET',null,owner)).body.included,1);
+  assert.ok(importedFiles.every(file=>!fs.existsSync(file)));
+  assert.equal(live.db.prepare('SELECT count(*) n FROM photos').get().n,1);
+  assert.equal((await call(endpoint+'/remove','DELETE',{},'',true)).body.removed,0);
+  available=true;
   await new Promise(r=>server.close(r));live.close();
   live=createLiveApp({dataDir,adminKey:key,baseUrl:'http://localhost',galleryUrl:''});server=live.app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base=`http://127.0.0.1:${server.address().port}`;
   assert.equal((await call('/api/admin/photobooth','GET',null,'',true)).body.url,galleryUrl);
-  assert.equal((await call(endpoint+'/sync','POST',{},'',true)).body.imported,0);
+  assert.equal((await call(endpoint+'/sync','POST',{},'',true)).status,400);
+  assert.equal((await call(endpoint,'PUT',{slug:'booth',variants:['framed','original','ai']},'',true)).body.imported,2);
+  assert.equal(live.db.prepare('SELECT photo FROM live_booth_imports WHERE source_id=?').get('capture-1').photo,null);
+  photos.push({id:'in-flight',variant:'framed',url:'/media/booth/one.png'});holdMedia=true;
+  const started=new Promise(r=>mediaStarted=r);const pendingSync=call(endpoint+'/sync','POST',{},'',true);await started;
+  assert.equal((await call(endpoint+'/remove','DELETE',{},'',true)).body.removed,2);
+  releaseMedia();assert.equal((await pendingSync).body.imported,0);
+  assert.deepEqual(live.db.prepare('SELECT id FROM photos').all().map(p=>p.id),[camera.id]);
+  assert.equal(live.db.prepare('SELECT count(*) n FROM live_booth_links').get().n,0);
 });
