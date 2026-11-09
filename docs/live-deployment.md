@@ -155,7 +155,42 @@ For an existing installation, pull the deployment branch and restart Live as bel
 Startup adds the administrator/session tables and owner access flag automatically;
 existing owners and events are preserved. Open `/admin` to complete the one-time setup.
 
-## Administrator feature controls
+## Share a live mosaic wall
+
+In **Admin → Events**, expand **Mosaic wall link** on an event and select
+**Enable wall link**, then **Copy wall link**. The same controls are in the event
+studio. Share this separate `/wall/<random-token>` link with a viewer or open it on
+a display; no owner/admin sign-in is required. Use **Fullscreen** for a display.
+The wall lays out multiple photo tiles, refreshes every five seconds, and cycles
+through the newest 200 approved photos when more photos exist than fit on screen.
+
+Sharing is off by default for each event. The event must be published or closed,
+with guest visibility set to **Everyone's approved photos**. Future reveal times
+are honored. Draft, host-only and own-photo galleries are unavailable through wall
+links, including direct image URLs. Anyone holding an enabled wall link can see its
+eligible photos; share it only with the intended audience.
+
+**Disable wall** stops access. **Replace link** invalidates the old link. The global
+**Shared mosaic walls** switch disables every wall independently of the guest Web app
+switch. Wall settings survive server restarts; deleting an event removes its link.
+Existing open walls clear unavailable photos on the next successful refresh (normally
+within five seconds), and clear the display on connection errors. Saved copies cannot
+be recalled. Cloudflare caching must remain bypassed for `/api/*`, including `/api/wall/*`.
+
+### Remove inappropriate photos
+
+Choose **Review photos** from the admin event card, or open the event studio:
+
+- **Hide from guests** immediately blocks a photo's guest/wall image URLs and
+  removes it from public feeds. Administrators and the owner can still review it.
+- **Delete → Delete photo** permanently removes the photo from the album and storage.
+- Under **Privacy, timing & limits**, enable **Approve new photos before guests see
+  them** to screen future uploads. Use **Awaiting approval** to review pending photos.
+
+These are manual moderation tools, not an automatic NSFW classifier. Turning on
+approval affects future uploads; review already-approved photos separately.
+
+## Administrator feature switches
 
 Sign in at `https://live.inmomentservices.com/admin`, expand **Feature controls**,
 and change the switches
@@ -172,6 +207,7 @@ in the Live SQLite database. No restart is needed to change them.
 | Countdown and reveal experience | Hides countdowns and the gallery-opening announcement; timing rules still apply. |
 | Covers and branding | Hides covers and disables branding uploads/new photo overlays. |
 | Live slideshow | Blocks the slideshow page and feed. |
+| Shared mosaic walls | Blocks public wall pages, feeds and image access. |
 | Download controls and ZIP export | Blocks explicit image-download requests and ZIP export. |
 | Photobook PDFs | Blocks PDF generation. |
 
@@ -231,6 +267,7 @@ npm ci
 npm run test:live
 npm run test:live:browser
 npm run test:live:camera
+npm run test:live:wall
 ```
 
 Browser QA uses Playwright/Chrome. Set `PLAYWRIGHT_MODULE` to your installed Playwright

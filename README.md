@@ -24,6 +24,11 @@ privacy and branding controls are collapsed; event creation and deletion use
 inline forms. New uploads preserve natural camera colour without selectable
 filters, including uploads to older events. Existing saved images are unchanged.
 
+Admins can enable a separate, revocable mosaic wall link for an event. Viewers need
+no sign-in; approved photos appear after reveal and update automatically. Private
+galleries remain protected. Review photos in the studio to hide or permanently delete
+inappropriate content; enable approval-before-sharing for future uploads.
+
 Live session galleries for InMoment photobooths. Guests open `https://moments.inmomentservices.com/{session}` to view photos as they arrive.
 
 ## Pi port note
