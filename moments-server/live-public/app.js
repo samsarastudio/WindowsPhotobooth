@@ -1,3 +1,4 @@
+import {landing} from './landing.js';
 import {printStudio} from './print-studio.js';
 import { wallControls } from './wall-controls.js';
 import { adminDashboard } from './admin.js';
@@ -44,6 +45,8 @@ function navigation() {
 async function home() {
   if (user?.role === 'admin') return admin();
   if (!user) {
+    if(!['access','host'].includes(parts[0]))return landing(app,nav);
+    nav.innerHTML='<a href="/">Explore Moments Live</a><a href="mailto:hello@inmomentservices.com">Request event access</a>';
     app.innerHTML = `<section class="hero"><div><p class="eyebrow">EVERY PERSPECTIVE, TOGETHER</p><h1>Your people.<br>Your moments.</h1><p>One shared gallery. All the little moments you might have missed.<br>Guests scan, snap and share — right from their phones.</p><div class="card"><h3>Welcome, event owner.</h3><p class="muted">Use the invitation from your Moments administrator, or request a fresh sign-in link below.</p><form id="login"><label>Email address<input type="email" name="email" autocomplete="email" required placeholder="you@example.com"></label><button type="submit">Send me an access link ↗</button></form></div><p class="muted">Joining an event? Open the link or scan the QR shared by your host.</p></div><div class="hero-art" aria-hidden="true"><div class="rings"></div><small>COLLECT THE UNPOSED.</small></div></section>`;
     form('#login', async b => notice((await send('/auth/request', b)).message)); return;
   }
@@ -108,7 +111,7 @@ async function loadPhotos(isHost = false) {
   const signature = JSON.stringify(photos);
   if (target.dataset.signature === signature) return;
   target.dataset.signature = signature;
-  target.innerHTML = photos.map(p => `<figure class="photo"><a href="${p.url}" data-preview="${p.url}"><img loading="lazy" src="${p.url}" alt="Photo shared by ${escape(p.guest_name)}"></a><figcaption><span>${escape(p.guest_name)}${!p.approved ? ' · Awaiting approval' : ''}${p.favorite ? ' · ★' : ''}</span><div class="actions"><a class="button small secondary" href="${p.url}?download=1">Save</a>${isHost ? `<button class="small secondary" data-favorite="${p.id}" data-value="${p.favorite ? 0 : 1}">${p.favorite ? 'Unfavorite' : 'Favorite'}</button><button class="small secondary" data-approve="${p.id}" data-value="${p.approved ? 0 : 1}">${p.approved ? 'Hide from guests' : 'Approve'}</button><button class="small danger" data-delete="${p.id}">Delete</button>` : ''}</div></figcaption></figure>`).join('') || (isHost ? '<div class="empty">No photos yet. Share the event link or QR code to get started.</div>' : '<div class="empty">No shared photos yet. Yours could be the first.</div>');
+  target.innerHTML = photos.map(p => `<figure class="photo"><a href="${p.url}" data-preview="${p.url}"><img loading="lazy" src="${p.url}" alt="Photo shared by ${escape(p.guest_name)}"></a><figcaption><span>${escape(p.guest_name)}${!p.approved ? ' · Awaiting approval' : ''}${p.favorite ? ' · ★' : ''}${p.source_visible===0 ? ' · Excluded by photobooth types' : ''}</span><div class="actions"><a class="button small secondary" href="${p.url}?download=1">Save</a>${isHost ? `<button class="small secondary" data-favorite="${p.id}" data-value="${p.favorite ? 0 : 1}">${p.favorite ? 'Unfavorite' : 'Favorite'}</button><button class="small secondary" data-approve="${p.id}" data-value="${p.approved ? 0 : 1}">${p.approved ? 'Hide from guests' : 'Approve'}</button><button class="small danger" data-delete="${p.id}">Delete</button>` : ''}</div></figcaption></figure>`).join('') || (isHost ? '<div class="empty">No photos yet. Share the event link or QR code to get started.</div>' : '<div class="empty">No shared photos yet. Yours could be the first.</div>');
   action('[data-favorite]', async el => { await send(`/events/${slug}/photos/${el.dataset.favorite}`, { favorite: Number(el.dataset.value) }, 'PATCH'); await loadPhotos(true); });
   action('[data-approve]', async el => { await send(`/events/${slug}/photos/${el.dataset.approve}`, { approved: Number(el.dataset.value) }, 'PATCH'); await loadPhotos(true); });
   action('[data-delete]', el => {

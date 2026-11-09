@@ -22,6 +22,7 @@
     "test:game:unity": "node scripts/test-game-unity.cjs",
     "seed": "node -e \"import('./src/db.js').then(async m=>{m.initDb(); const {seedSampleGallery}=await import('./src/seed-samples.js'); console.log(JSON.stringify(seedSampleGallery(),null,2))})\"",
     "build:game-admin": "node scripts/build-game-admin.mjs",
+    "test:live:landing": "node scripts/test-live-landing-browser.cjs",
     "test:live:print": "node scripts/test-live-print-browser.cjs"
   },
   "engines": {

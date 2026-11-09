@@ -338,19 +338,52 @@ The default Editorial story sequence alternates eight layouts: left hero, offset
 
 ### Optional photobooth gallery connection
 
-This update does not change `moments-gallery`, its checkout, database or images. Live reads Gallery's public `/api/wall`, `/api/sessions/:slug` and `/media/:slug/:filename` endpoints. Only currently available, unexpired public albums can be selected. No Gallery admin PIN is required.
+Live imports do not change Gallery photos or data. This release also includes an optional, backward-compatible Gallery API extension described below. Live reads Gallery's public `/api/wall`, `/api/sessions/:slug` and `/media/:slug/:filename` endpoints. Only currently available, unexpired public albums can be selected. No Gallery admin PIN is required.
 
-Configure everything from **Live Admin > Events > Connect your photobooth gallery**. Enter the Gallery server address and select **Save & test connection**. For the reported same-host installation use `http://127.0.0.1:3020`. The address must be reachable from the Live server, not from your browser. Saving checks the Gallery public API first; a failed check leaves the previous connection unchanged. No environment edit or service restart is needed to save the connection.
+Configure everything from **Live Admin > Events > Connect your photobooth gallery**. Paste a public gallery link, such as `https://moments.inmomentservices.com/christmas-production-qa-2026-11-02`, and select **Save & test connection**. Live extracts the server address and preselects that album. A plain server address remains supported. The address must be reachable from the Live server, not from your browser. Saving checks the Gallery public API first; a failed check leaves the previous connection unchanged. No environment edit or service restart is needed to save the connection.
 
-The address persists in Live's database across restarts and takes precedence over the optional `LIVE_GALLERY_URL` environment default. Use an HTTP(S) origin without a path, query, credentials or fragment. Redirects and media outside the configured origin/selected album are rejected. Once photos have been imported, changing to a different server origin is blocked to protect source identities and deletion records. Pause individual events or use the global feature switch to stop syncing.
+The address persists in Live's database across restarts and takes precedence over the optional `LIVE_GALLERY_URL` environment default. Use an HTTP(S) gallery URL (one album path segment) or server address, without query, credentials or fragment. Redirects and media outside the configured origin/selected album are rejected. Switching from a local address to a public address is allowed after verifying that both servers return the same album IDs for all imported albums. A different Gallery or an unavailable old address is rejected to protect source identities and deletion records. Pause individual events or use the global feature switch to stop syncing.
 
-Only deploy/restart `moments-live` for this update. Existing Moments Gallery versions exposing these public endpoints need no update. No DNS or reverse-proxy change is required.
+Deploy/restart Live for the landing page, banners, public-link input and photo-type filtering. Existing Gallery APIs support framed-only filtering immediately. The optional Gallery extension below allows explicit original-photo selection without legacy family deduplication. No DNS or reverse-proxy change is required.
 
 1. Sign in at `https://live.inmomentservices.com/admin` and create or select a Live event.
-2. Under its event card, open **Photobooth gallery**, select the source album, then **Connect & sync**. New connection controls appear only when the configured Gallery is available; existing connections retain status and pause controls while offline. Reload the dashboard after restoring availability.
-3. New source images sync every minute, up to 50 per event per cycle. **Sync now** imports the next batch immediately. Photos still processing are skipped. Gallery's public album filtering decides which original/framed/AI variants are eligible.
+2. Under its event card, open **Photobooth gallery**, select the source album and photo types, then **Connect & sync**. New connections default to **Framed** only; **AI** and **Original (unframed)** are optional. New connection controls appear only when the configured Gallery is available; existing connections retain status and pause controls while offline. Reload the dashboard after restoring availability.
+3. New source images sync every minute, up to 50 per event per cycle. **Sync now** imports the next batch immediately. Photos still processing are skipped. The chosen photo-type tags filter new imports. Saving types also hides excluded existing imports from the wall, guest gallery, slideshow and album designer, without changing approval or deleting files. Existing connections retain their previous all-types setting until edited. Physical print sheets and magnet source files are never imported.
 4. Imports are separate JPEG copies, quality 88, up to 2400 pixels on the longest edge. They use the Live event's approval setting at import time. With moderation enabled, approve them in **Manage event / Review photos** before display/export.
 5. Live camera photos and linked photobooth photos form one combined collection. Use **Mosaic wall link** to enable/copy the wall URL, or **Design album** to select photos and export a landscape PDF. Both combine eligible guest-camera and photobooth photos. Wall publication, reveal and visibility rules still apply; album exports remain private to owner/admin.
 6. **Pause connection** stops importing and retains copies. Reconnecting the same album deduplicates prior imports, including copies removed in Live. Switching albums retains earlier copies. Source changes/deletions/expiry do not alter existing Live copies: remove or hide sensitive copies in Live separately. Already downloaded PDFs cannot be recalled.
 
 Admin Settings / **Photobooth gallery connection** disables new syncing globally while preserving copies. Moderation remains manual; no automatic content classification is added. A synthetic Photobooth guest groups imported photos (one guest record per event); imports do not consume a real guest's shot allowance. Additive `live_booth_links` and `live_booth_imports` tables preserve links and deletion records across restarts. Back up Live's complete data directory as usual. Tests: `test/live-photobooth.test.mjs` and `npm run test:live:print`.
+
+
+### Gallery API photo-type extension (optional Gallery deployment)
+
+The only Gallery service source change is `src/routes/sessions.js`: `/api/sessions/:slug?variants=framed,ai,original` selects explicit types. Requests without this query keep the original family-deduplication behaviour. Gallery's Show non-framed photos setting still controls whether originals can be returned, and expired galleries remain blocked. Physical/magnet variants are rejected. Older Gallery versions ignore the query; Live still filters the public photos they return, but cannot import original siblings omitted by that older API.
+
+For the known detached Gallery checkout, apply only the reviewed source patch rather than changing branches or replacing its `.env`, lockfile or dependencies. After fetching the release containing this change, export the `src/routes/sessions.js` diff for that release and run `git apply --check` in `/home/enn707/moments-server-live` before applying it. Back up that file and restart `moments-gallery` only after the patch succeeds. If the check fails, reconcile the source change with the deployed version; do not reset the checkout. No database migration or dependency update is needed for Gallery. Live has an additive `photos.source_visible` migration plus source-type metadata; back up its data directory before deployment.
+
+### Celebration landing page and campaign collection
+
+Anonymous visitors at `/` now see the event marketing page: shared capture, combined photobooth/Live wall, QR stationery, landscape albums, moderation, weddings/birthdays and pricing. Owner sign-in is at `/access` via Menu; invitation acceptance and authenticated dashboards retain their existing flow. New-event enquiries and pricing links open email to `hello@inmomentservices.com`; no email is sent automatically. The stated offer is **Live is free with Photobooth**, with package details arranged by contact.
+
+`/marketing/` contains five downloadable **1920 x 1080 JPG banners**: guest photography, the shared wall, weddings, birthdays and keepsakes. Files are in `live-public/marketing/*-banner.jpg`; editable composition is `index.html` + `campaign.css`, copy is `campaign.json`. Five separate built-in ImageGen backgrounds are compressed JPEGs in the same directory. Prompt/provenance manifest: `docs/marketing-artwork-prompts.json`. Artwork is fictional campaign imagery, not customer testimonials or exact app screenshots. Type uses bundled licensed Noto Sans and Noto Serif. Album printing and display hardware are not promised as included.
+
+Validation: `npm run test:live:landing` checks 320/390/768/1440 widths, the owner-access menu and all five exports. It regenerates the banner JPGs from the HTML/CSS. `node --test test/gallery-types.test.mjs test/live-photobooth.test.mjs` checks legacy Gallery behaviour, expiry, type selection, combined wall/album eligibility, moderation and duplicate prevention. Local landing screenshots are under ignored `output/live-qa/`.
+
+
+The reviewed Gallery-only patch is bundled at `docs/gallery-photo-types.patch`. To apply it to the reported existing installation after this release is pushed:
+
+```bash
+cd /home/enn707/moments-server-live
+git fetch origin codex/moments-live-server
+git show FETCH_HEAD:docs/gallery-photo-types.patch > /tmp/moments-gallery-photo-types.patch
+# Stop here if this file already has local edits.
+git diff --exit-code -- src/routes/sessions.js && \
+  git apply --check /tmp/moments-gallery-photo-types.patch && \
+  cp src/routes/sessions.js /tmp/moments-gallery-sessions-before-types.js && \
+  git apply /tmp/moments-gallery-photo-types.patch && \
+  sudo systemctl restart moments-gallery
+sudo systemctl is-active moments-gallery moments-live
+```
+
+Do not reapply an already applied patch. This leaves the detached HEAD, `.env`, lockfile and `node_modules` unchanged. If checks fail, stop and review the source difference. Live deployment still uses the independent `/opt/moments-live` checkout and `moments-live` service.

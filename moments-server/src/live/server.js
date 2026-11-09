@@ -46,6 +46,7 @@ export function createLiveApp(options = {}) {
     CREATE TABLE IF NOT EXISTS assets(event TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,kind TEXT NOT NULL,filename TEXT NOT NULL,PRIMARY KEY(event,kind));
     CREATE TABLE IF NOT EXISTS live_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
   `);
+  if (!db.prepare('PRAGMA table_info(photos)').all().some(c => c.name === 'source_visible')) db.exec('ALTER TABLE photos ADD COLUMN source_visible INTEGER NOT NULL DEFAULT 1');
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
   const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, qrPrints: true, mosaic: true, downloads: true, photobooks: true, photoboothGallery: true };
@@ -93,7 +94,7 @@ export function createLiveApp(options = {}) {
   const canSee = (req, e, p) => {
     if (admin(req) || owner(req)?.id === e.owner) return true;
     const g = guest(req, e);
-    return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && Boolean(g) && (e.visibility === 'all' || (e.visibility === 'own' && p.guest === g.id));
+    return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && p.source_visible === 1 && Boolean(g) && (e.visibility === 'all' || (e.visibility === 'own' && p.guest === g.id));
   };
   const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: 'classic', shot_limit: e.shot_limit, closes_at: e.closes_at, reveal: e.reveal, visibility: e.visibility, status: statusOf(e), moderation: e.moderation, overlay: features().branding ? e.overlay : '', cover_url: features().branding && db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
   const mail = options.sendMail || (async (email, url) => {
@@ -287,7 +288,7 @@ export function createLiveApp(options = {}) {
         if (duplicate) throw fail(409, 'This upload already completed. Refresh your gallery.');
         const changed = db.prepare('UPDATE guests SET shots=shots+1 WHERE id=? AND shots<?').run(g.id, current.shot_limit);
         if (!changed.changes) throw fail(409, 'You have used all your photos');
-        db.prepare('INSERT INTO photos VALUES(?,?,?,?,?,0,?,?)').run(photoId, e.id, g.id, filename, current.moderation ? 0 : 1, now(), requestId);
+        db.prepare('INSERT INTO photos(id,event,guest,filename,approved,favorite,created,request_id) VALUES(?,?,?,?,?,0,?,?)').run(photoId, e.id, g.id, filename, current.moderation ? 0 : 1, now(), requestId);
       })();
     } catch (err) { fs.unlinkSync(filepath); throw err; }
     res.status(201).json({ id: photoId });
@@ -295,7 +296,7 @@ export function createLiveApp(options = {}) {
   app.get('/api/guest/:slug/photos', wrap((req, res) => {
     const e = event(req); if (!guest(req, e) && !admin(req) && owner(req)?.id !== e.owner) throw fail(401, 'Join the event first');
     const photos = db.prepare('SELECT p.*,g.name guest_name FROM photos p JOIN guests g ON p.guest=g.id WHERE p.event=? ORDER BY p.created DESC').all(e.id);
-    res.json(photos.filter(p => canSee(req, e, p)).map(p => ({ id: p.id, approved: p.approved, favorite: p.favorite, created: p.created, guest_name: p.guest_name, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
+    res.json(photos.filter(p => canSee(req, e, p)).map(p => ({ id: p.id, approved: p.approved, source_visible: p.source_visible, favorite: p.favorite, created: p.created, guest_name: p.guest_name, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
   app.get('/api/guest/:slug/photos/:photo/image', wrap(async (req, res) => {
     if (req.query.download) requireFeature('downloads');
@@ -349,7 +350,7 @@ export function createLiveApp(options = {}) {
   });
   app.get('/api/events/:slug/slideshow', wrap((req, res) => {
     const e = owned(req); requireFeature('slideshow');
-    res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
+    res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
   const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL});
   registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail});
@@ -362,8 +363,9 @@ export function createLiveApp(options = {}) {
     }
     next();
   });
+  app.get('/marketing/', (_req,res)=>res.sendFile(path.join(root,'live-public/marketing/index.html')));
   app.use(express.static(path.join(root, 'live-public'), { index: false }));
-  app.get(['/', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print', '/host/:slug/album'], (req, res) => {
+  app.get(['/', '/access', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print', '/host/:slug/album'], (req, res) => {
     const storeId = process.env.LIVE_APPLE_APP_STORE_ID || '';
     const bundle = process.env.LIVE_IOS_BUNDLE_ID || 'com.inmomentservices.live';
     if (req.path.startsWith('/e/') && /^\d+$/.test(storeId) && /^[a-zA-Z0-9.-]+$/.test(bundle)) {

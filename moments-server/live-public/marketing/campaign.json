@@ -1,0 +1,37 @@
+[
+  {
+    "slug": "live-every-perspective",
+    "label": "MOMENTS LIVE / GUEST PHOTOGRAPHY",
+    "title": "Every guest.<br>A new<br><em>perspective.</em>",
+    "body": "Scan. Snap. Share.<br>Collect the unposed moments, right from your guests’ phones.",
+    "offer": "LIVE IS FREE WITH PHOTOBOOTH"
+  },
+  {
+    "slug": "live-one-wall",
+    "label": "MOMENTS LIVE / THE SHARED WALL",
+    "title": "All your people.<br>One <em>living<br>wall.</em>",
+    "body": "Guest photos and selected photobooth portraits.<br>One shared collection. A celebration everyone can see.",
+    "offer": "LIVE IS FREE WITH PHOTOBOOTH"
+  },
+  {
+    "slug": "moments-wedding",
+    "label": "MOMENTS / WEDDINGS",
+    "title": "Your wedding.<br>Every side<br>of <em>the story.</em>",
+    "body": "Framed portraits. Playful AI photo experiences.<br>Your photobooth and guest photos, beautifully together.",
+    "offer": "PHOTOBOOTH + LIVE"
+  },
+  {
+    "slug": "moments-birthday",
+    "label": "MOMENTS / BIRTHDAYS & CELEBRATIONS",
+    "title": "Make a wish.<br>Keep <em>the<br>whole night.</em>",
+    "body": "Photo keepsakes. AI photo styles. Big birthday energy.<br>Photobooth memories and guest photos, together.",
+    "offer": "PHOTOBOOTH + LIVE"
+  },
+  {
+    "slug": "moments-keepsakes",
+    "label": "MOMENTS / MEMORIES TO KEEP",
+    "title": "Your celebration,<br><em>beautifully<br>kept.</em>",
+    "body": "From photobooth portraits to shared galleries.<br>Choose your favourites. Design a landscape album PDF.",
+    "offer": "PHOTOBOOTH + LIVE"
+  }
+]

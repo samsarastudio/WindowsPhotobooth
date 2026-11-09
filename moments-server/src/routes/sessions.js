@@ -144,7 +144,13 @@ sessionsRouter.get('/:slug', (req, res) => {
   if (isSessionExpired(session) && !wantId) {
     return res.status(410).json({ ok: false, error: 'Session expired' });
   }
-  const photos = wantId && isSessionExpired(session) ? [] : listPublicPhotos(session.id);
+  let photos = wantId && isSessionExpired(session) ? [] : listPublicPhotos(session.id);
+  // Explicit type selection for the Live connection; legacy guest galleries keep family deduplication.
+  if(req.query.variants && !isSessionExpired(session)) {
+    const variants=String(req.query.variants).split(',');
+    if(variants.some(v=>!['framed','ai','original'].includes(v)))return res.status(400).json({ok:false,error:'Unsupported photo type'});
+    photos=listPhotos(session.id).filter(p=>variants.includes(p.variant)&&(p.variant!=='original'||loadSettings().showOriginalPhotos!==false));
+  }
   // Share deep-link: include this photo even when filtered from the public gallery list.
   if (wantId && !photos.some((p) => p.id === wantId || String(p.id).toLowerCase() === wantId.toLowerCase())) {
     let row = getDb()
