@@ -1,3 +1,4 @@
+import {printStudio} from './print-studio.js';
 import { wallControls } from './wall-controls.js';
 import { adminDashboard } from './admin.js';
 import { applyCapabilities, countdown } from './features.js';
@@ -60,10 +61,7 @@ async function host() {
   if (!user) return home();
   const e = await api(`/events/${slug}`);
   capabilities = e.features;
-  if (parts[2] === 'print') {
-    app.innerHTML = `<div class="print-card"><p class="eyebrow">CAPTURE YOUR POINT OF VIEW</p><h1>${escape(e.title)}</h1><p>Scan. Snap. Share the moment.</p><img class="qr" src="/api/events/${slug}/qr" alt="Scan to join ${escape(e.title)}"><p>No app download needed.</p><p class="share-url">${escape(e.url)}</p><button class="no-print" id="print">Print invitation</button></div>`;
-    action('#print', () => window.print()); return;
-  }
+  if (['print','album'].includes(parts[2])) return printStudio({app,event:e,api,send,notice,escape,mode:parts[2]==='album'?'album':'qr'});
   if (parts[2] === 'slideshow') return slideshow(e);
   app.innerHTML = `<div class="toolbar"><div><p class="eyebrow">EVENT STUDIO</p><h2>${escape(e.title)}</h2></div><div class="actions"><a class="button secondary" href="${e.url}" target="_blank" rel="noopener">Guest view ↗</a><a class="button secondary" href="/host/${slug}/slideshow">Live slideshow</a></div></div><div class="workspace"><div class="settings card"><h3>Event settings</h3><form id="settings">${fields(e)}<button type="submit">Save event settings</button></form><hr><h3>Cover & branding</h3><p class="muted">Cover: JPEG/PNG. Overlay: transparent PNG. Branding applies to new photos.</p><form id="assets"><label>Asset type<select name="kind"><option value="cover">Event cover</option><option value="overlay">Photo graphic overlay</option></select></label><label>Image<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><button type="submit" class="secondary">Upload image</button></form></div><section><div class="card"><span class="pill">${escape(e.status)}</span><div class="stats"><div class="stat">${e.photo_count}<span>PHOTOS</span></div><div class="stat">${e.guest_count} / ${e.guest_limit}<span>GUESTS</span></div></div><div class="split"><div><h3>Share with guests</h3><p class="share-url">${escape(e.url)}</p><div class="actions"><button id="copy" class="small">Copy link</button><button id="share" class="small secondary">Share</button><a href="/host/${slug}/print" class="button small secondary">Print QR</a></div></div><a href="/api/events/${slug}/qr" download="${slug}-qr.png"><img class="qr" src="/api/events/${slug}/qr" alt="Event invitation QR"></a></div></div><div class="toolbar"><h3>Event photos</h3><div class="actions"><select id="sort" aria-label="Sort photos"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="favorites">Favorites</option><option value="pending">Awaiting approval</option></select><a class="button small secondary" href="/api/events/${slug}/download">Download all</a></div></div><div id="photos" class="gallery"></div></section></div>`;
   const schedule = document.createElement('label'); schedule.textContent = 'Close camera and uploads at';
@@ -71,7 +69,7 @@ async function host() {
   document.querySelector('#settings [name=reveal]').closest('label').before(schedule);
   const hostOnly = new Option('Only the event owner', 'host'); hostOnly.selected = e.visibility === 'host'; document.querySelector('#settings [name=visibility]').append(hostOnly);
   document.querySelector('#settings [name=status]').value = e.configured_status;
-  const book = document.createElement('a'); book.className = 'button small secondary'; book.href = `/api/events/${slug}/photobook`; book.textContent = 'Photobook PDF'; document.querySelector('#sort').parentElement.append(book);
+  const book = document.createElement('a'); book.className = 'button small secondary'; book.href = `/host/${slug}/album`; book.textContent = 'Design album'; document.querySelector('#sort').parentElement.append(book);
   const advanced = document.createElement('details'); advanced.className = 'advanced-settings';
   advanced.innerHTML = '<summary>Privacy, timing & limits</summary><div class="advanced-fields"></div>';
   const target = advanced.querySelector('div');

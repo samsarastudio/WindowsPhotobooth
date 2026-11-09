@@ -299,3 +299,5 @@ Player details → **Delete registration** removes that registration, QR, unused
 
 ### Scan a player at the game desk
 In **Players & rewards**, choose **Scan player QR**. Scan with a USB keyboard scanner (Enter suffix), paste the player pass code, or choose **Use camera** on an HTTPS device. The matching player card opens with main-chance, eligible extension and photo options. Scanning never grants credits: adding chances still requires the payment checkbox and Game confirmation PIN. Camera capture stops when the scan succeeds, the dialog closes, or the page is hidden.
+
+Live includes a private **QR print studio** and **landscape album designer** on each admin event card: five AI-created themes, configurable sizes, logos and borders, approved-photo selection, 150 original caption suggestions, page previews and PDFs. See `docs/live-deployment.md` for formats and print limitations.

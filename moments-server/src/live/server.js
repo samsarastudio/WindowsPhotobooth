@@ -1,3 +1,4 @@
+import {registerPrintStudio} from './print-studio.js';
 import { registerWall } from './wall.js';
 import { adminAuth } from './admin-auth.js';
 import express from 'express';
@@ -6,7 +7,6 @@ import multer from 'multer';
 import sharp from 'sharp';
 import QRCode from 'qrcode';
 import archiver from 'archiver';
-import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -47,7 +47,7 @@ export function createLiveApp(options = {}) {
   `);
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
-  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, mosaic: true, downloads: true, photobooks: true };
+  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, qrPrints: true, mosaic: true, downloads: true, photobooks: true };
   const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}'), filters: false });
   const requireFeature = key => { if (!features()[key]) throw fail(403, 'This feature is disabled by the administrator'); };
   // Existing privacy and timing rules stay enforced even when their editor is disabled.
@@ -326,24 +326,7 @@ export function createLiveApp(options = {}) {
     for (const p of photos) zip.file(path.join(data, 'photos', p.filename), { name: p.filename });
     void zip.finalize();
   }));
-  app.get('/api/events/:slug/photobook', wrap((req, res) => {
-    requireFeature('photobooks');
-    const e = owned(req);
-    const photos = db.prepare('SELECT * FROM photos WHERE event=? AND approved=1 ORDER BY favorite DESC,created ASC').all(e.id);
-    const pdf = new PDFDocument({ size: [432, 648], margin: 30, autoFirstPage: false });
-    res.attachment(`${e.slug}-photobook.pdf`); res.type('pdf'); pdf.pipe(res);
-    pdf.on('error', () => res.destroy());
-    pdf.addPage().rect(0, 0, 432, 648).fill('#173e35');
-    pdf.fillColor('#efe5cd').fontSize(12).text('INMOMENT / LIVE', 30, 48);
-    pdf.fontSize(36).text(e.title, 30, 210, { width: 372 });
-    pdf.fontSize(12).text('Every perspective, together.', 30, 565);
-    for (let n = 0; n < photos.length; n += 2) {
-      pdf.addPage();
-      for (let j = 0; j < 2 && n + j < photos.length; j++) pdf.image(path.join(data, 'photos', photos[n + j].filename), 30, 30 + j * 285, { fit: [372, 265], align: 'center', valign: 'center' });
-      pdf.fillColor('#66726b').fontSize(9).text(`${Math.floor(n / 2) + 1}`, 30, 615, { width: 372, align: 'center' });
-    }
-    pdf.end();
-  }));
+  app.get('/api/events/:slug/photobook', wrap((req,res)=>{owned(req);requireFeature('photobooks');res.redirect(307,`/api/events/${req.params.slug}/print/album/pdf`);}));
   app.delete('/api/events/:slug', wrap((req, res) => {
     const e = owned(req);
     const photos = db.prepare('SELECT filename FROM photos WHERE event=?').all(e.id);
@@ -367,6 +350,7 @@ export function createLiveApp(options = {}) {
     const e = owned(req); requireFeature('slideshow');
     res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
+  registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail});
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
   app.use((req, res, next) => {
@@ -377,7 +361,7 @@ export function createLiveApp(options = {}) {
     next();
   });
   app.use(express.static(path.join(root, 'live-public'), { index: false }));
-  app.get(['/', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print'], (req, res) => {
+  app.get(['/', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print', '/host/:slug/album'], (req, res) => {
     const storeId = process.env.LIVE_APPLE_APP_STORE_ID || '';
     const bundle = process.env.LIVE_IOS_BUNDLE_ID || 'com.inmomentservices.live';
     if (req.path.startsWith('/e/') && /^\d+$/.test(storeId) && /^[a-zA-Z0-9.-]+$/.test(bundle)) {

@@ -106,7 +106,7 @@ const sharp = require('sharp');
     await guest.getByRole('button', { name: 'Close camera settings', exact: true }).click();
     await host.screenshot({ path: path.join(output, 'studio-desktop.png'), fullPage: true });
     await host.setViewportSize({ width: 390, height: 844 }); assert.equal(await host.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'host mobile viewport');
-    await host.goto(base + '/host/' + slug + '/print'); await host.locator('.print-card .qr').waitFor();
+    await host.goto(base + '/host/' + slug + '/print'); await host.locator('.design-page img[alt="Scan to join this event"]').waitFor();
     await host.goto(base + '/host/' + slug + '/slideshow'); await host.locator('#slide img').waitFor();
     // Reveal on an already-open phone, based on the server clock.
     await host.request.patch(base + '/api/events/' + slug, { data: { reveal: Date.now() + 3500 } });

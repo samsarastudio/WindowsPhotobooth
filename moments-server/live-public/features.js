@@ -6,6 +6,7 @@ export const featureLabels = {
   hostOnlyGallery: ['Host-only gallery option', 'Allow choosing host-only visibility. Existing host-only galleries remain private.'],
   revealExperience: ['Countdown and reveal experience', 'Show countdowns and the gallery-opening announcement.'],
   branding: ['Covers and branding', 'Enable cover display and branding on new photos. Existing photo pixels are unchanged.'],
+  qrPrints: ['Designed QR prints', 'Enable themed QR print previews and PDF downloads. Plain event QR codes remain available.'],
   mosaic: ['Shared mosaic walls', 'Allow enabled event walls to be viewed through a shareable link.'],
   slideshow: ['Live slideshow', 'Enable the host slideshow page and feed.'],
   downloads: ['Download controls and ZIP export', 'Enable download buttons and ZIPs. Visible images can still be saved by the device.'],
@@ -20,7 +21,7 @@ export function applyCapabilities(flags) {
   const hostOption = document.querySelector('#settings [name=visibility] option[value=host]');
   if (hostOption) hostOption.disabled = flags.hostOnlyGallery === false && !hostOption.selected;
   const assets = document.querySelector('#assets'); if (assets) assets.hidden = flags.branding === false;
-  for (const [key, selector] of Object.entries({ downloads: 'a[href*="?download="],a[href$="/download"]', photobooks: 'a[href$="/photobook"]', slideshow: 'a[href$="/slideshow"]' })) {
+  for (const [key, selector] of Object.entries({ downloads: 'a[href*="?download="],a[href$="/download"]', photobooks: 'a[href$="/photobook"],a[href$="/album"]', slideshow: 'a[href$="/slideshow"]' })) {
     document.querySelectorAll(selector).forEach(el => { el.hidden = flags[key] === false; });
   }
 }

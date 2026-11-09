@@ -23,8 +23,8 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     const link=admin.getByRole('textbox',{name:'Mosaic wall link',exact:true});await link.waitFor();const url=await link.inputValue();
     const wall=await browser.newPage({viewport:{width:1920,height:1080}});wall.on('pageerror',e=>errors.push(e.message));
     assert.equal((await wall.request.get(base+'/api/me')).status(),401,'Wall viewer has no owner/admin session');
-    await wall.goto(url);await wall.locator('.tile img').first().waitFor();assert.equal(await wall.locator('header,footer,#count').count(),0,'No header, footer or photo count');assert.equal(await wall.evaluate(()=>new Set([...document.querySelectorAll('.tile[data-id]')].map(el=>el.dataset.id)).size),11,'Pending photo excluded');
-    await wall.waitForFunction(()=>[...document.querySelectorAll('.tile img')].every(img=>img.complete&&img.naturalWidth>0));
+    await wall.goto(url);await wall.locator('.mosaic-slot.is-filled img').first().waitFor();await wall.waitForTimeout(2200);assert.equal(await wall.locator('.mosaic-slot.is-filled img').count(),11,'Each photo appears once, not repeated');assert.equal(await wall.locator('header,footer,#count').count(),0,'No header, footer or photo count');assert.equal(await wall.evaluate(()=>new Set([...document.querySelectorAll('.mosaic-slot[data-id]')].map(el=>el.dataset.id)).size),11,'Pending photo excluded');
+    await wall.waitForFunction(()=>[...document.querySelectorAll('.mosaic-slot.is-filled img')].every(img=>img.complete&&img.naturalWidth>0));
     await wall.waitForTimeout(900);
     await wall.screenshot({path:path.join(out,'mosaic-wall-desktop.png')});
     for(const size of [{width:390,height:844},{width:844,height:390},{width:1920,height:1080}]){await wall.setViewportSize(size);assert.equal(await wall.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight),true,'Wall fits viewport');}
@@ -33,29 +33,29 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     await admin.getByRole('button',{name:'Upload partner logo',exact:true}).click();
     await admin.getByRole('button',{name:'Clear partner logo',exact:true}).waitFor();
     await admin.getByLabel('Completed grid (turn off for live collage)',{exact:true}).check();
-    await admin.getByLabel('Mosaic density (columns)',{exact:true}).fill('12');
+    await admin.getByLabel('Completed grid density (columns)',{exact:true}).fill('12');
     await admin.getByLabel('Partner brand text',{exact:true}).fill('Event partner');
     await admin.getByLabel('Enable brand partner reveal',{exact:true}).check();
     await admin.getByLabel('Show partner every (seconds)',{exact:true}).fill('10');
     await admin.getByLabel('Hold partner on screen (seconds)',{exact:true}).fill('3');
     await admin.getByRole('button',{name:'Save wall display',exact:true}).click();
-    await wall.locator('body.completed').waitFor({timeout:12000});
+    await wall.locator('#stage.is-completed').waitFor({timeout:12000});
     await wall.waitForFunction(()=>document.querySelector('#stage').getBoundingClientRect().height===innerHeight);
-    await wall.locator('body.revealing').waitFor({timeout:15000});
-    assert.equal(await wall.locator('#brand').textContent(),'Event partner');
-    assert.equal(await wall.locator('#logo').isVisible(),true);
-    assert.equal(await wall.locator('#logo').evaluate(img=>img.complete&&img.naturalWidth>0),true);
-    await wall.locator('body:not(.revealing)').waitFor({timeout:5000});
+    await wall.locator('#mosaicBrandReveal.is-on').waitFor({timeout:15000});
+    assert.equal(await wall.locator('#mosaicBrandRevealText').textContent(),'Event partner');
+    assert.equal(await wall.locator('#mosaicBrandRevealLogo').isVisible(),true);
+    assert.equal(await wall.locator('#mosaicBrandRevealLogo').evaluate(img=>img.complete&&img.naturalWidth>0),true);
+    await wall.locator('#mosaicBrandReveal:not(.is-on)').waitFor({state:'attached',timeout:5000});
     await wall.waitForTimeout(800);
     await wall.screenshot({path:path.join(out,'mosaic-wall-completed.png')});
-    const image=await wall.locator(`.tile[data-id="${ids[0]}"] img`).first().getAttribute('src');
+    const image=await wall.locator(`.mosaic-slot[data-id="${ids[0]}"] img`).first().getAttribute('src');
     // Hide the photo through the actual studio control, then remove another permanently.
     await admin.goto(base+`/host/${e.slug}`);await admin.locator(`[data-approve="${ids[0]}"]`).click();
-    await wall.locator(`.tile[data-id="${ids[0]}"]`).first().waitFor({state:'detached',timeout:12000});assert.equal((await wall.request.get(base+image)).status(),404);
+    await wall.locator(`.mosaic-slot[data-id="${ids[0]}"]`).first().waitFor({state:'detached',timeout:12000});assert.equal((await wall.request.get(base+image)).status(),404);
     await admin.locator(`[data-delete="${ids[1]}"]`).click();await admin.getByRole('button',{name:'Delete photo',exact:true}).click();
-    await wall.locator(`.tile[data-id="${ids[1]}"]`).first().waitFor({state:'detached',timeout:12000});
+    await wall.locator(`.mosaic-slot[data-id="${ids[1]}"]`).first().waitFor({state:'detached',timeout:12000});
     await admin.getByText('Mosaic wall link',{exact:true}).click();await admin.getByRole('button',{name:'Disable wall',exact:true}).click();
-    await wall.locator('#state').filter({hasText:'no longer available'}).waitFor({timeout:12000});assert.equal(await wall.locator('.tile img').count(),0);
+    await wall.locator('#state').filter({hasText:'no longer available'}).waitFor({timeout:12000});assert.equal(await wall.locator('.mosaic-slot.is-filled img').count(),0);
     assert.deepEqual(errors,[]);console.log('PASS: admin wall sharing, anonymous viewing, pending-photo exclusion, live hide/delete, disabling, and responsive wall layout.');
   }finally{if(browser)await browser.close();server.kill();if(server.exitCode===null)await new Promise(r=>server.once('exit',r));fs.rmSync(data,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

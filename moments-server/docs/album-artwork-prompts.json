@@ -1,0 +1,25 @@
+{
+  "tool": "Built-in image_gen",
+  "assets": {
+    "wedding-album": {
+      "file": "exec-67f9f6ac-0001-43da-9e66-d3b59f2cd2b9.png",
+      "prompt": "Production landscape photo album background, horizontal 3:2 aspect ratio. watercolor olive foliage and tiny ivory blossoms, subtle gold, warm ivory paper. Premium editorial print design. Very sparse artwork limited to the outer 8 percent edges and corners. The center 85 percent entirely empty and uniform for photographs and typography added separately. Flat page artwork, no mockup, no text, no logo, no people, no photographs."
+    },
+    "birthday-album": {
+      "file": "exec-91e1669a-0864-44d0-bbc5-937e7517bb0d.png",
+      "prompt": "Production landscape photo album background, horizontal 3:2 aspect ratio. coral and periwinkle confetti and ribbon watercolor, pale cream. Premium editorial print design. Very sparse artwork limited to the outer 8 percent edges and corners. The center 85 percent entirely empty and uniform for photographs and typography added separately. Flat page artwork, no mockup, no text, no logo, no people, no photographs."
+    },
+    "celebration-album": {
+      "file": "exec-bf901809-4cc6-44ec-b747-66c101c1d69c.png",
+      "prompt": "Production landscape photo album background, horizontal 3:2 aspect ratio. midnight navy paper with very fine gold art deco border. Premium editorial print design. Very sparse artwork limited to the outer 8 percent edges and corners. The center 85 percent entirely empty and uniform for photographs and typography added separately. Flat page artwork, no mockup, no text, no logo, no people, no photographs."
+    },
+    "corporate-album": {
+      "file": "exec-71c9fe01-4a43-49b9-af35-e9ced2b18237.png",
+      "prompt": "Production landscape photo album background, horizontal 3:2 aspect ratio. pearl white with restrained translucent teal and cool blue geometric corner curves. Premium editorial print design. Very sparse artwork limited to the outer 8 percent edges and corners. The center 85 percent entirely empty and uniform for photographs and typography added separately. Flat page artwork, no mockup, no text, no logo, no people, no photographs."
+    },
+    "family-album": {
+      "file": "exec-99029666-cb9b-4d19-8586-7ce61af11f0e.png",
+      "prompt": "Production landscape photo album background, horizontal 3:2 aspect ratio. oatmeal textured paper, pressed terracotta and sage wildflower corners. Premium editorial print design. Very sparse artwork limited to the outer 8 percent edges and corners. The center 85 percent entirely empty and uniform for photographs and typography added separately. Flat page artwork, no mockup, no text, no logo, no people, no photographs."
+    }
+  }
+}
