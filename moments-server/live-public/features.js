@@ -5,6 +5,7 @@ export const featureLabels = {
   scheduledReveal: ['Scheduled reveal editor', 'Allow owners to set or change reveal times. Existing hidden photos stay hidden.'],
   hostOnlyGallery: ['Host-only gallery option', 'Allow choosing host-only visibility. Existing host-only galleries remain private.'],
   revealExperience: ['Countdown and reveal experience', 'Show countdowns and the gallery-opening announcement.'],
+  filters: ['Photo looks', 'Enable Natural, Vivid, Golden, Soft, Vintage and Mono for new guest photos. Natural remains the default.'],
   branding: ['Covers and branding', 'Enable cover display and branding on new photos. Existing photo pixels are unchanged.'],
   qrPrints: ['Designed QR prints', 'Enable themed QR print previews and PDF downloads. Plain event QR codes remain available.'],
   mosaic: ['Shared mosaic walls', 'Allow enabled event walls to be viewed through a shareable link.'],
@@ -14,7 +15,7 @@ export const featureLabels = {
   photobooks: ['Photobook PDFs', 'Enable printable PDF generation.']
 };
 export function applyCapabilities(flags) {
-  const fields = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding' };
+  const fields = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding',photo_look:'filters',look_strength:'filters' };
   for (const [field, key] of Object.entries(fields)) {
     const input = document.querySelector(`#settings [name="${field}"]`);
     if (input) { input.disabled = flags[key] === false; input.title = input.disabled ? 'Disabled by administrator. Existing setting remains in effect.' : ''; }

@@ -1,3 +1,5 @@
+import {photoLooks} from './photo-looks.js';
+import {mountPhotoLooks} from './photo-look-controls.js';
 import {landing} from './landing.js';
 import {printStudio} from './print-studio.js';
 import { wallControls } from './wall-controls.js';
@@ -67,6 +69,7 @@ async function host() {
   if (['print','album'].includes(parts[2])) return printStudio({app,event:e,api,send,notice,escape,mode:parts[2]==='album'?'album':'qr'});
   if (parts[2] === 'slideshow') return slideshow(e);
   app.innerHTML = `<div class="toolbar"><div><p class="eyebrow">EVENT STUDIO</p><h2>${escape(e.title)}</h2></div><div class="actions"><a class="button secondary" href="${e.url}" target="_blank" rel="noopener">Guest view ↗</a><a class="button secondary" href="/host/${slug}/slideshow">Live slideshow</a></div></div><div class="workspace"><div class="settings card"><h3>Event settings</h3><form id="settings">${fields(e)}<button type="submit">Save event settings</button></form><hr><h3>Cover & branding</h3><p class="muted">Cover: JPEG/PNG. Overlay: transparent PNG. Branding applies to new photos.</p><form id="assets"><label>Asset type<select name="kind"><option value="cover">Event cover</option><option value="overlay">Photo graphic overlay</option></select></label><label>Image<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><button type="submit" class="secondary">Upload image</button></form></div><section><div class="card"><span class="pill">${escape(e.status)}</span><div class="stats"><div class="stat">${e.photo_count}<span>PHOTOS</span></div><div class="stat">${e.guest_count} / ${e.guest_limit}<span>GUESTS</span></div></div><div class="split"><div><h3>Share with guests</h3><p class="share-url">${escape(e.url)}</p><div class="actions"><button id="copy" class="small">Copy link</button><button id="share" class="small secondary">Share</button><a href="/host/${slug}/print" class="button small secondary">Print QR</a></div></div><a href="/api/events/${slug}/qr" download="${slug}-qr.png"><img class="qr" src="/api/events/${slug}/qr" alt="Event invitation QR"></a></div></div><div class="toolbar"><h3>Event photos</h3><div class="actions"><select id="sort" aria-label="Sort photos"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="favorites">Favorites</option><option value="pending">Awaiting approval</option></select><a class="button small secondary" href="/api/events/${slug}/download">Download all</a></div></div><div id="photos" class="gallery"></div></section></div>`;
+  const lookSettings=document.createElement('section');lookSettings.className='event-look-settings';lookSettings.innerHTML=`<h3>Default photo look</h3><p>Guests can change their look using the Looks button above the shutter. Applies to new guest camera photos and phone uploads.</p><label>Photo look<select name="photo_look">${photoLooks.map(l=>`<option value="${l.id}" ${l.id===e.photo_look?'selected':''}>${l.name}</option>`).join('')}</select></label><label>Look strength (0–100)<input type="number" name="look_strength" min="0" max="100" value="${e.look_strength??70}"></label>${e.features.filters?'':'<p>Photo looks are disabled. Enable them in Admin → Settings → Photo looks.</p>'}`;document.querySelector('#settings').prepend(lookSettings);
   const schedule = document.createElement('label'); schedule.textContent = 'Close camera and uploads at';
   const deadline = document.createElement('input'); deadline.type = 'datetime-local'; deadline.name = 'closes_at'; deadline.value = datetime(e.closes_at); schedule.append(deadline);
   document.querySelector('#settings [name=reveal]').closest('label').before(schedule);
@@ -132,6 +135,7 @@ async function loadPhotos(isHost = false) {
   });
   applyCapabilities(capabilities);
 }
+let lookSelection=null;
 let guestState, cameraFacing = 'environment', cameraAttempt = 0, uploadBusy = false, pendingUploads = [];
 const canCapture = () => guestState?.joined && guestState.uploads_enabled && guestState.remaining > 0;
 function cameraControls() {
@@ -150,6 +154,7 @@ async function guestView() {
   if (uploadBusy) return;
   const galleryOpen = document.querySelector('#gallery-dialog')?.open;
   const settingsOpen = document.querySelector('#camera-settings')?.open;
+  const looksOpen=document.querySelector('#photo-looks-dialog')?.open;
   guestState = data; clearCountdown(); capabilities = data.features;
   if (!capabilities.webApp) { stopCamera(); location.reload(); return; }
   if (!canCapture()) stopCamera();
@@ -163,8 +168,11 @@ async function guestView() {
     <div class="camera-bottom"><p id="upload-status" role="status"></p><div id="upload-recovery"></div><div class="camera-event-name">${escape(e.title)}</div><div class="camera-mode" aria-hidden="true">PHOTO</div><div class="capture-controls"><div class="shot-count"><strong>${data.remaining}</strong><span>of ${e.shot_limit} shots left</span></div><button id="shutter" aria-label="Take and share photo" disabled><span></span></button><button id="open-gallery" class="gallery-trigger"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m4 19 5-5 3 3 4-6 5 8"/></svg>Gallery</button></div><p class="capture-hint">${canCapture() ? 'Tap the shutter to share a photo' : data.joined ? 'Your moments, together' : 'Join to start taking photos'}</p></div>
     </section>
     <dialog id="gallery-dialog" class="camera-sheet" aria-labelledby="gallery-title"><div class="sheet-toolbar"><h2 id="gallery-title">Event gallery</h2><button type="button" data-close="gallery-dialog" aria-label="Close gallery">Close</button></div><div class="guest-head"><p>${escape(e.title)}</p></div><div id="gallery-state"></div><div id="photos" class="gallery"></div></dialog>
-    <dialog id="camera-settings" class="camera-sheet" aria-labelledby="camera-settings-title"><div class="sheet-toolbar"><h2 id="camera-settings-title">Camera settings</h2><button type="button" data-close="camera-settings" aria-label="Close camera settings">Close</button></div><p>${escape(e.title)}</p>${e.description ? `<p class="muted">${escape(e.description)}</p>` : ''}<div class="camera-options"><button id="settings-camera" ${canCapture() ? '' : 'disabled'}>Turn camera on</button><button id="flip-camera" class="secondary" ${canCapture() ? '' : 'disabled'}>Switch front / back camera</button><label class="button secondary file-button">Upload from phone<input id="upload" type="file" accept="image/*" multiple ${canCapture() ? '' : 'disabled'}></label></div><p class="muted">${e.moderation ? 'Your host reviews photos before they appear in the gallery.' : 'Photos are shared immediately when you take or upload them.'} Photos keep their natural colour.</p>${e.closes_at ? `<p class="muted">Camera closes ${escape(new Date(e.closes_at).toLocaleString())}.</p>` : ''}<p class="muted">Camera permission is controlled by your browser. If access was blocked, enable it in your browser’s site settings.</p></dialog>`;
+    <dialog id="camera-settings" class="camera-sheet" aria-labelledby="camera-settings-title"><div class="sheet-toolbar"><h2 id="camera-settings-title">Camera settings</h2><button type="button" data-close="camera-settings" aria-label="Close camera settings">Close</button></div><p>${escape(e.title)}</p>${e.description ? `<p class="muted">${escape(e.description)}</p>` : ''}<div class="camera-options"><button id="settings-camera" ${canCapture() ? '' : 'disabled'}>Turn camera on</button><button id="flip-camera" class="secondary" ${canCapture() ? '' : 'disabled'}>Switch front / back camera</button><label class="button secondary file-button">Upload from phone<input id="upload" type="file" accept="image/*" multiple ${canCapture() ? '' : 'disabled'}></label></div><p class="muted">${e.moderation ? 'Your host reviews photos before they appear in the gallery.' : 'Photos are shared immediately when you take or upload them.'} ${capabilities.filters?'Choose Photo looks above the shutter to change the colour of new photos.':'Photos keep their natural colour.'}</p>${e.closes_at ? `<p class="muted">Camera closes ${escape(new Date(e.closes_at).toLocaleString())}.</p>` : ''}<p class="muted">Camera permission is controlled by your browser. If access was blocked, enable it in your browser’s site settings.</p></dialog>`;
   if (stream) { const video = document.querySelector('#camera-preview'); video.srcObject = stream; await video.play().catch(() => stopCamera()); }
+  if(!lookSelection)lookSelection={id:e.photo_look||'natural',strength:e.look_strength??70};
+  if(!capabilities.filters)lookSelection={id:'natural',strength:70};
+  mountPhotoLooks({app,enabled:capabilities.filters,selection:{...lookSelection},onChange:value=>{lookSelection=value;}});
   cameraControls();
   const show = id => { document.querySelectorAll('.camera-sheet[open]').forEach(d => d.close()); document.querySelector(`#${id}`).showModal(); };
   action('#open-gallery', async () => { show('gallery-dialog'); if (data.joined && data.revealed && e.visibility !== 'host') await loadPhotos(); });
@@ -201,7 +209,7 @@ async function guestView() {
     sessionStorage.setItem(revealKey, 'revealed'); state.className = 'reveal-banner'; state.textContent = 'The wait is over. Your moments are ready.'; notice('Your event gallery is ready.');
   }
   clearCountdown = countdown(data, guestView);
-  if (galleryOpen) show('gallery-dialog'); else if (settingsOpen) show('camera-settings');
+  if (galleryOpen) show('gallery-dialog'); else if (settingsOpen) show('camera-settings'); else if(looksOpen&&capabilities.filters)show('photo-looks-dialog');
   clearInterval(refreshTimer); refreshTimer = setInterval(async () => {
     if (document.hidden || uploadBusy) return;
     try {
@@ -222,12 +230,12 @@ async function uploadFiles(files, retry = false) {
   uploadBusy = true; cameraControls(); renderUploadRecovery(); let completed = 0;
   try {
     if (!retry && files.length > guestState.remaining) throw new Error(`Choose up to ${guestState.remaining} photos for your remaining shots.`);
-    if (!retry) pendingUploads = files.map(file => ({ file, requestId: crypto.randomUUID() }));
+    if (!retry) pendingUploads = files.map(file => ({ file, requestId: crypto.randomUUID(),look:{...(lookSelection||{id:'natural',strength:70})} }));
     const total = pendingUploads.length;
     while (pendingUploads.length) {
-      const { file, requestId } = pendingUploads[0];
+      const { file, requestId,look } = pendingUploads[0];
       const status = document.querySelector('#upload-status'); if (status) status.textContent = `Sharing ${completed + 1} of ${total}…`;
-      const body = new FormData(); body.append('photo', file, file.name || 'capture.jpg'); body.append('request_id', requestId);
+      const body = new FormData(); body.append('photo', file, file.name || 'capture.jpg'); body.append('request_id', requestId);body.append('photo_look',look.id);body.append('look_strength',String(look.strength));
       await api(`/guest/${slug}/photos`, { method: 'POST', body }); completed++; pendingUploads.shift();
     }
     notice(`${completed} ${completed === 1 ? 'photo' : 'photos'} shared${guestState.event.moderation ? ' — waiting for host approval.' : '.'}`);

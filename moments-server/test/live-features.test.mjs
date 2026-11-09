@@ -64,7 +64,7 @@ test('Live feature controls enforce deadlines, preserve privacy and persist acro
   assert.equal((await call(media, 'GET', undefined, owner)).status, 200, 'display access is not DRM');
   assert.equal((await call(`/api/events/${e.slug}/assets/cover`, 'POST', photo('cover'), owner)).status, 403);
   assert.equal((await call(`/api/events/${e.slug}`, 'PATCH', { style: 'mono' }, owner)).body.style, 'classic');
-  assert.equal((await flags({ filters: true })).body.filters, false, 'Legacy toggle cannot restore removed filters');
+  assert.equal((await flags({ filters: true })).body.filters, true, 'Administrator can enable photo looks');
   const fresh = (await call('/api/events', 'POST', { title: 'Natural', status: 'published' }, owner)).body;
   assert.equal(fresh.style, 'classic');
   assert.equal((await call(`/api/guest/${fresh.slug}/join`, 'POST', { name: 'Paused' })).status, 403);

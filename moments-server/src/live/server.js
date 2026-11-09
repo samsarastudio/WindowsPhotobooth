@@ -1,3 +1,4 @@
+import {photoLooks,applyPhotoLook} from '../../live-public/photo-looks.js';
 import {registerPhotobooth} from './photobooth.js';
 import {registerPrintStudio} from './print-studio.js';
 import { registerWall } from './wall.js';
@@ -49,8 +50,11 @@ export function createLiveApp(options = {}) {
   if (!db.prepare('PRAGMA table_info(photos)').all().some(c => c.name === 'source_visible')) db.exec('ALTER TABLE photos ADD COLUMN source_visible INTEGER NOT NULL DEFAULT 1');
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
-  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: false, slideshow: true, qrPrints: true, mosaic: true, downloads: true, photobooks: true, photoboothGallery: true };
-  const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}'), filters: false });
+  const eventColumns=db.prepare('PRAGMA table_info(events)').all();
+  if(!eventColumns.some(c=>c.name==='photo_look'))db.exec("ALTER TABLE events ADD COLUMN photo_look TEXT NOT NULL DEFAULT 'natural'");
+  if(!eventColumns.some(c=>c.name==='look_strength'))db.exec("ALTER TABLE events ADD COLUMN look_strength INTEGER NOT NULL DEFAULT 70");
+  const defaults = { webApp: true, guestUploads: true, scheduledClosing: true, scheduledReveal: true, hostOnlyGallery: true, revealExperience: true, branding: true, filters: true, slideshow: true, qrPrints: true, mosaic: true, downloads: true, photobooks: true, photoboothGallery: true };
+  const features = () => ({ ...defaults, ...JSON.parse(db.prepare("SELECT value FROM live_settings WHERE key='features'").get()?.value || '{}') });
   const requireFeature = key => { if (!features()[key]) throw fail(403, 'This feature is disabled by the administrator'); };
   // Existing privacy and timing rules stay enforced even when their editor is disabled.
   const statusOf = e => e.status === 'published' && e.closes_at > 0 && e.closes_at <= now() ? 'closed' : e.status;
@@ -96,7 +100,7 @@ export function createLiveApp(options = {}) {
     const g = guest(req, e);
     return e.status !== 'draft' && e.reveal <= now() && p.approved === 1 && p.source_visible === 1 && Boolean(g) && (e.visibility === 'all' || (e.visibility === 'own' && p.guest === g.id));
   };
-  const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: 'classic', shot_limit: e.shot_limit, closes_at: e.closes_at, reveal: e.reveal, visibility: e.visibility, status: statusOf(e), moderation: e.moderation, overlay: features().branding ? e.overlay : '', cover_url: features().branding && db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
+  const publicEvent = e => ({ slug: e.slug, title: e.title, description: e.description, style: 'classic', photo_look:features().filters?e.photo_look:'natural',look_strength:e.look_strength, shot_limit: e.shot_limit, closes_at: e.closes_at, reveal: e.reveal, visibility: e.visibility, status: statusOf(e), moderation: e.moderation, overlay: features().branding ? e.overlay : '', cover_url: features().branding && db.prepare("SELECT 1 FROM assets WHERE event=? AND kind='cover'").get(e.id) ? `/api/guest/${e.slug}/cover` : null });
   const mail = options.sendMail || (async (email, url) => {
     if (!process.env.LIVE_SMTP_URL || !process.env.LIVE_MAIL_FROM) return false;
     const transport = nodemailer.createTransport(process.env.LIVE_SMTP_URL);
@@ -119,7 +123,7 @@ export function createLiveApp(options = {}) {
   app.patch('/api/admin/features', wrap((req, res) => {
     mustAdmin(req);
     if (!req.body || Array.isArray(req.body) || Object.entries(req.body).some(([k, v]) => !Object.hasOwn(defaults, k) || typeof v !== 'boolean')) throw fail(400, 'Provide known feature names with boolean values');
-    const updated = { ...features(), ...req.body, filters: false };
+    const updated = { ...features(), ...req.body };
     db.prepare("INSERT OR REPLACE INTO live_settings VALUES('features',?)").run(JSON.stringify(updated));
     res.json(updated);
   }));
@@ -158,10 +162,12 @@ export function createLiveApp(options = {}) {
   app.get('/api/me', wrap((req, res) => res.json(admin(req) || mustOwner(req))));
   app.get('/api/events', wrap((req, res) => res.json(db.prepare('SELECT * FROM events WHERE owner=? ORDER BY created DESC').all(mustOwner(req).id).map(summary))));
   function settings(b, previous = {}) {
-    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding' };
+    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding', photo_look:'filters',look_strength:'filters' };
     for (const [field, flag] of Object.entries(controlled)) if (b[field] !== undefined && String(b[field]) !== String(previous[field] ?? (field === 'style' ? 'classic' : field === 'overlay' ? '' : 0))) requireFeature(flag);
     if (b.visibility === 'host' && previous.visibility !== 'host') requireFeature('hostOnlyGallery');
     const value = { title: text(b.title ?? previous.title), description: text(b.description ?? previous.description, 1500), style: 'classic', shot_limit: Number(b.shot_limit ?? previous.shot_limit ?? 25), guest_limit: Number(b.guest_limit ?? previous.guest_limit ?? 250), reveal: Number(b.reveal ?? previous.reveal ?? 0), visibility: b.visibility ?? previous.visibility ?? 'all', status: b.status ?? previous.status ?? 'draft', moderation: Number(b.moderation ?? previous.moderation ?? 0), overlay: text(b.overlay ?? previous.overlay, 80) };
+    value.photo_look=b.photo_look??previous.photo_look??'natural';value.look_strength=Number(b.look_strength??previous.look_strength??70);
+    if(!photoLooks.some(l=>l.id===value.photo_look)||!Number.isInteger(value.look_strength)||value.look_strength<0||value.look_strength>100)throw fail(400,'Choose a valid photo look and strength from 0 to 100');
     value.closes_at = Number(b.closes_at ?? previous.closes_at ?? 0);
     if (!value.title || !['warm', 'mono', 'classic'].includes(value.style) || !['all', 'own', 'host'].includes(value.visibility) || !['draft', 'published', 'closed'].includes(value.status) || ![0, 1].includes(value.moderation) || !Number.isInteger(value.shot_limit) || value.shot_limit < 1 || value.shot_limit > 1000 || !Number.isInteger(value.guest_limit) || value.guest_limit < 1 || value.guest_limit > 10000 || !Number.isSafeInteger(value.reveal) || value.reveal < 0 || !Number.isSafeInteger(value.closes_at) || value.closes_at < 0) throw fail(400, 'Check event settings: valid times, 1–1000 photos and 1–10000 guests');
     return value;
@@ -220,7 +226,7 @@ export function createLiveApp(options = {}) {
     cookie(res, `live_guest_${e.id}`, raw, 365 * 86400);
     res.status(201).json({ joined: true, guest_token: raw, remaining: e.shot_limit });
   }));
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1, fields: 2 } }).single('photo');
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1, fields: 4 } }).single('photo');
   let activeUploads = 0;
   app.use(['/api/guest/:slug/photos', '/api/events/:slug/assets/:kind'], (req, res, next) => {
     if (req.method !== 'POST') return next();
@@ -261,9 +267,13 @@ export function createLiveApp(options = {}) {
     if (existing) return res.json(existing);
     if (g.shots >= e.shot_limit) throw fail(409, 'You have used all your photos');
     if (!req.file) throw fail(400, 'Choose a photo');
+    const photoLook=features().filters?(req.body.photo_look??e.photo_look):'natural';
+    const lookStrength=Number(req.body.look_strength??e.look_strength);
+    if(!photoLooks.some(l=>l.id===photoLook)||!Number.isInteger(lookStrength)||lookStrength<0||lookStrength>100)throw fail(400,'Choose a valid photo look and strength');
     let bytes;
     try {
       let pipeline = sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true });
+      if(photoLook!=='natural'&&lookStrength>0){const raw=await pipeline.flatten({background:'#fff'}).toColourspace('srgb').removeAlpha().raw().toBuffer({resolveWithObject:true});applyPhotoLook(raw.data,photoLook,lookStrength,raw.info.channels);pipeline=sharp(raw.data,{raw:raw.info});}
       bytes = await pipeline.jpeg({ quality: 88 }).toBuffer();
     } catch { throw fail(400, 'Use a valid JPEG, PNG, WebP or supported phone photo'); }
     const graphic = db.prepare("SELECT * FROM assets WHERE event=? AND kind='overlay'").get(e.id);

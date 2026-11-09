@@ -403,3 +403,16 @@ A connected, enabled photobooth album is watched by the Live server even when th
 Requests bypass stale album caches. Live admin shows the last check time, imported count, pending approvals and sync errors, refreshing every five seconds without resetting unsaved photo-type selections. The wall also refreshes every five seconds: an eligible approved capture usually appears within roughly 5–10 seconds, plus transfer/processing time. An outage, large backlog, slow image, pending approval, scheduled reveal, source album expiry, or excluded type may delay/prevent display. Keep the photobooth uploading into the connected album; a different daily album must be linked separately. Pausing or removing a connection stops future imports.
 
 Validation includes automatic later captures without any manual sync request, failed-image isolation, processing-to-ready transitions, recovery after an outage, restart recovery, duplicate prevention, pause/removal, and an already-open browser wall displaying a new approved capture. No Gallery service update is required for this sync fix; deploy Live only.
+
+
+### Camera photo looks
+
+Deploy Live only. Database columns migrate automatically at startup. Existing saved feature preferences are preserved: open **Admin > Settings**, enable **Photo looks**, and save if this installation previously disabled filters. New installations enable the selector, with Natural as the default.
+
+Guests tap **Looks · Natural** immediately above the shutter. Choose Natural, Vivid, Golden, Soft, Vintage or Mono, adjust strength from 0–100%, then tap Done. The camera preview updates live. Reset to Natural restores original colour. In **Admin > Events > Manage event > Default photo look**, choose the event's starting look and strength and save event settings. Guests can override it during their visit.
+
+Looks affect newly shared guest camera photos and phone uploads only. The selected look is captured when uploading begins, including retries. The server applies the colour matrix once before branding and saves JPEG at quality 88, maximum 2400 pixels per side. Existing photos and imported photobooth photos remain unchanged. Switching the feature off hides the picker and enforces Natural on new uploads. These are original colour presets, not face effects or proprietary film emulations. Native clients inherit event defaults; this release adds the picker to the web camera.
+
+Design research: [VSCO Capture](https://www.vsco.co/capture/live-filters-effects) demonstrates live previews and adjustable effect strength; [POV](https://pov.camera/) demonstrates a focused event-camera experience. Live uses six curated looks and one strength control to keep the shutter easy to reach.
+
+Validation: automated image tests cover all looks, JPEG output, zero-strength identity, invalid input, event defaults and the administrator switch. Browser camera tests cover Chromium and WebKit phone viewport sizes, modal containment, rendered grayscale previews and saved grayscale JPEGs. These are desktop browser simulations, not physical-device certification.
