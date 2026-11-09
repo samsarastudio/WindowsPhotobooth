@@ -387,3 +387,10 @@ sudo systemctl is-active moments-gallery moments-live
 ```
 
 Do not reapply an already applied patch. This leaves the detached HEAD, `.env`, lockfile and `node_modules` unchanged. If checks fail, stop and review the source difference. Live deployment still uses the independent `/opt/moments-live` checkout and `moments-live` service.
+
+
+### Remove a connected photobooth gallery
+
+Live Admin > Events > the event's **Photobooth gallery** panel > **Remove connected gallery** > **Remove gallery & imported photos** disconnects the currently linked album and removes its imported copies from that Live event. It works for paused connections, disabled syncing and offline source galleries. The wall feed excludes them immediately; an open wall refreshes within about five seconds. Album previews/exports exclude them too. Already downloaded PDFs cannot be recalled.
+
+Live camera photos, other events and the original photobooth gallery are unchanged. Files for removed imports are deleted from Live storage, and in-flight imports are cancelled before saving. A deliberate reconnect can import those copies again, but photos individually deleted earlier remain suppressed by their deletion records. **Pause connection** is still available when you only want to stop syncing while keeping copies. If you previously switched source albums, removal applies to the currently connected album only.
