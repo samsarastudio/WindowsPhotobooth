@@ -128,79 +128,133 @@ async function loadPhotos(isHost = false) {
   });
   applyCapabilities(capabilities);
 }
+let guestState, cameraFacing = 'environment', cameraAttempt = 0, uploadBusy = false, pendingUploads = [];
+const canCapture = () => guestState?.joined && guestState.uploads_enabled && guestState.remaining > 0;
+function cameraControls() {
+  const active = stream?.getVideoTracks().some(t => t.readyState === 'live');
+  const video = document.querySelector('#camera-preview');
+  if (video) video.hidden = !active;
+  const placeholder = document.querySelector('#camera-placeholder'); if (placeholder) placeholder.hidden = Boolean(active);
+  const shutter = document.querySelector('#shutter'); if (shutter) shutter.disabled = !active || !canCapture() || uploadBusy || pendingUploads.length > 0;
+  const toggle = document.querySelector('#settings-camera'); if (toggle) { toggle.textContent = active ? 'Turn camera off' : 'Turn camera on'; toggle.disabled = !canCapture() || uploadBusy; }
+  const upload = document.querySelector('#upload'); if (upload) upload.disabled = !canCapture() || uploadBusy || pendingUploads.length > 0;
+  document.querySelectorAll('#camera, #flip-camera').forEach(el => { el.disabled = !canCapture() || uploadBusy; });
+}
 async function guestView() {
+  if (uploadBusy) return;
   const data = await api(`/guest/${slug}`); const e = data.event;
-  clearCountdown(); capabilities = data.features;
+  if (uploadBusy) return;
+  const galleryOpen = document.querySelector('#gallery-dialog')?.open;
+  const settingsOpen = document.querySelector('#camera-settings')?.open;
+  guestState = data; clearCountdown(); capabilities = data.features;
   if (!capabilities.webApp) { stopCamera(); location.reload(); return; }
-  app.innerHTML = `<section class="guest"><div class="guest-head">${e.cover_url ? `<img class="cover" src="${e.cover_url}" alt="Event cover">` : ''}<p class="eyebrow">EVENT PHOTOS</p><h1>${escape(e.title)}</h1><p>${escape(e.description || 'Take a photo or upload from your phone to share it with this event.')}</p><span class="pill">${e.status === 'closed' ? 'Event gallery' : `${data.remaining} photos left for you`}</span></div>${!data.joined && e.status === 'published' ? `<div class="card"><h3>Join to share photos</h3><form id="join"><label>Your name<input name="name" maxlength="60" required autocomplete="given-name" placeholder="Enter your name"></label><p class="muted">Photos are shared with the event owner${e.visibility === 'all' ? ' and other event guests' : ''}. Only upload photos you have permission to share. Your place is remembered on this device.</p><button type="submit">Join event</button></form></div>` : ''}${data.joined && e.status === 'published' ? `<div class="capture-box" id="capture"><div class="toolbar"><div><h3>Add your photos</h3><p class="muted">${e.moderation ? 'Your host reviews photos before they appear.' : 'Photos are shared as soon as you upload.'}</p></div><div class="actions"><button id="camera" ${!data.remaining ? 'disabled' : ''}>Take a photo</button><label class="button secondary file-button">Upload photos<input id="upload" type="file" accept="image/*" multiple ${!data.remaining ? 'disabled' : ''}></label></div></div><div id="camera-area"></div><p id="upload-status" role="status"></p></div>` : ''}${!data.revealed ? `<div class="empty">Photos will be visible on ${escape(new Date(e.reveal).toLocaleString())}.</div>` : ''}${!data.joined && e.status === 'closed' ? '<p class="empty">This event has closed. Use the device you joined with to view its gallery.</p>' : ''}<div id="photos" class="gallery"></div></section>`;
-  document.querySelector('.guest-dock')?.remove();
-  if (data.joined) {
-    const dock = document.createElement('nav'); dock.className = 'guest-dock'; dock.setAttribute('aria-label', 'Event navigation');
-    dock.innerHTML = `${data.uploads_enabled && data.remaining > 0 ? '<a href="#capture"><span aria-hidden="true">＋</span>Add photos</a>' : ''}<a href="#photos"><span aria-hidden="true">▦</span>Gallery</a>`;
-    const updateDock = () => dock.querySelectorAll('a').forEach(a => { if (a.hash === (location.hash || (data.uploads_enabled && data.remaining > 0 ? '#capture' : '#photos'))) a.setAttribute('aria-current', 'location'); else a.removeAttribute('aria-current'); });
-    dock.querySelectorAll('a').forEach(a => a.addEventListener('click', () => { dock.querySelectorAll('a').forEach(link => link.removeAttribute('aria-current')); a.setAttribute('aria-current', 'location'); }));
-    updateDock(); document.body.append(dock);
-  }
+  if (!canCapture()) stopCamera();
+  const stateMessage = e.status === 'closed' ? 'The camera is closed. Your event gallery is still here.' : !data.uploads_enabled ? 'Photo sharing is paused by your host.' : data.remaining === 0 ? 'All your shots are shared. Enjoy the gallery.' : 'Enable your camera to start capturing.';
+  app.innerHTML = `<section class="camera-shell" aria-label="${escape(e.title)} camera">
+    <div class="viewfinder"><video id="camera-preview" autoplay playsinline muted aria-label="Camera preview" hidden></video>
+    <div id="camera-placeholder"><div class="camera-mark" aria-hidden="true"></div><h1>${escape(e.title)}</h1>
+    ${!data.joined && data.uploads_enabled ? `<p>Join once. Capture the moments.</p><form id="join"><label>Your name<input name="name" maxlength="60" required autocomplete="given-name" placeholder="Enter your name"></label><p class="camera-consent">Your photos are shared with ${e.visibility === 'all' ? 'the host and other guests' : 'the host'}. Only share photos you have permission to upload.</p><button type="submit">Join event</button></form>` : `<p id="camera-message" role="status">${escape(stateMessage)}</p>${canCapture() ? '<button id="camera">Enable camera</button><p class="camera-consent">Allow camera access when your browser asks.</p>' : ''}`}
+    </div></div>
+    <button id="open-camera-settings" class="camera-settings-trigger" aria-label="Camera settings">⚙</button>
+    <div class="camera-bottom"><p id="upload-status" role="status"></p><div id="upload-recovery"></div><div class="camera-event-name">${escape(e.title)}</div><div class="capture-controls"><div class="shot-count"><strong>${data.remaining}</strong><span>of ${e.shot_limit} shots left</span></div><button id="shutter" aria-label="Take and share photo" disabled><span></span></button><button id="open-gallery" class="gallery-trigger"><span aria-hidden="true">▦</span>Gallery</button></div><p class="capture-hint">${canCapture() ? 'Tap the shutter to share a photo' : data.joined ? 'Your moments, together' : 'Join to start taking photos'}</p></div>
+    </section>
+    <dialog id="gallery-dialog" class="camera-sheet" aria-labelledby="gallery-title"><div class="sheet-toolbar"><h2 id="gallery-title">Event gallery</h2><button type="button" data-close="gallery-dialog" aria-label="Close gallery">Close</button></div><div class="guest-head"><p>${escape(e.title)}</p></div><div id="gallery-state"></div><div id="photos" class="gallery"></div></dialog>
+    <dialog id="camera-settings" class="camera-sheet" aria-labelledby="camera-settings-title"><div class="sheet-toolbar"><h2 id="camera-settings-title">Camera settings</h2><button type="button" data-close="camera-settings" aria-label="Close camera settings">Close</button></div><p>${escape(e.title)}</p>${e.description ? `<p class="muted">${escape(e.description)}</p>` : ''}<div class="camera-options"><button id="settings-camera" ${canCapture() ? '' : 'disabled'}>Turn camera on</button><button id="flip-camera" class="secondary" ${canCapture() ? '' : 'disabled'}>Switch front / back camera</button><label class="button secondary file-button">Upload from phone<input id="upload" type="file" accept="image/*" multiple ${canCapture() ? '' : 'disabled'}></label></div><p class="muted">${e.moderation ? 'Your host reviews photos before they appear in the gallery.' : 'Photos are shared immediately when you take or upload them.'} Photos keep their natural colour.</p>${e.closes_at ? `<p class="muted">Camera closes ${escape(new Date(e.closes_at).toLocaleString())}.</p>` : ''}<p class="muted">Camera permission is controlled by your browser. If access was blocked, enable it in your browser’s site settings.</p></dialog>`;
+  if (stream) { const video = document.querySelector('#camera-preview'); video.srcObject = stream; await video.play().catch(() => stopCamera()); }
+  cameraControls();
+  const show = id => { document.querySelectorAll('.camera-sheet[open]').forEach(d => d.close()); document.querySelector(`#${id}`).showModal(); };
+  action('#open-gallery', async () => { show('gallery-dialog'); if (data.joined && data.revealed && e.visibility !== 'host') await loadPhotos(); });
+  action('#open-camera-settings', () => show('camera-settings'));
+  action('[data-close]', el => document.getElementById(el.dataset.close).close());
   form('#join', async b => { await send(`/guest/${slug}/join`, b); await guestView(); });
-  if (data.joined) {
-    const heading = document.createElement('h2'); heading.className = 'gallery-title'; heading.textContent = e.visibility === 'host' ? 'Private collection' : 'Event gallery'; document.querySelector('#photos').before(heading);
-  }
-  if (data.joined && data.remaining === 0 && e.status === 'published') {
-    const done = document.createElement('p'); done.className = 'empty'; done.textContent = 'You’ve shared all your photos. Thank you!'; document.querySelector('.capture-box')?.replaceWith(done);
-  }
-  if (!data.uploads_enabled) {
-    document.querySelector('#join')?.remove(); document.querySelector('.capture-box')?.remove(); stopCamera();
-    if (e.status === 'published') { const pause = document.createElement('p'); pause.className = 'empty'; pause.textContent = 'Photo submissions are paused by the administrator.'; document.querySelector('.guest-head').after(pause); }
-  }
-  if (e.visibility === 'host') {
-    const privacy = document.createElement('p'); privacy.className = 'empty'; privacy.textContent = 'This is a private collection for your host. Thank you for sharing your perspective.';
-    document.querySelector('#photos').append(privacy);
-    document.querySelectorAll('.guest > .empty').forEach(el => { if (el.textContent.includes('Photos will be visible on')) el.remove(); });
-  }
-  if (!data.revealed && e.visibility !== 'host') { const waiting = document.querySelector('.guest > .empty'); if (waiting) document.querySelector('#photos').append(waiting); }
+  renderUploadRecovery();
+  action('#camera', openCamera);
+  action('#settings-camera', async () => { if (stream) stopCamera(); else { document.querySelector('#camera-settings').close(); await openCamera(); } });
+  action('#flip-camera', async () => { cameraFacing = cameraFacing === 'environment' ? 'user' : 'environment'; document.querySelector('#camera-settings').close(); await openCamera(); });
+  action('#shutter', async () => {
+    const video = document.querySelector('#camera-preview');
+    if (!canCapture() || uploadBusy || pendingUploads.length || !video?.videoWidth || !stream) return;
+    // Crop the capture to exactly the same centre crop shown in the viewfinder.
+    const ratio = video.clientWidth / video.clientHeight;
+    const sw = Math.min(video.videoWidth, video.videoHeight * ratio);
+    const sh = Math.min(video.videoHeight, video.videoWidth / ratio);
+    const canvas = document.createElement('canvas'); canvas.width = Math.round(sw); canvas.height = Math.round(sh);
+    canvas.getContext('2d').drawImage(video, (video.videoWidth-sw)/2, (video.videoHeight-sh)/2, sw, sh, 0, 0, canvas.width, canvas.height);
+    uploadBusy = true; cameraControls();
+    try { const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', .92)); if (!blob) throw new Error('Could not take a photo. Please try again.'); uploadBusy = false; await uploadFiles([blob]); }
+    finally { uploadBusy = false; cameraControls(); }
+  });
+  document.querySelector('#upload').addEventListener('change', event => { document.querySelector('#camera-settings').close(); void uploadFiles([...event.target.files]); });
+  const state = document.querySelector('#gallery-state');
+  if (e.visibility === 'host') state.textContent = 'This is a private collection for your host. Thank you for sharing your perspective.';
+  else if (!data.joined) state.textContent = 'Join this event to see its gallery. If the event has closed, use the device you joined with.';
+  else if (!data.revealed) state.textContent = `Photos will be visible on ${new Date(e.reveal).toLocaleString()}.`;
+  else await loadPhotos();
   const revealKey = `moments-reveal-${slug}-${e.reveal}`;
   if (!data.revealed && e.visibility !== 'host') sessionStorage.setItem(revealKey, 'waiting');
   if (data.revealed && e.visibility !== 'host' && capabilities.revealExperience && sessionStorage.getItem(revealKey) === 'waiting') {
-    sessionStorage.setItem(revealKey, 'revealed');
-    const banner = document.createElement('div'); banner.className = 'reveal-banner'; banner.setAttribute('role', 'status'); banner.textContent = 'The wait is over. Your moments are ready.'; document.querySelector('#photos').before(banner);
+    sessionStorage.setItem(revealKey, 'revealed'); state.className = 'reveal-banner'; state.textContent = 'The wait is over. Your moments are ready.'; notice('Your event gallery is ready.');
   }
-  clearCountdown = countdown(data, async () => { stopCamera(); await guestView(); });
-  action('#camera', openCamera);
-  document.querySelector('#upload')?.addEventListener('change', event => uploadFiles([...event.target.files]));
-  if (data.joined && data.revealed && e.visibility !== 'host') await loadPhotos();
+  clearCountdown = countdown(data, guestView);
+  if (galleryOpen) show('gallery-dialog'); else if (settingsOpen) show('camera-settings');
   clearInterval(refreshTimer); refreshTimer = setInterval(async () => {
-    if (document.hidden) return;
-    try { const next = await api(`/guest/${slug}`); if (next.revealed !== data.revealed || JSON.stringify(next.features) !== JSON.stringify(data.features) || JSON.stringify(next.event) !== JSON.stringify(e)) { stopCamera(); await guestView(); } else if (data.joined && data.revealed && e.visibility !== 'host') await loadPhotos(); } catch { /* Preserve current view on temporary network loss. */ }
+    if (document.hidden || uploadBusy) return;
+    try {
+      const next = await api(`/guest/${slug}`);
+      if (next.remaining !== data.remaining || next.revealed !== data.revealed || JSON.stringify(next.features) !== JSON.stringify(data.features) || JSON.stringify(next.event) !== JSON.stringify(e)) await guestView();
+      else if (document.querySelector('#gallery-dialog')?.open && data.joined && data.revealed && e.visibility !== 'host') await loadPhotos();
+    } catch { /* Keep the camera usable through a temporary connection loss. */ }
   }, 8000);
 }
-async function uploadFiles(files) {
-  if (!files.length) return;
-  document.querySelectorAll('#camera, #upload, #shutter').forEach(el => { el.disabled = true; });
-  stopCamera(); let completed = 0;
-  try {
-    for (const file of files) {
-      const status = document.querySelector('#upload-status'); if (status) status.textContent = `Sharing ${completed + 1} of ${files.length}… Keep this page open.`;
-      const body = new FormData(); body.append('photo', file, file.name || 'capture.jpg'); body.append('request_id', crypto.randomUUID());
-      await api(`/guest/${slug}/photos`, { method: 'POST', body }); completed++;
-    }
-    notice(`${completed} ${completed === 1 ? 'photo' : 'photos'} shared. Thank you!`);
-  } catch (err) { notice(`${completed} shared. ${err.message} Your original photos remain on your device.`, true); }
-  finally { await guestView(); }
+function renderUploadRecovery() {
+  const box = document.querySelector('#upload-recovery'); if (!box) return;
+  box.innerHTML = pendingUploads.length ? `<div class="upload-retry"><span>${pendingUploads.length} photo${pendingUploads.length === 1 ? '' : 's'} waiting to send. Keep this page open.</span><button id="retry-upload" ${uploadBusy || !guestState?.uploads_enabled ? 'disabled' : ''}>Retry</button><button id="discard-upload" class="secondary" ${uploadBusy ? 'disabled' : ''}>Discard</button></div>` : '';
+  action('#retry-upload', () => uploadFiles([], true));
+  action('#discard-upload', () => { if (uploadBusy) return; pendingUploads = []; renderUploadRecovery(); cameraControls(); });
 }
-function stopCamera() { stream?.getTracks().forEach(t => t.stop()); stream = null; document.querySelector('#camera-area')?.replaceChildren(); }
+async function uploadFiles(files, retry = false) {
+  if (uploadBusy || (retry ? !pendingUploads.length || !guestState?.uploads_enabled : !files.length || !canCapture() || pendingUploads.length)) return;
+  uploadBusy = true; cameraControls(); renderUploadRecovery(); let completed = 0;
+  try {
+    if (!retry && files.length > guestState.remaining) throw new Error(`Choose up to ${guestState.remaining} photos for your remaining shots.`);
+    if (!retry) pendingUploads = files.map(file => ({ file, requestId: crypto.randomUUID() }));
+    const total = pendingUploads.length;
+    while (pendingUploads.length) {
+      const { file, requestId } = pendingUploads[0];
+      const status = document.querySelector('#upload-status'); if (status) status.textContent = `Sharing ${completed + 1} of ${total}…`;
+      const body = new FormData(); body.append('photo', file, file.name || 'capture.jpg'); body.append('request_id', requestId);
+      await api(`/guest/${slug}/photos`, { method: 'POST', body }); completed++; pendingUploads.shift();
+    }
+    notice(`${completed} ${completed === 1 ? 'photo' : 'photos'} shared${guestState.event.moderation ? ' — waiting for host approval.' : '.'}`);
+  } catch (err) { notice(`${completed ? completed + ' shared. ' : ''}${err.message} ${pendingUploads.length ? 'Your photo is kept here for retry. Keep this page open.' : ''}`, true); }
+  finally { uploadBusy = false; renderUploadRecovery(); try { await guestView(); } catch { const status = document.querySelector('#upload-status'); if (status) status.textContent = 'Could not refresh. Check your connection.'; } cameraControls(); }
+}
+function stopCamera() {
+  cameraAttempt++; stream?.getTracks().forEach(t => t.stop()); stream = null;
+  const video = document.querySelector('#camera-preview'); if (video) { video.srcObject = null; video.hidden = true; }
+  cameraControls();
+}
 async function openCamera() {
   stopCamera();
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS. Use Upload photos to share from your phone.');
-  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } }, audio: false });
-  document.querySelector('#camera-area').innerHTML = '<video autoplay playsinline muted aria-label="Camera preview"></video><div class="camera-tools"><button id="shutter">Take & share photo</button><button id="stop-camera" class="secondary">Close camera</button></div>';
-  const video = document.querySelector('video'); video.srcObject = stream; await video.play();
-  action('#stop-camera', stopCamera);
-  action('#shutter', async () => {
-    if (!video.videoWidth) throw new Error('Camera is still starting');
-    const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d').drawImage(video, 0, 0);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .92));
-    if (!blob) throw new Error('Could not capture photo'); await uploadFiles([blob]);
-  });
+  if (!canCapture() || uploadBusy) return;
+  const attempt = cameraAttempt;
+  const message = document.querySelector('#camera-message'); if (message) message.textContent = 'Starting camera…';
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS. You can upload photos from Camera settings.');
+    const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: cameraFacing }, width: { ideal: 1920 } }, audio: false });
+    if (attempt !== cameraAttempt || document.hidden || !canCapture()) { media.getTracks().forEach(t => t.stop()); return; }
+    stream = media;
+    const video = document.querySelector('#camera-preview'); video.srcObject = stream; await video.play();
+    if (attempt !== cameraAttempt) return;
+    clearTimeout(noticeTimer); document.querySelector('#notice').className = '';
+    if (message) message.textContent = 'Camera is off. Enable it to keep capturing.';
+    cameraControls();
+  } catch (err) {
+    if (attempt !== cameraAttempt) return;
+    stopCamera();
+    const help = err.name === 'NotAllowedError' ? 'Camera access is blocked. Allow it in your browser’s site settings, or upload photos from Camera settings.' : err.name === 'NotFoundError' ? 'No camera found. Upload photos from Camera settings instead.' : err.message;
+    if (message) message.textContent = help; notice(help, true);
+  }
 }
 async function slideshow(e) {
   let photos = [], index = 0;

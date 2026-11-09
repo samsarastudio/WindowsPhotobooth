@@ -14,8 +14,11 @@ directly, opens any event studio, and controls features. Owner suspension revoke
 owner access without deleting galleries. See the deployment guide for recovery.
 
 The web experience uses bold typography, a dark capture panel, bright primary
-actions and compact album cards. Guests have bottom navigation for capture and
-gallery access; administrators have Events, Owners and Settings sections with
+actions and compact album cards. Guests use a full-screen camera with a fixed shutter and shot counter, plus popup
+gallery and camera settings. Captures retain the preview for the next shot; failed
+uploads can be retried in the same page without spending another shot after a lost
+response. Pending photos are held in memory only and are lost if the page is closed.
+The camera stops when the page is hidden. Preview and saved capture use the same crop; administrators have Events, Owners and Settings sections with
 live event/photo totals. The web experience puts guest capture and event sharing first. Optional timing,
 privacy and branding controls are collapsed; event creation and deletion use
 inline forms. New uploads preserve natural camera colour without selectable
