@@ -1,4 +1,6 @@
+let statusTimer;
 export async function photoboothControls(app,events,{api,send,notice,escape}) {
+  clearInterval(statusTimer);
   const state=await api('/admin/photobooth');
   app.querySelectorAll('[data-booth-controls]').forEach(el=>el.remove());
   const setup=document.createElement('section');setup.className='card';setup.dataset.boothControls='setup';
@@ -9,12 +11,12 @@ export async function photoboothControls(app,events,{api,send,notice,escape}) {
   for(const card of app.querySelectorAll('[data-wall]')) {
     const e=events.find(e=>e.slug===card.dataset.wall),linked=state.links.find(l=>l.event===e.id);
     if(!state.available&&!linked)continue;
-    const section=document.createElement('details');section.className='advanced-settings';section.dataset.boothControls='event';
+    const section=document.createElement('details');section.className='advanced-settings';section.dataset.boothControls='event';section.dataset.boothEvent=e.id;
     section.innerHTML='<summary>Photobooth gallery</summary><div></div>';card.after(section);
     const content=section.querySelector('div');
     const render=link=>{
-      content.innerHTML=`<p class="muted">Connect an existing photobooth album to this event’s mosaic wall and album designer. New photos sync every minute, up to 50 at a time, using this event’s approval settings.</p>
-        ${link?`<p>${link.enabled?'Connected':'Paused'}: <strong>${escape(state.sessions.find(s=>s.slug===link.slug)?.title||link.slug)}</strong></p><p class="muted">${link.last_sync?'Last synced '+escape(new Date(link.last_sync).toLocaleString()):'Not synced yet'}${link.error?' · '+escape(link.error):''}</p>`:''}
+      content.innerHTML=`<p class="muted">Connect an existing photobooth album to this event’s mosaic wall and album designer. New photos sync automatically about every five seconds, up to 50 at a time, using this event’s approval settings.</p>
+        ${link?`<p>${link.enabled?'Connected':'Paused'}: <strong>${escape(state.sessions.find(s=>s.slug===link.slug)?.title||link.slug)}</strong></p><p class="muted" data-sync-state>${link.last_sync?'Last synced '+escape(new Date(link.last_sync).toLocaleString()):'Not synced yet'}${link.error?' · '+escape(link.error):''}</p>`:''}
         ${state.available?`<label>Photobooth album<select aria-label="Photobooth album"><option value="">Choose an album</option>${state.sessions.map(s=>`<option value="${escape(s.slug)}" ${s.slug===(link?.slug||state.suggestedSlug)?'selected':''}>${escape(s.title)}</option>`).join('')}</select></label><fieldset><legend>Include photo types</legend>${[['framed','Framed'],['ai','AI'],['original','Original (unframed)']].map(([value,label])=>`<label class="check"><input type="checkbox" name="variant" value="${value}" ${(link?JSON.parse(link.variants):['framed']).includes(value)?'checked':''}>${label}</label>`).join('')}</fieldset><p class="muted">Framed only by default. These choices also hide excluded imports from the shared wall and album designer; approval settings remain unchanged.</p><div class="actions"><button type="button" data-connect>Connect & sync</button>${link?.enabled?'<button type="button" class="secondary" data-sync>Sync now</button>':''}</div>`:'<p>Photobooth connection is unavailable or disabled. Existing imported photos are retained.</p>'}
         ${link?.enabled?'<button type="button" class="secondary" data-stop>Pause connection</button>':''}
         ${link?'<details class="advanced-settings"><summary>Remove connected gallery</summary><p>Remove this gallery’s imported copies from this Live event, its mosaic wall and album designer. Live camera photos and the original photobooth gallery stay untouched. Previously downloaded albums cannot be changed.</p><button type="button" class="danger" data-remove>Remove gallery & imported photos</button></details>':''}
@@ -27,4 +29,14 @@ export async function photoboothControls(app,events,{api,send,notice,escape}) {
     };
     render(linked);
   }
+  const refreshStatus=async()=>{
+    if(!app.isConnected||!app.querySelector('[data-booth-controls]')){clearInterval(statusTimer);return;}
+    if(document.hidden)return;
+    try{const result=await api('/admin/photobooth/status');for(const item of result.links){
+      const field=app.querySelector(`[data-booth-event="${item.event}"] [data-sync-state]`);if(!field)continue;
+      field.textContent=[!result.enabled?'Automatic syncing disabled':!item.enabled?'Connection paused':item.syncing?'Syncing new captures…':'Watching for new captures',item.last_sync?'Last checked '+new Date(item.last_sync).toLocaleTimeString():'Waiting for first check',`${item.imported} imported`,item.pending?`${item.pending} awaiting approval`:null,item.error||null].filter(Boolean).join(' · ');
+    }}catch{/* Keep the current form usable during network interruptions. */}
+  };
+  void refreshStatus();statusTimer=setInterval(()=>{void refreshStatus();},5000);
 }
+window.addEventListener('pagehide',()=>clearInterval(statusTimer));

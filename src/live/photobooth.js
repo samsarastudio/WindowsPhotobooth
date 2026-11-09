@@ -4,7 +4,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 
 // Read-only integration. Gallery credentials, database and original files are never touched.
-export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url}) {
+export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url,pollMs=5000}) {
   function parseOrigin(value){
     let candidate;try{candidate=new URL(value);}catch{throw fail(400,'Enter the Moments Gallery server address');}
     if(!['http:','https:'].includes(candidate.protocol)||candidate.username||candidate.password||candidate.pathname.split('/').filter(Boolean).length>1||candidate.search||candidate.hash)throw fail(400,'Paste a Moments gallery URL or server address without a query or credentials');
@@ -22,12 +22,12 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     for(const row of rows)if(row.photo)db.prepare('UPDATE photos SET source_visible=? WHERE id=?').run(Number(chosen(source).includes(row.variant)||(row.variant==='unknown'&&chosen(source).length===3)),row.photo);
   }
   let stopped=false;
-  const busy=new Set();
+  const busy=new Set(),retryAfter=new Map();
   const enabled=()=>origin && features().photoboothGallery;
   async function read(route,limit=8*1024*1024,server=origin) {
     const target=new URL(route,server);
     if(target.origin!==server.origin) throw fail(502,'Invalid gallery media address');
-    const response=await fetch(target,{redirect:'error',signal:AbortSignal.timeout(15000)});
+    const response=await fetch(target,{redirect:'error',headers:{'Cache-Control':'no-cache, no-store','Pragma':'no-cache'},signal:AbortSignal.timeout(15000)});
     if(!response.ok) throw fail(502,'Photobooth gallery is unavailable or this album has expired');
     const chunks=[];let size=0;
     for await(const chunk of response.body) {size+=chunk.length;if(size>limit)throw fail(502,'Gallery response exceeds the import size limit');chunks.push(chunk);}
@@ -40,17 +40,21 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     if(!enabled())throw fail(503,'Photobooth connection is disabled or not configured');
     if(busy.has(e.id))throw fail(409,'This event is already syncing');
     const source=link(e);if(!source?.enabled)throw fail(400,'Connect a photobooth album first');
-    busy.add(e.id);let imported=0;
+    busy.add(e.id);let imported=0,failed=0,attempted=0;
     const current=()=>!stopped&&enabled()&&link(e)?.enabled&&link(e)?.slug===source.slug;
     try {
-      const result=await json(`/api/sessions/${encodeURIComponent(source.slug)}?variants=${chosen(source).join(",")}`);
+      const result=await json(`/api/sessions/${encodeURIComponent(source.slug)}?variants=${chosen(source).join(",")}&_live=${Date.now()}`);
       if(!result.ok||result.session?.slug!==source.slug||!Array.isArray(result.session.photos))throw fail(502,'Invalid gallery album');
-      for(const p of result.session.photos) {
-        if(!current()||imported>=50)break;
+      for(const p of [...result.session.photos].reverse()) {
+        if(!current()||attempted>=50)break;
         if(typeof p.id!=='string'||p.id.length>200||p.processStatus==='processing'||['physical','magnet-source'].includes(p.variant))continue;
         const previous=db.prepare('SELECT photo FROM live_booth_imports WHERE event=? AND slug=? AND source_id=?').get(e.id,source.slug,p.id);
         if(previous){db.prepare('UPDATE live_booth_imports SET variant=? WHERE event=? AND slug=? AND source_id=?').run(p.variant||'unknown',e.id,source.slug,p.id);if(previous.photo)db.prepare('UPDATE photos SET source_visible=? WHERE id=?').run(Number(chosen(source).includes(p.variant)),previous.photo);continue;}
         if(!chosen(source).includes(p.variant))continue;
+        const retryKey=JSON.stringify([e.id,source.slug,p.id]);
+        if((retryAfter.get(retryKey)||0)>Date.now()){failed++;continue;}
+        attempted++;
+        try {
         // Accept only this album's media route, never arbitrary URLs from the upstream response.
         const media=new URL(p.url,origin);
         if(media.origin!==origin.origin||!media.pathname.startsWith(`/media/${encodeURIComponent(source.slug)}/`)||media.search||media.hash)throw fail(502,'Invalid gallery media address');
@@ -67,15 +71,25 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
           db.prepare('INSERT INTO photos(id,event,guest,filename,approved,favorite,created,request_id) VALUES(?,?,?,?,?,0,?,?)').run(id,e.id,guest.id,filename,fresh.moderation?0:1,Date.now(),id);
           db.prepare('INSERT INTO live_booth_imports VALUES(?,?,?,?,?)').run(e.id,source.slug,p.id,id,p.variant);
         })();}catch(err){fs.rmSync(file,{force:true});throw err;}
-        imported++;
+        imported++;retryAfter.delete(retryKey);
+        } catch {
+          // A missing or unfinished file must not block later captures. Retry it on a later sweep.
+          failed++;retryAfter.set(retryKey,Date.now()+30000);
+        }
       }
-      if(current())db.prepare("UPDATE live_booth_links SET last_sync=?,error='' WHERE event=?").run(Date.now(),e.id);
-      return {imported,link:stopped?null:link(e)};
+      if(current())db.prepare("UPDATE live_booth_links SET last_sync=?,error=? WHERE event=?").run(Date.now(),failed?`${failed} photo(s) could not be imported yet. Other photos continue syncing; failed photos will retry.`:'',e.id);
+      return {imported,failed,link:stopped?null:link(e)};
     } catch(err) {
       if(current())db.prepare('UPDATE live_booth_links SET error=? WHERE event=?').run('Sync failed. Check the gallery connection and album availability.',e.id);
       throw err;
     } finally {busy.delete(e.id);}
   }
+  app.get('/api/admin/photobooth/status',wrap((req,res)=>{
+    mustAdmin(req);res.json({enabled:Boolean(enabled()),pollMs,links:db.prepare(`SELECT l.*,
+      (SELECT count(*) FROM live_booth_imports i WHERE i.event=l.event AND i.slug=l.slug AND i.photo IS NOT NULL) AS imported,
+      (SELECT count(*) FROM live_booth_imports i JOIN photos p ON p.id=i.photo WHERE i.event=l.event AND i.slug=l.slug AND p.approved=0 AND p.source_visible=1) AS pending
+      FROM live_booth_links l`).all().map(l=>({...l,syncing:busy.has(l.event)}))});
+  }));
   app.get('/api/admin/photobooth',wrap(async(req,res)=>{
     mustAdmin(req);const details={url:origin?.origin||'',suggestedSlug:db.prepare("SELECT value FROM live_settings WHERE key='photoboothSuggestedSlug'").get()?.value||'',enabled:Boolean(features().photoboothGallery)};const links=db.prepare('SELECT * FROM live_booth_links').all();
     if(!enabled())return res.json({...details,configured:Boolean(origin),available:false,sessions:[],links});
@@ -136,13 +150,19 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     for(const row of rows){try{fs.rmSync(path.join(data,'photos',row.filename),{force:true});}catch(err){console.error('[moments-live] Unable to remove disconnected gallery file:',row.filename,err.code);}}
     res.json({ok:true,removed:rows.length});
   }));
-  const timer=setInterval(async()=>{
-    if(stopped||!enabled())return;
-    for(const e of db.prepare('SELECT e.* FROM events e JOIN live_booth_links l ON e.id=l.event WHERE l.enabled=1').all()) {
-      if(stopped)break;
-      try{await sync(e);}catch{/* Retain per-event error for the administrator; retry next minute. */}
-    }
-  },60000);
+  let sweeping=false;
+  async function sweep(){
+    if(stopped||sweeping||!enabled())return;
+    sweeping=true;
+    try {
+      for(const [key,deadline] of retryAfter)if(deadline<=Date.now())retryAfter.delete(key);
+      const queue=db.prepare('SELECT e.* FROM events e JOIN live_booth_links l ON e.id=l.event WHERE l.enabled=1').all();
+      // Two independent workers keep one unavailable gallery from blocking every event.
+      const worker=async()=>{while(!stopped&&queue.length){const e=queue.shift();if(busy.has(e.id))continue;try{await sync(e);}catch{/* Per-event error is retained for admin; retry on the next sweep. */}}};
+      await Promise.all([worker(),worker()]);
+    } finally {sweeping=false;}
+  }
+  const timer=setInterval(()=>{void sweep();},pollMs);
   timer.unref();
-  return ()=>{stopped=true;clearInterval(timer);};
+  return ()=>{stopped=true;clearInterval(timer);retryAfter.clear();};
 }

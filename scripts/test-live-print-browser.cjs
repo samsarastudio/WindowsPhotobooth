@@ -4,7 +4,8 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
   const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'print-browser-')),out=path.join(root,'output/live-qa');fs.mkdirSync(out,{recursive:true});
   const base='http://127.0.0.1:3195',key='wall-browser-administrator-key-32-characters';
   const boothBytes=await sharp({create:{width:600,height:400,channels:3,background:'gold'}}).png().toBuffer();
-  const booth=require('node:http').createServer((req,res)=>{if(req.url==='/media/booth/photo.png'){res.end(boothBytes);return;}res.setHeader('Content-Type','application/json');res.end(JSON.stringify(req.url==='/api/wall'?{ok:true,sessions:[{slug:'booth',title:'Reception photobooth'}]}:{ok:true,session:{slug:'booth',photos:[{id:'booth-photo',url:'/media/booth/photo.png',variant:'framed'}]}}));}).listen(0,'127.0.0.1');await new Promise(r=>booth.once('listening',r));
+  const boothPhotos=[{id:'booth-photo',url:'/media/booth/photo.png',variant:'framed'}];
+  const booth=require('node:http').createServer((req,res)=>{if(req.url==='/media/booth/photo.png'){res.end(boothBytes);return;}res.setHeader('Content-Type','application/json');res.end(JSON.stringify(req.url==='/api/wall'?{ok:true,sessions:[{slug:'booth',title:'Reception photobooth'}]}:{ok:true,session:{slug:'booth',photos:boothPhotos}}));}).listen(0,'127.0.0.1');await new Promise(r=>booth.once('listening',r));
   const server=spawn(process.execPath,['src/live/index.js'],{cwd:root,windowsHide:true,env:{...process.env,LIVE_GALLERY_URL:'',LIVE_PORT:'3195',LIVE_BASE_URL:base,LIVE_DATA_DIR:data,LIVE_ADMIN_KEY:key},stdio:'pipe'});let browser;
   try{
     for(let i=0;i<100;i++){try{if((await fetch(base+'/api/health')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
@@ -31,12 +32,23 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     assert.equal(await admin.getByLabel('Original (unframed)',{exact:true}).isChecked(),false);
     await admin.getByRole('button',{name:'Connect & sync',exact:true}).click();
     await admin.getByRole('button',{name:'Pause connection',exact:true}).waitFor();
+    const initialBooth=(await (await admin.request.get(base+`/api/guest/${e.slug}/photos`)).json()).find(p=>p.guest_name==='Photobooth');
+    const wall=await (await admin.request.patch(base+`/api/events/${e.slug}/wall`,{data:{enabled:true,config:{completedView:true}}})).json();
+    const wallPage=await browser.newPage({viewport:{width:1280,height:720}});await wallPage.goto(wall.url);await wallPage.locator('[data-id]').first().waitFor();
+    boothPhotos.push({id:'later-capture',url:'/media/booth/photo.png',variant:'framed'});
+    let laterPhoto;const syncDeadline=Date.now()+15000;
+    while(Date.now()<syncDeadline){laterPhoto=(await (await admin.request.get(base+`/api/guest/${e.slug}/photos`)).json()).find(p=>p.guest_name==='Photobooth'&&p.id!==initialBooth.id);if(laterPhoto)break;await new Promise(r=>setTimeout(r,200));}
+    assert.ok(laterPhoto,'A later photobooth capture arrives without pressing Sync now');assert.equal(laterPhoto.approved,0);
+    assert.equal(await wallPage.locator(`[data-id="${laterPhoto.id}"]`).count(),0);
+    await admin.request.patch(base+`/api/events/${e.slug}/photos/${laterPhoto.id}`,{data:{approved:true}});
+    await wallPage.locator(`[data-id="${laterPhoto.id}"]`).first().waitFor({timeout:15000});await wallPage.close();
+    await admin.bringToFront();await admin.locator('[data-sync-state]').filter({hasText:'2 imported'}).waitFor({timeout:10000});
     await admin.screenshot({path:path.join(out,'photobooth-connection.png'),fullPage:true});
     await admin.getByRole('button',{name:'Pause connection',exact:true}).click();
     await admin.getByText('Paused:',{exact:false}).waitFor();
     await admin.getByText('Remove connected gallery',{exact:true}).click();
     await admin.getByRole('button',{name:'Remove gallery & imported photos',exact:true}).click();
-    await admin.locator('#notice').filter({hasText:'1 imported photos removed'}).waitFor();
+    await admin.locator('#notice').filter({hasText:'2 imported photos removed'}).waitFor();
     assert.equal(await admin.getByText('Remove connected gallery',{exact:true}).count(),0);
     await admin.getByRole('link',{name:'QR print studio',exact:true}).click();
     await admin.locator('.design-page').waitFor();await admin.getByLabel('Event type',{exact:true}).selectOption('wedding');
@@ -56,6 +68,6 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     for(const size of [{width:390,height:844},{width:320,height:568},{width:844,height:390}]){await admin.setViewportSize(size);const overflow=await admin.evaluate(()=>({width:innerWidth,total:document.documentElement.scrollWidth,els:[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).map(el=>({tag:el.tagName,cls:el.className,id:el.id,width:el.getBoundingClientRect().width})).slice(0,15)}));assert.equal(overflow.total<=size.width,true,JSON.stringify(overflow));}
     await admin.setViewportSize({width:390,height:844});await admin.screenshot({path:path.join(out,'album-studio-mobile.png'),fullPage:true});
     download=admin.waitForEvent('download');await admin.getByRole('button',{name:'Download PDF',exact:true}).click();await (await download).saveAs(path.join(out,'browser-album.pdf'));
-    assert.deepEqual(errors,[]);console.log('PASS: optional photobooth connect/sync/pause, QR custom sizes, logo upload, landscape album selection and order, previews, PDF downloads and responsive print studio.');
+    assert.deepEqual(errors,[]);console.log('PASS: ongoing photobooth capture sync and open wall updates, connect/pause/remove, QR custom sizes, logo upload, landscape album selection and order, previews, PDF downloads and responsive print studio.');
   }finally{if(browser)await browser.close();server.kill();if(server.exitCode===null)await new Promise(r=>server.once('exit',r));await new Promise(r=>booth.close(r));fs.rmSync(data,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});
