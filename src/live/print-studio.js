@@ -6,14 +6,14 @@ import sharp from 'sharp';
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import {themes,printDefaults,qrSizes,albumSizes} from '../../live-public/print-catalog.js';
-import {printPlan,photoGeometry} from '../../live-public/print-layout.js';
+import {printPlan,photoGeometry,keepsakeFlourish} from '../../live-public/print-layout.js';
 
 export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail}){
   db.exec("CREATE TABLE IF NOT EXISTS live_print_designs(event TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,config TEXT NOT NULL)");
   const config=e=>({...printDefaults,...JSON.parse(db.prepare('SELECT config FROM live_print_designs WHERE event=?').get(e.id)?.config||'{}')});
   const logo=e=>db.prepare("SELECT filename FROM assets WHERE event=? AND kind='print-logo'").get(e.id);
   const logoUrl=e=>logo(e)?`/api/events/${e.slug}/print/logo?v=${logo(e).filename}`:null;
-  const choices={eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],layout:['editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
+  const choices={eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],albumStyle:['themed','keepsake'],layout:['keepsake','editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['gold-line','none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
   function validate(old,patch){
     if(!patch||typeof patch!=='object'||Array.isArray(patch))throw fail(400,'Provide design settings');
     const c={...old};
@@ -73,7 +73,7 @@ export async function renderPrintPDF(pages,{root,images=new Map(),fail=(s,m)=>Ob
   pdf.registerFont('serif',path.join(root,'live-public/print-fonts/NotoSerif-Regular.ttf'));pdf.registerFont('sans',path.join(root,'live-public/print-fonts/NotoSans-Regular.ttf'));
   const chunks=[];const done=new Promise((resolve,reject)=>{pdf.on('data',b=>chunks.push(b));pdf.on('end',()=>resolve(Buffer.concat(chunks)));pdf.on('error',reject);});
   try{for(const page of pages){
-    pdf.addPage({size:[page.w,page.h],margin:0});pdf.image(path.join(root,'live-public',page.background),0,0,{width:page.w,height:page.h});
+    pdf.addPage({size:[page.w,page.h],margin:0});if(page.paper)pdf.rect(0,0,page.w,page.h).fill(page.paper);else pdf.image(path.join(root,'live-public',page.background),0,0,{width:page.w,height:page.h});
     for(const el of page.elements){
       if(el.kind==='border'){pdf.lineWidth(.6).strokeColor(el.color);if(el.rounded)pdf.roundedRect(el.x,el.y,el.w,el.h,12).stroke();else pdf.rect(el.x,el.y,el.w,el.h).stroke();if(el.double)pdf.rect(el.x+4,el.y+4,el.w-8,el.h-8).stroke();}
       if(el.kind==='text'){
@@ -84,10 +84,14 @@ export async function renderPrintPDF(pages,{root,images=new Map(),fail=(s,m)=>Ob
         const bytes=images.get(el.url);if(bytes){
           const meta=await sharp(bytes).metadata(),g=photoGeometry(el,meta.width,meta.height);
           pdf.save();if(el.frame!=='none'){pdf.fillColor('#14251c').fillOpacity(.10).roundedRect(g.x+2,g.y+3,g.w,g.h,g.radius).fill();pdf.fillOpacity(el.frame==='glass'?.28:.92).fillColor(el.paper).roundedRect(g.x,g.y,g.w,g.h,g.radius).fill();}pdf.restore();
-          pdf.save();pdf.roundedRect(g.ix,g.iy,g.iw,g.ih,el.frame==='none'?0:g.radius*.65).clip();pdf.image(bytes,g.ix,g.iy,{cover:[g.iw,g.ih],align:'center',valign:'center'});pdf.restore();
+          pdf.save();pdf.roundedRect(g.ix,g.iy,g.iw,g.ih,el.frame==='none'?0:g.radius*(el.frame==='gold-line'?1:.65)).clip();pdf.image(bytes,g.ix,g.iy,{cover:[g.iw,g.ih],align:'center',valign:'center'});pdf.restore();
           if(el.art)pdf.image(path.join(root,'live-public',el.art),g.x,g.y,{width:g.w,height:g.h});
-          else if(el.frame==='rounded')pdf.save().strokeColor(el.accent).strokeOpacity(.35).lineWidth(.6).roundedRect(g.x,g.y,g.w,g.h,g.radius).stroke().restore();
+          else if(['rounded','gold-line'].includes(el.frame))pdf.save().strokeColor(el.frame==='gold-line'?'#b49552':el.accent).strokeOpacity(el.frame==='gold-line'?1:.35).lineWidth(el.frame==='gold-line'?.8:.6).roundedRect(g.x,g.y,g.w,g.h,g.radius).stroke().restore();
         }
+      }
+      if(el.kind==='fold'){pdf.save().rect(el.x,el.y,el.w,el.h).fill('#e9ddc7').restore();}
+      if(el.kind==='ornament'){
+        pdf.save().translate(el.x,el.y).scale(el.w/100,el.h/14).strokeColor(el.color).fillColor(el.color).lineWidth(.5).path(keepsakeFlourish).fillAndStroke().restore();
       }
       if(el.kind==='rule'){pdf.save().strokeColor(el.color).lineWidth(.7).moveTo(el.x,el.y).lineTo(el.x+el.w,el.y).stroke().restore();}
       if(el.kind==='image'){const bytes=images.get(el.url);if(bytes)pdf.image(bytes,el.x,el.y,{fit:[el.w,el.h],align:'center',valign:'center'});}
