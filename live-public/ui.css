@@ -16,7 +16,7 @@ body[data-screen=guest]>header,body[data-screen=guest]>footer{display:none}
 body[data-screen=guest] main{width:100%;max-width:none;height:100dvh;min-height:0;margin:0;padding:0;overflow:hidden}
 .camera-shell{height:100%;display:flex;flex-direction:column;position:relative;max-width:900px;margin:auto;background:#10120f}
 .viewfinder{position:relative;flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;background:#161914}
-#camera-preview{width:100%;height:100%;max-height:none;object-fit:cover;border-radius:0;background:#10120f}
+#camera-preview{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover;border-radius:0;background:#10120f}
 #camera-placeholder{position:absolute;inset:0;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:safe center;padding:58px 28px 20px;text-align:center;background:radial-gradient(ellipse at 50% 15%,#303c22,#141712 75%)}
 #camera-placeholder h1{font-size:clamp(24px,5vw,38px);margin:14px 0;max-width:440px;overflow-wrap:anywhere}
 #camera-placeholder>p{max-width:400px;color:#c1c9b5;font-size:14px}
@@ -47,6 +47,20 @@ body[data-screen=guest] main{width:100%;max-width:none;height:100dvh;min-height:
 body[data-screen=guest] #notice{bottom:180px;background:#eef6d9;color:#202719;border:1px solid #cbd7b3}
 body[data-screen=guest] #notice.error{background:#8e352e;color:#fff;border:0}
 @media(max-width:600px){.camera-sheet{width:100%;max-height:90dvh;border-radius:24px 24px 0 0;margin:auto 0 0;padding:20px 18px max(24px,env(safe-area-inset-bottom))}.sheet-toolbar{top:-20px}.camera-sheet .gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.camera-bottom{padding-left:16px;padding-right:16px}#camera-placeholder{padding-left:24px;padding-right:24px}}
-@media(max-height:500px){.camera-shell{flex-direction:row}.camera-bottom{width:170px;display:flex;flex-direction:column;justify-content:center;padding:12px}.capture-controls{grid-template-columns:1fr;gap:8px}.camera-event-name,.capture-hint{display:none}.shot-count strong{font-size:18px}.camera-settings-trigger{right:184px}.camera-sheet{max-height:96dvh}#shutter{width:64px;height:64px;min-height:64px}#camera-placeholder{padding-top:20px}.camera-mark{display:none}#camera-placeholder h1{font-size:22px;margin:6px 0}}
+@media(orientation:landscape) and (max-height:500px){.camera-shell{flex-direction:row}.camera-bottom{width:170px;display:flex;flex-direction:column;justify-content:center;padding:12px}.capture-controls{grid-template-columns:1fr;gap:8px}.camera-event-name,.capture-hint{display:none}.shot-count strong{font-size:18px}.camera-settings-trigger{right:184px}.camera-sheet{max-height:96dvh}#shutter{width:64px;height:64px;min-height:64px}#camera-placeholder{padding-top:20px}.camera-mark{display:none}#camera-placeholder h1{font-size:22px;margin:6px 0}}
 
 .upload-retry{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;margin-bottom:12px}.upload-retry span{width:100%;text-align:center}.upload-retry button{min-height:36px;padding:8px 14px;font-size:12px;background:#d8fa58;color:#18210d}.upload-retry .secondary{background:transparent;color:white;border-color:#657156}
+
+/* Device insets are variables so QA can exercise notch/home-indicator layouts. */
+body[data-screen=guest]{--safe-top:env(safe-area-inset-top,0px);--safe-right:env(safe-area-inset-right,0px);--safe-bottom:env(safe-area-inset-bottom,0px);--safe-left:env(safe-area-inset-left,0px)}
+.camera-settings-trigger{right:max(14px,var(--safe-right));top:max(14px,var(--safe-top))}
+.camera-flip-trigger{right:auto;left:max(14px,var(--safe-left))}
+.camera-settings-trigger svg,.gallery-trigger svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.gallery-trigger{min-width:64px;min-height:48px}.gallery-trigger svg{width:27px;height:27px}
+.camera-bottom{padding-bottom:max(12px,var(--safe-bottom));padding-left:max(16px,var(--safe-left));padding-right:max(16px,var(--safe-right))}
+.camera-mode{text-align:center;font-size:10px;font-weight:700;letter-spacing:2px;color:#d8fa58;margin-bottom:12px}
+#shutter span{background:#fff}#shutter:focus-visible{outline:3px solid #d8fa58;outline-offset:4px}
+#camera-placeholder{padding-top:max(64px,calc(var(--safe-top) + 52px))}
+#camera-placeholder input{font-size:16px}
+.camera-sheet{padding-bottom:max(24px,var(--safe-bottom));padding-left:max(18px,var(--safe-left));padding-right:max(18px,var(--safe-right))}
+@media(orientation:landscape) and (max-height:500px){.camera-bottom{box-sizing:border-box;width:calc(150px + var(--safe-right));padding-right:max(12px,var(--safe-right));padding-left:12px;padding-top:max(12px,var(--safe-top));padding-bottom:max(12px,var(--safe-bottom))}.camera-settings-trigger{right:calc(164px + var(--safe-right))}.camera-flip-trigger{right:auto}.camera-mode{margin:0 0 8px}.capture-controls{gap:6px}.gallery-trigger{min-height:44px}.camera-sheet{max-height:calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px)}#camera-placeholder{padding-top:56px}}

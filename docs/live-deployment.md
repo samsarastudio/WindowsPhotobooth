@@ -230,11 +230,27 @@ server's libvips build; native iOS converts captures/selections to JPEG.
 npm ci
 npm run test:live
 npm run test:live:browser
+npm run test:live:camera
 ```
 
 Browser QA uses Playwright/Chrome. Set `PLAYWRIGHT_MODULE` to your installed Playwright
 module if outside this workstation. Tests use temporary databases and never call production.
 Android/iOS build and manual signing steps are in [mobile-release.md](mobile-release.md).
+
+Camera layout QA covers 16 viewport scenarios in Chromium and WebKit: compact
+320×480 through 430×932 phones, landscape, reduced browser/keyboard viewports,
+and simulated notch/home-indicator insets. It checks no page overflow, visible
+44px minimum controls, modal bounds, camera shutdown, and capture/preview aspect
+ratio in Chromium. Results and screenshots are written to
+`output/camera-responsive/`. The suite needs Chrome and Playwright's WebKit browser
+installed (`node PATH_TO_PLAYWRIGHT/cli.js install webkit`). `CAMERA_ENGINES` can be
+set to `chromium` or `webkit` for an individual engine run.
+
+These are desktop touch-viewport tests, not physical-device certification. Chromium
+uses a synthetic canvas camera. The Windows WebKit build has no media stack, so its
+preview is mocked and it exercises file uploads instead of camera capture. Real
+iOS Safari and Android Chrome still need device checks for permission prompts,
+front/back cameras, rotation, changing browser chrome, and returning from background.
 
 ## Refreshing the server-only branch
 

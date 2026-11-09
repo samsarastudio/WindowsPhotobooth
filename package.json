@@ -9,6 +9,7 @@
     "start:live": "node src/live/index.js",
     "test:live": "node --test test/live.test.mjs test/live-features.test.mjs test/live-admin.test.mjs",
     "test:live:browser": "node scripts/test-live-browser.cjs",
+    "test:live:camera": "node scripts/test-live-camera-layout.cjs",
     "build:live:icons": "node scripts/build-live-icons.mjs",
     "start": "node src/index.js",
     "dev": "node --watch-path=src --watch-path=public src/index.js",
