@@ -301,3 +301,9 @@ git push -u origin codex/moments-live-server
 
 For subsequent refreshes, split to a temporary branch and fast-forward the deployment
 branch when its history matches. Review divergence rather than overwriting it.
+
+### Wall display controls
+
+In Admin → Events → Mosaic wall link (also available in the event studio), use **Wall display** to choose live collage or completed grid, density (8–28 columns at desktop width), optional center text, backdrop opacity, and timed partner reveals. The title changes the browser tab only. Save wall display to apply changes to open viewers within five seconds. Upload or clear a backdrop and partner logo in the same panel (PNG, JPEG or WebP, up to 8 MB / 24 megapixels); save text/settings before uploading artwork.
+
+The wall fills the viewport without a header, footer, or photo count. Move the pointer, tap, or use the keyboard to reveal the fullscreen button; it fades after inactivity. For unattended displays use browser kiosk mode. Live collage moves and swaps tiles, revealing the backdrop; completed grid removes floating motion and changes its photo window every 14 seconds. Photos repeat to fill the screen when the event has fewer images than available tiles. Density scales down on phone screens. Branding is optional and absent by default. The original Gallery's framed/original selection does not apply to Live, which stores one final image per capture.
