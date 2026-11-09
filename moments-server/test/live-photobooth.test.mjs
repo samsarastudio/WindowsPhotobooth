@@ -59,7 +59,7 @@ test('Optional photobooth connection imports JPGs once, respects moderation and 
   assert.equal(live.db.prepare('SELECT count(*) n FROM photos').get().n,1);
   assert.equal(live.db.prepare('SELECT photo FROM live_booth_imports').get().photo,null);
   photos.push({id:'foreign',variant:'framed',url:'http://example.com/photo.jpg'});
-  assert.equal((await call(endpoint+'/sync','POST',{},'',true)).status,502);
+  assert.equal((await call(endpoint+'/sync','POST',{},'',true)).body.failed,1);
   photos.pop();available=false;
   assert.equal((await call('/api/admin/photobooth','GET',null,'',true)).body.available,false);
   assert.equal((await call(endpoint+'/sync','POST',{},'',true)).status,502);

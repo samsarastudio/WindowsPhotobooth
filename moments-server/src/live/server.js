@@ -352,7 +352,7 @@ export function createLiveApp(options = {}) {
     const e = owned(req); requireFeature('slideshow');
     res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
-  const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL});
+  const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL,pollMs:options.galleryPollMs ?? 5000});
   registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail});
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
