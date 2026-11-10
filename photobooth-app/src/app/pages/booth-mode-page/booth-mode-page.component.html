@@ -64,6 +64,7 @@
     </ul>
 
     <div class="pb-row">
+      @if(showFamilyCard()){<a routerLink="/family-card-queue" class="pb-btn pb-btn-ghost">Card queue</a>}
       <a routerLink="/" class="pb-btn pb-btn-ghost">{{ copy().boothMode.back }}</a>
     </div>
   </div>

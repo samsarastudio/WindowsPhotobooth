@@ -2,11 +2,12 @@
   <div class="pb-kiosk-surface pb-thanks-inner">
     <span class="pb-thanks-mark" aria-hidden="true">✓</span>
     <h1 class="pb-thanks-title">{{ copy().thanks.title }}</h1>
-    <p class="pb-thanks-sub">{{ aiProcessing() ? 'Your Christmas photo is being created.' : copy().thanks.subtitle }}</p>
-    <p class="pb-hint pb-thanks-foot">{{ aiProcessing() ? 'Follow its progress on the tablet. When it’s ready, choose Print there.' : copy().thanks.footnote }}</p>
+    <p class="pb-thanks-sub">{{ familyProcessing() ? 'Your Christmas card is processing in the background.' : aiProcessing() ? 'Your Christmas photo is being created.' : copy().thanks.subtitle }}</p>
+    <p class="pb-hint pb-thanks-foot">{{ familyProcessing() ? 'The next family can start now. Your finished card will appear in the admin gallery, ready to print and share.' : aiProcessing() ? 'Follow its progress on the tablet. When it’s ready, choose Print there.' : copy().thanks.footnote }}</p>
     <button type="button" class="pb-btn pb-btn-primary pb-thanks-done" (click)="finish()">
       {{ copy().thanks.done }}
     </button>
+    @if (familyProcessing()) {<a class="pb-btn pb-btn-ghost" routerLink="/family-card-queue">View card queue</a>}
     @if (secondsLeft() > 0) {
       <p class="pb-thanks-return">Returning to the start in {{ secondsLeft() }} seconds</p>
     }

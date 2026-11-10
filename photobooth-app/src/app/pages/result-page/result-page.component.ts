@@ -25,7 +25,8 @@ import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
 })
 export class ResultPageComponent implements OnInit, OnDestroy {
   private readonly familyCard = inject(FamilyCardService);
-  readonly isFamilyCard = computed(() => /_family-card\.jpg$/i.test(this.path() || ''));
+  readonly editableFamilyCard = computed(() => this.familyCard.previewPath() === this.path());
+  readonly isFamilyCard = computed(() => /_family-card(?:_framed)?\.jpg$/i.test(this.path() || ''));
   readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly boothMode = inject(BoothModeService);
@@ -103,7 +104,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     () =>
       !this.isPreview() &&
       !!this.path() &&
-      !/_family-card\.jpg$/i.test(this.path() || '') &&
+      !/_family-card(?:_framed)?\.jpg$/i.test(this.path() || '') &&
       !this.aiGenerating() &&
       this.booth.guestModes().physicalFrameEnabled !== false &&
       this.selectedMode()?.pipeline !== 'head-swap',
@@ -115,7 +116,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       !!this.path() &&
       !this.aiGenerating() &&
       !this.viewingPhysicalSheet() &&
-      !/_family-card\.jpg$/i.test(this.path() || '') &&
+      !/_family-card(?:_framed)?\.jpg$/i.test(this.path() || '') &&
       this.booth.photoFrames().enabled,
   );
   /**
@@ -526,7 +527,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   retake(): void {
-    if(this.isFamilyCard() && this.familyCard.members().length){
+    if(this.isFamilyCard() && this.editableFamilyCard() && this.familyCard.members().length){
       this.familyCard.active.set(true);
       void this.router.navigate(['/family-card']);
       return;

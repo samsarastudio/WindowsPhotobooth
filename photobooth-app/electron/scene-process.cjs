@@ -4,7 +4,10 @@ const path = require('node:path');
 const os = require('node:os');
 let tail = Promise.resolve();
 function prepareSceneIsolated(source, background, modelDir, fork) {
-  const job = tail.then(() => run(source, background, modelDir, fork));
+  return queueBackgroundTask(() => run(source, background, modelDir, fork));
+}
+function queueBackgroundTask(task) {
+  const job = tail.then(task);
   tail = job.catch(() => undefined);
   return job;
 }
@@ -31,4 +34,4 @@ async function run(source, background, modelDir, fork) {
     fs.rmSync(dir, {recursive:true, force:true});
   }
 }
-module.exports = { prepareSceneIsolated };
+module.exports = { prepareSceneIsolated, queueBackgroundTask };

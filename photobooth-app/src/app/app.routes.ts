@@ -19,7 +19,9 @@ import { PreparePageComponent } from './pages/prepare-page/prepare-page.componen
 
 import { FamilyCardPageComponent } from './pages/family-card-page/family-card-page.component';
 
+import { FamilyCardQueueComponent } from './pages/family-card-page/family-card-queue.component';
 export const routes: Routes = [
+  {path:'family-card-queue',component:FamilyCardQueueComponent},
   { path: 'family-card', component: FamilyCardPageComponent },
   { path: '', component: AttractPageComponent },
   { path: 'history', component: HistoryPageComponent },

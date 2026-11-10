@@ -2043,11 +2043,9 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => killBridge());
 
-let familyBusy = false;
+
 const familyCutouts = new Set();
-ipcMain.handle('family:cutout', async (_e, source) => {
-  if (familyBusy) return {ok:false,error:'Please wait for the current portrait.'};
-  familyBusy = true;
+async function familyCutout(source) {
   try {
     if (typeof source !== 'string' || !fs.existsSync(source)) throw Error('Capture not found. Please retake.');
     const out = path.join(getCaptureDir(), `${require('crypto').randomUUID()}_family-person.png`);
@@ -2060,7 +2058,20 @@ ipcMain.handle('family:cutout', async (_e, source) => {
     });
     familyCutouts.add(out);
     return {ok:true,path:out};
-  } catch(e) { return {ok:false,error:e.message}; } finally { familyBusy=false; }
+  } catch(e) { return {ok:false,error:e.message}; }
+}
+ipcMain.handle('family:cutout', (_e, source) => {
+ return require('./scene-process.cjs').queueBackgroundTask(()=>familyCutout(source));
+});
+ipcMain.handle('family:draft', async (_e,payload) => {
+ try {
+  const sources=payload?.sources;
+  if(!Array.isArray(sources)||sources.length<1||sources.length>10||sources.some(p=>typeof p!=='string'||!fs.existsSync(p)))throw Error('Please add 1-10 captured portraits.');
+  const out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
+  const art=path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');
+  fs.writeFileSync(out,await require('./family-card.cjs').renderCard(sources,art,payload.name||''));
+  return {ok:true,path:out};
+ }catch(e){return {ok:false,error:e.message};}
 });
 ipcMain.handle('family:render', async (_e, payload) => {
   try {
@@ -2068,7 +2079,12 @@ ipcMain.handle('family:render', async (_e, payload) => {
     if (!Array.isArray(paths)||paths.length<1||paths.length>10||new Set(paths).size!==paths.length||paths.some(p=>!familyCutouts.has(p))) throw Error('Please add 1–10 approved portraits.');
     const art=path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');
     const data=await require('./family-card.cjs').renderCard(paths,art,typeof payload.name==='string'?payload.name:'');
-    const out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
+    let out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
+    if(payload.draftPath){
+      const draft=path.resolve(payload.draftPath);
+      if(path.dirname(draft)!==path.resolve(getCaptureDir())||!/_family-card\.jpg$/i.test(draft)||!fs.existsSync(draft))throw Error('Card draft is unavailable.');
+      out=draft.replace(/\.jpg$/i,'_framed.jpg');
+    }
     fs.writeFileSync(out,data);return {ok:true,path:out};
   } catch(e) { return {ok:false,error:e.message}; }
 });

@@ -1,0 +1,395 @@
+{
+  "note": "Actual ONNX background removal on two approved solo fixtures, reused to exercise counts 1–10. No physical printing.",
+  "results": [
+    {
+      "count": 1,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-01.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 1500,
+          "height": 2040
+        }
+      ]
+    },
+    {
+      "count": 2,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-02.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 1500,
+          "height": 1020
+        },
+        {
+          "left": 150,
+          "top": 1500,
+          "width": 1500,
+          "height": 1020
+        }
+      ]
+    },
+    {
+      "count": 3,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-03.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 750,
+          "height": 1020
+        },
+        {
+          "left": 900,
+          "top": 480,
+          "width": 750,
+          "height": 1020
+        },
+        {
+          "left": 150,
+          "top": 1500,
+          "width": 1500,
+          "height": 1020
+        }
+      ]
+    },
+    {
+      "count": 4,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-04.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 750,
+          "height": 1020
+        },
+        {
+          "left": 900,
+          "top": 480,
+          "width": 750,
+          "height": 1020
+        },
+        {
+          "left": 150,
+          "top": 1500,
+          "width": 750,
+          "height": 1020
+        },
+        {
+          "left": 900,
+          "top": 1500,
+          "width": 750,
+          "height": 1020
+        }
+      ]
+    },
+    {
+      "count": 5,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-05.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 480,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1160,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 1160,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1840,
+          "width": 1500,
+          "height": 680
+        }
+      ]
+    },
+    {
+      "count": 6,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-06.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 480,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1160,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 1160,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1840,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 1840,
+          "width": 750,
+          "height": 680
+        }
+      ]
+    },
+    {
+      "count": 7,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-07.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 650,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 1150,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1160,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 1160,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1840,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 1840,
+          "width": 750,
+          "height": 680
+        }
+      ]
+    },
+    {
+      "count": 8,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-08.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 650,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 1150,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1160,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 650,
+          "top": 1160,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 1150,
+          "top": 1160,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1840,
+          "width": 750,
+          "height": 680
+        },
+        {
+          "left": 900,
+          "top": 1840,
+          "width": 750,
+          "height": 680
+        }
+      ]
+    },
+    {
+      "count": 9,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-09.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 650,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 1150,
+          "top": 480,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1160,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 650,
+          "top": 1160,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 1150,
+          "top": 1160,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 150,
+          "top": 1840,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 650,
+          "top": 1840,
+          "width": 500,
+          "height": 680
+        },
+        {
+          "left": 1150,
+          "top": 1840,
+          "width": 500,
+          "height": 680
+        }
+      ]
+    },
+    {
+      "count": 10,
+      "file": "F:\\Workspace Important Projects\\AI Photobooth\\output\\christmas\\family-card-tests\\family-card-10.jpg",
+      "cells": [
+        {
+          "left": 150,
+          "top": 480,
+          "width": 500,
+          "height": 510
+        },
+        {
+          "left": 650,
+          "top": 480,
+          "width": 500,
+          "height": 510
+        },
+        {
+          "left": 1150,
+          "top": 480,
+          "width": 500,
+          "height": 510
+        },
+        {
+          "left": 150,
+          "top": 990,
+          "width": 500,
+          "height": 510
+        },
+        {
+          "left": 650,
+          "top": 990,
+          "width": 500,
+          "height": 510
+        },
+        {
+          "left": 1150,
+          "top": 990,
+          "width": 500,
+          "height": 510
+        },
+        {
+          "left": 150,
+          "top": 1500,
+          "width": 750,
+          "height": 510
+        },
+        {
+          "left": 900,
+          "top": 1500,
+          "width": 750,
+          "height": 510
+        },
+        {
+          "left": 150,
+          "top": 2010,
+          "width": 750,
+          "height": 510
+        },
+        {
+          "left": 900,
+          "top": 2010,
+          "width": 750,
+          "height": 510
+        }
+      ]
+    }
+  ]
+}

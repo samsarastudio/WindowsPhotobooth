@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { BoothConfigService } from '../../services/booth-config.service';
 import { AiStyleService } from '../../services/ai-style.service';
 import { BoothModeService } from '../../services/booth-mode.service';
@@ -9,6 +9,7 @@ import { CameraService } from '../../services/camera.service';
 
 @Component({
   selector: 'pb-thanks-page',
+  imports: [RouterLink],
   templateUrl: './thanks-page.component.html',
   styleUrl: './thanks-page.component.scss',
 })
@@ -23,6 +24,7 @@ export class ThanksPageComponent implements OnInit, OnDestroy {
 
   readonly copy = this.booth.copy;
   readonly secondsLeft = signal(0);
+  readonly familyProcessing = signal(history.state?.familyProcessing === true);
   readonly aiProcessing = signal(history.state?.aiProcessing === true);
 
   private timer?: ReturnType<typeof setInterval>;

@@ -3,5 +3,14 @@
   "asset": "artwork/family-card-window.png",
   "purpose": "Reusable square evergreen shadowbox window behind each background-removed family portrait",
   "direction": "Photorealistic narrow evergreen and cedar edges, dark warm charcoal empty interior, rustic bottom ledge, tiny warm lights, straight frontal view. No people or lettering. Inspired by the user's Christmas family card references.",
-  "layout": "Deterministic compositor adds original guest cutouts and card text; no generative portrait editing."
+  "layout": "Portrait 4x6 postcard, continuous dark backdrop, no card-colored gaps or doubled frames; six portraits use two columns by three rows. Original guest cutouts behind shared foreground foliage. Script heading and family line; no outer gold stroke.",
+  "dividerAsset": "artwork/family-card-evergreen-divider.png",
+  "dividerDirection": "Natural irregular fir and cedar, pinecones, red berries, small cranberry and antique-gold baubles, subtle warm fairy lights. 160px shared branch strips with preserved needle proportions; no doubled divisions.",
+  "font": {
+    "family": "Great Vibes",
+    "file": "fonts/GreatVibes-Regular.ttf",
+    "license": "fonts/OFL.txt",
+    "source": "https://github.com/google/fonts/tree/main/ofl/greatvibes"
+  },
+  "cardSurface": "Faint tone-on-tone snowflake and star pattern over burgundy, behind the script header; portrait 4x6 layout."
 }

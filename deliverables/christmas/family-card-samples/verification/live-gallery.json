@@ -1,0 +1,32 @@
+{
+  "live": true,
+  "physicalPrinting": false,
+  "checks": [
+    "Default background option; two captures without waiting; finish returns while processing",
+    "Live gallery Processing card visible",
+    "Next family captured and queued while previous family was processing",
+    "Both isolated family jobs completed with correct portrait counts",
+    "Full-resolution delivered JPEGs verified; existing gallery QR downloads available"
+  ],
+  "finishReturnMs": 1526,
+  "photos": [
+    {
+      "id": "--3dtr6G64T1uv",
+      "variant": "framed",
+      "processStatus": "ready",
+      "width": 1800,
+      "height": 2700,
+      "shareUrl": "https://moments.inmomentservices.com/download/--3dtr6G64T1uv"
+    },
+    {
+      "id": "MiUG8OjHJeymTe",
+      "variant": "framed",
+      "processStatus": "ready",
+      "width": 1800,
+      "height": 2700,
+      "shareUrl": "https://moments.inmomentservices.com/download/MiUG8OjHJeymTe"
+    }
+  ],
+  "validationNote": "Live feed omitted image dimensions; verified downloaded JPEG dimensions instead.",
+  "passed": true
+}
