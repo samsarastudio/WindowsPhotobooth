@@ -56,6 +56,8 @@ export interface PbThemeListItem {
 }
 
 export interface PbApi {
+  familyCardCutout(source:string):Promise<{ok:boolean;path?:string;error?:string}>;
+  familyCardRender(payload:{paths:string[];name:string}):Promise<{ok:boolean;path?:string;error?:string}>;
   getPaths(): Promise<PbPaths>;
   getVersion(): Promise<{
     ok: boolean;

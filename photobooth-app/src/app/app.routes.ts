@@ -17,7 +17,10 @@ import { HistoryPageComponent } from './pages/history-page/history-page.componen
 import { ThanksPageComponent } from './pages/thanks-page/thanks-page.component';
 import { PreparePageComponent } from './pages/prepare-page/prepare-page.component';
 
+import { FamilyCardPageComponent } from './pages/family-card-page/family-card-page.component';
+
 export const routes: Routes = [
+  { path: 'family-card', component: FamilyCardPageComponent },
   { path: '', component: AttractPageComponent },
   { path: 'history', component: HistoryPageComponent },
   { path: 'booth-mode', component: BoothModePageComponent },

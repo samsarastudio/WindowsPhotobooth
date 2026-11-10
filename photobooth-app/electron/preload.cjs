@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pbApi', {
+  familyCardCutout: (source) => ipcRenderer.invoke('family:cutout', source),
+  familyCardRender: (payload) => ipcRenderer.invoke('family:render', payload),
   getPaths: () => ipcRenderer.invoke('app:getPaths'),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   checkBoothUpdate: (payload) => ipcRenderer.invoke('app:checkBoothUpdate', payload || {}),

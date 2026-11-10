@@ -1,3 +1,4 @@
+import { FamilyCardService } from '../../services/family-card.service';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { BrandingLogoService } from '../../services/branding-logo.service';
@@ -7,7 +8,7 @@ import { AiStyleService } from '../../services/ai-style.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
 
 /** Guest experience after Tap to start (not digital vs physical). */
-export type GuestExperienceId = 'photoPrint' | 'aiPortrait' | 'scene';
+export type GuestExperienceId = 'photoPrint' | 'aiPortrait' | 'scene' | 'familyCard';
 
 @Component({
   selector: 'pb-booth-mode-page',
@@ -17,6 +18,7 @@ export type GuestExperienceId = 'photoPrint' | 'aiPortrait' | 'scene';
 })
 export class BoothModePageComponent implements OnInit {
   private readonly booth = inject(BoothConfigService);
+  private readonly familyCard = inject(FamilyCardService);
   private readonly boothMode = inject(BoothModeService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly router = inject(Router);
@@ -28,6 +30,7 @@ export class BoothModePageComponent implements OnInit {
   );
 
   /** Photo Print — framed digital original; magnet optional at the end. */
+  readonly showFamilyCard = computed(() => this.booth.activeThemeId() === 'christmas');
   readonly showPhotoPrint = computed(() => this.booth.guestModes().defaultEnabled !== false);
 
   /** AI Christmas Portrait — Choose your Christmas character. */
@@ -42,7 +45,7 @@ export class BoothModePageComponent implements OnInit {
   });
 
   readonly experienceCount = computed(() => {
-    let n = 0;
+    let n = this.showFamilyCard() ? 1 : 0;
     if (this.showPhotoPrint()) n += 1;
     if (this.showAiPortrait()) n += 1;
     if (this.showScene()) n += 1;
@@ -53,7 +56,9 @@ export class BoothModePageComponent implements OnInit {
     this.boothMode.selectMode('default');
     void this.loadThumbs();
     if (this.experienceCount() <= 1) {
-      if (this.showAiPortrait() && !this.showPhotoPrint() && !this.showScene()) {
+      if (this.showFamilyCard()) {
+        void this.choose('familyCard');
+      } else if (this.showAiPortrait() && !this.showPhotoPrint() && !this.showScene()) {
         void this.choose('aiPortrait');
       } else if (this.showScene() && !this.showPhotoPrint() && !this.showAiPortrait()) {
         void this.choose('scene');
@@ -98,6 +103,8 @@ export class BoothModePageComponent implements OnInit {
 
   choose(id: GuestExperienceId): void {
     this.boothMode.selectMode('default');
+    this.familyCard.clear();
+    if(id==='familyCard'){this.familyCard.start();this.aiStyle.selectMode(PLAIN_PHOTO_MODE_ID);}
     void this.continueAfterChoice(id);
   }
 
@@ -120,6 +127,7 @@ export class BoothModePageComponent implements OnInit {
   }
 
   private async routeExperience(id: GuestExperienceId): Promise<void> {
+    if (id === 'familyCard') {await this.router.navigate(['/family-card']);return;}
     if (id === 'photoPrint') {
       this.aiStyle.selectMode(PLAIN_PHOTO_MODE_ID);
       await this.router.navigate(['/capture']);

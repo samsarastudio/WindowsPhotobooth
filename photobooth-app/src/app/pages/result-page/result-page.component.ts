@@ -10,6 +10,7 @@ import { AiGallerySessionService } from '../../services/ai-gallery-session.servi
 import { GalleryUploadService } from '../../services/gallery-upload.service';
 import { AiBackgroundJobService } from '../../services/ai-background-job.service';
 import { PLAIN_PHOTO_MODE_ID } from '../../models/photobooth-config.model';
+import { FamilyCardService } from '../../services/family-card.service';
 
 import { PrintTroubleDialogComponent } from '../../components/print-trouble-dialog/print-trouble-dialog.component';
 import { PhysicalFrameAdjustDialogComponent } from '../../components/physical-frame-adjust-dialog/physical-frame-adjust-dialog.component';
@@ -23,6 +24,8 @@ import type { PhysicalPhotoCrop } from '../../models/physical-frame-layout';
   styleUrl: './result-page.component.scss',
 })
 export class ResultPageComponent implements OnInit, OnDestroy {
+  private readonly familyCard = inject(FamilyCardService);
+  readonly isFamilyCard = computed(() => /_family-card\.jpg$/i.test(this.path() || ''));
   readonly booth = inject(BoothConfigService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly boothMode = inject(BoothModeService);
@@ -100,6 +103,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
     () =>
       !this.isPreview() &&
       !!this.path() &&
+      !/_family-card\.jpg$/i.test(this.path() || '') &&
       !this.aiGenerating() &&
       this.booth.guestModes().physicalFrameEnabled !== false &&
       this.selectedMode()?.pipeline !== 'head-swap',
@@ -111,6 +115,7 @@ export class ResultPageComponent implements OnInit, OnDestroy {
       !!this.path() &&
       !this.aiGenerating() &&
       !this.viewingPhysicalSheet() &&
+      !/_family-card\.jpg$/i.test(this.path() || '') &&
       this.booth.photoFrames().enabled,
   );
   /**
@@ -521,6 +526,11 @@ export class ResultPageComponent implements OnInit, OnDestroy {
   }
 
   retake(): void {
+    if(this.isFamilyCard() && this.familyCard.members().length){
+      this.familyCard.active.set(true);
+      void this.router.navigate(['/family-card']);
+      return;
+    }
     this.gallerySession.clear();
     this.galleryUpload.clearGuestSession();
     this.aiErr.set(null);

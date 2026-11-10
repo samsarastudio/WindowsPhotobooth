@@ -1,0 +1,7 @@
+{
+  "generator": "Built-in image generation",
+  "asset": "artwork/family-card-window.png",
+  "purpose": "Reusable square evergreen shadowbox window behind each background-removed family portrait",
+  "direction": "Photorealistic narrow evergreen and cedar edges, dark warm charcoal empty interior, rustic bottom ledge, tiny warm lights, straight frontal view. No people or lettering. Inspired by the user's Christmas family card references.",
+  "layout": "Deterministic compositor adds original guest cutouts and card text; no generative portrait editing."
+}

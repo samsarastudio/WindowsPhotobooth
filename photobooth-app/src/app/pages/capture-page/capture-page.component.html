@@ -4,8 +4,8 @@
       <p class="pb-kia-style-chip">Style: {{ styleName }}</p>
     }
 
-    <h1 class="pb-kia-ready-title">{{ copy().capture.readyTitle }}</h1>
-    <p class="pb-kia-ready-lead">{{ copy().capture.readySubtitle }}</p>
+    <h1 class="pb-kia-ready-title">{{ familyCard.active() ? 'One person at a time' : copy().capture.readyTitle }}</h1>
+    <p class="pb-kia-ready-lead">{{ familyCard.active() ? 'Stand in the centre. Keep your head and shoulders fully visible.' : copy().capture.readySubtitle }}</p>
 
     <div class="pb-kia-stage">
       <div

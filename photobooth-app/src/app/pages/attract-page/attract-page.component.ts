@@ -1,3 +1,4 @@
+import { FamilyCardService } from '../../services/family-card.service';
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { BrandingLogoService } from '../../services/branding-logo.service';
@@ -13,6 +14,7 @@ import { AiStyleService } from '../../services/ai-style.service';
 })
 export class AttractPageComponent implements OnInit {
   private readonly booth = inject(BoothConfigService);
+  private readonly familyCard = inject(FamilyCardService);
   private readonly boothMode = inject(BoothModeService);
   private readonly aiStyle = inject(AiStyleService);
   readonly branding = inject(BrandingLogoService);
@@ -22,6 +24,7 @@ export class AttractPageComponent implements OnInit {
   readonly startLink = '/booth-mode';
 
   ngOnInit(): void {
+    this.familyCard.clear();
     this.boothMode.clear();
     this.aiStyle.clear();
   }

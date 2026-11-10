@@ -26,6 +26,7 @@ const execFileAsync = promisify(execFile);
  * settings persist next to the launcher the user placed.
  */
 function getPortableRoot() {
+  if (!app.isPackaged && process.env.PB_QA_RUNTIME) return path.resolve(process.env.PB_QA_RUNTIME);
   if (app.isPackaged) {
     const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
     if (portableDir && typeof portableDir === 'string' && portableDir.trim()) {
@@ -2042,6 +2043,35 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => killBridge());
 
+let familyBusy = false;
+const familyCutouts = new Set();
+ipcMain.handle('family:cutout', async (_e, source) => {
+  if (familyBusy) return {ok:false,error:'Please wait for the current portrait.'};
+  familyBusy = true;
+  try {
+    if (typeof source !== 'string' || !fs.existsSync(source)) throw Error('Capture not found. Please retake.');
+    const out = path.join(getCaptureDir(), `${require('crypto').randomUUID()}_family-person.png`);
+    const models = app.isPackaged ? path.join(process.resourcesPath,'bundled-config','ai-models') : path.join(getBundleRoot(),'config','ai-models');
+    await new Promise((resolve,reject) => {
+      const child=require('electron').utilityProcess.fork(path.join(__dirname,'family-card-worker.cjs'),[source,path.join(models,'birefnet-lite.onnx'),out],{serviceName:'Family card background removal',stdio:'ignore'});
+      const timer=setTimeout(()=>{child.kill();reject(Error('Background removal timed out. Please retake.'));},120000);
+      child.once('error',()=>{clearTimeout(timer);reject(Error('Background removal could not start.'));});
+      child.once('exit',code=>{clearTimeout(timer);code===0?resolve():reject(Error('Background removal failed. Please retake in good light.'));});
+    });
+    familyCutouts.add(out);
+    return {ok:true,path:out};
+  } catch(e) { return {ok:false,error:e.message}; } finally { familyBusy=false; }
+});
+ipcMain.handle('family:render', async (_e, payload) => {
+  try {
+    const paths=payload?.paths;
+    if (!Array.isArray(paths)||paths.length<1||paths.length>10||new Set(paths).size!==paths.length||paths.some(p=>!familyCutouts.has(p))) throw Error('Please add 1–10 approved portraits.');
+    const art=path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');
+    const data=await require('./family-card.cjs').renderCard(paths,art,typeof payload.name==='string'?payload.name:'');
+    const out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
+    fs.writeFileSync(out,data);return {ok:true,path:out};
+  } catch(e) { return {ok:false,error:e.message}; }
+});
 ipcMain.handle('app:getPaths', () => {
   const captureDir = getCaptureDir();
   const local = readLocalVersion(getPortableRoot(), getBundleRoot());

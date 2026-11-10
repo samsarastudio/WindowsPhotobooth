@@ -1,0 +1,23 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{execFileSync}=require('child_process');
+const {_electron}=require('C:/Users/Unity/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const app=path.resolve(__dirname,'..'),out=path.resolve(app,'../output/christmas/family-card-tests'),runtime=path.join(out,'runtime');
+fs.mkdirSync(path.join(runtime,'config'),{recursive:true});
+const config=JSON.parse(fs.readFileSync(path.join(app,'config/photobooth-config.default.json')));
+config.camera={source:'webcam',sdkCameraIndex:0,webcamDeviceId:null};config.capture.countdownSeconds=1;config.print.enabled=false;config.gallery.enabled=false;config.gallery.uploadToken='';config.boothUpdates={enabled:false};config.requireQrUnlock=false;config.releaseProfileVersion='1.2.2-christmas';
+fs.writeFileSync(path.join(runtime,'config/photobooth-config.json'),JSON.stringify(config));
+const clip=path.join(out,'solo.y4m');if(!fs.existsSync(clip))execFileSync('ffmpeg',['-y','-v','error','-loop','1','-i',path.join(app,'../deliverables/christmas/approved-samples-2026-11-02/01-source-photos/graveyard.png'),'-t','1','-vf','scale=960:640','-r','10','-pix_fmt','yuv420p','-f','yuv4mpegpipe',clip],{windowsHide:true});
+(async()=>{let instance;const report={hardware:'Prerecorded webcam, real Electron IPC and ONNX, no print jobs or uploads',checks:[]};try{
+ const env={...process.env,PB_QA_RUNTIME:runtime,PORTABLE_EXECUTABLE_DIR:runtime};delete env.ELECTRON_RUN_AS_NODE;
+ const packaged=process.argv.includes('--packaged');
+ instance=await _electron.launch({executablePath:path.join(app,packaged?'release/win-unpacked/PhotoBooth.exe':'node_modules/electron/dist/electron.exe'),args:[...(packaged?[]:[app]),'--disable-gpu','--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream','--use-file-for-fake-video-capture='+clip],env,timeout:60000});
+ const page=await instance.firstWindow();await instance.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setFullScreen(false);w.setSize(1366,900)});
+ await page.locator('.pb-kia-cta').waitFor({timeout:60000});await page.locator('.pb-kia-cta').click();await page.getByRole('button',{name:/Family Christmas Card/}).click();
+ await page.getByRole('button',{name:'Take first photo',exact:true}).click();await page.getByRole('button',{name:'Add this person',exact:true}).waitFor({timeout:180000});
+ await page.screenshot({path:path.join(out,'ui-review.png')});await page.getByRole('button',{name:'Retake',exact:true}).click();await page.getByRole('button',{name:'Add this person',exact:true}).waitFor({timeout:180000});await page.getByRole('button',{name:'Add this person',exact:true}).click();report.checks.push('Capture, actual removal, retake, approval');
+ await page.getByRole('button',{name:'Take another',exact:true}).click();await page.getByRole('button',{name:'Add this person',exact:true}).waitFor({timeout:180000});await page.getByRole('button',{name:'Add this person',exact:true}).click();assert.equal(await page.locator('.members img').count(),2);await page.getByRole('button',{name:'Remove person 1',exact:true}).click();assert.equal(await page.locator('.members img').count(),1);report.checks.push('Take another, remove, retained portrait');
+ await page.locator('input').fill('The Williams Family');await page.screenshot({path:path.join(out,'ui-members.png')});await page.getByRole('button',{name:'Finish card',exact:true}).click();await page.locator('.pb-result-img').waitFor({timeout:45000});await page.waitForFunction(()=>document.querySelector('.pb-result-img')?.naturalWidth===1800);await page.screenshot({path:path.join(out,'ui-result.png')});report.checks.push('Finish card, result preview, 1800px export');
+ assert.equal(await page.locator('.pb-result-physical-btn').count(),0);report.checks.push('No double frame or magnet conversion');
+ await page.getByRole('button',{name:'Edit card',exact:true}).click();assert.equal(await page.locator('.members img').count(),1);await page.getByRole('button',{name:'Finish card',exact:true}).click();await page.locator('.pb-result-img').waitFor();report.checks.push('Edit finished card preserves portraits');
+ await page.evaluate(()=>location.hash='/');await page.locator('.pb-kia-cta').click();await page.getByRole('button',{name:/Family Christmas Card/}).click();assert.equal(await page.locator('.members img').count(),0);report.checks.push('New session clears previous family');
+ report.passed=true;console.log(JSON.stringify(report));
+ }catch(e){report.error=e.stack;console.error(e);process.exitCode=1;}finally{fs.writeFileSync(path.join(out,'ui-flow-report.json'),JSON.stringify(report,null,2));if(instance)await instance.close();}})();

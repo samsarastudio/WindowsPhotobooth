@@ -43,7 +43,7 @@
     }
 
     <div class="pb-row pb-result-actions">
-      <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ copy().result.retake }}</button>
+      <button type="button" class="pb-btn pb-btn-ghost" (click)="retake()">{{ isFamilyCard() ? 'Edit card' : copy().result.retake }}</button>
       @if (isPreview()) {
         <button type="button" class="pb-btn pb-btn-primary" (click)="confirmPreview()">
           {{ copy().result.confirmPhoto || copy().result.submit }}

@@ -1,3 +1,4 @@
+import { FamilyCardService } from '../../services/family-card.service';
 import {
   Component,
   ElementRef,
@@ -45,6 +46,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   @ViewChild('videoEl') videoRef?: ElementRef<HTMLVideoElement>;
 
   private readonly booth = inject(BoothConfigService);
+  readonly familyCard = inject(FamilyCardService);
   private readonly boothMode = inject(BoothModeService);
   private readonly aiStyle = inject(AiStyleService);
   private readonly boothLog = inject(BoothLogService);
@@ -508,6 +510,7 @@ export class CapturePageComponent implements OnInit, OnDestroy {
   }
 
   private async navigateResult(filePath: string): Promise<void> {
+    if(this.familyCard.active()){await this.router.navigate(['/family-card'],{state:{familySource:filePath}});return;}
     if (this.boothMode.isPhysicalFrameMode()) {
       this.physicalAdjustPath.set(filePath);
       return;

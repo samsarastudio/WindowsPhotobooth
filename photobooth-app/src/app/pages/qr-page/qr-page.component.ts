@@ -55,6 +55,7 @@ export class QrPageComponent implements OnInit, OnDestroy {
 
     this.boothMode.selectMode('default');
 
+    if (experience === 'familyCard') {void this.router.navigate(['/family-card']);return;}
     if (experience === 'aiPortrait') {
       void this.router.navigate(['/portrait-select']);
       return;
