@@ -23,6 +23,8 @@ const root=path.resolve(__dirname,'../..'),out=path.join(root,'output/christmas/
   for(const y of new Set(cells.map(c=>c.top))){const row=cells.filter(c=>c.top===y);assert(Math.abs(row[0].left+row.at(-1).left+row.at(-1).width-1800)<=1);for(let i=1;i<row.length;i++)assert.equal(row[i-1].left+row[i-1].width,row[i].left,'No burgundy gap between portraits');}
   const file=path.join(out,`family-card-${String(n).padStart(2,'0')}.jpg`);fs.writeFileSync(file,await renderCard(people.slice(0,n),art,'The Williams Family'));
   fs.copyFileSync(file,path.join(samples,'03-cards',path.basename(file)));
+  const junctions=new Set(cells.flatMap(c=>[[c.left,c.top],[c.left+c.width,c.top],[c.left,c.top+c.height],[c.left+c.width,c.top+c.height]].map(p=>p.join(','))));
+  for(const point of junctions){const [x,y]=point.split(',').map(Number);const pixels=await sharp(file).extract({left:x-30,top:y-30,width:60,height:60}).removeAlpha().raw().toBuffer();let foliage=0;for(let i=0;i<pixels.length;i+=3)if(pixels[i+1]>pixels[i]*1.08&&pixels[i+1]>pixels[i+2]*1.08)foliage++;assert(foliage/3600>.30,`Sparse foliage join at ${point}, count ${n}`);}
   const m=await sharp(file).metadata();assert.equal(m.width,1800);assert.equal(m.height,2700);results.push({count:n,file,cells});console.log('PASS',n);
  }
  const tiles=await Promise.all(results.map(async(r,i)=>({input:await sharp(r.file).resize(360,540).toBuffer(),left:i%5*360,top:Math.floor(i/5)*540})));

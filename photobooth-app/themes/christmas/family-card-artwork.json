@@ -5,7 +5,7 @@
   "direction": "Photorealistic narrow evergreen and cedar edges, dark warm charcoal empty interior, rustic bottom ledge, tiny warm lights, straight frontal view. No people or lettering. Inspired by the user's Christmas family card references.",
   "layout": "Portrait 4x6 postcard, continuous dark backdrop, no card-colored gaps or doubled frames; six portraits use two columns by three rows. Original guest cutouts behind shared foreground foliage. Script heading and family line; no outer gold stroke.",
   "dividerAsset": "artwork/family-card-evergreen-divider.png",
-  "dividerDirection": "Natural irregular fir and cedar, pinecones, red berries, small cranberry and antique-gold baubles, subtle warm fairy lights. 160px shared branch strips with preserved needle proportions; no doubled divisions.",
+  "dividerDirection": "220px thick natural decorated foliage. Dense middle sections replace tapered branch tips; every corner and T-junction overlaps by 90px. Soft rounded branch ends preserve organic silhouettes. Portrait headroom protects faces.",
   "font": {
     "family": "Great Vibes",
     "file": "fonts/GreatVibes-Regular.ttf",

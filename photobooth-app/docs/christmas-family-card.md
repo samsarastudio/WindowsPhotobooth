@@ -41,3 +41,5 @@ The default checked background option keeps the capture flow available during re
 Each card snapshots its source paths and greeting. New families cannot change queued cards. Job records survive renderer reload; incomplete cards are resumed, and failed jobs have a Retry action in Card queue. The normal durable upload queue handles offline delivery. Individual portrait removal shares the existing scene worker queue to avoid concurrent heavy model allocations. Uncheck the background option to wait for and edit a card locally.
 
 `node scripts/qa-family-card-queue.cjs --live` exercises two consecutive family sessions, nonblocking capture, live Processing-to-Ready gallery delivery and QR sharing. Physical printing remains untested without hardware.
+
+The foliage border is 220 pixels thick at export size. Dense branch sections overlap every corner and junction by 90 pixels, with softened end caps. Layout verification samples every join to catch exposed dark gaps. Extra portrait headroom protects faces from the fuller foliage.
