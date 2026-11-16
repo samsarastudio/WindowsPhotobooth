@@ -1,3 +1,4 @@
+import { boothPackagesRouter, adminBoothPackagesRouter } from './routes/booth-packages.js';
 import { portraitJobsRouter, initPortraitJobs } from './routes/portrait-jobs.js';
 import { gameRouter, adminGameRouter } from './routes/game.js';
 import fs from 'node:fs';
@@ -107,6 +108,8 @@ app.get('/game-admin', (_req,res) => res.sendFile(path.join(config.publicDir,'ga
 app.use('/api/frames', framesRouter);
 app.use('/api/wall', wallRouter);
 app.use('/api/qr', qrRouter);
+app.use('/api/booth-packages', boothPackagesRouter);
+app.use('/api/admin/booth-packages', adminBoothPackagesRouter);
 app.use('/api/booth-update', boothUpdateRouter);
 app.use('/api/tablet', tabletRouter);
 app.use('/api/booth', boothJobsRouter);
