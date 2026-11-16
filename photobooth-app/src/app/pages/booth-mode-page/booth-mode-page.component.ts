@@ -30,7 +30,8 @@ export class BoothModePageComponent implements OnInit {
   );
 
   /** Photo Print — framed digital original; magnet optional at the end. */
-  readonly showFamilyCard = computed(() => this.booth.activeThemeId() === 'christmas');
+  readonly showFamilyCard = computed(() => this.booth.skinPresentation()?.familyCardEnabled ?? (this.booth.activeThemeId() === 'christmas'));
+  readonly familyThumb = computed(() => this.booth.skinPresentation()?.familyCard || 'christmas/family-card.jpg');
   readonly showPhotoPrint = computed(() => this.booth.guestModes().defaultEnabled !== false);
 
   /** AI Christmas Portrait — Choose your Christmas character. */
@@ -69,6 +70,8 @@ export class BoothModePageComponent implements OnInit {
   }
 
   private async loadThumbs(): Promise<void> {
+    const presentation = this.booth.skinPresentation();
+    if(presentation){this.thumbs.set(presentation);return;}
     // UI artwork is bundled with the app, independent of editable capture assets.
     if (this.booth.activeThemeId() === 'christmas') {
       this.thumbs.set({ photo: 'christmas/classic.png', portrait: 'christmas/portrait.png', scene: 'christmas/scene.png' });

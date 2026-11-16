@@ -74,11 +74,11 @@ function createPipelineHelpers(ctx) {
   } = ctx;
 
   function getCompositionsDir(modeId) {
-    return path.join(getPortableRoot(), 'config', 'compositions', sanitizeModeId(modeId));
+    return path.join(ctx.getAssetConfigDir ? ctx.getAssetConfigDir() : path.join(getPortableRoot(), 'config'), 'compositions', sanitizeModeId(modeId));
   }
 
   function getSharedCompositionsDir() {
-    return path.join(getPortableRoot(), 'config', 'compositions', '_shared');
+    return path.join(ctx.getAssetConfigDir ? ctx.getAssetConfigDir() : path.join(getPortableRoot(), 'config'), 'compositions', '_shared');
   }
 
   function listCompositionImageNames(dir) {

@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "id": "sports-cricket",
+  "name": "Match Day · Cricket",
+  "version": "1.0.0",
+  "minAppVersion": "1.3.0",
+  "description": "Three cinematic cricket venues, navy and emerald styling, and matching portrait / landscape keepsakes.",
+  "presentation": {
+    "familyCardEnabled": false,
+    "hero": "theme/assets/stadium.webp",
+    "photo": "theme/assets/stadium.webp",
+    "scene": "config/ai-backgrounds/scene/players-tunnel.webp"
+  },
+  "config": {
+    "guestModes": {
+      "defaultEnabled": true,
+      "physicalFrameEnabled": true
+    },
+    "aiGenerationEnabled": true,
+    "defaultAiModeId": null,
+    "photoFrames": {
+      "enabled": true,
+      "photoScale": 1,
+      "defaultFrameFile": "cricket-landscape.webp",
+      "defaultPortraitFrameFile": "cricket-portrait.webp",
+      "guestFrameFiles": [
+        "cricket-landscape.webp",
+        "cricket-portrait.webp"
+      ],
+      "autoApplyFrame": true,
+      "guestAdjustPhoto": true,
+      "guestTextEnabled": false,
+      "guestTextOptional": true,
+      "guestTextMaxLength": 36,
+      "guestTextCreditLine": "by InMoment",
+      "guestTextXPercent": 50,
+      "guestTextYPercent": 78,
+      "guestTextSizePercent": 3.4,
+      "guestTextColor": "#dfc58f",
+      "guestTextCreditColor": "#d8c4a0",
+      "guestTextAlign": "center",
+      "guestTextBrush": false,
+      "guestTextBrushOpacity": 0.22
+    },
+    "aiModes": [
+      {
+        "id": "scene",
+        "label": "Cricket backdrops",
+        "pipeline": "scene",
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "allowBackgroundChoice": true,
+        "prompt": "Keep every guest exactly as photographed. Replace only the background with this cricket venue. Preserve faces, clothing, poses, proportions and depth."
+      }
+    ],
+    "copy": {
+      "attract": {
+        "icon": "",
+        "tagline": "INMOMENT · CRICKET",
+        "mainScale": 1,
+        "topScale": 1,
+        "title": "MATCH DAY",
+        "subtitle": "Your team. Your moment.",
+        "ctaLabel": "Step into the game",
+        "startAria": "Start your cricket photo",
+        "adminLink": "Admin"
+      },
+      "qr": {
+        "icon": "🔐",
+        "title": "Scan your QR",
+        "subtitle": "Hold your phone to the photobooth scanner to begin your photo experience.",
+        "scanSuccess": "QR verified",
+        "footer": "Have your registration QR ready.",
+        "codeLabel": "Code",
+        "ok": "OK",
+        "back": "Back",
+        "invalidCode": "Invalid code. Use 1234 to continue (debug).",
+        "debugHint": "Debug — type ok then Enter"
+      },
+      "capture": {
+        "sideTitle": "Strike a pose",
+        "instructions": "Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends",
+        "starting": "Starting camera…",
+        "readyTitle": "Get Ready",
+        "readySubtitle": "Center yourself in the frame. Your photo begins in…",
+        "footerHint": "Look at the camera and hold still.",
+        "smileHint": "Smile — capturing soon"
+      },
+      "result": {
+        "title": "Your photo",
+        "loading": "Loading…",
+        "savedPrefix": "Saved:",
+        "retake": "Retake",
+        "submit": "Done",
+        "confirmPhoto": "Use this photo",
+        "generateAi": "Create AI version",
+        "generatingAi": "Creating your AI photo…",
+        "aiPreviewTitle": "AI version",
+        "aiErrorPrefix": "AI generation failed:",
+        "aiGalleryTitle": "Your photos",
+        "galleryThumbOriginal": "Original",
+        "galleryThumbAi": "AI style",
+        "galleryBackToResult": "Back to photo",
+        "galleryFinish": "Finish",
+        "thinkingSummary": "Preparing your photo",
+        "thinkingStepAnalyze": "Preparing your photo",
+        "thinkingStepPlan": "Applying your match-day backdrop",
+        "thinkingStepBackground": "Building scenery and locking your faces",
+        "thinkingStepImage": "Finishing your photo",
+        "thinkingFootnote": "This may take a moment. Please wait while we finish your photo.",
+        "share": "Share",
+        "sharing": "Uploading…",
+        "shareQrTitle": "Scan to view your photo",
+        "shareBack": "Back",
+        "uploadFailed": "Could not upload to gallery",
+        "print": "Print",
+        "printing": "Printing…",
+        "printed": "Printed",
+        "printFailed": "Print failed"
+      },
+      "history": {
+        "title": "Print history",
+        "empty": "No photos yet — take one to see it here.",
+        "back": "Back to start",
+        "ariaOpen": "Reprint previous photos"
+      },
+      "aiMode": {
+        "title": "Choose your photo style",
+        "subtitle": "A classic keepsake or a cricket backdrop. Your choice.",
+        "back": "Back",
+        "plainPhotoLabel": "Classic photo",
+        "portraitEntryLabel": "AI Portrait",
+        "portraitEntryHint": "Choose a match-day character for your portrait.",
+        "sceneEntryHint": "Step into an unforgettable cricket setting."
+      },
+      "portraitSelect": {
+        "title": "Choose your character",
+        "subtitle": "Choose a match-day look for your portrait.",
+        "back": "Back"
+      },
+      "frame": {
+        "title": "Choose a frame",
+        "subtitle": "Pick a keepsake border for your photo",
+        "continueLabel": "Use this frame",
+        "skipLabel": "Skip frame",
+        "applying": "Applying frame…"
+      },
+      "sceneSelect": {
+        "title": "Choose your ground",
+        "subtitle": "Stadium lights, pavilion hospitality or the players’ entrance.",
+        "back": "Back"
+      },
+      "boothMode": {
+        "title": "Choose your experience",
+        "subtitle": "Pick a style to get started.",
+        "defaultLabel": "Classic photo",
+        "defaultHint": "A photo to remember the occasion.",
+        "aiPortraitLabel": "AI portrait",
+        "aiPortraitHint": "Choose your character portrait.",
+        "sceneLabel": "Cricket backdrops",
+        "sceneHint": "Your photo. An unforgettable cricket ground.",
+        "magnetNote": "Ask our team about photo prints and glow magnets.",
+        "physicalLabel": "Glow magnet",
+        "physicalHint": "Create a keepsake photo magnet.",
+        "back": "Back"
+      }
+    }
+  },
+  "files": {
+    "artwork-provenance.json": "fc9846577aae7cdfded92a7def9775536f108c98d34b05910ddd2a85865109fe",
+    "config/ai-backgrounds/scene/pavilion.depths.json": "9268bbb6a94718a81b346386f32866fdba33fa18e50c48ac5577d361be4424c5",
+    "config/ai-backgrounds/scene/pavilion.webp": "b6747ed082f381fcb93f1fceafdbf2f0f3bd71e278aba9b0201972a8df466162",
+    "config/ai-backgrounds/scene/players-tunnel.depths.json": "ee7f66dde99b9be605b1920a9bdccb1fb88d4229819e632ee7be9bc8971b3bca",
+    "config/ai-backgrounds/scene/players-tunnel.webp": "2798bec367f8b2fed2992db13fb1831cf465a7d87be080c01683b5bbfd37a46d",
+    "config/ai-backgrounds/scene/stadium-lights.depths.json": "78d35cb0c9325f687068fb6b1b855b9a24bb00e44c41be134643b042d7329a93",
+    "config/ai-backgrounds/scene/stadium-lights.webp": "de6247d46f2c4c10d05d52b179f84a4a5fb9fd90a4a6ee9cd65e2aae0605d658",
+    "config/photo-frames/cricket-landscape.webp": "42d9925002932c52525315352fcf3bdcec180971a7443ebf4c6782b40e9379d2",
+    "config/photo-frames/cricket-portrait.webp": "d74c57b3652fc5d9ad07f28be90ba50a357677e336e09f2a5e432020eefe5e7b",
+    "theme/assets/stadium.webp": "de6247d46f2c4c10d05d52b179f84a4a5fb9fd90a4a6ee9cd65e2aae0605d658",
+    "theme/styles.css": "20b95dfc79767ff3aea9418cb2c425181f889c2a8a20864f1c396b2e20e65a60",
+    "theme/theme.json": "1d3b60c371f5bdc4d7ae39769d42311c981c502dacdd01508b5ab96106fded37"
+  }
+}

@@ -1,3 +1,4 @@
+import { SkinPackagesComponent } from '../skin-packages.component';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -113,7 +114,7 @@ interface UploadQueueSummary {
 
 @Component({
   selector: 'pb-admin-dashboard',
-  imports: [FormsModule, RouterLink, PrintTroubleDialogComponent, CapturePhotoBrowserComponent],
+  imports: [SkinPackagesComponent, FormsModule, RouterLink, PrintTroubleDialogComponent, CapturePhotoBrowserComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.scss',
 })

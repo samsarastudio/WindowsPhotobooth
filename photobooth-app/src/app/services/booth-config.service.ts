@@ -43,7 +43,7 @@ function mergeCopy(base: PhotoboothCopy, patch?: Partial<PhotoboothCopy>): Photo
     portraitSelect: { ...base.portraitSelect, ...patch.portraitSelect },
     sceneSelect: { ...base.sceneSelect, ...patch.sceneSelect },
     boothMode: { ...base.boothMode, ...patch.boothMode,
-      sceneLabel: 'Custom Backdrops' },
+      sceneLabel: patch.boothMode?.sceneLabel || base.boothMode.sceneLabel },
     frame: { ...base.frame, ...patch.frame },
     caption: { ...base.caption, ...patch.caption },
     frameAdjust: { ...base.frameAdjust, ...patch.frameAdjust },
@@ -102,8 +102,8 @@ function mergeBranding(patch?: Partial<PhotoboothBranding> | null): PhotoboothBr
   };
 }
 
-function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
-  if (!Array.isArray(raw)) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
+function normalizeAiModes(raw: unknown, explicitPackage = false): PhotoboothAiMode[] {
+  if (!Array.isArray(raw)) return explicitPackage ? [] : [...PHOTOBOOTH_DEFAULT_AI_MODES];
   const out: PhotoboothAiMode[] = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
@@ -143,6 +143,7 @@ function normalizeAiModes(raw: unknown): PhotoboothAiMode[] {
       });
     }
   }
+  if (explicitPackage) return out;
   if (out.length === 0) return [...PHOTOBOOTH_DEFAULT_AI_MODES];
   // Ensure new Christmas portrait characters appear even on older saved configs.
   const have = new Set(out.map((m) => m.id));
@@ -497,7 +498,7 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     PHOTOBOOTH_DEFAULT_COPY,
     (rest['copy'] as Partial<PhotoboothCopy> | undefined) ?? undefined,
   );
-  copy = { ...copy, attract: upgradeLegacyAttractCopy(copy.attract) };
+  if (!rest['skinPackage']) copy = { ...copy, attract: upgradeLegacyAttractCopy(copy.attract) };
   copy = { ...copy, attract: normalizeAttractControls(copy.attract) };
   let activeRaw = rest['activeThemeId'];
   if (typeof activeRaw === 'string' && activeRaw === 'kia') {
@@ -539,12 +540,14 @@ function normalizeConfigPayload(raw: unknown): PhotoboothConfig {
     typeof rest['requireQrUnlock'] === 'boolean' ? rest['requireQrUnlock'] : false;
   const aiGenerationEnabled =
     typeof rest['aiGenerationEnabled'] === 'boolean' ? rest['aiGenerationEnabled'] : false;
-  const aiModes = normalizeAiModes(rest['aiModes']);
+  const aiModes = normalizeAiModes(rest['aiModes'], !!rest['skinPackage']);
   const defaultAiModeId = normalizeDefaultAiModeId(rest['defaultAiModeId'], aiModes);
   const openAiConfigured =
     typeof rest['openAiConfigured'] === 'boolean' ? rest['openAiConfigured'] : false;
 
   return {
+    skinPresentation: rest['skinPresentation'] as PhotoboothConfig['skinPresentation'],
+    skinPackage: rest['skinPackage'] as PhotoboothConfig['skinPackage'],
     activeThemeId: typeof activeRaw === 'string' ? activeRaw : 'christmas',
     branding,
     camera,
@@ -628,6 +631,7 @@ export class BoothConfigService {
   });
   readonly shouldShowBoothModeStep = computed(() => this.offeredBoothModes().length > 1);
   readonly requireQrUnlock = computed(() => this.state()?.requireQrUnlock ?? false);
+  readonly skinPresentation = computed(() => this.state()?.skinPresentation);
   readonly activeThemeId = computed(() => this.state()?.activeThemeId ?? 'christmas');
   readonly aiGenerationEnabled = computed(() => this.state()?.aiGenerationEnabled ?? false);
   readonly defaultAiModeId = computed(() => this.state()?.defaultAiModeId ?? null);

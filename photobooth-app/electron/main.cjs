@@ -55,6 +55,18 @@ function getConfigDir() {
   return path.join(getPortableRoot(), 'config');
 }
 
+// Package state is per portable booth instance, separate from credentials and hardware.
+let packageStoreInstance;
+function packages() { return packageStoreInstance ||= new (require('./theme-packages.cjs').PackageStore)(path.join(getPortableRoot(), 'skin-packages'), require('../package.json').version); }
+function activePackage() { return packages().active(); }
+function assetConfigDir() { const p = activePackage(); return p ? path.join(p.dir, 'config') : getConfigDir(); }
+function familyArtwork() { const p = activePackage(); return path.join(p ? path.join(p.dir,'theme') : path.join(getBundleRoot(),'themes','christmas'), 'artwork','family-card-window.png'); }
+let assetJobs = 0;
+function handleAssetJob(channel, handler) { ipcMain.handle(channel, async (...args) => { assetJobs++; try { return await handler(...args); } finally { assetJobs--; } }); }
+let packageAdminUntil = 0;
+function requirePackageAdmin() { if (Date.now() > packageAdminUntil) throw Error('Enter the booth admin PIN to manage packages.'); }
+function packageReadOnly() { if (activePackage()) throw Error('Package artwork is versioned. Import a new package version to change it.'); }
+
 function getLogsDir() {
   const dir = path.join(getPortableRoot(), 'logs');
   try {
@@ -217,7 +229,7 @@ function readJsonSafe(p) {
 function ensureConfigFiles() {
   const dir = getConfigDir();
   fs.mkdirSync(dir, { recursive: true });
-  if (app.isPackaged) require('./ota-assets.cjs').seedMissingAssets(path.join(process.resourcesPath, 'bundled-config'), dir);
+  if (app.isPackaged && !packages().state().active) require('./ota-assets.cjs').seedMissingAssets(path.join(process.resourcesPath, 'bundled-config'), dir);
   const cfgPath = getConfigPath();
   if (!fs.existsSync(cfgPath)) {
     const def = getConfigDefaultPath();
@@ -235,7 +247,14 @@ function loadMergedConfig() {
     ? readJsonSafe(getConfigDefaultPath())
     : {};
   const user = fs.existsSync(getConfigPath()) ? readJsonSafe(getConfigPath()) : {};
-  return deepMerge(defaults, user);
+  const base = deepMerge(defaults, user);
+  const pack = activePackage();
+  if (!pack) return base;
+  const presentation = { ...(pack.manifest.presentation || {}) };
+  for (const key of ['hero','photo','portrait','scene','familyCard']) if (presentation[key]) presentation[key] = pathToFileURL(path.join(pack.dir, presentation[key])).href;
+  const override = base.skinOverrides?.[pack.manifest.id + '@' + pack.manifest.version] || {};
+  return { ...base, ...deepMerge({aiModes:[],aiGenerationEnabled:false,defaultAiModeId:null,photoFrames:{...base.photoFrames,enabled:false,guestFrameFiles:[]},...pack.manifest.config}, override), activeThemeId: pack.manifest.id, skinPackage: { id:pack.manifest.id, version:pack.manifest.version }, skinPresentation:presentation };
+
 }
 
 function psQuote(s) {
@@ -302,6 +321,8 @@ function resolveThemeDirectoryInRoot(root, themeId) {
 }
 
 function resolveThemeDirectory(themeId) {
+  const pack = activePackage();
+  if (pack && pack.manifest.id === themeId) return path.join(pack.dir, "theme");
   for (const root of listThemeSearchRoots()) {
     const found = resolveThemeDirectoryInRoot(root, themeId);
     if (found) return found;
@@ -350,10 +371,11 @@ function sanitizeModeId(id) {
 }
 
 function getAiBackgroundsRoot() {
-  return path.join(getPortableRoot(), 'config', 'ai-backgrounds');
+  return path.join(assetConfigDir(), 'ai-backgrounds');
 }
 
 function getPhotoFramesDir() {
+  const pack = activePackage(); if (pack) return path.join(pack.dir, 'config','photo-frames');
   const dir = path.join(getPortableRoot(), 'config', 'photo-frames');
   fs.mkdirSync(dir, { recursive: true });
   // Seed from bundled defaults on first run
@@ -1383,6 +1405,7 @@ const {
 } = require('./ai-pipelines.cjs');
 
 const aiPipelines = createPipelineHelpers({
+  getAssetConfigDir: assetConfigDir,
   getPortableRoot,
   sanitizeModeId,
   IMAGE_EXTENSIONS,
@@ -2060,24 +2083,26 @@ async function familyCutout(source) {
     return {ok:true,path:out};
   } catch(e) { return {ok:false,error:e.message}; }
 }
-ipcMain.handle('family:cutout', (_e, source) => {
+handleAssetJob('family:cutout', (_e, source) => {
  return require('./scene-process.cjs').queueBackgroundTask(()=>familyCutout(source));
 });
-ipcMain.handle('family:draft', async (_e,payload) => {
+handleAssetJob('family:draft', async (_e,payload) => {
  try {
   const sources=payload?.sources;
   if(!Array.isArray(sources)||sources.length<1||sources.length>10||sources.some(p=>typeof p!=='string'||!fs.existsSync(p)))throw Error('Please add 1-10 captured portraits.');
   const out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
-  const art=path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');
+  const art=familyArtwork();
   fs.writeFileSync(out,await require('./family-card.cjs').renderCard(sources,art,payload.name||''));
+  fs.writeFileSync(out+'.skin.json',JSON.stringify({package:packages().state().active}));
   return {ok:true,path:out};
  }catch(e){return {ok:false,error:e.message};}
 });
-ipcMain.handle('family:render', async (_e, payload) => {
+handleAssetJob('family:render', async (_e, payload) => {
   try {
     const paths=payload?.paths;
     if (!Array.isArray(paths)||paths.length<1||paths.length>10||new Set(paths).size!==paths.length||paths.some(p=>!familyCutouts.has(p))) throw Error('Please add 1–10 approved portraits.');
-    const art=path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');
+    let art=familyArtwork();
+    if(payload.draftPath){ const draft=path.resolve(payload.draftPath); if(path.dirname(draft)!==path.resolve(getCaptureDir())||!/_family-card\.jpg$/i.test(draft))throw Error('Invalid card draft'); if(fs.existsSync(draft+'.skin.json')){const ref=readJsonSafe(draft+'.skin.json').package;art=ref?path.join(packages().directory(ref),'theme','artwork','family-card-window.png'):path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');}}
     const data=await require('./family-card.cjs').renderCard(paths,art,typeof payload.name==='string'?payload.name:'');
     let out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
     if(payload.draftPath){
@@ -2386,7 +2411,7 @@ ipcMain.handle('file:saveJpeg', async (_e, fullPath, base64Body) => {
   return { ok: true, path: fullPath };
 });
 
-ipcMain.handle('openai:generateImage', async (_e, payload) => {
+handleAssetJob('openai:generateImage', async (_e, payload) => {
   const generationStarted = Date.now();
   appendAppLog('info', 'openai', 'generateImage start', {
     modeId: payload?.modeId,
@@ -2628,7 +2653,7 @@ ipcMain.handle('openai:generateImage', async (_e, payload) => {
 
 function configForRenderer(full) {
   if (!full || typeof full !== 'object') return full;
-  const { adminPin: _omit, openAiApiKey: _key, ...rest } = full;
+  const { adminPin: _omit, openAiApiKey: _key, skinOverrides: _overrides, ...rest } = full;
   return {
     ...rest,
     openAiConfigured:
@@ -2648,7 +2673,9 @@ ipcMain.handle('admin:verifyPin', async (_e, pin) => {
   try {
     const full = loadMergedConfig();
     const expected = String(full.adminPin ?? '2727');
-    return { ok: true, valid: expected === String(pin ?? '') };
+    const valid = expected === String(pin ?? '');
+    if (valid) packageAdminUntil = Date.now() + 30*60*1000;
+    return { ok: true, valid };
   } catch (e) {
     return { ok: false, error: String(e), valid: false };
   }
@@ -2657,10 +2684,21 @@ ipcMain.handle('admin:verifyPin', async (_e, pin) => {
 ipcMain.handle('admin:saveConfig', async (_e, partial) => {
   try {
     ensureConfigFiles();
-    const merged = deepMerge(loadMergedConfig(), partial || {});
+    const patch = { ...(partial || {}) };
+    delete patch.skinPresentation; delete patch.skinPackage;
+    const pack = activePackage();
+    const saved = readJsonSafe(getConfigPath());
+    if(pack) {
+      const key=pack.manifest.id+'@'+pack.manifest.version;
+      const overrides={...(saved.skinOverrides?.[key]||{})};
+      for(const field of ['aiGenerationEnabled','defaultAiModeId','guestModes','copy']) if(field in patch) overrides[field]=patch[field];
+      patch.skinOverrides={...(saved.skinOverrides||{}),[key]:overrides};
+      for(const field of ['activeThemeId',...Object.keys(pack.manifest.config)]) delete patch[field];
+    }
+    const merged = deepMerge(saved, patch);
     fs.mkdirSync(getConfigDir(), { recursive: true });
     fs.writeFileSync(getConfigPath(), JSON.stringify(merged, null, 2), 'utf8');
-    return { ok: true, config: configForRenderer(merged) };
+    return { ok: true, config: configForRenderer(loadMergedConfig()) };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -3074,6 +3112,7 @@ ipcMain.handle('admin:pickCompositionImage', async () => {
 
 ipcMain.handle('admin:installComposition', async (_e, modeId, sourcePath) => {
   try {
+    packageReadOnly();
     if (!sourcePath || typeof sourcePath !== 'string' || !fs.existsSync(sourcePath)) {
       return { ok: false, error: 'Invalid source file.' };
     }
@@ -3153,7 +3192,7 @@ ipcMain.handle('frames:preview', async (_e, filename) => {
   } catch(e) { return {ok:false,error:String(e)}; }
 });
 
-ipcMain.handle('frames:apply', async (_e, payload) => {
+handleAssetJob('frames:apply', async (_e, payload) => {
   try {
     let sharpMod;
     try {
@@ -3222,7 +3261,7 @@ ipcMain.handle('frames:apply', async (_e, payload) => {
   }
 });
 
-ipcMain.handle('layouts:physicalFrameDual', async (_e, payload) => {
+handleAssetJob('layouts:physicalFrameDual', async (_e, payload) => {
   try {
     let sharpMod;
     try {
@@ -3288,6 +3327,7 @@ ipcMain.handle('admin:pickPhotoFrameImage', async () => {
 
 ipcMain.handle('admin:installPhotoFrame', async (_e, sourcePath) => {
   try {
+    packageReadOnly();
     if (!sourcePath || typeof sourcePath !== 'string' || !fs.existsSync(sourcePath)) {
       return { ok: false, error: 'Invalid source file.' };
     }
@@ -3317,6 +3357,7 @@ ipcMain.handle('admin:installPhotoFrame', async (_e, sourcePath) => {
 
 ipcMain.handle('admin:deletePhotoFrame', async (_e, filename) => {
   try {
+    packageReadOnly();
     const safe = path.basename(String(filename || ''));
     if (!safe || safe.includes('..')) return { ok: false, error: 'Invalid filename.' };
     const full = path.join(getPhotoFramesDir(), safe);
@@ -3348,6 +3389,7 @@ ipcMain.handle('admin:pickAiBackgroundImage', async () => {
 
 ipcMain.handle('admin:installAiBackground', async (_e, modeId, sourcePath) => {
   try {
+    packageReadOnly();
     if (!sourcePath || typeof sourcePath !== 'string' || !fs.existsSync(sourcePath)) {
       return { ok: false, error: 'Invalid source file.' };
     }
@@ -3373,6 +3415,7 @@ ipcMain.handle('admin:installAiBackground', async (_e, modeId, sourcePath) => {
 
 ipcMain.handle('admin:deleteAiBackground', async (_e, modeId, filename) => {
   try {
+    packageReadOnly();
     const full = resolveAiBackgroundPath(modeId, filename);
     if (!full) {
       return { ok: false, error: 'Background file not found.' };
@@ -4038,6 +4081,7 @@ async function syncFramesWithMoments(payload) {
 }
 
 async function syncFramesWithMomentsOnce(payload) {
+  if(activePackage()) return {ok:true,synced:[],skipped:[],failed:[],message:'Frames are supplied by the active package.'};
   const base = galleryBaseUrl(payload?.apiBaseUrl);
   if (!base) return { ok: false, error: 'Gallery API URL is required.' };
   const token = String(payload?.uploadToken || '').trim();
@@ -4803,4 +4847,34 @@ ipcMain.handle('print:test', async () => {
       } catch (_) {}
     }
   }
+});
+
+// Catalog reads use the configured Moments host/token; neither is supplied by a package.
+ipcMain.handle('packages:manage', async (_e, request = {}) => {
+ try {
+  const action = request.action;
+  if(!['status','catalog','download','import','apply','rollback','base','remove'].includes(action))throw Error('Unknown package action');
+  if(action !== 'status') requirePackageAdmin();
+  const cfg = loadMergedConfig(), base = String(cfg.gallery?.apiBaseUrl || '').replace(/\/$/, ''), token = cfg.gallery?.uploadToken || '';
+  if(action === 'catalog') {
+   const url = new URL(base); if(url.protocol !== 'https:' && !['localhost','127.0.0.1'].includes(url.hostname)) throw Error('Moments must use HTTPS');
+   const r=await fetch(base+'/api/booth-packages',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000),redirect:'error'});
+   if(!r.ok)throw Error('Moments catalog: HTTP '+r.status); return await r.json();
+  }
+  if(action === 'download') { const buffer=await require('./theme-packages.cjs').downloadPackage(base,token,request.ref); packages().install(buffer); }
+  if(action === 'import') { const r=await dialog.showOpenDialog(mainWindow,{title:'Install booth package',properties:['openFile'],filters:[{name:'Booth package ZIP',extensions:['zip']}]}); if(r.canceled)return {ok:true,canceled:true}; if(fs.statSync(r.filePaths[0]).size>require('./theme-package-format.cjs').MAX_ZIP)throw Error('Package exceeds 90 MiB'); packages().install(fs.readFileSync(r.filePaths[0])); }
+  if(['apply','rollback','base'].includes(action)) {
+   if(assetJobs)throw Error('Wait for photo processing to finish before changing packages.');
+   const safe=await mainWindow.webContents.executeJavaScript(`(() => { const jobs=JSON.parse(localStorage.getItem('pb-family-card-jobs')||'[]'); return location.hash.includes('/admin') && !jobs.some(j=>j.status==='queued'||j.status==='processing') && !window.__pbSceneJobs; })()`);
+   if(!safe)throw Error('Open Admin and finish queued photo processing before changing packages.');
+   if(action==='rollback')packages().rollback();else packages().activate(action==='base'?null:request.ref);
+   setTimeout(() => { const index=path.join(__dirname,'..','dist','photobooth-app','browser','index.html'); if(fs.existsSync(index))void mainWindow.loadFile(index,{hash:'/admin'}); else void mainWindow.loadURL('http://localhost:4200/#/admin'); }, 150);
+  }
+  if(action==='remove') {
+   const drafts=await mainWindow.webContents.executeJavaScript(`JSON.parse(localStorage.getItem('pb-family-card-jobs')||'[]').filter(j=>j.status!=='ready').map(j=>j.draft)`);
+   for(const draft of drafts){if(typeof draft==='string'&&path.dirname(path.resolve(draft))===path.resolve(getCaptureDir())&&fs.existsSync(draft+'.skin.json')){const ref=readJsonSafe(draft+'.skin.json').package;if(ref?.id===request.ref?.id&&ref?.version===request.ref?.version)throw Error('A retryable family card still needs this package. Complete that job first.');}}
+   packages().remove(request.ref);
+  }
+  return {ok:true,authorized:Date.now()<=packageAdminUntil,...packages().state(),installed:packages().list().map(m=>({...m,previewUrl:m.presentation?.hero?pathToFileURL(path.join(packages().directory(m),m.presentation.hero)).href:null}))};
+ } catch(e) { return {ok:false,error:e.message}; }
 });

@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('pbApi', {
+  managePackages: (request) => ipcRenderer.invoke('packages:manage', request),
   familyCardDraft: (payload) => ipcRenderer.invoke('family:draft', payload),
   familyCardCutout: (source) => ipcRenderer.invoke('family:cutout', source),
   familyCardRender: (payload) => ipcRenderer.invoke('family:render', payload),

@@ -586,6 +586,8 @@ export const PHOTOBOOTH_DEFAULT_PHYSICAL_FRAME: PhotoboothPhysicalFrameConfig = 
 
 /** Fields returned to the renderer (admin PIN and OpenAI API key are never included). */
 export interface PhotoboothConfig {
+  skinPresentation?: {familyCardEnabled?:boolean;photo?:string;portrait?:string;scene?:string;familyCard?:string};
+  skinPackage?: {id:string;version:string};
   activeThemeId: string;
   branding: PhotoboothBranding;
   camera: PhotoboothCameraConfig;

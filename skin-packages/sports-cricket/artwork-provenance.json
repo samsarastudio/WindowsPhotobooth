@@ -1,0 +1,24 @@
+{
+  "tool": "Built-in image_gen",
+  "scenes": [
+    {
+      "id": "stadium-lights",
+      "name": "Stadium Lights",
+      "source": "exec-22a15604-6cf3-434f-97bc-eb8742c98248.png",
+      "brief": "Photorealistic cricket venue; eye-level view, central guest space, architectural framing, navy / green / ivory / gold; no brands or foreground people."
+    },
+    {
+      "id": "pavilion",
+      "name": "Pavilion Club",
+      "source": "exec-ef85382a-168c-41e2-aaf4-6754674a9e9a.png",
+      "brief": "Photorealistic cricket venue; eye-level view, central guest space, architectural framing, navy / green / ivory / gold; no brands or foreground people."
+    },
+    {
+      "id": "players-tunnel",
+      "name": "Players’ Entrance",
+      "source": "exec-69a07bb7-cb3c-4102-aec8-648c2a405bf2.png",
+      "brief": "Photorealistic cricket venue; eye-level view, central guest space, architectural framing, navy / green / ivory / gold; no brands or foreground people."
+    }
+  ],
+  "frames": "Original deterministic vector graphics; transparent print openings; 1800x1200 and 1200x1800."
+}

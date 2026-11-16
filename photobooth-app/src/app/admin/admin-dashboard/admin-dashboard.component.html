@@ -222,45 +222,7 @@
     }
 
     @if (tab === 'themes') {
-      <div class="pb-admin-themes">
-        <section class="pb-admin-card">
-          <h2>Active theme</h2>
-          <p class="pb-hint">WordPress-style packs live in the <code>themes/&lt;id&gt;/</code> folder (theme.json + styles.css).</p>
-          <label>Theme</label>
-          <select class="pb-input" [(ngModel)]="activeThemeId">
-            @if (themes().length === 0) {
-              <option [value]="activeThemeId">{{ activeThemeId }}</option>
-            }
-            @for (t of themes(); track t.id) {
-              <option [value]="t.id">{{ t.name }} ({{ t.id }})</option>
-            }
-          </select>
-          <div class="pb-row pb-row-wrap">
-            <button type="button" class="pb-btn pb-btn-primary" [disabled]="busy()" (click)="saveThemeSelection()">
-              Apply theme
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="installZip()">
-              Install from zip
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="downloadSelectedTheme()">
-              Download theme zip
-            </button>
-            <button
-              type="button"
-              class="pb-btn pb-btn-ghost"
-              [disabled]="busy() || activeThemeId === 'default'"
-              (click)="removeSelectedTheme()"
-            >
-              Remove theme
-            </button>
-            <button type="button" class="pb-btn pb-btn-ghost" (click)="exportTemplate()">Download blank template zip</button>
-          </div>
-          <p class="pb-hint pb-hint-tight">
-            “Download theme zip” exports the selected theme folder. “Remove theme” deletes it from disk (not available
-            for <code>default</code>). If you remove the active theme, the app switches to default.
-          </p>
-        </section>
-      </div>
+      <pb-skin-packages />
     }
 
     @if (tab === 'ai') {

@@ -18,7 +18,7 @@ const https = require('https');
 const http = require('http');
 const { spawn, execFileSync } = require('child_process');
 
-const PRESERVE = new Set(['config', 'capture', 'data', 'logs', 'updates']);
+const PRESERVE = new Set(['config', 'capture', 'data', 'logs', 'updates', 'skin-packages']);
 
 function readLocalVersion(portableRoot, bundleRoot) {
   const candidates = [

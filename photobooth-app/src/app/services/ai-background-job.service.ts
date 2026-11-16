@@ -31,10 +31,12 @@ export class AiBackgroundJobService {
   }
 
   run(req: AiBackgroundJobRequest): Promise<void> {
+    const win = window as Window & {__pbSceneJobs?:number};
+    win.__pbSceneJobs = (win.__pbSceneJobs || 0) + 1;
     const request = structuredClone(req);
     const announced = this.galleryUpload.uploadPath(request.imagePath, 'original', { processStatus: 'processing' })
       .catch((error) => { void this.log.warn('ai-bg', 'processing upload unavailable', { error: String(error) }); });
-    const job = this.tail.then(async () => { await announced; await this.execute(request); });
+    const job = this.tail.then(async () => { try { await announced; await this.execute(request); } finally { win.__pbSceneJobs!--; } });
     this.tail = job.catch(() => undefined);
     return job;
   }
