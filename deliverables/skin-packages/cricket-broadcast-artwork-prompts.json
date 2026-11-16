@@ -1,0 +1,65 @@
+{
+  "tool": "Built-in image_gen",
+  "version": "1.1.0",
+  "sets": [
+    {
+      "id": "stadium-lights",
+      "name": "Broadcast Arena",
+      "variants": {
+        "wide": {
+          "prompt": "Create a premium sports television broadcast set background for a cricket event photo booth, landscape 3:2. A bold high-end virtual production studio, eye-level camera 1.5m high, not a low floor perspective. Immersive enormous curved LED wall showing a dramatic floodlit cricket oval with tiny pitch and wickets, stylised layered emerald and electric teal luminous arcs sweeping around the extreme outer edges, sophisticated navy metallic architectural ribs, warm gold trim, tasteful giant abstract cricket ball seam pattern integrated into far upper-right LED panel. Deep layered set with screen behind architecture, cinematic atmospheric beams, premium live-sports opening-title energy. Central 65% is clear scenery for waist-up guest compositing, interesting graphics remain visible at sides and above heads, no desk or objects in front of guests, floor only bottom 12%. Balanced centred composition, realistic physical surfaces and lighting blended with broadcast motion-graphics aesthetic, expansive recognizable stadium. Crisp rich vibrant finish. No people, no words, no letters, no scores, no logos, no channel trademarks, no watermarks. Not a conventional plain cricket field, make it visually spectacular and distinctly sports broadcast.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-c304105f-3268-4fee-aee2-1d2c29765de3.png"
+        },
+        "medium": {
+          "prompt": "EDIT this referenced broadcast cricket arena into its medium depth background variant, landscape 3:2. Move the virtual camera moderately closer into the set: about 25% nearer the LED wall. Show less ceiling and almost no floor. The architectural side ribs stay visible at edges, stadium image feels moderately larger with a realistic change in perspective. Preserve the exact stadium identity, navy emerald cyan gold palette, cricket field, side ribs and red cricket-ball motif. Camera remains at adult eye height and level, centred composition, broad empty centre for composited people, no people or text, no new props or logos. This is a real separately rendered background-depth plate, not a mockup or a photograph containing guests. Maintain scene continuity with reference.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-86521059-c509-4d1f-860c-2c7556a04a29.png"
+        },
+        "close": {
+          "prompt": "EDIT this referenced broadcast cricket arena into its close depth background variant, landscape 3:2. A close portrait-compatible viewpoint within this same set, camera nearer the LED wall. Stadium details and lighting are larger, the outer structure is partially cropped at far edges, almost no floor or ceiling visible. Give scenery a gentle optical defocus, while keeping cricket-ball seam detail and light ribbons recognizable at edges. Preserve the exact stadium identity, navy emerald cyan gold palette, cricket field, side ribs and red cricket-ball motif. Camera remains at adult eye height and level, centred composition, broad empty centre for composited people, no people or text, no new props or logos. This is a real separately rendered background-depth plate, not a mockup or a photograph containing guests. Maintain scene continuity with reference.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-daed1092-2f6b-4699-b66a-9e88e4fadac5.png"
+        }
+      }
+    },
+    {
+      "id": "players-tunnel",
+      "name": "Cricket Analysis Studio",
+      "variants": {
+        "wide": {
+          "prompt": "Create a photorealistic high-end cricket television analysis studio background, landscape 3:2. This is a REAL ENCLOSED TV STUDIO, NOT a stadium entrance, NOT a view of grandstands, no oval portals, no arches. Distinctive broad rectilinear charcoal navy architectural wall with inset large flat LED tactical cricket field diagram in muted emerald and fine gold linework at upper left, abstract red leather cricket-ball seam macro panel at far right, vertical frosted glass light columns, warm pale timber acoustic slats at side edges, overhead softbox glow. Contemporary sports editorial set, refined cyan accent lighting, deep room perspective, sophisticated physical materials. Leave central 65% mostly clean softly lit navy/emerald wall for later waist-up guests; no desk, no people, no presenter chairs, no foreground props. Wide framing establishing the studio, camera at adult eye height 1.5m, floor only bottom 10%, camera square and centred not angled. Recognizable cricket tactical diagram and ball-panel detail around edges. Bright professional sports-channel graphics aesthetic with beautiful restrained layers, highly realistic. No text, no letters, no numbers, no branding, no logos.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-afe9d918-b33e-4b14-8641-af66eadfe23e.png"
+        },
+        "medium": {
+          "prompt": "EDIT the referenced cricket analysis TV studio to produce the medium depth variant, landscape 3:2. Move the virtual camera moderately closer, roughly 25%, into the studio. Ceiling softboxes disappear from the top, almost no floor. Left tactical field screen and right red leather ball panel become larger and partly clipped by edges. Keep subtle layered glass-column depth. Preserve this exact room design, wood slats, rectangular gold-edged tactical screen, glass light columns, dark teal wall and red ball detail. Adult eye-height camera, level, centred, roomy centre for later guests, no people, no desk, no text, no logos, NO stadium, no arches. Separately render the changed camera depth, do not merely add blur to unchanged framing. Premium realistic sports broadcast studio.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-feee428d-c56d-4c55-b8f2-08320f13788d.png"
+        },
+        "close": {
+          "prompt": "EDIT the referenced cricket analysis TV studio to produce the close depth variant, landscape 3:2. Move to a closer portrait-compatible studio viewpoint. No ceiling or floor. Tactical board remains partially visible near left outer edge and the red leather ball-seam display near right outer edge, both larger and gently optically softened. The clean teal navy wall remains most of the centre. Preserve this exact room design, wood slats, rectangular gold-edged tactical screen, glass light columns, dark teal wall and red ball detail. Adult eye-height camera, level, centred, roomy centre for later guests, no people, no desk, no text, no logos, NO stadium, no arches. Separately render the changed camera depth, do not merely add blur to unchanged framing. Premium realistic sports broadcast studio.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-8d63019f-d9fc-4921-ae4f-48ce98934a44.png"
+        }
+      }
+    },
+    {
+      "id": "pavilion",
+      "name": "Champions Gallery",
+      "variants": {
+        "wide": {
+          "prompt": "Create an aspirational photorealistic cricket CHAMPIONS GALLERY background for a sports-channel hero portrait, landscape 3:2. A luxurious physical museum-like trophy room / players' honours gallery, NOT a stadium, NOT an LED tunnel, NO arena field or grandstands, NO glowing portal or circle. Cream travertine walls and bronze architectural details, asymmetrical illuminated recessed display cabinets at far sides containing elegant generic cricket cups, pale timber cricket bats mounted diagonally as sculptural artifacts at upper right, red leather cricket ball on a small distant plinth at left, refined ribbed glass and brushed brass. Deep gallery corridor receding through slightly off-centre background doorway, soft champagne lighting, warm ivory dominant palette with subtle emerald accents, beautiful dramatic side light. Wide establishing plate with camera at adult eye height 1.5 metres, centred frontal balanced composition. Central 65% clean warm wall and distant corridor for later waist-up guests, trophy details remain around outside edges, no foreground plinth obstructing centre, floor only bottom 10%. Luxury sports documentary intro aesthetic, unmistakable cricket heritage, pristine contemporary finish, realistic material detail. No people, no readable writing, no lettering, no numbers, no brand logos, no specific real trophy replicas.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-49d395a6-7f75-496f-a326-5f1baa9ac7fe.png"
+        },
+        "medium": {
+          "prompt": "EDIT the referenced cricket Champions Gallery into its medium background depth variant, landscape 3:2. Move the virtual camera moderately closer, about 20%, toward the stone wall. Reduce floor to a tiny bottom sliver. Side trophy cabinets, left corridor entrance and upper-right three mounted bats get moderately larger. Preserve their exact left/right arrangement and approximate counts. Preserve the same cream travertine room, warm champagne lighting, bronze metalwork, emerald cabinet bases, generic gold cups, red ball at left and pale wooden cricket bats at upper right. Same architectural identity and orientation. Camera stays adult eye height, level and centred; leave middle clear for photographed guests. No people, no writing, no logos, no stadium, no LED graphics. Separately render viewpoint depth variation, not just blur. Elegant realistic cricket heritage gallery.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-692f3ae4-df4c-42f9-b915-f25299cc9bb8.png"
+        },
+        "close": {
+          "prompt": "EDIT the referenced cricket Champions Gallery into its close background depth variant, landscape 3:2. A close portrait-compatible viewpoint near the stone wall, no floor visible. The left corridor doorway is partially clipped at the left third, trophy cabinets become cropped at extreme left and right edges, the three mounted bats stay partly visible at upper right. Gentle optical softening behind later portrait subjects, warm stone centre remains spacious. Preserve the same cream travertine room, warm champagne lighting, bronze metalwork, emerald cabinet bases, generic gold cups, red ball at left and pale wooden cricket bats at upper right. Same architectural identity and orientation. Camera stays adult eye height, level and centred; leave middle clear for photographed guests. No people, no writing, no logos, no stadium, no LED graphics. Separately render viewpoint depth variation, not just blur. Elegant realistic cricket heritage gallery.",
+          "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-f6ffac0f-8666-4a1d-bbbb-1a4bc4928852.png"
+        }
+      }
+    }
+  ],
+  "classic": {
+    "prompt": "Create a realistic premium event photobooth sample photograph, landscape 3:2. Three fictional family members, a smiling Black father about 35 in a plain charcoal shirt, a smiling South Asian mother about 32 in a simple soft ivory blouse, and their child about 8 in an understated blue top, close together in a relaxed cheerful pose. Framed from waist up, all heads fully visible with generous headroom and margins, people centred occupying about 60% of image width. NORMAL PURE BLACK seamless cloth studio backdrop behind them, absolutely no stadium, no scene graphics, no scenery, no props, no frame, no text, no logos. Clean flattering photographic booth lighting, natural skin texture and realistic bodies, a straightforward classic photo keepsake. Black background should be unmistakable and cover all areas around people. Ordinary everyday clothing, no seasonal Christmas patterns.",
+    "source": "C:\\Users\\Unity\\.codex\\generated_images\\01a19a6d-0010-77c0-ba11-a7355083a9ce\\exec-9becbe51-3835-4d3b-bdfb-469c1377d4d4.png",
+    "file": "presentation/classic-black.webp"
+  }
+}

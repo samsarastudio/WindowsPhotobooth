@@ -1,0 +1,33 @@
+{
+  "checks": [
+    "All three published packages downloaded through actual admin UI; download does not activate",
+    "Cricket attract/menu; no Christmas card or AI portrait menu leakage; both frames; all three backgrounds through real local removal pipeline",
+    "Both seasonal packages activated; instance configuration preserved; in-flight processing blocks switch; rollback; offline cached activation"
+  ],
+  "physicalPrinting": false,
+  "cricketVersion": "1.1.0",
+  "packaged": true,
+  "selectedDepths": [
+    {
+      "scene": "stadium-lights",
+      "backgroundUsed": "stadium-lights.webp (medium)"
+    },
+    {
+      "scene": "pavilion",
+      "backgroundUsed": "pavilion.webp (medium)"
+    },
+    {
+      "scene": "players-tunnel",
+      "backgroundUsed": "players-tunnel.webp (medium)"
+    }
+  ],
+  "ok": true,
+  "classicMenuCheck": "Classic photo uses the black-backdrop preview and original-photo wording",
+  "depthChecks": {
+    "combinations": 9,
+    "result": "All pass: original resolver returns correct close/medium/wide file for each scene; images 1536x1024; all nine hashes distinct; mixed-face selection uses largest face."
+  },
+  "visualReview": "Reviewed all nine together for per-set architecture, palette, lighting, prop placement, increasing proximity and central guest space. Reviewed three actual medium-depth family composites.",
+  "originalDepthAndSubjectCodeChanged": false,
+  "packageSha256": "d7acb5374e33d600510bc72d33d5111902631cf5d0222d17f9d38333ec805475"
+}

@@ -1,6 +1,11 @@
 {
   "version": 1,
   "scene": "players-tunnel",
-  "displayName": "Players’ Entrance",
-  "variants": {}
+  "displayName": "Cricket Analysis Studio",
+  "baseSha256": "91fb6e73f1adf5a1573c38b372031a21ba259199af83a84ac79cf8d00a8f4779",
+  "variants": {
+    "wide": "depths/players-tunnel/wide.webp",
+    "medium": "depths/players-tunnel/medium.webp",
+    "close": "depths/players-tunnel/close.webp"
+  }
 }

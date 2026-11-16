@@ -84,3 +84,7 @@ node photobooth-app/scripts/qa-skin-packages.cjs
 ```
 
 QA uses isolated temporary booth/server data and prerecorded image fixtures, with printing disabled. It never changes production galleries, tokens, installed skins or paid AI-generation limits. Hardware printing/Canon capture and paid AI portraits are outside this validation. The test report/screenshots are generated in ignored `output/skin-packages-qa`.
+
+### Cricket 1.1.0 package update
+
+Publish `sports-cricket-1.1.0.booth.zip` and download/apply it on existing app 1.3.0 booths. No new executable is needed. This revision replaces the three single-plate scenes with **Broadcast Arena, Cricket Analysis Studio and Champions Gallery**, with **three generated depth variants each** (nine plates). Original Halloween depth selection and subject geometry are unchanged. Classic photo now uses an accurate black-backdrop preview; only Cricket backdrops replaces the background. Version 1.0.0 remains available for rollback. The new ZIP is approximately 4.7 MB; its complete image/depth contact sheet and provenance are in the deliverables folder.

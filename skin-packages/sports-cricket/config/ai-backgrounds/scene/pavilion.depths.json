@@ -1,6 +1,11 @@
 {
   "version": 1,
   "scene": "pavilion",
-  "displayName": "Pavilion Club",
-  "variants": {}
+  "displayName": "Champions Gallery",
+  "baseSha256": "d1509f361fc6d12c9d1acaef5188e0b83a7891f6d3ea0efb67b60cb080b80258",
+  "variants": {
+    "wide": "depths/pavilion/wide.webp",
+    "medium": "depths/pavilion/medium.webp",
+    "close": "depths/pavilion/close.webp"
+  }
 }

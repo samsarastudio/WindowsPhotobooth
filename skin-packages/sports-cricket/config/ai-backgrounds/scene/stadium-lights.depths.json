@@ -1,6 +1,11 @@
 {
   "version": 1,
   "scene": "stadium-lights",
-  "displayName": "Stadium Lights",
-  "variants": {}
+  "displayName": "Broadcast Arena",
+  "baseSha256": "b3c4553f023ab770ee97184f2fc8319a0ca9a33bfa2b00ff90dcf38d420d8557",
+  "variants": {
+    "wide": "depths/stadium-lights/wide.webp",
+    "medium": "depths/stadium-lights/medium.webp",
+    "close": "depths/stadium-lights/close.webp"
+  }
 }
