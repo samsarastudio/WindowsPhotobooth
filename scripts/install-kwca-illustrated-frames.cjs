@@ -17,7 +17,7 @@ const generated='C:/Users/Unity/.codex/generated_images/01a1efa0-b35c-7262-b881-
   // Remove residual near-transparent export haze; keep decorative alpha edges.
   for(let k=3;k<data.length;k+=4)data[k]=data[k]<=110?0:Math.round((data[k]-110)*255/145);
   if(orientation==='portrait'){const old=await sharp(path.join(out,'portrait-alpha-reference.webp')).ensureAlpha().raw().toBuffer();for(let k=3;k<data.length;k+=4)data[k]=Math.min(data[k],old[k]);}
-  if(orientation==='portrait'){for(let y=h-180;y<h-70;y++)for(let x=w/2-85;x<w/2+85;x++)data[(y*w+x)*4+3]=0;}
+  if(orientation==='portrait'){for(let y=h-210;y<h-45;y++)for(let x=w/2-120;x<w/2+120;x++){const dx=Math.abs(x-w/2)/120,dy=Math.abs(y-(h-125))/85;const t=Math.min(1,Math.max(0,(Math.max(dx,dy)-.55)/.45));data[(y*w+x)*4+3]=Math.round(data[(y*w+x)*4+3]*t*t*(3-2*t));}}
   const bleed=Buffer.from(`<svg width="${w}" height="${h}"><path d="M0 0H${w}V${h}H0ZM6 6V${h-24}H${w-6}V6Z" fill="#071d2a" fill-rule="evenodd"/></svg>`);
   const artwork=await sharp(data,{raw:info}).png().toBuffer();
   const badgeLeft=Math.round(w*.17-size/2),badgeTop=Math.round(cy-size/2);
