@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "kwca-players-pavilion",
+  "displayName": "KWCA Players Pavilion",
+  "baseSha256": "53fa9f095857ce30b66102b83aa2f8202216544adca9986d4e59826dbc890aa8",
+  "variants": {
+    "wide": "depths/kwca-players-pavilion/wide.webp",
+    "medium": "depths/kwca-players-pavilion/medium.webp",
+    "close": "depths/kwca-players-pavilion/close.webp"
+  }
+}

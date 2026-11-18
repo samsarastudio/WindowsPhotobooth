@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-18",
+  "generator": "Built-in image generation",
+  "references": "User-provided KWCA logo and orange/yellow team jersey photographs. People in reference were not reproduced.",
+  "sets": [
+    {
+      "id": "kwca-trophy-gallery",
+      "name": "KWCA Trophy Gallery",
+      "direction": "Travertine, champagne brass, orange/gold jersey inlays; dimensional enamel logo on upper right wall.",
+      "sources": {
+        "wide": "exec-32a13779-64b1-4d09-938b-70a46c0a9e7f.png",
+        "medium": "exec-17a6dbce-7e2a-4684-ad22-7d60a517e005.png",
+        "close": "exec-82a285a3-0f05-459a-861c-7140a42cd09d.png"
+      }
+    },
+    {
+      "id": "kwca-players-pavilion",
+      "name": "KWCA Players Pavilion",
+      "direction": "Midnight navy, illuminated orange/gold ribs, stadium glazing and jersey vitrine; dimensional logo on upper left wall.",
+      "sources": {
+        "wide": "exec-7c43f275-249f-4d52-8bab-6c99e5fcd737.png",
+        "medium": "exec-239003a6-cd7e-4209-b72f-80497b0a2473.png",
+        "close": "exec-7e82b33c-0a6a-4474-b52a-9a992c29c442.png"
+      }
+    }
+  ]
+}

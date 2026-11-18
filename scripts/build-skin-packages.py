@@ -30,7 +30,7 @@ def build(id,name,description,ref=None,version="1.0.0"):
   config['aiGenerationEnabled']=True;config['defaultAiModeId']=None
   config['photoFrames'].update(defaultFrameFile='cricket-landscape.png',defaultPortraitFrameFile='cricket-portrait.png',guestFrameFiles=['cricket-landscape.png','cricket-portrait.png'],guestTextCreditLine='by InMoment',guestTextColor='#dfc58f')
   config['copy']['attract'].update(title='MATCH DAY',tagline='INMOMENT · CRICKET',subtitle='Your team. Your moment.',ctaLabel='Step into the game',startAria='Start your cricket photo')
-  config['copy']['sceneSelect'].update(title='Choose your ground',subtitle='Broadcast Arena, Cricket Analysis Studio or Champions Gallery.')
+  config['copy']['sceneSelect'].update(title='Choose your ground',subtitle='Broadcast Arena, Cricket Analysis Studio, Champions Gallery or two exclusive KWCA venues.')
   config['copy']['aiMode'].update(subtitle='A classic keepsake or a cricket backdrop. Your choice.',sceneEntryHint='Step into an unforgettable cricket setting.')
   config['copy']['result']['thinkingStepPlan']='Applying your match-day backdrop'
   presentation={'familyCardEnabled':False,'hero':'theme/assets/stadium.webp','photo':'presentation/classic-black.webp','scene':'config/ai-backgrounds/scene/players-tunnel.webp'}
@@ -101,4 +101,4 @@ def build(id,name,description,ref=None,version="1.0.0"):
 if '--sports-only' not in sys.argv:
  build('christmas','Christmas · Evergreen & Gold','Cinematic winter backdrops, Merry Christmas frames and 1–10 person family cards.')
  build('halloween','Halloween · After Dark','Original HauntBooth scenery, depth plates, character compositions and Halloween frames.','8b413fae60742b92c94a4decf84a23104a6b591a')
-build('sports-cricket','Match Day · Cricket','Three distinct broadcast settings, each with close / medium / wide depth plates: Broadcast Arena, Cricket Analysis Studio and Champions Gallery.',version='1.1.0')
+build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.2.0')

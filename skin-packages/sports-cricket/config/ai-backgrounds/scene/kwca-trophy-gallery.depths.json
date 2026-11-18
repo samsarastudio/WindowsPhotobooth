@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "scene": "kwca-trophy-gallery",
+  "displayName": "KWCA Trophy Gallery",
+  "baseSha256": "c91355aced3f9c118680ea27cd67d51ee5aac7b0747d615210d74aeefe6d9af7",
+  "variants": {
+    "wide": "depths/kwca-trophy-gallery/wide.webp",
+    "medium": "depths/kwca-trophy-gallery/medium.webp",
+    "close": "depths/kwca-trophy-gallery/close.webp"
+  }
+}

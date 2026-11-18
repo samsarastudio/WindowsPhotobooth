@@ -1,0 +1,22 @@
+{
+  "checks": [
+    "All three published packages downloaded through actual admin UI; download does not activate",
+    "Cricket attract/menu; no Christmas card or AI portrait menu leakage; both frames; both KWCA backgrounds through real local removal pipeline",
+    "Both seasonal packages activated; instance configuration preserved; in-flight processing blocks switch; rollback; offline cached activation"
+  ],
+  "physicalPrinting": false,
+  "runtime": "C:\\Users\\Unity\\AppData\\Local\\Temp\\booth-skins-qa-rGMbKr",
+  "cricketVersion": "1.2.0",
+  "packaged": true,
+  "selectedDepths": [
+    {
+      "scene": "kwca-trophy-gallery",
+      "backgroundUsed": "kwca-trophy-gallery.webp (medium)"
+    },
+    {
+      "scene": "kwca-players-pavilion",
+      "backgroundUsed": "kwca-players-pavilion.webp (medium)"
+    }
+  ],
+  "ok": true
+}
