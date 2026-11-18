@@ -33,7 +33,7 @@ def build(id,name,description,ref=None,version="1.0.0"):
   config['copy']['sceneSelect'].update(title='Choose your ground',subtitle='Broadcast Arena, Cricket Analysis Studio, Champions Gallery or two exclusive KWCA venues.')
   config['copy']['aiMode'].update(subtitle='A classic keepsake or a cricket backdrop. Your choice.',sceneEntryHint='Step into an unforgettable cricket setting.')
   config['copy']['result']['thinkingStepPlan']='Applying your match-day backdrop'
-  presentation={'familyCardEnabled':False,'hero':'theme/assets/stadium.webp','photo':'presentation/classic-black.webp','scene':'config/ai-backgrounds/scene/players-tunnel.webp'}
+  presentation={'familyCardEnabled':True,'familyCardTitle':'KWCA Team Card','familyCard':'presentation/team-card.jpg','hero':'theme/assets/stadium.webp','photo':'presentation/classic-black.webp','scene':'config/ai-backgrounds/scene/players-tunnel.webp'}
  else:
   addtree('themes/'+id,'theme')
   for folder in ['ai-backgrounds','photo-frames','compositions']:addtree('config/'+folder,'config/'+folder)
@@ -88,7 +88,7 @@ def build(id,name,description,ref=None,version="1.0.0"):
     if plate and j.get('variants'):j['baseSha256']=hashlib.sha256(plate).hexdigest()
    optimized[k]=json.dumps(j,ensure_ascii=False).encode()
  files=optimized;config=rewrite(config);presentation=rewrite(presentation)
- manifest={'schemaVersion':1,'id':id,'name':name,'version':version,'minAppVersion':'1.3.0','description':description,'presentation':presentation,'config':config,'files':{k:hashlib.sha256(v).hexdigest() for k,v in sorted(files.items())}}
+ manifest={'schemaVersion':1,'id':id,'name':name,'version':version,'minAppVersion':'1.3.1' if id=='sports-cricket' else '1.3.0','description':description,'presentation':presentation,'config':config,'files':{k:hashlib.sha256(v).hexdigest() for k,v in sorted(files.items())}}
  if ref:manifest['sourceRevision']=subprocess.check_output(['git','rev-parse',ref],cwd=ROOT,text=True).strip()
  files['theme/theme.json']=json.dumps({'id':id,'name':name,'version':version,'author':'InMoment'}).encode()
  manifest['files']['theme/theme.json']=hashlib.sha256(files['theme/theme.json']).hexdigest()
@@ -101,4 +101,4 @@ def build(id,name,description,ref=None,version="1.0.0"):
 if '--sports-only' not in sys.argv:
  build('christmas','Christmas · Evergreen & Gold','Cinematic winter backdrops, Merry Christmas frames and 1–10 person family cards.')
  build('halloween','Halloween · After Dark','Original HauntBooth scenery, depth plates, character compositions and Halloween frames.','8b413fae60742b92c94a4decf84a23104a6b591a')
-build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.2.7')
+build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.3.0')

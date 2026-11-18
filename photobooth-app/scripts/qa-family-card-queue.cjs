@@ -1,6 +1,7 @@
 const fs=require('fs'),path=require('path'),assert=require('assert/strict');
 const {_electron}=require('C:/Users/Unity/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const app=path.resolve(__dirname,'..'),root=path.dirname(app),out=path.join(root,'output/christmas/family-card-queue-qa'),runtime=path.join(out,'runtime');
+const cricket=process.argv.includes('--cricket');
+const app=path.resolve(__dirname,'..'),root=path.dirname(app),out=cricket?path.join(require('os').tmpdir(),'kwca-family-card-queue-qa'):path.join(root,'output/christmas/family-card-queue-qa'),runtime=path.join(out,'runtime');
 fs.mkdirSync(path.join(runtime,'config'),{recursive:true});
 const cfg=JSON.parse(fs.readFileSync(path.join(app,'config/photobooth-config.default.json')));
 const live=process.argv.includes('--live');const report={live,physicalPrinting:false,checks:[]};
@@ -9,12 +10,13 @@ let instance;
  cfg.camera={source:'webcam',sdkCameraIndex:0,webcamDeviceId:null};cfg.capture.countdownSeconds=1;cfg.print.enabled=false;cfg.requireQrUnlock=false;cfg.boothUpdates={enabled:false};cfg.releaseProfileVersion='1.2.2-christmas';cfg.gallery.enabled=live;cfg.gallery.uploadToken='';cfg.gallery.sessionPrefix='christmas-family-card-qa';cfg.guestFlow={...cfg.guestFlow,thanksAutoReturnSec:0,boothId:'christmas-family-card-qa'};
  if(live){const env=require(path.join(root,'moments-server/node_modules/dotenv')).parse(fs.readFileSync(path.join(root,'moments-server/.env')));const r=await fetch('https://moments.inmomentservices.com/api/admin/settings',{headers:{'x-admin-pin':env.ADMIN_PIN}});assert(r.ok);const data=await r.json();cfg.gallery.uploadToken=data.settings.uploadToken;cfg.gallery.apiBaseUrl='https://moments.inmomentservices.com';}
  fs.writeFileSync(path.join(runtime,'config/photobooth-config.json'),JSON.stringify(cfg));
+ if(cricket){const {PackageStore}=require('../electron/theme-packages.cjs');const store=new PackageStore(path.join(runtime,'skin-packages'),'1.3.1');store.install(fs.readFileSync(path.join(root,'deliverables/skin-packages/sports-cricket-1.3.0.booth.zip')));store.activate({id:'sports-cricket',version:'1.3.0'});}
  const env={...process.env,PB_QA_RUNTIME:runtime,PORTABLE_EXECUTABLE_DIR:runtime};delete env.ELECTRON_RUN_AS_NODE;
  const packaged=process.argv.includes('--packaged');
- instance=await _electron.launch({executablePath:path.join(app,packaged?'release/win-unpacked/PhotoBooth.exe':'node_modules/electron/dist/electron.exe'),args:[...(packaged?[]:[app]),'--disable-gpu','--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream','--use-file-for-fake-video-capture='+path.join(root,'output/christmas/family-card-tests/solo.y4m')],env,timeout:60000});
+ instance=await _electron.launch({executablePath:process.env.PB_QA_PACKAGE_EXE||path.join(app,packaged?'release/win-unpacked/PhotoBooth.exe':'node_modules/electron/dist/electron.exe'),args:[...(packaged?[]:[app]),'--disable-gpu','--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream','--use-file-for-fake-video-capture='+path.join(root,'output/christmas/family-card-tests/solo.y4m')],env,timeout:60000});
  const page=await instance.firstWindow();await instance.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setFullScreen(false);w.setSize(1366,900);});
  await page.locator('.pb-kia-cta').waitFor({timeout:60000});
- const begin=async()=>{await page.locator('.pb-kia-cta').click();await page.getByRole('button',{name:/Family Christmas Card/}).click();};
+ const begin=async()=>{await page.locator('.pb-kia-cta').click();await page.getByRole('button',{name:cricket?/KWCA Team Card/:/Family Christmas Card/}).click();};
  const take=async(first)=>{const start=Date.now();await page.getByRole('button',{name:first?'Take first photo':'Take another',exact:true}).click();await page.getByRole('button',{name:'Add this person',exact:true}).waitFor({timeout:20000});assert(Date.now()-start<20000,'Capture review waited for background removal');await page.getByRole('button',{name:'Add this person',exact:true}).click();};
  await begin();assert(await page.getByRole('checkbox').isChecked());await take(true);await take(false);assert(await page.getByRole('button',{name:'Take another',exact:true}).isEnabled());
  await page.locator('input:not([type=checkbox])').fill('Queue test family one');const started=Date.now();await page.getByRole('button',{name:'Finish card',exact:true}).click();await page.waitForURL(/#\/thanks/,{timeout:20000});report.finishReturnMs=Date.now()-started;assert(report.finishReturnMs<20000);report.checks.push('Default background option; two captures without waiting; finish returns while processing');

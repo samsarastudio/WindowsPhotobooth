@@ -21,7 +21,10 @@ async function cutout(source,model){
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
 async function renderCard(people,art,name=''){
- const path=require('path'),cells=layout(people.length),layers=[];
+ const path=require('path'),fs=require('fs'),cells=layout(people.length),layers=[];
+ const stylePath=path.join(path.dirname(art),'family-card-style.json');
+ const style=fs.existsSync(stylePath)?JSON.parse(fs.readFileSync(stylePath,'utf8')):{};
+ const cricket=style.variant==='cricket';
  const left=Math.min(...cells.map(c=>c.left)),top=Math.min(...cells.map(c=>c.top));
  const right=Math.max(...cells.map(c=>c.left+c.width)),bottom=Math.max(...cells.map(c=>c.top+c.height));
  // A single continuous backdrop. Portraits have no individual rectangular frame.
@@ -59,13 +62,14 @@ async function renderCard(people,art,name=''){
  layers.push(await vertical(left,top-overlap,bottom-top+overlap*2),await vertical(right,top-overlap,bottom-top+overlap*2,true),await horizontal(left-overlap,top,right-left+overlap*2),await horizontal(left-overlap,bottom,right-left+overlap*2,true));
  const fontfile=path.join(path.dirname(art),'../fonts/GreatVibes-Regular.ttf');
  const script=async(text,size,maxWidth)=>{
-  let buf=await sharp({text:{text:`<span foreground="#fff3df">${escape(text)}</span>`,font:`Great Vibes ${size}`,fontfile,rgba:true,dpi:72}}).png().toBuffer();
+  let buf=await sharp({text:{text:`<span foreground="#fff3df">${escape(text)}</span>`,font:cricket?`Segoe UI Bold ${size}`:`Great Vibes ${size}`,...(cricket?{}:{fontfile}),rgba:true,dpi:72}}).png().toBuffer();
   const m=await sharp(buf).metadata();if(m.width>maxWidth)buf=await sharp(buf).resize({width:maxWidth}).png().toBuffer();return buf;
  };
- const heading=await script('Merry Christmas',164,1380),hm=await sharp(heading).metadata();layers.push({input:heading,left:Math.round((1800-hm.width)/2),top:100});
- const line=name.trim().slice(0,60)||'Together at Christmas';
+ const heading=await script(cricket?'KWCA TEAM CARD':'Merry Christmas',cricket?100:164,1380),hm=await sharp(heading).metadata();layers.push({input:heading,left:Math.round((1800-hm.width)/2),top:100});
+ const line=name.trim().slice(0,60)||(cricket?'One team. One card.':'Together at Christmas');
  const sub=await script(line.replace(/ /g,'\u2002'),83,1380),sm=await sharp(sub).metadata();layers.push({input:sub,left:Math.round((1800-sm.width)/2),top:275});
- const svg=Buffer.from(`<svg width="1800" height="2700" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b"><stop stop-color="#884047"/><stop offset="1" stop-color="#682d36"/></radialGradient><pattern id="winter" width="210" height="210" patternUnits="userSpaceOnUse"><g stroke="#f1d6b7" stroke-width="1.4" opacity=".075" fill="none"><path d="M42 24v36M26 33l32 18M26 51l32-18M37 29l5 5 5-5M37 55l5-5 5 5M28 38l7-2-1-7M50 55l-1-7 7-2"/><path d="M151 123v16M143 131h16M147 127l8 8M147 135l8-8"/></g><circle cx="103" cy="77" r="1.8" fill="#f1d6b7" opacity=".09"/><circle cx="73" cy="172" r="1.2" fill="#f1d6b7" opacity=".07"/></pattern></defs><rect width="1800" height="2700" fill="url(#b)"/><rect width="1800" height="2700" fill="url(#winter)"/></svg>`);
+ let svg=Buffer.from(`<svg width="1800" height="2700" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b"><stop stop-color="#884047"/><stop offset="1" stop-color="#682d36"/></radialGradient><pattern id="winter" width="210" height="210" patternUnits="userSpaceOnUse"><g stroke="#f1d6b7" stroke-width="1.4" opacity=".075" fill="none"><path d="M42 24v36M26 33l32 18M26 51l32-18M37 29l5 5 5-5M37 55l5-5 5 5M28 38l7-2-1-7M50 55l-1-7 7-2"/><path d="M151 123v16M143 131h16M147 127l8 8M147 135l8-8"/></g><circle cx="103" cy="77" r="1.8" fill="#f1d6b7" opacity=".09"/><circle cx="73" cy="172" r="1.2" fill="#f1d6b7" opacity=".07"/></pattern></defs><rect width="1800" height="2700" fill="url(#b)"/><rect width="1800" height="2700" fill="url(#winter)"/></svg>`);
+ if(cricket)svg=Buffer.from(`<svg width="1800" height="2700" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b"><stop stop-color="#163a46"/><stop offset="1" stop-color="#071b29"/></radialGradient><pattern id="p" width="160" height="160" patternUnits="userSpaceOnUse"><path d="M0 160L160 0M60 160L160 60" stroke="#edb957" stroke-width="1" opacity=".08"/></pattern></defs><rect width="1800" height="2700" fill="url(#b)"/><rect width="1800" height="2700" fill="url(#p)"/></svg>`);
  return sharp(svg).composite(layers).withMetadata({density:450}).jpeg({quality:97,chromaSubsampling:'4:4:4'}).toBuffer();
 }
 module.exports={layout,cutout,renderCard};

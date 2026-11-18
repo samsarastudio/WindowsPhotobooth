@@ -1,0 +1,11 @@
+{
+  "live": false,
+  "physicalPrinting": false,
+  "checks": [
+    "Default background option; two captures without waiting; finish returns while processing",
+    "Next family captured and queued while previous family was processing",
+    "Both isolated family jobs completed with correct portrait counts"
+  ],
+  "finishReturnMs": 1763,
+  "passed": true
+}

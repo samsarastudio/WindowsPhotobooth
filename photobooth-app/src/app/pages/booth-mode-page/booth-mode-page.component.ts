@@ -31,6 +31,7 @@ export class BoothModePageComponent implements OnInit {
 
   /** Photo Print — framed digital original; magnet optional at the end. */
   readonly showFamilyCard = computed(() => this.booth.skinPresentation()?.familyCardEnabled ?? (this.booth.activeThemeId() === 'christmas'));
+  readonly familyTitle = computed(() => this.booth.skinPresentation()?.familyCardTitle || 'Family Christmas Card');
   readonly familyThumb = computed(() => this.booth.skinPresentation()?.familyCard || 'christmas/family-card.jpg');
   readonly showPhotoPrint = computed(() => this.booth.guestModes().defaultEnabled !== false);
 

@@ -15,7 +15,7 @@
     <p class="pb-sub">{{ copy().boothMode.subtitle }}</p>
 
     <ul class="pb-booth-mode-grid" role="list">
-      @if (showFamilyCard()) {<li><button type="button" class="pb-exp-card" (click)="choose('familyCard')"><span class="pb-exp-card-media"><img [src]="familyThumb()" alt="Christmas family card with individual portrait windows"/></span><span class="pb-exp-card-label">Family Christmas Card</span><span class="pb-exp-card-hint">Individual portraits. One beautiful card. 1–10 people.</span></button></li>}
+      @if (showFamilyCard()) {<li><button type="button" class="pb-exp-card" (click)="choose('familyCard')"><span class="pb-exp-card-media"><img [src]="familyThumb()" alt="Card with individual portrait windows"/></span><span class="pb-exp-card-label">{{familyTitle()}}</span><span class="pb-exp-card-hint">Individual portraits. One beautiful card. 1–10 people.</span></button></li>}
       @if (showPhotoPrint()) {
         <li>
           <button type="button" class="pb-exp-card" (click)="choose('photoPrint')">

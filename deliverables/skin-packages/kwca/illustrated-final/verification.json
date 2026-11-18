@@ -1,5 +1,5 @@
 {
-  "packageVersion": "1.2.7",
+  "packageVersion": "1.3.0",
   "ok": true,
   "source": "Verified background-removal raw results; medium-depth KWCA scenes. Portraits reframed through app.",
   "physicalPrinting": false,
@@ -8,26 +8,32 @@
       "name": "01-family-trophy-landscape",
       "width": 1800,
       "height": 1200,
-      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+      "renderer": "PhotoBooth 1.3.1 applyPhotoFrame"
     },
     {
       "name": "02-couple-pavilion-landscape",
       "width": 1800,
       "height": 1200,
-      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+      "renderer": "PhotoBooth 1.3.1 applyPhotoFrame"
     },
     {
       "name": "03-family-trophy-portrait",
       "width": 1200,
       "height": 1800,
-      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+      "renderer": "PhotoBooth 1.3.1 applyPhotoFrame"
     },
     {
       "name": "04-couple-pavilion-portrait",
       "width": 1200,
       "height": 1800,
-      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+      "renderer": "PhotoBooth 1.3.1 applyPhotoFrame"
     }
   ],
-  "portraitHazeCorrected": true
+  "portraitHazeCorrected": true,
+  "badge": {
+    "landscapeDiameter": 180,
+    "portraitDiameter": 150,
+    "left": 24,
+    "goldMount": true
+  }
 }

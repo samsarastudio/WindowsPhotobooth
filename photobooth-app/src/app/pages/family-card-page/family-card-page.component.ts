@@ -5,7 +5,7 @@ import { FamilyCardService } from '../../services/family-card.service';
 import { GalleryUploadService } from '../../services/gallery-upload.service';
 @Component({selector:'pb-family-card',imports:[FormsModule],template:`
  <main class="pb-page"><section class="pb-card family">
- <p class="eyebrow">YOUR FAMILY CHRISTMAS CARD</p><h1>{{pending() ? 'A little Christmas magic' : 'Together in one beautiful card'}}</h1>
+ <p class="eyebrow">YOUR PERSONALISED CARD</p><h1>{{pending() ? 'Your next portrait' : 'Together in one beautiful card'}}</h1>
  <p>Photograph each person individually. Add up to 10 portraits.</p>
  @if(error()){<p role="alert">{{error()}}</p>}
  @if(busy()){<p role="status">{{status()}}</p>}
@@ -13,7 +13,7 @@ import { GalleryUploadService } from '../../services/gallery-upload.service';
  @else {
  <div class="members">@for(m of card.members();track m.path;let i=$index){<div><img [src]="m.url" [alt]="'Person '+(i+1)"/><small>{{m.error ? "Needs retry" : m.processed ? "Ready" : "Processing in background…"}}</small><button class="pb-btn pb-btn-ghost" [disabled]="busy()" (click)="remove(i)" [attr.aria-label]="'Remove person '+(i+1)">Remove {{i+1}}</button></div>}</div>
  <p>{{card.members().length}} of 10 portraits added</p>
- <label>Family name or greeting (optional)<input maxlength="60" [disabled]="busy()" [ngModel]="card.name()" (ngModelChange)="card.name.set($event)" placeholder="The Williams Family"/></label>
+ <label>Team / family name or greeting (optional)<input maxlength="60" [disabled]="busy()" [ngModel]="card.name()" (ngModelChange)="card.name.set($event)" placeholder="Your name or greeting"/></label>
  <label class="queue-option"><input type="checkbox" [ngModel]="card.background()" (ngModelChange)="card.background.set($event)"/> Process in background — keep the booth available</label>
  <div class="pb-row"><button class="pb-btn pb-btn-ghost" [disabled]="busy() || card.members().length >= 10" (click)="capture()">{{card.members().length ? 'Take another' : 'Take first photo'}}</button><button class="pb-btn pb-btn-primary" [disabled]="busy() || !card.members().length" (click)="finish()">Finish card</button></div>
  }
@@ -32,7 +32,7 @@ export class FamilyCardPageComponent implements OnInit {
  remove(i:number){this.card.members.update(a=>a.filter((_,j)=>i!==j));}
  capture(){if(!this.busy())void this.router.navigate(['/capture']);}
  cancel(){this.card.clear();void this.router.navigate(['/booth-mode']);}
- async finish(){if(this.busy()||!this.card.members().length)return;this.busy.set(true);this.error.set('');this.status.set('Arranging your Christmas card…');try{
+ async finish(){if(this.busy()||!this.card.members().length)return;this.busy.set(true);this.error.set('');this.status.set('Arranging your card…');try{
  if(this.card.background()){
   await this.card.enqueue();await this.router.navigate(['/thanks'],{state:{familyProcessing:true}});
  }else{
