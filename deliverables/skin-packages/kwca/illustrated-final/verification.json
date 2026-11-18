@@ -1,5 +1,5 @@
 {
-  "packageVersion": "1.2.5",
+  "packageVersion": "1.2.6",
   "ok": true,
   "source": "Verified background-removal raw results; medium-depth KWCA scenes. Portraits reframed through app.",
   "physicalPrinting": false,
@@ -28,5 +28,6 @@
       "height": 1800,
       "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
     }
-  ]
+  ],
+  "portraitHazeCorrected": true
 }

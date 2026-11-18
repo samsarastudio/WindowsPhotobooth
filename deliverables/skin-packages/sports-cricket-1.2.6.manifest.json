@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "id": "sports-cricket",
+  "name": "Match Day · Cricket",
+  "version": "1.2.6",
+  "minAppVersion": "1.3.0",
+  "description": "Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.",
+  "presentation": {
+    "familyCardEnabled": false,
+    "hero": "theme/assets/stadium.webp",
+    "photo": "presentation/classic-black.webp",
+    "scene": "config/ai-backgrounds/scene/players-tunnel.webp"
+  },
+  "config": {
+    "guestModes": {
+      "defaultEnabled": true,
+      "physicalFrameEnabled": true
+    },
+    "aiGenerationEnabled": true,
+    "defaultAiModeId": null,
+    "photoFrames": {
+      "enabled": true,
+      "photoScale": 1,
+      "defaultFrameFile": "cricket-landscape.webp",
+      "defaultPortraitFrameFile": "cricket-portrait.webp",
+      "guestFrameFiles": [
+        "cricket-landscape.webp",
+        "cricket-portrait.webp"
+      ],
+      "autoApplyFrame": true,
+      "guestAdjustPhoto": true,
+      "guestTextEnabled": false,
+      "guestTextOptional": true,
+      "guestTextMaxLength": 36,
+      "guestTextCreditLine": "KWCA",
+      "guestTextXPercent": 50,
+      "guestTextYPercent": 78,
+      "guestTextSizePercent": 3.4,
+      "guestTextColor": "#ffc928",
+      "guestTextCreditColor": "#d8c4a0",
+      "guestTextAlign": "center",
+      "guestTextBrush": false,
+      "guestTextBrushOpacity": 0.22
+    },
+    "aiModes": [
+      {
+        "id": "scene",
+        "label": "Cricket backdrops",
+        "pipeline": "scene",
+        "useInpainting": true,
+        "randomizeBackground": false,
+        "allowBackgroundChoice": true,
+        "prompt": "Keep every guest exactly as photographed. Replace only the background with this cricket venue. Preserve faces, clothing, poses, proportions and depth."
+      }
+    ],
+    "copy": {
+      "attract": {
+        "icon": "",
+        "tagline": "INMOMENT · CRICKET",
+        "mainScale": 1,
+        "topScale": 1,
+        "title": "MATCH DAY",
+        "subtitle": "Your team. Your moment.",
+        "ctaLabel": "Step into the game",
+        "startAria": "Start your cricket photo",
+        "adminLink": "Admin"
+      },
+      "qr": {
+        "icon": "🔐",
+        "title": "Scan your QR",
+        "subtitle": "Hold your phone to the photobooth scanner to begin your photo experience.",
+        "scanSuccess": "QR verified",
+        "footer": "Have your registration QR ready.",
+        "codeLabel": "Code",
+        "ok": "OK",
+        "back": "Back",
+        "invalidCode": "Invalid code. Use 1234 to continue (debug).",
+        "debugHint": "Debug — type ok then Enter"
+      },
+      "capture": {
+        "sideTitle": "Strike a pose",
+        "instructions": "Stand in the frame · Face the camera · Leave a little space above your head · Smile when the countdown ends",
+        "starting": "Starting camera…",
+        "readyTitle": "Get Ready",
+        "readySubtitle": "Center yourself in the frame. Your photo begins in…",
+        "footerHint": "Look at the camera and hold still.",
+        "smileHint": "Smile — capturing soon"
+      },
+      "result": {
+        "title": "Your photo",
+        "loading": "Loading…",
+        "savedPrefix": "Saved:",
+        "retake": "Retake",
+        "submit": "Done",
+        "confirmPhoto": "Use this photo",
+        "generateAi": "Create AI version",
+        "generatingAi": "Creating your AI photo…",
+        "aiPreviewTitle": "AI version",
+        "aiErrorPrefix": "AI generation failed:",
+        "aiGalleryTitle": "Your photos",
+        "galleryThumbOriginal": "Original",
+        "galleryThumbAi": "AI style",
+        "galleryBackToResult": "Back to photo",
+        "galleryFinish": "Finish",
+        "thinkingSummary": "Preparing your photo",
+        "thinkingStepAnalyze": "Preparing your photo",
+        "thinkingStepPlan": "Applying your match-day backdrop",
+        "thinkingStepBackground": "Building scenery and locking your faces",
+        "thinkingStepImage": "Finishing your photo",
+        "thinkingFootnote": "This may take a moment. Please wait while we finish your photo.",
+        "share": "Share",
+        "sharing": "Uploading…",
+        "shareQrTitle": "Scan to view your photo",
+        "shareBack": "Back",
+        "uploadFailed": "Could not upload to gallery",
+        "print": "Print",
+        "printing": "Printing…",
+        "printed": "Printed",
+        "printFailed": "Print failed"
+      },
+      "history": {
+        "title": "Print history",
+        "empty": "No photos yet — take one to see it here.",
+        "back": "Back to start",
+        "ariaOpen": "Reprint previous photos"
+      },
+      "aiMode": {
+        "title": "Choose your photo style",
+        "subtitle": "A classic keepsake or a cricket backdrop. Your choice.",
+        "back": "Back",
+        "plainPhotoLabel": "Classic photo",
+        "portraitEntryLabel": "AI Portrait",
+        "portraitEntryHint": "Choose a match-day character for your portrait.",
+        "sceneEntryHint": "Step into an unforgettable cricket setting."
+      },
+      "portraitSelect": {
+        "title": "Choose your character",
+        "subtitle": "Choose a match-day look for your portrait.",
+        "back": "Back"
+      },
+      "frame": {
+        "title": "Choose a frame",
+        "subtitle": "Pick a keepsake border for your photo",
+        "continueLabel": "Use this frame",
+        "skipLabel": "Skip frame",
+        "applying": "Applying frame…"
+      },
+      "sceneSelect": {
+        "title": "Choose your ground",
+        "subtitle": "Broadcast Arena, Cricket Analysis Studio, Champions Gallery or two exclusive KWCA venues.",
+        "back": "Back"
+      },
+      "boothMode": {
+        "title": "Choose your experience",
+        "subtitle": "Pick a style to get started.",
+        "defaultLabel": "Classic photo",
+        "defaultHint": "Your original photo against our black backdrop.",
+        "aiPortraitLabel": "AI portrait",
+        "aiPortraitHint": "Choose your character portrait.",
+        "sceneLabel": "Cricket backdrops",
+        "sceneHint": "Choose a cricket setting for your photo.",
+        "magnetNote": "Ask our team about photo prints and glow magnets.",
+        "physicalLabel": "Glow magnet",
+        "physicalHint": "Create a keepsake photo magnet.",
+        "back": "Back"
+      }
+    }
+  },
+  "files": {
+    "artwork-provenance.json": "f19553c8e03d9b6434cdf1bde969b74eecd77e01bdcc2de94503e23265574dac",
+    "config/ai-backgrounds/scene/depths/kwca-players-pavilion/close.webp": "95617af9b8c0d4485281de3630a672d829ebd3f925f973c2b16861c3ae27d116",
+    "config/ai-backgrounds/scene/depths/kwca-players-pavilion/medium.webp": "3ce0d119d7d0dcca97a031d2a1c07961e4d3cfc8d093672c9d5dabbb559ac741",
+    "config/ai-backgrounds/scene/depths/kwca-players-pavilion/wide.webp": "53fa9f095857ce30b66102b83aa2f8202216544adca9986d4e59826dbc890aa8",
+    "config/ai-backgrounds/scene/depths/kwca-trophy-gallery/close.webp": "be1693e19224337b513d45f099fd76afa5b309be65284efd1b7c0f2aa2b44edf",
+    "config/ai-backgrounds/scene/depths/kwca-trophy-gallery/medium.webp": "5f94dc120cd3e5a59118b2fe9e50999c4d2a7681f3735949d9d744e0c055b61a",
+    "config/ai-backgrounds/scene/depths/kwca-trophy-gallery/wide.webp": "c91355aced3f9c118680ea27cd67d51ee5aac7b0747d615210d74aeefe6d9af7",
+    "config/ai-backgrounds/scene/depths/pavilion/close.webp": "83bc62530a6f46f08ec6eae2fa8b1e2a9cafd535701c1c11e073e18560eb8c57",
+    "config/ai-backgrounds/scene/depths/pavilion/medium.webp": "fcac59d0e191e10e7cce258894d5fe452f9f2920de14675a40ce486e715127f5",
+    "config/ai-backgrounds/scene/depths/pavilion/wide.webp": "d1509f361fc6d12c9d1acaef5188e0b83a7891f6d3ea0efb67b60cb080b80258",
+    "config/ai-backgrounds/scene/depths/players-tunnel/close.webp": "a080d4cc47f02ab3524d3df50512212bc01aaf2fa92d14d87a4522f79953e181",
+    "config/ai-backgrounds/scene/depths/players-tunnel/medium.webp": "1437ee10a734d963cc55a8b08e84c62819f977b23018150f1b84777b661a742b",
+    "config/ai-backgrounds/scene/depths/players-tunnel/wide.webp": "91fb6e73f1adf5a1573c38b372031a21ba259199af83a84ac79cf8d00a8f4779",
+    "config/ai-backgrounds/scene/depths/stadium-lights/close.webp": "9509c7422f1c2f2d50544fd955fe69525070df969eca9bc17423d6547cbbb608",
+    "config/ai-backgrounds/scene/depths/stadium-lights/medium.webp": "599d5a76f343cdffc44394ae83a21c1e2d5ac215c8a3b0de410be750d06d7637",
+    "config/ai-backgrounds/scene/depths/stadium-lights/wide.webp": "b3c4553f023ab770ee97184f2fc8319a0ca9a33bfa2b00ff90dcf38d420d8557",
+    "config/ai-backgrounds/scene/kwca-players-pavilion.depths.json": "0c22ead6179979286b68962cd56f9bf8f9e7e3d482c3c8c3ccb63e7b7804d4fb",
+    "config/ai-backgrounds/scene/kwca-players-pavilion.webp": "53fa9f095857ce30b66102b83aa2f8202216544adca9986d4e59826dbc890aa8",
+    "config/ai-backgrounds/scene/kwca-trophy-gallery.depths.json": "ddc76c7f786691b92530ca10a9718c362556178ac6728b6c9b6174bad8a9f78d",
+    "config/ai-backgrounds/scene/kwca-trophy-gallery.webp": "c91355aced3f9c118680ea27cd67d51ee5aac7b0747d615210d74aeefe6d9af7",
+    "config/ai-backgrounds/scene/pavilion.depths.json": "5ba8c39ce1752456b6ac1c640d56ebc171f4d76efcc03e6d51740c1a372278fb",
+    "config/ai-backgrounds/scene/pavilion.webp": "d1509f361fc6d12c9d1acaef5188e0b83a7891f6d3ea0efb67b60cb080b80258",
+    "config/ai-backgrounds/scene/players-tunnel.depths.json": "6788552e9eb2f4ed838dd3b36cefda899a8b47ab73b692b3bb28a70f6ddebf55",
+    "config/ai-backgrounds/scene/players-tunnel.webp": "91fb6e73f1adf5a1573c38b372031a21ba259199af83a84ac79cf8d00a8f4779",
+    "config/ai-backgrounds/scene/stadium-lights.depths.json": "51c07935d4b9cf4f027bb8c82bc343ea34cf3d367d067d4f9857e28529ee1156",
+    "config/ai-backgrounds/scene/stadium-lights.webp": "b3c4553f023ab770ee97184f2fc8319a0ca9a33bfa2b00ff90dcf38d420d8557",
+    "config/photo-frames/cricket-landscape.webp": "b54edccd0e42bc239ddc36f489fb67f75c0c6ab65f9a54ea0f6baf1d2d08c700",
+    "config/photo-frames/cricket-portrait.webp": "00769fc553d0c8e63885a9886f90b3e8ebc03a9b0737946250b3b0fcd20a1839",
+    "presentation/classic-black.webp": "031396b9de756adf5ed14f10877824576a15df75f63554570ad060d3acc58ae9",
+    "theme/assets/stadium.webp": "b3c4553f023ab770ee97184f2fc8319a0ca9a33bfa2b00ff90dcf38d420d8557",
+    "theme/styles.css": "20b95dfc79767ff3aea9418cb2c425181f889c2a8a20864f1c396b2e20e65a60",
+    "theme/theme.json": "8c5e7c9da6259d7c35b2bdac4ada32c85ae623fdab347def56c4252f263e3027"
+  }
+}

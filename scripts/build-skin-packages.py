@@ -101,4 +101,4 @@ def build(id,name,description,ref=None,version="1.0.0"):
 if '--sports-only' not in sys.argv:
  build('christmas','Christmas · Evergreen & Gold','Cinematic winter backdrops, Merry Christmas frames and 1–10 person family cards.')
  build('halloween','Halloween · After Dark','Original HauntBooth scenery, depth plates, character compositions and Halloween frames.','8b413fae60742b92c94a4decf84a23104a6b591a')
-build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.2.5')
+build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.2.6')

@@ -1,6 +1,6 @@
 FINAL KWCA ORNAMENTAL FRAMES — SMALLER BALL
 
-Package: sports-cricket-1.2.5.booth.zip. Requires PhotoBooth 1.3.0+.
+Package: sports-cricket-1.2.6.booth.zip. Requires PhotoBooth 1.3.0+.
 Larger original supplied circular KWCA badge placed at lower left, inserted directly without generative reconstruction. Original colours, lettering and silhouettes retained, scaled to fit the badge. Black square corners clipped outside the circle.
 
 Detailed orange/gold embroidered ribbons, engraved trophy, fine gold leaves, willow bats and small red cricket ball. Thin blended sides and a transparent photo opening. Outer perimeter has continuous opaque print bleed; no transparent gaps below the ribbon.

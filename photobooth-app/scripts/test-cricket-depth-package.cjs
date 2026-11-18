@@ -1,9 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),os=require('os'),sharp=require('../node_modules/sharp');
 const {PackageStore}=require('../electron/theme-packages.cjs'),{readPackage,sha}=require('../electron/theme-package-format.cjs'),{resolveDepthBackground,classifyFraming}=require('../electron/background-depth.cjs');
 const root=path.resolve(__dirname,'../../deliverables/skin-packages');
-test('cricket 1.2.5 carries five distinct sets and all fifteen original-logic depth selections',async()=>{
+test('cricket 1.2.6 carries five distinct sets and all fifteen original-logic depth selections',async()=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'cricket-depth-test-'));
- try{const store=new PackageStore(temp,'1.3.0');const m=store.install(fs.readFileSync(path.join(root,'sports-cricket-1.2.5.booth.zip')));const dir=store.directory(m),seen=new Set();
+ try{const store=new PackageStore(temp,'1.3.0');const m=store.install(fs.readFileSync(path.join(root,'sports-cricket-1.2.6.booth.zip')));const dir=store.directory(m),seen=new Set();
  for(const id of ['stadium-lights','players-tunnel','pavilion','kwca-trophy-gallery','kwca-players-pavilion']){const bg=path.join(dir,'config/ai-backgrounds/scene',id+'.webp');const meta=JSON.parse(fs.readFileSync(bg.replace('.webp','.depths.json')));assert.deepEqual(Object.keys(meta.variants).sort(),['close','medium','wide']);
  for(const [depth,h]of [['wide',100],['medium',200],['close',350]]){const result=resolveDepthBackground(bg,[{h}],1024);assert.equal(result.depth,depth);assert.equal(result.path,path.join(path.dirname(bg),meta.variants[depth]));const bytes=fs.readFileSync(result.path),image=await sharp(bytes).metadata();assert.equal(image.width,1536);assert.equal(image.height,1024);seen.add(sha(bytes));}
  }

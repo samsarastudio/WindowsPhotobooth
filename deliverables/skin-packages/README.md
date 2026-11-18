@@ -4,7 +4,7 @@ These versioned data-only ZIPs require **PhotoBooth 1.3.0 or newer**.
 
 - `christmas-1.0.0.booth.zip` — Christmas, including family cards.
 - `halloween-1.0.0.booth.zip` — original HauntBooth package.
-- `sports-cricket-1.2.5.booth.zip` — latest: enlarged exact KWCA badge at lower left; continuous artwork to outer edges, with smaller ball and rich ornamental detail in both orientations.
+- `sports-cricket-1.2.6.booth.zip` — latest: enlarged exact KWCA badge at lower left; continuous artwork to outer edges, with smaller ball and rich ornamental detail in both orientations.
 - `sports-cricket-1.2.4.booth.zip` — previous: detailed ornamental KWCA frames with smaller cricket balls, original supplied logo, blended transparent edges and orange/gold cricket artwork in both orientations.
 - `sports-cricket-1.2.1.booth.zip` — previous: KWCA landscape and portrait frames in orange/yellow jersey colours; all five settings and fifteen depth plates preserved.
 - `sports-cricket-1.2.0.booth.zip` — previous: adds KWCA Trophy Gallery and KWCA Players Pavilion with dimensional branding and six depth plates; retains all three original cricket settings.
