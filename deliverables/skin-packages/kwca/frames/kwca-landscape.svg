@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <defs><linearGradient id="jersey" x1="0" x2="1" y1="0" y2="0"><stop stop-color="#f04b12"/><stop offset=".48" stop-color="#ff830b"/><stop offset="1" stop-color="#ffc928"/></linearGradient></defs>
+  <path d="M0 0H1800V1200H0ZM20 20V1096H1780V20Z" fill="#091e29" fill-rule="evenodd"/>
+  <rect x="13" y="13" width="1774" height="1174" rx="3" fill="none" stroke="url(#jersey)" stroke-width="4"/>
+  <path d="M20 1096H1780" stroke="#ffb719" stroke-width="2"/>
+  <path d="M20 1098H486.00000000000006L371.00000000000006 1181H20Z" fill="url(#jersey)"/>
+  <path d="M1780 1098H1314L1429 1181H1780Z" fill="url(#jersey)"/>
+  <path d="M216 1098l-95 83h28l95-83ZM378 1098l-95 83h12l95-83Z" fill="#ffcf33" opacity=".8"/>
+  <path d="M1584 1098l95 83h-28l-95-83ZM1422 1098l95 83h-12l-95-83Z" fill="#ffcf33" opacity=".8"/>
+  <text x="900" y="1161" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="49" font-weight="800" letter-spacing="9" fill="#fff6dd">KWCA</text>
+  <path d="M852 1176H948" stroke="#ffbd20" stroke-width="3"/>
+  </svg>

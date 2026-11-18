@@ -28,7 +28,7 @@ def build(id,name,description,ref=None,version="1.0.0"):
   config=json.loads(json.dumps(config).replace('Christmas','match-day').replace('christmas','cricket').replace('MerryBooth','Match Day').replace('Christmas character','cricket scene'))
   config['aiModes']=[{'id':'scene','label':'Cricket backdrops','pipeline':'scene','useInpainting':True,'randomizeBackground':False,'allowBackgroundChoice':True,'prompt':'Keep every guest exactly as photographed. Replace only the background with this cricket venue. Preserve faces, clothing, poses, proportions and depth.'}]
   config['aiGenerationEnabled']=True;config['defaultAiModeId']=None
-  config['photoFrames'].update(defaultFrameFile='cricket-landscape.png',defaultPortraitFrameFile='cricket-portrait.png',guestFrameFiles=['cricket-landscape.png','cricket-portrait.png'],guestTextCreditLine='by InMoment',guestTextColor='#dfc58f')
+  config['photoFrames'].update(defaultFrameFile='cricket-landscape.png',defaultPortraitFrameFile='cricket-portrait.png',guestFrameFiles=['cricket-landscape.png','cricket-portrait.png'],guestTextCreditLine='KWCA',guestTextColor='#ffc928')
   config['copy']['attract'].update(title='MATCH DAY',tagline='INMOMENT · CRICKET',subtitle='Your team. Your moment.',ctaLabel='Step into the game',startAria='Start your cricket photo')
   config['copy']['sceneSelect'].update(title='Choose your ground',subtitle='Broadcast Arena, Cricket Analysis Studio, Champions Gallery or two exclusive KWCA venues.')
   config['copy']['aiMode'].update(subtitle='A classic keepsake or a cricket backdrop. Your choice.',sceneEntryHint='Step into an unforgettable cricket setting.')
@@ -101,4 +101,4 @@ def build(id,name,description,ref=None,version="1.0.0"):
 if '--sports-only' not in sys.argv:
  build('christmas','Christmas · Evergreen & Gold','Cinematic winter backdrops, Merry Christmas frames and 1–10 person family cards.')
  build('halloween','Halloween · After Dark','Original HauntBooth scenery, depth plates, character compositions and Halloween frames.','8b413fae60742b92c94a4decf84a23104a6b591a')
-build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.2.0')
+build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.2.1')
