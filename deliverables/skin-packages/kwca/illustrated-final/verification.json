@@ -1,0 +1,32 @@
+{
+  "packageVersion": "1.2.4",
+  "ok": true,
+  "source": "Previously verified local background-removal results; medium-depth KWCA scenes. Portrait samples reframed through actual app.",
+  "physicalPrinting": false,
+  "samples": [
+    {
+      "name": "01-family-trophy-landscape",
+      "width": 1800,
+      "height": 1200,
+      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+    },
+    {
+      "name": "02-couple-pavilion-landscape",
+      "width": 1800,
+      "height": 1200,
+      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+    },
+    {
+      "name": "03-family-trophy-portrait",
+      "width": 1200,
+      "height": 1800,
+      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+    },
+    {
+      "name": "04-couple-pavilion-portrait",
+      "width": 1200,
+      "height": 1800,
+      "renderer": "packaged PhotoBooth 1.3.0 applyPhotoFrame"
+    }
+  ]
+}
