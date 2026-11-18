@@ -1,7 +1,7 @@
 {
-  "packageVersion": "1.2.4",
+  "packageVersion": "1.2.5",
   "ok": true,
-  "source": "Previously verified local background-removal results; medium-depth KWCA scenes. Portrait samples reframed through actual app.",
+  "source": "Verified background-removal raw results; medium-depth KWCA scenes. Portraits reframed through app.",
   "physicalPrinting": false,
   "samples": [
     {
