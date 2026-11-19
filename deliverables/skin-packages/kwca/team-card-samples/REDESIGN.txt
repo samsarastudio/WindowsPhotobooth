@@ -1,0 +1,11 @@
+19 November 2026 — warm gold collage redesign
+
+Preview: redesign-four-and-six.jpg (4 people left, 6 people right).
+Full-resolution outputs for all 1–10 counts:
+C:/Users/Unity/.codex/visualizations/2026/11/18/01a1efa0-b35c-7262-b881-9d5ae59e5de0/kwca-collage-redesign
+
+Amber interiors, midnight navy stationery, champagne gold laurel with orange ribbon, Great Vibes script, serif small lettering and the supplied original KWCA badge on a slim gold seal. Existing individual portrait cutouts are retained. Four people use 2x2; six use 2x3. All counts rendered at 1800x2700. Source renderer and package artwork updated; previously published OTA 1.3.1 and skin ZIP 1.3.0 are unchanged. This revision is not deployed.
+
+Art generated with the built-in image tool. Prompt: Production horizontal narrow embossed gold laurel divider for a premium KWCA cricket collage, coordinated with amber-gold trophy rooms and orange jerseys. Fine engraved gold leaves woven with burnt-orange silk and a thin navy under-ribbon. Dense repeatable ends, transparent background, no text, logos, green foliage, Christmas baubles or balls. Restrained champagne and bronze highlights; orange around 15 percent of the surface.
+
+Reproduce via scripts/build-kwca-team-card.cjs. Set KWCA_SAMPLE_OUTPUT to a folder with sufficient free space; optionally KWCA_SAMPLE_COUNTS=4,6.

@@ -38,7 +38,7 @@ async function renderCard(people,art,name=''){
   layers.push({input:person,left:Math.round(c.left+(c.width-m.width)/2),top:c.top+c.height-my-m.height});
  }
  const divider=path.join(path.dirname(art),'family-card-evergreen-divider.png');
- const thickness=220,half=thickness/2,overlap=90;
+ const thickness=cricket?150:220,half=thickness/2,overlap=90;
  const branch=await sharp(divider).trim().resize({height:thickness}).png().toBuffer();
  const bm=await sharp(branch).metadata();
  async function strip(length,flip){
@@ -65,11 +65,28 @@ async function renderCard(people,art,name=''){
   let buf=await sharp({text:{text:`<span foreground="#fff3df">${escape(text)}</span>`,font:cricket?`Segoe UI Bold ${size}`:`Great Vibes ${size}`,...(cricket?{}:{fontfile}),rgba:true,dpi:72}}).png().toBuffer();
   const m=await sharp(buf).metadata();if(m.width>maxWidth)buf=await sharp(buf).resize({width:maxWidth}).png().toBuffer();return buf;
  };
- const heading=await script(cricket?'KWCA TEAM CARD':'Merry Christmas',cricket?100:164,1380),hm=await sharp(heading).metadata();layers.push({input:heading,left:Math.round((1800-hm.width)/2),top:100});
+ if(!cricket){
+ const heading=await script('Merry Christmas',164,1380),hm=await sharp(heading).metadata();layers.push({input:heading,left:Math.round((1800-hm.width)/2),top:100});
  const line=name.trim().slice(0,60)||(cricket?'One team. One card.':'Together at Christmas');
  const sub=await script(line.replace(/ /g,'\u2002'),83,1380),sm=await sharp(sub).metadata();layers.push({input:sub,left:Math.round((1800-sm.width)/2),top:275});
+ }else{
+  const logoPath=path.join(path.dirname(art),'family-card-logo.jpg');
+  const size=240;
+  if(fs.existsSync(logoPath)){
+   const seal=Buffer.from('<svg width="270" height="270"><defs><linearGradient id="g"><stop stop-color="#80531f"/><stop offset=".35" stop-color="#ffe0a1"/><stop offset=".7" stop-color="#bc802f"/><stop offset="1" stop-color="#f5d49a"/></linearGradient></defs><circle cx="135" cy="135" r="133" fill="url(#g)"/><circle cx="135" cy="135" r="126" fill="#132533" stroke="#f4d297" stroke-width="2"/></svg>');
+   const logo=await sharp(logoPath).resize(size,size).composite([{input:Buffer.from(`<svg width="${size}" height="${size}"><circle cx="120" cy="120" r="120" fill="white"/></svg>`),blend:'dest-in'}]).png().toBuffer();
+   layers.push({input:seal,left:150,top:95},{input:logo,left:165,top:110});
+  }
+  const label=await sharp({text:{text:'<span foreground="#d8ae70" letter_spacing="7000">K W C A  ·  C R I C K E T</span>',font:'Georgia 30',rgba:true,dpi:72}}).png().toBuffer();
+  layers.push({input:label,left:485,top:100});
+  const title=await sharp({text:{text:'<span foreground="#f5dbaf">Together we play</span>',font:'Great Vibes 135',fontfile,rgba:true,dpi:72}}).png().toBuffer();
+  layers.push({input:await sharp(title).resize({width:1050}).png().toBuffer(),left:480,top:160});
+  const subtitle=await sharp({text:{text:`<span foreground="#dbb786">${escape(name.trim().slice(0,60)||'ONE TEAM. SHARED MEMORIES.')}</span>`,font:'Georgia 30',rgba:true,dpi:72}}).png().toBuffer();
+  const sm=await sharp(subtitle).metadata();layers.push({input:sm.width>1000?await sharp(subtitle).resize({width:1000}).png().toBuffer():subtitle,left:Math.round((1800-Math.min(sm.width,1000))/2),top:2620});
+ }
  let svg=Buffer.from(`<svg width="1800" height="2700" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b"><stop stop-color="#884047"/><stop offset="1" stop-color="#682d36"/></radialGradient><pattern id="winter" width="210" height="210" patternUnits="userSpaceOnUse"><g stroke="#f1d6b7" stroke-width="1.4" opacity=".075" fill="none"><path d="M42 24v36M26 33l32 18M26 51l32-18M37 29l5 5 5-5M37 55l5-5 5 5M28 38l7-2-1-7M50 55l-1-7 7-2"/><path d="M151 123v16M143 131h16M147 127l8 8M147 135l8-8"/></g><circle cx="103" cy="77" r="1.8" fill="#f1d6b7" opacity=".09"/><circle cx="73" cy="172" r="1.2" fill="#f1d6b7" opacity=".07"/></pattern></defs><rect width="1800" height="2700" fill="url(#b)"/><rect width="1800" height="2700" fill="url(#winter)"/></svg>`);
  if(cricket)svg=Buffer.from(`<svg width="1800" height="2700" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b"><stop stop-color="#163a46"/><stop offset="1" stop-color="#071b29"/></radialGradient><pattern id="p" width="160" height="160" patternUnits="userSpaceOnUse"><path d="M0 160L160 0M60 160L160 60" stroke="#edb957" stroke-width="1" opacity=".08"/></pattern></defs><rect width="1800" height="2700" fill="url(#b)"/><rect width="1800" height="2700" fill="url(#p)"/></svg>`);
+ if(cricket)svg=Buffer.from(`<svg width="1800" height="2700"><defs><linearGradient id="b" x2="1" y2="1"><stop stop-color="#102332"/><stop offset=".5" stop-color="#071825"/><stop offset="1" stop-color="#1b2b39"/></linearGradient><linearGradient id="g"><stop stop-color="#5d3518"/><stop offset=".5" stop-color="#e9b766"/><stop offset="1" stop-color="#815022"/></linearGradient></defs><rect width="1800" height="2700" fill="url(#b)"/><path d="M25 400V25H1775V2675H25V400" fill="none" stroke="url(#g)" stroke-width="3"/><path d="M43 380V43H1757V2657H43V380" fill="none" stroke="#9c6c36" stroke-opacity=".3"/><path d="M0 0H1800V14H0ZM0 2686H1800V2700H0Z" fill="url(#g)"/><path d="M0 0H115L0 230ZM1800 2700H1685L1800 2470Z" fill="#be5c1d" opacity=".55"/></svg>`);
  return sharp(svg).composite(layers).withMetadata({density:450}).jpeg({quality:97,chromaSubsampling:'4:4:4'}).toBuffer();
 }
 module.exports={layout,cutout,renderCard};
