@@ -20,7 +20,7 @@ async function cutout(source,model){
  return sharp(rgba).extract({left:l,top:t,width:r-l+1,height:b-t+1}).png().toBuffer();
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
-async function renderCard(people,art,name=''){
+async function renderCard(people,art,name='',effects=[]){
  const path=require('path'),fs=require('fs'),cells=layout(people.length),layers=[];
  const stylePath=path.join(path.dirname(art),'family-card-style.json');
  const style=fs.existsSync(stylePath)?JSON.parse(fs.readFileSync(stylePath,'utf8')):{};
@@ -31,11 +31,20 @@ async function renderCard(people,art,name=''){
  const meta=await sharp(art).metadata();
  const interior=await sharp(art).extract({left:Math.round(meta.width*.22),top:Math.round(meta.height*.22),width:Math.round(meta.width*.56),height:Math.round(meta.height*.48)}).resize(right-left,bottom-top,{fit:'fill'}).png().toBuffer();
  layers.push({input:interior,left,top});
+ const foreground=[];
  for(let i=0;i<cells.length;i++){
   const c=cells[i],mx=Math.min(65,Math.round(c.width*.10)),my=5;
-  const person=await sharp(people[i]).resize(c.width-mx*2,c.height-140,{fit:'inside'}).png().toBuffer();
+  const pop=Array.isArray(effects)&&effects[i]==='over-frame';
+  const person=await sharp(people[i]).resize(pop?c.width+100:c.width-mx*2,pop?c.height+35:c.height-140,{fit:'inside'}).png().toBuffer();
   const m=await sharp(person).metadata();
-  layers.push({input:person,left:Math.round(c.left+(c.width-m.width)/2),top:c.top+c.height-my-m.height});
+  const placement={input:person,left:Math.round(c.left+(c.width-m.width)/2),top:c.top+c.height-my-m.height};
+  // Base remains behind the frame. Only the upper silhouette crosses it; the
+  // waist stays concealed. Bounded overscan protects neighbouring faces/header.
+  layers.push(placement);
+  if(pop){
+   const height=Math.max(1,m.height-110);
+   foreground.push({...placement,input:await sharp(person).extract({left:0,top:0,width:m.width,height}).png().toBuffer()});
+  }
  }
  const divider=path.join(path.dirname(art),'family-card-evergreen-divider.png');
  const thickness=cricket?150:220,half=thickness/2,overlap=90;
@@ -60,6 +69,7 @@ async function renderCard(people,art,name=''){
   if(r>0)layers.push(await horizontal(left,row[0].top,right-left,r%2===0));
  }
  layers.push(await vertical(left,top-overlap,bottom-top+overlap*2),await vertical(right,top-overlap,bottom-top+overlap*2,true),await horizontal(left-overlap,top,right-left+overlap*2),await horizontal(left-overlap,bottom,right-left+overlap*2,true));
+ layers.push(...foreground);
  const fontfile=path.join(path.dirname(art),'../fonts/GreatVibes-Regular.ttf');
  const script=async(text,size,maxWidth)=>{
   let buf=await sharp({text:{text:`<span foreground="#fff3df">${escape(text)}</span>`,font:cricket?`Segoe UI Bold ${size}`:`Great Vibes ${size}`,...(cricket?{}:{fontfile}),rgba:true,dpi:72}}).png().toBuffer();

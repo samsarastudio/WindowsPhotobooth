@@ -2092,7 +2092,7 @@ handleAssetJob('family:draft', async (_e,payload) => {
   if(!Array.isArray(sources)||sources.length<1||sources.length>10||sources.some(p=>typeof p!=='string'||!fs.existsSync(p)))throw Error('Please add 1-10 captured portraits.');
   const out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
   const art=familyArtwork();
-  fs.writeFileSync(out,await require('./family-card.cjs').renderCard(sources,art,payload.name||''));
+  fs.writeFileSync(out,await require('./family-card.cjs').renderCard(sources,art,payload.name||'',payload.effects));
   fs.writeFileSync(out+'.skin.json',JSON.stringify({package:packages().state().active}));
   return {ok:true,path:out};
  }catch(e){return {ok:false,error:e.message};}
@@ -2103,7 +2103,7 @@ handleAssetJob('family:render', async (_e, payload) => {
     if (!Array.isArray(paths)||paths.length<1||paths.length>10||new Set(paths).size!==paths.length||paths.some(p=>!familyCutouts.has(p))) throw Error('Please add 1–10 approved portraits.');
     let art=familyArtwork();
     if(payload.draftPath){ const draft=path.resolve(payload.draftPath); if(path.dirname(draft)!==path.resolve(getCaptureDir())||!/_family-card\.jpg$/i.test(draft))throw Error('Invalid card draft'); if(fs.existsSync(draft+'.skin.json')){const ref=readJsonSafe(draft+'.skin.json').package;art=ref?path.join(packages().directory(ref),'theme','artwork','family-card-window.png'):path.join(getBundleRoot(),'themes','christmas','artwork','family-card-window.png');}}
-    const data=await require('./family-card.cjs').renderCard(paths,art,typeof payload.name==='string'?payload.name:'');
+    const data=await require('./family-card.cjs').renderCard(paths,art,typeof payload.name==='string'?payload.name:'',payload.effects);
     let out=path.join(getCaptureDir(),`${require('crypto').randomUUID()}_family-card.jpg`);
     if(payload.draftPath){
       const draft=path.resolve(payload.draftPath);

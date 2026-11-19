@@ -5,7 +5,7 @@
     }
 
     <h1 class="pb-kia-ready-title">{{ familyCard.active() ? 'One person at a time' : copy().capture.readyTitle }}</h1>
-    <p class="pb-kia-ready-lead">{{ familyCard.active() ? 'Stand in the centre. Keep your head and shoulders fully visible.' : copy().capture.readySubtitle }}</p>
+    <p class="pb-kia-ready-lead">{{ familyCard.active() ? familyCard.poseGuide() : copy().capture.readySubtitle }}</p>
 
     <div class="pb-kia-stage">
       <div

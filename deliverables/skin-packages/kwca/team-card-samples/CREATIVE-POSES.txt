@@ -1,0 +1,20 @@
+Creative portrait collage — 19 November 2026
+
+creative-four-and-six.jpg shows four people on the left and six on the right.
+Full-resolution cards, six separately generated source portraits and actual BiRefNet cutouts are saved in:
+C:/Users/Unity/.codex/visualizations/2026/11/18/01a1efa0-b35c-7262-b881-9d5ae59e5de0/kwca-creative-poses
+
+APP BEHAVIOUR
+Choose the planned group size for inward-facing pose guidance. Choose Inside or Reach over the frame before each capture. The capture screen repeats the guidance; mirrored live preview direction must be checked by the operator against the final photo. No guest is automatically mirrored or reposed.
+After capture, reorder individuals and change their layer effect independently. If the final count changes, review gaze directions because the grid adapts. Finish can still happen early. Effects and ordered sources persist together in background jobs and retry processing. Older queued jobs without effects retain their previous behind-frame rendering.
+Over-frame mode enlarges the cutout within bounded overscan. Its upper silhouette is drawn in front of shared ornaments while the lower torso remains behind them. It uses the captured silhouette, not hand/body-part detection, and cannot recover hands cropped out of the camera image. Operator review is needed for each pose.
+
+VALIDATION
+Renderer tests exercise actual over-frame pixels for counts 1–10, dimensions, missing metadata and unknown effect fallback. Angular production build passes (existing admin stylesheet budget warning). Fake-camera app-flow test covers two captures, reorder, persisted effects, queue completion, next group, foreground review and editing. No physical camera or printing test.
+Source version is 1.3.2. The published OTA 1.3.1 and skin ZIP 1.3.0 have not been changed by this source revision. A new app build is required to deploy pose controls and compositing.
+
+SAMPLE GENERATION
+Built-in image generation: six separate photorealistic isolated head-to-hips portraits, soft warm studio light, full hands/elbows, solid garments, no logo/text/furniture/frame. Subjects: woman in orange laughing/reaching image-right; man in navy laughing/gesturing image-left; girl in orange leaning forward with hands over imaginary ledge; boy in navy looking up-left with hand shading eyes; older woman in cream/orange pointing up-right; older man in orange reaching forward with both arms. These are synthetic demonstrations, not altered guest photos. Raw generation files are mapped in scripts/render-kwca-creative-poses.cjs; actual background removal then runs before collage rendering.
+
+Old unused illustrated-v1 drafts were preserved at:
+C:/Users/Unity/.codex/visualizations/2026/11/18/01a1efa0-b35c-7262-b881-9d5ae59e5de0/kwca-archived-illustrated-v1
