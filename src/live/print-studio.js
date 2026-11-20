@@ -10,10 +10,12 @@ import {printPlan,photoGeometry,keepsakeFlourish} from '../../live-public/print-
 
 export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail}){
   db.exec("CREATE TABLE IF NOT EXISTS live_print_designs(event TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,config TEXT NOT NULL)");
-  const config=e=>({...printDefaults,...JSON.parse(db.prepare('SELECT config FROM live_print_designs WHERE event=?').get(e.id)?.config||'{}')});
+  const config=e=>{const saved=db.prepare('SELECT config FROM live_print_designs WHERE event=?').get(e.id);return {...printDefaults,...(saved?{qrLayout:'classic',...JSON.parse(saved.config)}:{})};};
   const logo=e=>db.prepare("SELECT filename FROM assets WHERE event=? AND kind='print-logo'").get(e.id);
+  const instruction=e=>db.prepare("SELECT filename FROM assets WHERE event=? AND kind='print-instruction'").get(e.id);
+  const instructionUrl=e=>instruction(e)?`/api/events/${e.slug}/print/instruction-image?v=${instruction(e).filename}`:'/print-themes/qr-instruction-phone.png';
   const logoUrl=e=>logo(e)?`/api/events/${e.slug}/print/logo?v=${logo(e).filename}`:null;
-  const choices={eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],albumStyle:['themed','keepsake'],layout:['keepsake','editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['gold-line','none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
+  const choices={qrLayout:['classic','pages','fold'],qrHeaderMode:['text','logo','none'],eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],albumStyle:['themed','keepsake'],layout:['keepsake','editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['gold-line','none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
   function validate(old,patch){
     if(!patch||typeof patch!=='object'||Array.isArray(patch))throw fail(400,'Provide design settings');
     const c={...old};
@@ -23,7 +25,7 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
         if(!Array.isArray(v)||v.length>300||v.some(id=>typeof id!=='string'||! /^[a-f0-9-]{36}$/.test(id))||new Set(v).size!==v.length)throw fail(400,'Choose up to 300 unique photos');
       }else if(typeof v!==typeof printDefaults[k])throw fail(400,'Invalid design setting: '+k);
       if(choices[k]&&!choices[k].includes(v))throw fail(400,'Invalid choice: '+k);
-      const ranges={qrWidth:[70,420],qrHeight:[70,594],albumWidth:[180,420],albumHeight:[120,297],photoLimit:[1,300],wordingOffset:[0,149],layoutOffset:[0,7]};
+      const ranges={qrLogoScale:[25,400],qrWidth:[70,420],qrHeight:[70,594],albumWidth:[180,420],albumHeight:[120,297],photoLimit:[1,300],wordingOffset:[0,149],layoutOffset:[0,7]};
       if(ranges[k]&&(!Number.isFinite(v)||v<ranges[k][0]||v>ranges[k][1]||(['photoLimit','wordingOffset','layoutOffset'].includes(k)&&!Number.isInteger(v))))throw fail(400,'Invalid range: '+k);
       if(typeof v==='string'&&v.length>({intro:1200,closing:400,customCaptions:12000,qrInstructions:160}[k]||120))throw fail(400,'Text is too long: '+k);
       if(k==='customCaptions'&&(v.split('\n').length>150||v.split('\n').some(line=>line.length>180)))throw fail(400,'Use up to 150 captions, each at most 180 characters');
@@ -39,7 +41,7 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
     if(c.order==='favorites')rows.sort((a,b)=>b.favorite-a.favorite);
     return {total:rows.length,rows:rows.slice(0,c.photoLimit).map(p=>({...p,url:`/api/guest/${e.slug}/photos/${p.id}/image`}))};
   }
-  app.get('/api/events/:slug/print',wrap((req,res)=>{const e=owned(req),c=config(e),list=selected(e,c);res.json({config:c,logo:logoUrl(e),eligible:list.total,included:list.rows.length,photos:db.prepare('SELECT id,favorite FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created ASC,id ASC').all(e.id).map(p=>({...p,url:`/api/guest/${e.slug}/photos/${p.id}/image?thumb=1`}))});}));
+  app.get('/api/events/:slug/print',wrap((req,res)=>{const e=owned(req),c=config(e),list=selected(e,c);res.json({config:c,logo:logoUrl(e),instructionImage:instructionUrl(e),customInstructionImage:!!instruction(e),eligible:list.total,included:list.rows.length,photos:db.prepare('SELECT id,favorite FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created ASC,id ASC').all(e.id).map(p=>({...p,url:`/api/guest/${e.slug}/photos/${p.id}/image?thumb=1`}))});}));
   app.patch('/api/events/:slug/print',wrap((req,res)=>{const e=owned(req),c=validate(config(e),req.body);db.prepare('INSERT INTO live_print_designs VALUES(?,?) ON CONFLICT(event) DO UPDATE SET config=excluded.config').run(e.id,JSON.stringify(c));res.json({config:c});}));
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:8*1024*1024,files:1,fields:0}}).single('photo');
   app.post('/api/events/:slug/print/logo',(req,res,next)=>{try{owned(req);next();}catch(err){next(err);}},upload,wrap(async(req,res)=>{
@@ -49,8 +51,15 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
   }));
   app.get('/api/events/:slug/print/logo',wrap((req,res)=>{const e=owned(req),a=logo(e);if(!a)throw fail(404,'Logo not found');res.type('png').send(fs.readFileSync(path.join(data,'assets',a.filename)));}));
   app.delete('/api/events/:slug/print/logo',wrap((req,res)=>{const e=owned(req),a=logo(e);db.prepare("DELETE FROM assets WHERE event=? AND kind='print-logo'").run(e.id);if(a)fs.rmSync(path.join(data,'assets',a.filename),{force:true});res.json({ok:true});}));
+  app.post('/api/events/:slug/print/instruction-image',(req,res,next)=>{try{owned(req);next();}catch(err){next(err);}},upload,wrap(async(req,res)=>{
+    const e=owned(req);if(!req.file)throw fail(400,'Choose an instruction image');
+    let bytes;try{bytes=await sharp(req.file.buffer,{limitInputPixels:24000000}).rotate().resize({width:1800,height:2400,fit:'inside',withoutEnlargement:true}).png().toBuffer();}catch{throw fail(400,'Choose a valid PNG, JPEG or WebP image');}
+    owned(req);const filename=crypto.randomUUID()+'.png',old=instruction(e);fs.writeFileSync(path.join(data,'assets',filename),bytes);db.prepare('INSERT OR REPLACE INTO assets VALUES(?,?,?)').run(e.id,'print-instruction',filename);if(old)fs.rmSync(path.join(data,'assets',old.filename),{force:true});res.json({instructionImage:instructionUrl(e)});
+  }));
+  app.get('/api/events/:slug/print/instruction-image',wrap((req,res)=>{const e=owned(req),a=instruction(e);if(!a)throw fail(404,'Instruction image not found');res.type('png').send(fs.readFileSync(path.join(data,'assets',a.filename)));}));
+  app.delete('/api/events/:slug/print/instruction-image',wrap((req,res)=>{const e=owned(req),a=instruction(e);db.prepare("DELETE FROM assets WHERE event=? AND kind='print-instruction'").run(e.id);if(a)fs.rmSync(path.join(data,'assets',a.filename),{force:true});res.json({instructionImage:instructionUrl(e)});}));
   app.get('/api/events/:slug/print/qr/image',wrap(async(req,res)=>{const e=owned(req);requireFeature('qrPrints');res.type('png').send(await QRCode.toBuffer(`${base}/e/${e.slug}`,{width:900,margin:4,errorCorrectionLevel:'M'}));}));
-  function prepare(req){const e=owned(req),kind=req.params.kind;if(!['qr','album'].includes(kind))throw fail(404,'Unknown print format');requireFeature(kind==='album'?'photobooks':'qrPrints');const c=config(e),selection=selected(e,c);if(kind==='album'&&!selection.rows.length)throw fail(400,'Approve or select at least one photo before creating an album');return {e,c,kind,selection,pages:printPlan(kind,c,{...e,url:`${base}/e/${e.slug}`},selection.rows,logoUrl(e))};}
+  function prepare(req){const e=owned(req),kind=req.params.kind;if(!['qr','album'].includes(kind))throw fail(404,'Unknown print format');requireFeature(kind==='album'?'photobooks':'qrPrints');const c=config(e),selection=selected(e,c);if(kind==='album'&&!selection.rows.length)throw fail(400,'Approve or select at least one photo before creating an album');return {e,c,kind,selection,pages:printPlan(kind,c,{...e,url:`${base}/e/${e.slug}`},selection.rows,logoUrl(e),instructionUrl(e))};}
   app.get('/api/events/:slug/print/:kind/preview',wrap((req,res)=>{const {pages,selection}=prepare(req);res.json({pages,included:selection.rows.length,eligible:selection.total});}));
   const busy=new Set();
   app.get('/api/events/:slug/print/:kind/pdf',wrap(async(req,res)=>{
@@ -59,6 +68,7 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
       const images=new Map();
       for(const p of kind==='album'?selection.rows:[]){images.set(p.url,await sharp(fs.readFileSync(path.join(data,'photos',p.filename))).resize({width:2400,height:1800,fit:'inside',withoutEnlargement:true}).jpeg({quality:90}).toBuffer());}
       const a=logo(e);if(a)images.set(logoUrl(e),fs.readFileSync(path.join(data,'assets',a.filename)));
+      if(kind==='qr'){const artwork=instruction(e);images.set(instructionUrl(e),fs.readFileSync(artwork?path.join(data,'assets',artwork.filename):path.join(root,'live-public/print-themes/qr-instruction-phone.png')));}
       const bytes=await renderPrintPDF(pages,{root,images,fail});
       owned(req);requireFeature(kind==='album'?'photobooks':'qrPrints');
       // Do not deliver a stale export if photos were hidden/deleted during rendering.
@@ -75,6 +85,7 @@ export async function renderPrintPDF(pages,{root,images=new Map(),fail=(s,m)=>Ob
   try{for(const page of pages){
     pdf.addPage({size:[page.w,page.h],margin:0});if(page.paper)pdf.rect(0,0,page.w,page.h).fill(page.paper);else pdf.image(path.join(root,'live-public',page.background),0,0,{width:page.w,height:page.h});
     for(const el of page.elements){
+      if(el.kind==='panel')pdf.rect(el.x,el.y,el.w,el.h).fill(el.color);
       if(el.kind==='border'){pdf.lineWidth(.6).strokeColor(el.color);if(el.rounded)pdf.roundedRect(el.x,el.y,el.w,el.h,12).stroke();else pdf.rect(el.x,el.y,el.w,el.h).stroke();if(el.double)pdf.rect(el.x+4,el.y+4,el.w-8,el.h-8).stroke();}
       if(el.kind==='text'){
         pdf.font(el.font).fillColor(el.color);let size=el.size;pdf.fontSize(size);while(pdf.heightOfString(el.text,{width:el.w,lineGap:1})>el.h&&size>4){size-=.5;pdf.fontSize(size);}if(pdf.heightOfString(el.text,{width:el.w,lineGap:1})>el.h)throw fail(400,'Shorten the text to fit this paper size');

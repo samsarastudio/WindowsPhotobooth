@@ -31,3 +31,16 @@ test('Keepsake spreads preserve every photo, alternate sides and handle incomple
     const qr=printPlan('qr',config,{title:'Join',url:'https://example.com'});assert.ok(qr[0].background,'Album paper does not change QR artwork');
   }
 });
+
+test('QR normal is two portrait pages; fold card is one landscape sheet with QR left and instructions right',()=>{
+  for(const size of ['a3','a4','a5','a6','postcard','invitation','custom'])for(const mode of ['text','logo','none'])for(const scale of [25,100,400]){
+    const config={...printDefaults,qrSize:size,qrWidth:100,qrHeight:150,qrHeaderMode:mode,qrLogoScale:scale};
+    const e={title:'Event name',url:'https://example.com/e/test'};
+    const normal=printPlan('qr',{...config,qrLayout:'pages',qrLandscape:true},e,[],'/logo');assert.equal(normal.length,2);assert.ok(normal.every(p=>p.h>p.w));assert.equal(normal[0].elements.filter(e=>e.kind==='qr').length,1);assert.equal(normal[1].elements.filter(e=>e.kind==='qr').length,0);
+    const folded=printPlan('qr',{...config,qrLayout:'fold'},e,[],'/logo');assert.equal(folded.length,1);const p=folded[0];assert.ok(p.w>p.h);const qr=p.elements.find(e=>e.kind==='qr');assert.ok(qr.x+qr.w<=p.w/2);assert.ok(p.elements.find(e=>e.kind==='fold'));
+    const phone=p.elements.find(e=>e.url?.includes('qr-instruction'));assert.ok(phone.x>=p.w/2);
+    if(mode!=='text')assert.ok(!p.elements.some(e=>e.text==='Event name'||e.text===config.qrHeading));
+    for(const page of [...normal,...folded])for(const el of page.elements)assert.ok(el.x>=0&&el.y>=0&&el.x+el.w<=page.w+.01&&el.y+el.h<=page.h+.01,JSON.stringify(el));
+    const mark=p.elements.find(e=>e.url==='/logo');if(mark)assert.ok(mark.x+mark.w<=qr.x||qr.x+qr.w<=mark.x||mark.y+mark.h<=qr.y||qr.y+qr.h<=mark.y);
+  }
+});

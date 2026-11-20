@@ -8,6 +8,10 @@ test('Print studio validates dimensions, isolates owners and exports approved la
   assert.equal((await call(endpoint)).status,401);assert.equal((await call(endpoint,'GET',null,other)).status,404);
   assert.equal((await call(endpoint,'PATCH',{qrWidth:-2},cookie)).status,400);assert.equal((await call(endpoint,'PATCH',{albumSize:'custom',albumWidth:180,albumHeight:250},cookie)).status,400);assert.equal((await call(endpoint,'PATCH',{theme:'../../secret'},cookie)).status,400);assert.equal((await call(endpoint,'PATCH',{showLogo:'yes'},cookie)).status,400);
   assert.equal((await call(endpoint,'PATCH',{photoFrame:'invalid'},cookie)).status,400);
+  assert.equal((await call(endpoint,'GET',null,cookie)).body.config.qrLayout,'pages');
+  live.db.prepare('INSERT INTO live_print_designs VALUES(?,?)').run(e.id,JSON.stringify({qrSize:'a5'}));
+  assert.equal((await call(endpoint,'GET',null,cookie)).body.config.qrLayout,'classic','Existing designs retain their single-page output');
+  await call(endpoint,'PATCH',{qrLayout:'pages'},cookie);
   assert.equal((await call(endpoint+'/album/pdf','GET',null,cookie)).status,400);
   const guest=(await call(`/api/guest/${e.slug}/join`,'POST',{name:'Guest'})).cookie,ids=[];
   for(let i=0;i<9;i++){
@@ -17,13 +21,32 @@ test('Print studio validates dimensions, isolates owners and exports approved la
   await call(endpoint,'PATCH',{selectedPhotos:[ids[2],ids[0]],order:'manual',albumSize:'custom',albumWidth:300,albumHeight:200},cookie);let plan=(await call(endpoint+'/album/preview','GET',null,cookie)).body;assert.equal(plan.included,2);assert.ok(JSON.stringify(plan.pages[1]).includes(ids[2]));
   await call(`/api/events/${e.slug}/photos/${ids[2]}`,'PATCH',{approved:false},cookie);assert.equal((await call(endpoint+'/album/preview','GET',null,cookie)).body.included,1);
   await call(endpoint,'PATCH',{selectedPhotos:[],eventType:'wedding',theme:'auto',subtitle:'A day held close',date:'12 December 2026',location:'The Garden House',intro:'A room full of love, a day full of little moments. These are the stories our people saw.',albumSize:'a4'},cookie);
-  const out=path.resolve('output/live-print-qa');fs.mkdirSync(out,{recursive:true});
+  const out=path.resolve(process.env.LIVE_PRINT_QA_DIR||'output/live-print-qa');fs.mkdirSync(out,{recursive:true});
   for(const theme of ['wedding','birthday','celebration','corporate','family']){
     await call(endpoint,'PATCH',{eventType:theme,theme:'auto',photoFrame:{wedding:'rounded',birthday:'glass',celebration:'gold',corporate:'none',family:'botanical'}[theme]},cookie);
     for(const kind of ['qr','album']){const r=await call(endpoint+`/${kind}/pdf`,'GET',null,cookie);assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,`${theme}-${kind}.pdf`),r.body);}
   }
-  await call(endpoint,'PATCH',{qrSize:'custom',qrWidth:90,qrHeight:130,qrLandscape:true},cookie);plan=(await call(endpoint+'/qr/preview','GET',null,cookie)).body;assert.ok(Math.abs(plan.pages[0].w-130*72/25.4)<.01);
+  await call(endpoint,'PATCH',{qrLayout:'classic',qrSize:'custom',qrWidth:90,qrHeight:130,qrLandscape:true},cookie);plan=(await call(endpoint+'/qr/preview','GET',null,cookie)).body;assert.ok(Math.abs(plan.pages[0].w-130*72/25.4)<.01);
   const logo=new FormData();logo.append('photo',new Blob([await sharp({create:{width:100,height:60,channels:3,background:'green'}}).png().toBuffer()]),'logo.png');assert.equal((await call(endpoint+'/logo','POST',logo,guest)).status,401);assert.equal((await call(endpoint+'/logo','POST',logo,cookie)).status,200);assert.equal((await call(endpoint+'/logo','GET',null,other)).status,404);
+  assert.equal((await call(endpoint,'PATCH',{qrLogoScale:401},cookie)).status,400);
+  assert.equal((await call(endpoint,'PATCH',{qrLayout:'invalid'},cookie)).status,400);
+  const instruction=new FormData();instruction.append('photo',new Blob([await sharp({create:{width:200,height:300,channels:3,background:'blue'}}).png().toBuffer()]),'sample.png');
+  assert.equal((await call(endpoint+'/instruction-image','POST',instruction,guest)).status,401);
+  assert.equal((await call(endpoint+'/instruction-image','POST',instruction,other)).status,404);
+  assert.equal((await call(endpoint+'/instruction-image','POST',instruction,cookie)).status,200);
+  assert.equal((await call(endpoint+'/instruction-image','GET',null,other)).status,404);
+  for(const layout of ['pages','fold']){
+    await call(endpoint,'PATCH',{qrLayout:layout,qrHeaderMode:'logo',qrLogoScale:200,qrShowTitle:false,qrSize:'a4'},cookie);
+    const preview=(await call(endpoint+'/qr/preview','GET',null,cookie)).body;
+    assert.equal(preview.pages.length,layout==='pages'?2:1);
+    assert.ok(preview.pages.every(p=>layout==='pages'?p.h>p.w:p.w>p.h));
+    assert.ok(preview.pages.flatMap(p=>p.elements).some(el=>el.url?.includes('/instruction-image')));
+    const pdf=await call(endpoint+'/qr/pdf','GET',null,cookie);assert.equal(pdf.status,200);fs.writeFileSync(path.join(out,`qr-${layout}.pdf`),pdf.body);
+  }
+  assert.equal((await call(endpoint+'/instruction-image','DELETE',{},cookie)).status,200);
+  assert.equal((await call(endpoint+'/instruction-image','GET',null,cookie)).status,404);
+  assert.equal((await call(endpoint,'GET',null,cookie)).body.customInstructionImage,false);
+  assert.ok((await call(endpoint+'/qr/preview','GET',null,cookie)).body.pages[0].elements.some(el=>el.url==='/print-themes/qr-instruction-phone.png'));
   await call('/api/admin/features','PATCH',{photobooks:false},'',true);assert.equal((await call(endpoint+'/album/pdf','GET',null,cookie)).status,403);assert.equal((await call(endpoint+'/album/preview','GET',null,cookie)).status,403);assert.equal((await call(endpoint+'/qr/pdf','GET',null,cookie)).status,200);
   await call('/api/admin/features','PATCH',{qrPrints:false},'',true);assert.equal((await call(endpoint+'/qr/pdf','GET',null,cookie)).status,403);assert.equal((await call(endpoint+'/qr/preview','GET',null,cookie)).status,403);
   await new Promise(r=>server.close(r));live.close();live=createLiveApp({dataDir:dir,adminKey:key,baseUrl:'http://localhost'});server=live.app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));base=`http://127.0.0.1:${server.address().port}`;assert.equal((await call(endpoint,'GET',null,cookie)).body.config.qrWidth,90);assert.equal((await call(endpoint+'/logo','GET',null,cookie)).status,200);
