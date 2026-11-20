@@ -54,6 +54,17 @@ test('Shared walls respect moderation, reveal, privacy, revocation and event del
   assert.equal((await call(feed)).body.photos.length,0,'Hidden NSFW photo immediately leaves the public feed');
   assert.equal((await call(image)).status,404,'Hidden image cannot be fetched directly');
   await call(`/api/events/${e.slug}/photos/${photo.id}`,'PATCH',{approved:true},owner);
+  await call(`/api/events/${e.slug}`,'PATCH',{moderation:0},owner);
+  const automatic=new FormData();automatic.append('photo',new Blob([bytes]),'photo.jpg');automatic.append('request_id','auto-approved-photo');
+  const auto=(await call(`/api/guest/${e.slug}/photos`,'POST',automatic,guest)).body;
+  assert.ok((await call(feed)).body.photos.some(p=>p.id===auto.id),'Automatic capture enters the wall feed without an approval request');
+  await call(`/api/events/${e.slug}`,'PATCH',{moderation:1},owner);
+  const manual=new FormData();manual.append('photo',new Blob([bytes]),'photo.jpg');manual.append('request_id','pending-again');
+  const pending=(await call(`/api/guest/${e.slug}/photos`,'POST',manual,guest)).body;
+  assert.ok(!(await call(feed)).body.photos.some(p=>p.id===pending.id));
+  await call(`/api/events/${e.slug}`,'PATCH',{moderation:0},owner);
+  assert.ok(!(await call(feed)).body.photos.some(p=>p.id===pending.id),'Turning auto approval on does not release existing pending photos');
+  await call(`/api/events/${e.slug}/photos/${auto.id}`,'DELETE',{},owner);
   for(const visibility of ['own','host']){
     await call(`/api/events/${e.slug}`,'PATCH',{visibility},owner);
     assert.equal((await call(feed)).status,404);assert.equal((await call(image)).status,404);

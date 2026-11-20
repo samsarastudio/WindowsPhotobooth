@@ -423,3 +423,21 @@ Validation: automated image tests cover all looks, JPEG output, zero-strength id
 Open **Admin > Events > Design album**, choose **Classic keepsake · poster style**, then **Save & preview**. The preset selects warm ivory paper, paired-page compositions, fine rounded gold borders and Fill frame. It preserves your selected photos, order, captions, event type, title and logo. Existing saved designs are not automatically changed. Each landscape PDF page contains a complete open-book composition; it is not a print-imposition or binding file.
 
 Spreads alternate left/right, include up to four photos, and adapt to one, two or three photos on the final spread. Headings follow the event type, with custom subtitles and the existing caption library. Select **Fit full photo** to preserve photo edges (especially framed photobooth strips); the preset's **Fill frame** crops edges for the poster look. Preview and PDF share geometry, fine vector frames and leaf ornaments. Paper, layout and frame can also be changed individually. Approved Live and connected photobooth photos use the same album selection; moderation and source-visibility restrictions still apply. Digital PDF only; physical printing is not included. Deploy Live only, with no changes to moments-gallery.
+
+
+### QR logos, normal pages and fold cards
+
+Open **Admin > Events > QR print studio**. Under **Logo & heading area**, set **Heading area** to **Large logo instead of wording**, then change **Logo size (%)** (25–400). This replaces the invitation heading, event name, subtitle, date and location with the uploaded logo. Sizing is bounded to the heading area so it cannot cover the QR. Use **Leave heading area empty** to remove that area entirely. In text mode, uncheck **Show event name** to hide the event-name fallback; other optional text can be cleared individually. Upload a tightly cropped transparent logo for best results. These controls affect QR sheets; album branding remains unchanged.
+
+**QR page layout** determines the PDF:
+- **Normal · 2 portrait pages**: page 1 is the QR design; page 2 is the 1–2–3 instructions and illustration.
+- **Fold card · 1 landscape page**: left half is the QR design, right half is the instructions and illustration, with a subtle centre fold guide. The selected paper size is the whole sheet (A4 folds to two A5 panels).
+- **Single QR page · legacy**: preserves the previous one-page layout and optional orientation.
+
+Normal and Fold card enforce their portrait/landscape orientation. New designs start in Normal; previously saved designs retain legacy output until changed. Edit all three steps under **1–2–3 instruction panel**. Under **Instruction image**, upload a replacement PNG/JPEG/WebP (up to 8 MB) or choose **Restore sample image**. The image fits without cropping. Save & preview, then Download PDF. The default phone illustration was created with the built-in image generation tool using the supplied flyer as a visual reference; it is sample artwork, not a real guest capture.
+
+### Automatic photo approval
+
+Each event card in **Admin > Events** has **Automatically approve new photos** and **Save photo approval**. Checked means new guest captures and uploads are approved when saved and appear on an enabled, visible wall's next refresh (normally within about five seconds after upload finishes). Unchecked means manual review. New-event creation also exposes this choice. Manage event shows the same underlying setting as **Review new photos before sharing**; leave it unchecked for automatic approval.
+
+This does not approve existing pending photos or bypass scheduled reveal, shared-gallery visibility, wall enablement or source-type restrictions. Hide/delete controls remain available. Connected photobooth imports use the event's approval setting too. Deploy Live only; moments-gallery needs no update.

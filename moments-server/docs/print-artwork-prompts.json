@@ -20,6 +20,11 @@
     "family": {
       "file": "exec-5b7bfd7f-eba4-4752-aa44-c9724cab8824.png",
       "prompt": "Use case: stylized-concept. Create a production background artwork for printed event QR stationery and photo album pages. Theme: family gathering: soft pale oatmeal cotton paper with delicate terracotta and sage pressed wildflowers only at the outer corners, warm nostalgic handmade scrapbook sensibility. Portrait 2:3 aspect ratio. Center 75 percent must be empty low-contrast negative space for separate live typography, QR and photographs. Flat full-bleed page artwork, no mockup, no text, letters, QR, logo, photographs, or people. Tasteful premium stationery, elegant restraint."
+    },
+    "qr-instruction-phone": {
+      "file": "live-public/print-themes/qr-instruction-phone.png",
+      "tool": "Built-in image_gen",
+      "prompt": "Create a standalone portrait illustration to use inside a printable event QR instruction page. Use the supplied flyer as reference only for the upright phone and Live camera interface. One large upright black smartphone, fully visible on flat warm ivory #faf6ed. The screen shows joyful diverse adult wedding guests at a warmly lit celebration with camera-switch and settings icons, Looks · Natural, PHOTO, 25 shots left, shutter and Gallery. No external text, QR, logo, headings or numbered steps. Clean print illustration, thin bezel, minimal shadow. Illustrative sample screen, not real customer imagery."
     }
   }
 }

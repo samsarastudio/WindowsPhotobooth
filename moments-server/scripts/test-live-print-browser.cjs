@@ -1,7 +1,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'C:/Users/Unity/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const {spawn}=require('node:child_process');const fs=require('node:fs');const os=require('node:os');const path=require('node:path');const assert=require('node:assert/strict');const sharp=require('sharp');
 (async()=>{
-  const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'print-browser-')),out=path.join(root,'output/live-qa');fs.mkdirSync(out,{recursive:true});
+  const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'print-browser-')),out=process.env.LIVE_PRINT_BROWSER_QA_DIR||path.join(root,'output/live-qa');fs.mkdirSync(out,{recursive:true});
   const base='http://127.0.0.1:3195',key='wall-browser-administrator-key-32-characters';
   const boothBytes=await sharp({create:{width:600,height:400,channels:3,background:'gold'}}).png().toBuffer();
   const boothPhotos=[{id:'booth-photo',url:'/media/booth/photo.png',variant:'framed'}];
@@ -50,6 +50,11 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     await admin.getByRole('button',{name:'Remove gallery & imported photos',exact:true}).click();
     await admin.locator('#notice').filter({hasText:'2 imported photos removed'}).waitFor();
     assert.equal(await admin.getByText('Remove connected gallery',{exact:true}).count(),0);
+    const approval=admin.locator(`[data-photo-approval="${e.slug}"]`);
+    await approval.locator('[name=autoApprove]').check();await approval.getByRole('button',{name:'Save photo approval'}).click();await admin.locator('#notice').filter({hasText:'Photo approval saved'}).waitFor();
+    const liveWall=await browser.newPage({viewport:{width:1280,height:720}});await liveWall.goto(wall.url);await liveWall.locator('[data-id]').first().waitFor();
+    const autoPhoto=await (await guest.request.post(base+`/api/guest/${e.slug}/photos`,{multipart:{photo:{name:'auto.jpg',mimeType:'image/png',buffer:boothBytes},request_id:'auto-on-wall'}})).json();
+    await liveWall.locator(`[data-id="${autoPhoto.id}"]`).first().waitFor({timeout:15000});await liveWall.close();
     await admin.getByRole('link',{name:'QR print studio',exact:true}).click();
     await admin.locator('.design-page').waitFor();await admin.getByLabel('Event type',{exact:true}).selectOption('wedding');
     await admin.getByLabel('Paper size',{exact:true}).selectOption('custom');await admin.getByLabel('Custom width (mm)',{exact:true}).fill('100');await admin.getByLabel('Custom height (mm)',{exact:true}).fill('150');
@@ -59,6 +64,21 @@ const {spawn}=require('node:child_process');const fs=require('node:fs');const os
     const bytes=await sharp({create:{width:160,height:80,channels:3,background:'#a4ba91'}}).png().toBuffer();await admin.getByLabel('Print logo',{exact:true}).setInputFiles({name:'logo.png',mimeType:'image/png',buffer:bytes});await admin.getByRole('button',{name:'Upload logo',exact:true}).click();await admin.getByRole('button',{name:'Remove logo',exact:true}).waitFor();
     let download=admin.waitForEvent('download');await admin.getByRole('button',{name:'Download PDF',exact:true}).click();await (await download).saveAs(path.join(out,'browser-qr.pdf'));
     await admin.evaluate(()=>document.fonts.ready);await admin.screenshot({path:path.join(out,'print-studio-desktop.png'),fullPage:true});
+    await admin.getByLabel('Heading area',{exact:true}).selectOption('logo');await admin.getByLabel('Logo size (%)',{exact:true}).fill('200');
+    await admin.getByLabel('QR page layout',{exact:true}).selectOption('fold');await admin.getByLabel('Paper size',{exact:true}).selectOption('a4');
+    await admin.getByRole('button',{name:'Save & preview',exact:true}).click();await admin.locator('#export-summary').filter({hasText:'One landscape sheet'}).waitFor();
+    assert.equal(await admin.locator('#page-position').innerText(),'1 / 1');
+    await admin.locator('.design-page').screenshot({path:path.join(out,'qr-fold-preview.png')});
+    download=admin.waitForEvent('download');await admin.getByRole('button',{name:'Download PDF',exact:true}).click();await (await download).saveAs(path.join(out,'browser-qr-fold.pdf'));
+    await admin.getByText('Instruction image',{exact:true}).click();
+    await admin.getByLabel('Instruction image file',{exact:true}).setInputFiles({name:'custom.png',mimeType:'image/png',buffer:bytes});
+    await admin.getByRole('button',{name:'Upload instruction image',exact:true}).click();await admin.getByRole('button',{name:'Restore sample image',exact:true}).waitFor();
+    assert.equal(await admin.locator('.design-page img[src*="instruction-image"]').count(),1);
+    await admin.getByRole('button',{name:'Restore sample image',exact:true}).click();await admin.locator('.design-page img[src="/print-themes/qr-instruction-phone.png"]').waitFor();
+    await admin.getByLabel('QR page layout',{exact:true}).selectOption('pages');await admin.getByRole('button',{name:'Save & preview',exact:true}).click();await admin.locator('#export-summary').filter({hasText:'Two portrait pages'}).waitFor();
+    assert.equal(await admin.locator('#page-position').innerText(),'1 / 2');await admin.getByRole('button',{name:'Next page',exact:true}).click();assert.equal(await admin.locator('#page-position').innerText(),'2 / 2');
+    download=admin.waitForEvent('download');await admin.getByRole('button',{name:'Download PDF',exact:true}).click();await (await download).saveAs(path.join(out,'browser-qr-normal.pdf'));
+    await admin.reload();await admin.locator('.design-page').waitFor();assert.equal(await admin.getByLabel('Logo size (%)',{exact:true}).inputValue(),'200');assert.equal(await admin.getByLabel('Heading area',{exact:true}).inputValue(),'logo');
     await admin.getByRole('link',{name:'Landscape album',exact:true}).click();await admin.locator('.design-page').waitFor();
     await admin.getByLabel('Photo frame',{exact:true}).selectOption('gold');await admin.getByLabel('Photo fitting',{exact:true}).selectOption('cover');
     await admin.getByLabel('Album cover title',{exact:true}).fill('A day held close');await admin.getByLabel('Opening note (optional)',{exact:true}).fill('All our favorite people, together. A collection of moments from every perspective.');
