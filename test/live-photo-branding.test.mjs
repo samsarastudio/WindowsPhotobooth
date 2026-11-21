@@ -25,6 +25,10 @@ test('Admin photo border persists and brands new portrait, landscape and square 
  await page.locator('#photo-branding select').selectOption('kwca_gold');await page.getByRole('button',{name:'Save photo border',exact:true}).click();
  await page.getByText('Photo border saved for new photos',{exact:true}).waitFor();await page.reload();
  assert.equal(await page.locator('#photo-branding select').inputValue(),'kwca_gold');
+ const cover=new FormData();cover.append('photo',new Blob([await sharp({create:{width:300,height:100,channels:3,background:'#c9a25c'}}).png().toBuffer()]),'cover.png');
+ assert.equal((await api(`/api/events/${event.slug}/assets/cover`,'POST',cover,owner)).status,200);
+ const guestPage=await context.newPage();await guestPage.goto(`${base}/e/${event.slug}`);await guestPage.locator('#camera-placeholder img').waitFor();
+ assert(await guestPage.locator('#camera-placeholder img').evaluate(img=>img.complete&&img.naturalWidth>0),'Uploaded cover displays on welcome screen');await guestPage.close();
  const guest=(await api(`/api/guest/${event.slug}/join`,'POST',{name:'QA'})).cookie;
  let n=0;const saved=[];
  for(const [width,height] of [[900,1200],[1200,900],[900,900]]){
