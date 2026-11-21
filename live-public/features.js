@@ -22,6 +22,7 @@ export function applyCapabilities(flags) {
   }
   const hostOption = document.querySelector('#settings [name=visibility] option[value=host]');
   if (hostOption) hostOption.disabled = flags.hostOnlyGallery === false && !hostOption.selected;
+  const border=document.querySelector('#photo-branding');if(border)border.hidden=flags.branding===false;
   const assets = document.querySelector('#assets'); if (assets) assets.hidden = flags.branding === false;
   for (const [key, selector] of Object.entries({ downloads: 'a[href*="?download="],a[href$="/download"]', photobooks: 'a[href$="/photobook"],a[href$="/album"]', slideshow: 'a[href$="/slideshow"]' })) {
     document.querySelectorAll(selector).forEach(el => { el.hidden = flags[key] === false; });
