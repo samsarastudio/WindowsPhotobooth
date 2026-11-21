@@ -22,6 +22,14 @@ test('Admin photo border persists and brands new portrait, landscape and square 
  browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext();
  const equals=owner.indexOf('=');await context.addCookies([{name:owner.slice(0,equals),value:owner.slice(equals+1),url:base}]);const page=await context.newPage();
  await page.goto(`${base}/host/${event.slug}`);await page.getByText('Cover & branding',{exact:true}).click();
+ for(const viewport of [{width:1697,height:900},{width:390,height:844}]){
+  await page.setViewportSize(viewport);
+  const bounds=await page.evaluate(()=>{const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,height:r.height};};return {card:box('.settings'),form:box('#photo-branding'),image:box('.photo-branding-badge'),select:box('#photo-branding select'),page:document.documentElement.scrollWidth,viewport:innerWidth};});
+  assert(bounds.image.width<=72&&bounds.image.height<=72,'Badge remains thumbnail-sized under real CSP');
+  for(const part of [bounds.form,bounds.select,bounds.image])assert(part.left>=bounds.card.left&&part.right<=bounds.card.right,'Branding stays inside settings card');
+  assert(bounds.page<=bounds.viewport,'No horizontal page overflow');
+  if(process.env.BRANDING_QA_OUTPUT){fs.mkdirSync(process.env.BRANDING_QA_OUTPUT,{recursive:true});await page.locator('details').filter({has:page.locator('#photo-branding')}).screenshot({path:path.join(process.env.BRANDING_QA_OUTPUT,`branding-${viewport.width}.png`)});}
+ }
  await page.locator('#photo-branding select').selectOption('kwca_gold');await page.getByRole('button',{name:'Save photo border',exact:true}).click();
  await page.getByText('Photo border saved for new photos',{exact:true}).waitFor();await page.reload();
  assert.equal(await page.locator('#photo-branding select').inputValue(),'kwca_gold');

@@ -469,3 +469,20 @@ Live photos are returned only by the selected session's `?wall=1` feed and broad
 `docs/gallery-event-wall.patch` upgrades Gallery from the preceding `88737d7` / server `58c9bb1` release, preserving configuration/data. Fetch `codex/moments-live-server`, export the patch with `git show FETCH_HEAD:docs/gallery-event-wall.patch`, check with `git apply --check -p2`, then apply and restart `moments-gallery`. Stop and reconcile if the version or local edits differ. Update `/opt/moments-live` with the normal fast-forward pull and restart `moments-live`. Live adds `session_slug`/`session_id` columns automatically; back up its database as usual.
 
 Validation adds `node --test test/gallery-event-wall.test.mjs test/live-gallery-wall.test.mjs test/gallery-types.test.mjs`: two real Gallery sessions, separate booth/Live photo sets, scoped additions/removals, global rejection, disconnect isolation, expiry, same-slug recreation, and EXIF handling.
+
+### Wait for readiness after restarting
+
+`systemctl restart` may return before Node has finished startup and opened port 3021.
+Use the bounded readiness check below instead of a single immediate curl. It retries
+connection failures and validates both `ok: true` and `service: moments-live`.
+A timeout exits nonzero; deployment automation must not report success on that exit.
+
+```bash
+cd /opt/moments-live
+git pull --ff-only origin codex/moments-live-server &&
+sudo systemctl restart moments-live &&
+node scripts/wait-live-ready.mjs
+```
+
+This repository supplies the readiness command; external Discord bot deployment
+scripts need to call it explicitly.
