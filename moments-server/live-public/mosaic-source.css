@@ -487,3 +487,7 @@ body.is-mosaic-completed .mosaic-watermark {
     opacity: 0;
   }
 }
+
+/* The visible card hugs the photo inside its reserved mosaic space. */
+.mosaic-slot{display:flex;align-items:center;justify-content:center}
+.mosaic-slot.is-filled .mosaic-slot-card{flex:none;border:0}
