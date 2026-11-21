@@ -1,4 +1,4 @@
-import {photoLooks,svgLookMatrix} from './photo-looks.js';
+import {photoLooks,svgLookMatrix,applyPhotoLook} from './photo-looks.js';
 export function mountPhotoLooks({app,enabled,selection,onChange}){
   if(!enabled)return;
   app.querySelector('.camera-shell').classList.add('has-photo-looks');
@@ -7,6 +7,30 @@ export function mountPhotoLooks({app,enabled,selection,onChange}){
   const matrix=(id,look,strength)=>{const f=document.createElementNS(ns,'filter');f.id=id;f.setAttribute('color-interpolation-filters','sRGB');const m=document.createElementNS(ns,'feColorMatrix');m.setAttribute('type','matrix');m.setAttribute('values',svgLookMatrix(look,strength));f.append(m);defs.append(f);return m;};
   const hintKey='moments-photo-looks-seen:'+location.pathname;
   let discover=true;try{discover=sessionStorage.getItem(hintKey)!=='1';}catch{}
+  // WebKit can ignore SVG filters on hardware-backed video. Render the same
+  // colour matrix into a separate display canvas; capture still uses raw video.
+  const video=app.querySelector('#camera-preview');
+  const canvas=document.createElement('canvas');canvas.id='camera-look-preview';canvas.hidden=true;
+  canvas.setAttribute('aria-label','Camera preview with selected photo look');
+  video.after(canvas);
+  const context=canvas.getContext('2d',{willReadFrequently:true});
+  let lastFrame=0;
+  const renderPreview=time=>{
+    if(!video.isConnected)return;
+    requestAnimationFrame(renderPreview);
+    const active=selection.id!=='natural'&&selection.strength>0&&!video.hidden&&video.readyState>=2&&video.videoWidth>0;
+    if(!active||document.hidden){canvas.hidden=true;return;}
+    if(time-lastFrame<1000/24)return;
+    lastFrame=time;
+    const scale=Math.min(1,720/Math.max(video.videoWidth,video.videoHeight));
+    const width=Math.round(video.videoWidth*scale),height=Math.round(video.videoHeight*scale);
+    if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+    context.drawImage(video,0,0,width,height);
+    const frame=context.getImageData(0,0,width,height);
+    applyPhotoLook(frame.data,selection.id,selection.strength,4);
+    context.putImageData(frame,0,0);canvas.hidden=false;
+  };
+  requestAnimationFrame(renderPreview);
   const current=matrix('current-photo-look',selection.id,selection.strength);
   photoLooks.forEach(l=>matrix('look-sample-'+l.id,l.id,70));app.append(svg);
   const trigger=document.createElement('button');trigger.id='open-photo-looks';trigger.type='button';trigger.className='photo-looks-trigger';app.querySelector('.camera-bottom').prepend(trigger);
