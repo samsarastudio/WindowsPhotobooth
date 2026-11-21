@@ -70,3 +70,11 @@ body[data-screen=guest]{--safe-top:env(safe-area-inset-top,0px);--safe-right:env
 .wall-display-settings,.wall-asset{flex-basis:100%;width:100%;display:grid;gap:12px;margin-top:20px}.wall-display-settings label{display:grid;gap:6px}.wall-display-settings label.check{display:flex}.wall-display-settings input[type=checkbox]{width:auto}.wall-asset input{max-width:100%}
 
 .capture-review{width:min(94vw,650px);max-height:94dvh;padding:18px;overflow:auto}.capture-review h2{margin:0 0 12px}.capture-review img{display:block;width:100%;height:min(64dvh,650px);object-fit:contain}.capture-review .actions{justify-content:center;margin-top:16px}.capture-review .actions button{min-width:120px}
+
+/* Keep branding within the settings column; CSP disallows inline styles. */
+.workspace>.settings,.advanced-settings,#photo-branding{min-width:0;max-width:100%}
+#photo-branding{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:18px 0 24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+#photo-branding label,#photo-branding select,#photo-branding button{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+#photo-branding p{margin:0;overflow-wrap:anywhere}
+.photo-branding-badge{display:block;width:72px;height:72px;max-width:100%;object-fit:contain}
+.event-cover-preview{display:block;width:auto;height:auto;max-width:180px;max-height:80px;object-fit:contain;border-radius:8px;margin:0 auto}
