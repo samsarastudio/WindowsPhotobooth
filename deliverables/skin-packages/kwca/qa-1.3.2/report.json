@@ -1,0 +1,14 @@
+{
+  "live": false,
+  "physicalPrinting": false,
+  "checks": [
+    "Only two KWCA backdrop choices",
+    "Default background option; two captures without waiting; finish returns while processing",
+    "Creative effect follows portrait reorder and persists in queued job",
+    "Next family captured and queued while previous family was processing",
+    "Both isolated family jobs completed with correct portrait counts",
+    "Optional foreground review and edit retains portrait"
+  ],
+  "finishReturnMs": 1542,
+  "passed": true
+}

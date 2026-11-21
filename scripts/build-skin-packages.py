@@ -24,16 +24,19 @@ def build(id,name,description,ref=None,version="1.0.0"):
  config.get('copy',{}).get('qr',{}).pop('bypassCode',None)
  if id=='sports-cricket':
   for f in (ROOT/'skin-packages/sports-cricket').rglob('*'):
-   if f.is_file():files[f.relative_to(ROOT/'skin-packages/sports-cricket').as_posix()]=f.read_bytes()
+   if f.is_file():
+    rel=f.relative_to(ROOT/'skin-packages/sports-cricket').as_posix()
+    if rel.startswith('config/ai-backgrounds/scene/') and not any(n in rel for n in ['kwca-trophy-gallery','kwca-players-pavilion']):continue
+    files[rel]=f.read_bytes()
   config=json.loads(json.dumps(config).replace('Christmas','match-day').replace('christmas','cricket').replace('MerryBooth','Match Day').replace('Christmas character','cricket scene'))
   config['aiModes']=[{'id':'scene','label':'Cricket backdrops','pipeline':'scene','useInpainting':True,'randomizeBackground':False,'allowBackgroundChoice':True,'prompt':'Keep every guest exactly as photographed. Replace only the background with this cricket venue. Preserve faces, clothing, poses, proportions and depth.'}]
   config['aiGenerationEnabled']=True;config['defaultAiModeId']=None
   config['photoFrames'].update(defaultFrameFile='cricket-landscape.png',defaultPortraitFrameFile='cricket-portrait.png',guestFrameFiles=['cricket-landscape.png','cricket-portrait.png'],guestTextCreditLine='KWCA',guestTextColor='#ffc928')
   config['copy']['attract'].update(title='MATCH DAY',tagline='INMOMENT · CRICKET',subtitle='Your team. Your moment.',ctaLabel='Step into the game',startAria='Start your cricket photo')
-  config['copy']['sceneSelect'].update(title='Choose your ground',subtitle='Broadcast Arena, Cricket Analysis Studio, Champions Gallery or two exclusive KWCA venues.')
+  config['copy']['sceneSelect'].update(title='Choose your backdrop',subtitle='Two KWCA settings. Your moment.')
   config['copy']['aiMode'].update(subtitle='A classic keepsake or a cricket backdrop. Your choice.',sceneEntryHint='Step into an unforgettable cricket setting.')
   config['copy']['result']['thinkingStepPlan']='Applying your match-day backdrop'
-  presentation={'familyCardEnabled':True,'familyCardTitle':'KWCA Team Card','familyCard':'presentation/team-card.jpg','hero':'theme/assets/stadium.webp','photo':'presentation/classic-black.webp','scene':'config/ai-backgrounds/scene/players-tunnel.webp'}
+  presentation={'familyCardEnabled':True,'familyCardTitle':'KWCA Team Card','familyCard':'presentation/team-card.jpg','hero':'theme/assets/stadium.webp','photo':'presentation/classic-black.webp','scene':'config/ai-backgrounds/scene/kwca-players-pavilion.webp'}
  else:
   addtree('themes/'+id,'theme')
   for folder in ['ai-backgrounds','photo-frames','compositions']:addtree('config/'+folder,'config/'+folder)
@@ -88,7 +91,7 @@ def build(id,name,description,ref=None,version="1.0.0"):
     if plate and j.get('variants'):j['baseSha256']=hashlib.sha256(plate).hexdigest()
    optimized[k]=json.dumps(j,ensure_ascii=False).encode()
  files=optimized;config=rewrite(config);presentation=rewrite(presentation)
- manifest={'schemaVersion':1,'id':id,'name':name,'version':version,'minAppVersion':'1.3.1' if id=='sports-cricket' else '1.3.0','description':description,'presentation':presentation,'config':config,'files':{k:hashlib.sha256(v).hexdigest() for k,v in sorted(files.items())}}
+ manifest={'schemaVersion':1,'id':id,'name':name,'version':version,'minAppVersion':'1.3.2' if id=='sports-cricket' else '1.3.0','description':description,'presentation':presentation,'config':config,'files':{k:hashlib.sha256(v).hexdigest() for k,v in sorted(files.items())}}
  if ref:manifest['sourceRevision']=subprocess.check_output(['git','rev-parse',ref],cwd=ROOT,text=True).strip()
  files['theme/theme.json']=json.dumps({'id':id,'name':name,'version':version,'author':'InMoment'}).encode()
  manifest['files']['theme/theme.json']=hashlib.sha256(files['theme/theme.json']).hexdigest()
@@ -101,4 +104,4 @@ def build(id,name,description,ref=None,version="1.0.0"):
 if '--sports-only' not in sys.argv:
  build('christmas','Christmas · Evergreen & Gold','Cinematic winter backdrops, Merry Christmas frames and 1–10 person family cards.')
  build('halloween','Halloween · After Dark','Original HauntBooth scenery, depth plates, character compositions and Halloween frames.','8b413fae60742b92c94a4decf84a23104a6b591a')
-build('sports-cricket','Match Day · Cricket','Five cricket settings with close / medium / wide depth plates, including the branded KWCA Trophy Gallery and KWCA Players Pavilion.',version='1.3.0')
+build('sports-cricket','Match Day · Cricket','Two branded KWCA venues with close / medium / wide depth plates and creative team cards.',version='1.3.1')

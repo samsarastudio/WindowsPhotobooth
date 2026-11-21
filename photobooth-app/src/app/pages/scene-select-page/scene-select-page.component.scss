@@ -86,3 +86,5 @@
   text-align: center;
   padding-bottom: 0.2rem;
 }
+
+.pb-scene-grid.two-scenes{grid-template-columns:repeat(2,minmax(0,1fr));max-width:940px;gap:24px}.two-scenes .pb-scene-card{width:100%;padding:10px;border-radius:18px}.two-scenes .pb-scene-card-label{font-size:16px;letter-spacing:.02em;text-transform:none;padding:12px 0 7px}.pb-scene-select-inner .pb-sub{text-align:center;font-size:18px}.pb-scene-grid.two-scenes img{aspect-ratio:3/2}@media(max-width:560px){.pb-scene-grid.two-scenes{grid-template-columns:1fr;gap:12px;overflow:auto}.two-scenes .pb-scene-card img{max-height:200px}}

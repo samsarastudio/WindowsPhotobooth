@@ -1,18 +1,25 @@
-# KWCA release — 18 November 2026
+# KWCA release — 21 November 2026
 
-- PhotoBooth 1.3.1 OTA is uploaded and active on moments.inmomentservices.com.
-- OTA release ID: `DvBMpyXUspoB`; build: `20261118-kwca`.
-- Server archive: 592869345 bytes; SHA-256 `ad3e935cad26e084658794ad6e9275e448e7f2a7fe2a034672b53cc380bbd569`.
-- Uploadable local archive: `C:/Users/Unity/.codex/builds/PhotoBooth-1.3.1/PhotoBooth-Folder-1.3.1-20261118-kwca-ota.zip`.
-- This archive retains BiRefNet and omits the unused U2Net model to fit the server's 600 MB upload limit.
-- Both current frames are uploaded to the existing Gallery admin frame library: `cricket-landscape.png` and `cricket-portrait.png`. Downloaded bytes were verified against the originals.
+PhotoBooth 1.3.2 OTA is uploaded and active on moments.inmomentservices.com.
 
-Frame sources remain in `skin-packages/sports-cricket/config/photo-frames`. Run `node scripts/publish-kwca-frames.cjs` from the repository to republish them using the local Moments admin credentials. This explicitly replaces these two filenames; other frames are untouched.
+- Release ID: `Hbakb2ZeO-rQ`; build: `20261121-kwca-poses`.
+- Archive: 600773948 bytes.
+- SHA-256: `23bed5b33d609468dc78dc4c6a1079e73937b0da685b14ee283842a4f4be395e`.
+- Local archive: `C:/Users/Unity/.codex/builds/PhotoBooth-1.3.2/PhotoBooth-Folder-1.3.2-20261121-kwca-poses-ota.zip`.
+- BiRefNet is retained; unused U2Net is omitted to fit the server upload limit.
+
+## Booth setup after OTA
+
+In Admin → Themes, import `skin-packages-to-import/sports-cricket-1.3.1.booth.zip` beside PhotoBooth.exe, then apply it. Existing installed skins and settings are preserved by OTA; this explicit import installs the updated artwork and two-scene menu.
+
+The new package contains only KWCA Players Pavilion and KWCA Trophy Gallery, each with original close/medium/wide depth logic. It includes the refined gold/orange team card design. The app has a simplified collage screen with optional controls collapsed, per-person effects and ordering, and background queue processing enabled by default.
+
+## Verification
+
+Packaged app capture tests passed: two backdrop choices, consecutive captures, effect/reorder persistence, a second family captured while the first processes, both queued cards completed, and foreground review/edit. Desktop and narrow-screen layout checks passed. See `qa-1.3.2/report.json` and previews. Physical printing and live gallery delivery were not exercised in this test.
 
 ## Remaining manual server deployment
 
-The live server currently returns 404 for `/api/admin/booth-packages`. Deploy the package catalog integration using `moments-server/docs/booth-packages.md`. Preserve the existing Gallery checkout's local configuration and data; do not replace it with the independent Moments Live service.
+The live package catalog endpoint `/api/admin/booth-packages` still returns 404. Deploy the package catalog integration using `moments-server/docs/booth-packages.md`, preserving the Gallery checkout's local configuration and data. Then upload and publish `deliverables/skin-packages/sports-cricket-1.3.1.booth.zip` (requires PhotoBooth 1.3.2).
 
-Then upload and publish `deliverables/skin-packages/sports-cricket-1.3.0.booth.zip`. It requires PhotoBooth 1.3.1 and includes the KWCA 1–10-person card, leafy shared dividers, compact branded frames and existing backdrop depth variants. Booth administrators can download and apply it after the app update.
-
-Uploading frames to Gallery alone does not install the team-card package or enable its guest mode. The frame library and skin-package catalog are separate services.
+The existing Gallery frame library already contains the compact KWCA frames `cricket-landscape.png` and `cricket-portrait.png`. Sources remain in `skin-packages/sports-cricket/config/photo-frames`; `node scripts/publish-kwca-frames.cjs` republishes these two filenames. Uploading frames alone does not install the team-card skin package.

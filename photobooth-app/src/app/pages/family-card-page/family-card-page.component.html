@@ -1,0 +1,48 @@
+<main class="pb-page card-page">
+ <section class="pb-card family">
+  <header class="card-header">
+   <button class="quiet" [disabled]="busy()" (click)="cancel()">Cancel card</button>
+   <span class="eyebrow">YOUR PHOTO CARD</span>
+   <span class="count">{{card.members().length}} / 10</span>
+  </header>
+  <div class="intro"><h1>{{pending() ? 'Looking good?' : 'Everyone in. One great card.'}}</h1><p>{{pending() ? 'Keep this portrait or try another pose.' : 'Take a portrait of each person. We’ll bring you together.'}}</p></div>
+  @if(error()){<p class="notice" role="alert">{{error()}}</p>}
+  @if(busy()){<p class="notice" role="status">{{status()}}</p>}
+  @if(pending(); as p){
+   <div class="review-wrap"><img class="review" [src]="p.url" alt="Captured portrait for review"/></div>
+   <footer class="actions"><button class="secondary" [disabled]="busy()" (click)="capture()">Retake</button><button class="primary" [disabled]="busy()" (click)="accept()">Add this person</button></footer>
+  }@else{
+   <div class="members" [class.empty]="!card.members().length">
+    @for(m of card.members();track m.path;let i=$index){
+     <button class="portrait" [class.selected]="editing()===i" [disabled]="busy()" (click)="editing.set(editing()===i?null:i)" [attr.aria-label]="'Edit person '+(i+1)">
+      <img [src]="m.url" [alt]="'Person '+(i+1)"/><span class="number">{{i+1}}</span><span class="portrait-status" [class.failed]="m.error">{{m.error?'Needs retry':m.processed?'Ready':'Preparing…'}}</span>
+     </button>
+    }
+    @if(!card.members().length){<div class="empty-state"><span class="empty-icon" aria-hidden="true">＋</span><h2>Start with a smile</h2><p>Your portraits will appear here.</p></div>}
+   </div>
+   @if(editing() !== null){
+    @if(card.members()[editing()!]; as member){
+     <div class="portrait-editor">
+      <strong>Person {{editing()!+1}}</strong>
+      <label>Frame effect<select [ngModel]="member.effect||'behind'" (ngModelChange)="card.setEffect(editing()!,$event)" [disabled]="busy()"><option value="behind">Inside</option><option value="over-frame">Over frame</option></select></label>
+      <div class="order"><button [disabled]="busy()||editing()===0" aria-label="Move earlier" (click)="move(-1)">←</button><button [disabled]="busy()||editing()===card.members().length-1" aria-label="Move later" (click)="move(1)">→</button></div>
+      <button class="quiet remove" [disabled]="busy()" [attr.aria-label]="'Remove person '+(editing()!+1)" (click)="remove(editing()!)">Remove</button>
+      <button class="quiet" (click)="editing.set(null)">Done</button>
+     </div>
+    }
+   }
+   <details class="options">
+    <summary>Card options <span>Name, poses &amp; processing</span></summary>
+    <div class="option-grid">
+     <label>Greeting <span class="optional">optional</span><input maxlength="60" [disabled]="busy()" [ngModel]="card.name()" (ngModelChange)="card.name.set($event)" placeholder="Your name or greeting"/></label>
+     <label>Planned group size<select [disabled]="busy()" [ngModel]="card.plannedCount()" (ngModelChange)="card.plannedCount.set(+$event)">@for(n of [1,2,3,4,5,6,7,8,9,10];track n){<option [ngValue]="n">{{n}} people</option>}</select></label>
+     <label>Next portrait<select [disabled]="busy()" [ngModel]="card.nextEffect()" (ngModelChange)="card.nextEffect.set($event)"><option value="behind">Inside the frame</option><option value="over-frame">Reach over the frame</option></select></label>
+    </div>
+    <p class="pose-guide">{{card.poseGuide()}}</p>
+    <label class="queue-option"><input type="checkbox" [disabled]="busy()" [ngModel]="card.background()" (ngModelChange)="card.background.set($event)"/> Process in background</label>
+   </details>
+   <footer class="actions"><button [class.primary]="!card.members().length" [class.secondary]="card.members().length" [disabled]="busy()||card.members().length>=10" (click)="capture()">{{card.members().length?'Take another':'Take first photo'}}</button>@if(card.members().length){<button class="primary" [disabled]="busy()" (click)="finish()">Finish card <span aria-hidden="true">→</span></button>}</footer>
+   <p class="footnote">{{card.members().length?'Tap a portrait to edit. Finish whenever everyone’s in.':'Up to 10 people. No need to wait between portraits.'}}</p>
+  }
+ </section>
+</main>

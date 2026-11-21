@@ -13,7 +13,7 @@
     } @else if (!hasScenes()) {
       <p class="pb-hint">Backgrounds are not available right now. Please choose another experience or ask our team for help.</p>
     } @else {
-      <ul class="pb-scene-grid" role="list">
+      <ul class="pb-scene-grid" [class.two-scenes]="scenes().length === 2" role="list">
         @for (s of scenes(); track s.filename) {
           <li>
             <button type="button" class="pb-scene-card" (click)="choose(s.filename)">
