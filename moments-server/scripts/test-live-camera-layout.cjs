@@ -32,6 +32,9 @@ const sizes = [
     const invite = await api('/admin/invitations',{name:'Camera QA',email:'camera@example.com'},{'X-Live-Admin-Key':key});
     const auth = await api('/auth/accept',{token:new URLSearchParams(new URL(invite.body.url).hash.slice(1)).get('access')});
     const event = (await api('/events',{title:'A night to remember',status:'published',visibility:'own'}, {cookie:auth.cookie})).body;
+    // Include an oversized uploaded cover: it must never replace the live camera.
+    const cover=new FormData();cover.append('photo',new Blob([await sharp({create:{width:1600,height:1600,channels:3,background:'#c9a25c'}}).png().toBuffer()]),'cover.png');
+    assert.equal((await fetch(`${base}/api/events/${event.slug}/assets/cover`,{method:'POST',headers:{cookie:auth.cookie},body:cover})).status,200);
     for (const engine of (process.env.CAMERA_ENGINES || 'chromium,webkit').split(',')) {
       browser = await (engine === 'chromium' ? chromium.launch({ channel:'chrome',headless:true }) : webkit.launch({headless:true}));
       for (const [name,width,height,insets] of sizes.filter(s=>!process.env.CAMERA_CASES||process.env.CAMERA_CASES.split(',').includes(s[0]))) {
@@ -67,6 +70,8 @@ const sizes = [
         await page.goto(`${base}/e/${event.slug}`);
         if(insets) await page.evaluate(v=>{for(const [k,value] of Object.entries(v))document.body.style.setProperty(`--safe-${k}`,`${value}px`);},insets);
         await page.locator('#join [name=name]').fill('Guest'); await page.getByRole('button',{name:'Join event',exact:true}).click();
+        await page.locator('#camera').waitFor({state:'visible'});
+        assert.equal(await page.locator('.event-cover-preview').count(),0,'Joined guests do not see the event cover in the viewfinder');
         await page.locator('#camera').click(); await page.locator('#shutter:not([disabled])').waitFor().catch(async e=>{console.error(engine, await page.locator('body').innerText(), errors);throw e;});
         const check = async selector => {
           const r=await page.locator(selector).boundingBox(); assert.ok(r,`${engine}/${name} ${selector} visible`);
@@ -75,6 +80,7 @@ const sizes = [
         };
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight),true,`${engine}/${name}: no page scroll`);
         assert.equal(await page.locator('body>header').isVisible(),false);
+        assert(await page.locator('#camera-placeholder').isHidden(),'Live video replaces placeholder after camera starts');
         const preview=await check('#camera-preview'); assert.ok(preview.width>100&&preview.height>100);
         for(const selector of ['#shutter','#open-gallery','#open-camera-settings','#quick-flip']) {const r=await check(selector);assert.ok(r.width>=44&&r.height>=44,`${selector} touch target`);}
         await check('#open-photo-looks');assert.equal(await page.locator('#open-photo-looks').innerText(),'Try live filters ✨');
