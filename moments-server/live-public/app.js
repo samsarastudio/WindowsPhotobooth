@@ -187,14 +187,11 @@ async function guestView() {
   action('#shutter', async () => {
     const video = document.querySelector('#camera-preview');
     if (!canCapture() || uploadBusy || pendingUploads.length || !video?.videoWidth || !stream) return;
-    // Crop the capture to exactly the same centre crop shown in the viewfinder.
-    const ratio = video.clientWidth / video.clientHeight;
-    const sw = Math.min(video.videoWidth, video.videoHeight * ratio);
-    const sh = Math.min(video.videoHeight, video.videoWidth / ratio);
-    const canvas = document.createElement('canvas'); canvas.width = Math.round(sw); canvas.height = Math.round(sh);
-    canvas.getContext('2d').drawImage(video, (video.videoWidth-sw)/2, (video.videoHeight-sh)/2, sw, sh, 0, 0, canvas.width, canvas.height);
+    // Browser video dimensions already reflect sensor orientation; preserve the full frame.
+    const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
     uploadBusy = true; cameraControls();
-    try { const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', .92)); if (!blob) throw new Error('Could not take a photo. Please try again.'); uploadBusy = false; await uploadFiles([blob]); }
+    try { const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', .92)); if (!blob) throw new Error('Could not take a photo. Please try again.'); const accepted=await reviewCapture(blob); if(accepted){uploadBusy = false; await uploadFiles([blob]);} }
     finally { uploadBusy = false; cameraControls(); }
   });
   document.querySelector('#upload').addEventListener('change', event => { document.querySelector('#camera-settings').close(); void uploadFiles([...event.target.files]); });
@@ -241,6 +238,18 @@ async function uploadFiles(files, retry = false) {
     notice(`${completed} ${completed === 1 ? 'photo' : 'photos'} shared${guestState.event.moderation ? ' — waiting for host approval.' : '.'}`);
   } catch (err) { notice(`${completed ? completed + ' shared. ' : ''}${err.message} ${pendingUploads.length ? 'Your photo is kept here for retry. Keep this page open.' : ''}`, true); }
   finally { uploadBusy = false; renderUploadRecovery(); try { await guestView(); } catch { const status = document.querySelector('#upload-status'); if (status) status.textContent = 'Could not refresh. Check your connection.'; } cameraControls(); }
+}
+function reviewCapture(blob) {
+  return new Promise(resolve=>{
+    const url=URL.createObjectURL(blob),dialog=document.createElement('dialog');
+    dialog.className='capture-review';
+    dialog.innerHTML='<h2>Your photo</h2><img alt="Captured photo preview"><div class="actions"><button class="secondary" type="button" data-retake>Retake</button><button type="button" data-use>Use photo</button></div>';
+    dialog.querySelector('img').src=url;if(document.querySelector('.camera-shell.has-photo-looks'))dialog.querySelector('img').style.filter='url(#current-photo-look)';document.body.append(dialog);
+    dialog.querySelector('[data-retake]').onclick=()=>dialog.close('retake');
+    dialog.querySelector('[data-use]').onclick=()=>dialog.close('use');
+    dialog.addEventListener('close',()=>{const accepted=dialog.returnValue==='use';URL.revokeObjectURL(url);dialog.remove();resolve(accepted);},{once:true});
+    dialog.showModal();
+  });
 }
 function stopCamera() {
   cameraAttempt++; stream?.getTracks().forEach(t => t.stop()); stream = null;

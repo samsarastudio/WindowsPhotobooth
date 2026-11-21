@@ -95,6 +95,7 @@ const sharp = require('sharp');
     // Simulate a saved photo whose response is lost; retry must not spend another shot.
     await guest.route(`**/api/guest/${slug}/photos`, async route => { await route.fetch(); await route.abort('failed'); }, { times: 1 });
     await guest.locator('#shutter').click();
+    await guest.getByRole('button',{name:'Use photo',exact:true}).click();
     await guest.locator('#retry-upload').waitFor();
     await guest.locator('#retry-upload').click();
     await guest.locator('#notice').filter({ hasText: 'photo shared' }).waitFor();

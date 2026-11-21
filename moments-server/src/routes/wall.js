@@ -1,11 +1,12 @@
 import fs from 'node:fs';
+import {createLiveWallBridge} from '../live-wall-bridge.js';
 import path from 'node:path';
 import multer from 'multer';
 import { Router } from 'express';
 import { config } from '../config.js';
 import { getDb, isSessionExpired, publicPhoto, loadSettings, saveSettings, selectDisplayPhotos } from '../db.js';
 import { subscribeSession, broadcastPhotoAdded, broadcastEvent } from '../sse.js';
-import { requireAdminPin } from '../auth.js';
+import { requireAdminPin, requireUploadToken } from '../auth.js';
 
 const WALL_CHANNEL = '__wall__';
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg']);
@@ -30,7 +31,7 @@ function listActiveSessions(now = new Date()) {
 function listWallPhotos(limit = 4000) {
   const sessions = listActiveSessions();
   const byId = new Map(sessions.map((s) => [s.id, s]));
-  if (!sessions.length) return { photos: [], sessions: [] };
+  if (!sessions.length) return { photos: liveBridge.list(), sessions: [] };
   const placeholders = sessions.map(() => '?').join(',');
   const rows = getDb()
     .prepare(
@@ -54,7 +55,7 @@ function listWallPhotos(limit = 4000) {
     })
     .filter(Boolean);
   return {
-    photos,
+    photos: [...photos,...liveBridge.list()],
     sessions: sessions.map((s) => ({
       slug: s.slug,
       title: s.title,
@@ -128,10 +129,12 @@ export function notifyWallPhoto(photo) {
 }
 
 export const wallRouter = Router();
+const liveBridge=createLiveWallBridge({dir:path.join(config.dataDir,'live-wall'),authorize:requireUploadToken,notify:(type,photo)=>broadcastEvent(WALL_CHANNEL,type,photo)});
+wallRouter.use('/live',liveBridge.router);
 
 wallRouter.get('/', (_req, res) => {
   const { photos, sessions } = listWallPhotos();
-  res.json({
+  res.set('Cache-Control','no-store').json({
     ok: true,
     wall: wallSettings(),
     photoCount: photos.length,

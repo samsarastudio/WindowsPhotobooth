@@ -1,4 +1,5 @@
 import {photoLooks,applyPhotoLook} from '../../live-public/photo-looks.js';
+import {registerGalleryWall} from './gallery-wall.js';
 import {registerPhotobooth} from './photobooth.js';
 import {registerPrintStudio} from './print-studio.js';
 import { registerWall } from './wall.js';
@@ -363,6 +364,7 @@ export function createLiveApp(options = {}) {
     res.json(db.prepare('SELECT id FROM photos WHERE event=? AND approved=1 AND source_visible=1 ORDER BY created DESC').all(e.id).map(p => ({ id: p.id, url: `/api/guest/${e.slug}/photos/${p.id}/image` })));
   }));
   const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL,pollMs:options.galleryPollMs ?? 5000});
+  const stopGalleryWall=registerGalleryWall({app,db,mustAdmin,event,features,data,wrap,fail,now,pollMs:options.galleryPollMs??5000});
   registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail});
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
@@ -389,5 +391,5 @@ export function createLiveApp(options = {}) {
     if (status === 500) console.error('[moments-live]', err.message);
     res.status(status).json({ error: status === 500 ? 'Unable to complete this request' : err.message });
   });
-  return { app, db, close: () => { stopPhotobooth(); db.close(); } };
+  return { app, db, close: () => { stopPhotobooth(); stopGalleryWall(); db.close(); } };
 }

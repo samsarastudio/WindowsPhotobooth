@@ -638,6 +638,16 @@ els.btnSaveGuestPhoto?.addEventListener('click', () => {
   void savePhotoToDevice(photo.url, `${photo.id}-${photo.variant || 'photo'}.jpg`);
 });
 
+const photoAspects=new Map();
+let orientationRefresh;
+const portraitPhoto=p=>(photoAspects.get(p.id)||(p.width&&p.height?p.width/p.height:1.5))<1;
+function observePhotoOrientation(img,photo){
+  const loaded=()=>{if(!img.naturalWidth||!photos.some(p=>p.id===photo.id))return;
+    const ratio=img.naturalWidth/img.naturalHeight,old=portraitPhoto(photo);photoAspects.set(photo.id,ratio);
+    if(old!==(ratio<1)){clearTimeout(orientationRefresh);orientationRefresh=setTimeout(()=>{if(viewMode==='mosaic')applyMosaicLayoutMode(true);},100);}
+  };
+  img.onload=loaded;if(img.complete)loaded();
+}
 function seededRandom(seed) {
   let s = seed % 2147483647;
   if (s <= 0) s += 2147483646;
@@ -758,6 +768,7 @@ function buildMosaicCompleted() {
     const img = cell.querySelector('.mosaic-slot-photo');
     if (img) {
       img.src = thumbSrc(photo);
+      observePhotoOrientation(img,photo);
       img.alt = '';
       img.draggable = false;
     }
@@ -799,12 +810,12 @@ function mosaicLayoutSignature() {
 }
 
 /** Fit a 6×4 card centered inside a reserved rect (never stretch the frame). */
-function fitLandscapeCard(reserveX, reserveY, reserveW, reserveH) {
+function fitLandscapeCard(reserveX, reserveY, reserveW, reserveH, aspect=MOSAIC_CELL_ASPECT) {
   let w = reserveW;
-  let h = w / MOSAIC_CELL_ASPECT;
+  let h = w / aspect;
   if (h > reserveH + 0.5) {
     h = reserveH;
-    w = h * MOSAIC_CELL_ASPECT;
+    w = h * aspect;
   }
   return {
     x: reserveX + (reserveW - w) / 2,
@@ -854,9 +865,11 @@ function layoutMosaicSlots() {
     const reserveH = cellH * spanR + gap * (spanR - 1);
     const reserveX = pad + c * (cellW + gap);
     const reserveY = pad + r * (cellH + gap);
-    const card = fitLandscapeCard(reserveX, reserveY, reserveW, reserveH);
+    const aspect=spanC===1&&spanR===2?2/3:MOSAIC_CELL_ASPECT;
+    const card = fitLandscapeCard(reserveX, reserveY, reserveW, reserveH,aspect);
     const rot = (rand() - 0.5) * (grids >= 4 ? 0.7 : 1.1);
     slots.push({
+      aspect,
       x: card.x,
       y: card.y,
       homeX: card.x,
@@ -879,6 +892,12 @@ function layoutMosaicSlots() {
     });
   };
 
+  // Reserve upright placeholders as well as landscape tiles, adapting to the photo mix.
+  const ratio=photos.length?photos.filter(portraitPhoto).length/photos.length:0.3;
+  let portraitSlots=Math.max(1,Math.round(cols*rows*Math.min(0.8,Math.max(0.15,ratio))/2));
+  for(let c=0;c<cols&&portraitSlots>0;c++)for(let r=(c%2);r<rows-1&&portraitSlots>0;r+=2){
+    if(canPlace(r,c,1,2)){pushSlot(r,c,1,2,2);portraitSlots--;}
+  }
   // Seed 1–2 hero 4-grid tiles first for hierarchy
   let heroes = 0;
   const heroTarget = rows * cols >= 20 ? 2 : 1;
@@ -969,9 +988,9 @@ function updateMosaicBranding() {
 function applySlotTransform(slot, animatePos = true) {
   if (!slot?.el) return;
   if (!animatePos) slot.el.style.transition = 'none';
-  // Always keep 6×4 — height derived from width
+  // Preserve the assigned portrait or landscape tile proportions.
   const w = slot.size;
-  const h = w / MOSAIC_CELL_ASPECT;
+  const h = w / (slot.aspect || MOSAIC_CELL_ASPECT);
   slot.height = h;
   slot.el.style.setProperty('--sz', w + 'px');
   slot.el.style.setProperty('--sz-h', h + 'px');
@@ -1004,6 +1023,7 @@ function snapshotSlotGeometry(slot) {
     homeY: slot.homeY,
     size: slot.size,
     height: slot.height,
+    aspect: slot.aspect,
     homeSize: slot.homeSize,
     homeHeight: slot.homeHeight,
     rot: slot.rot,
@@ -1053,6 +1073,7 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
   }
 
   const applyContent = () => {
+    if(!photos.some(p=>p.id===photo.id)||!slot.el.isConnected)return;
     slot.photoId = photo.id;
     mosaicPhotoSlot.set(photo.id, slotIndex);
     slot.el.classList.remove('is-empty', 'is-vanish');
@@ -1063,6 +1084,7 @@ function fillMosaicSlot(slotIndex, photo, opts = {}) {
     const img = slot.el.querySelector('.mosaic-slot-photo');
     if (img) {
       img.src = thumbSrc(photo);
+      observePhotoOrientation(img,photo);
       img.alt = '';
     }
     slot.el.classList.remove('is-swoosh', 'is-shine');
@@ -1089,21 +1111,22 @@ function mosaicFillCap() {
   return Math.max(1, mosaicSlots.length - reserve);
 }
 
-function pickEmptySlot() {
-  const empty = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => !x.s.photoId);
+function pickEmptySlot(photo) {
+  let empty = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => !x.s.photoId);
   if (!empty.length) return -1;
+  const matching=empty.filter(x=>(x.s.aspect<1)===portraitPhoto(photo));if(matching.length)empty=matching;
   return empty[Math.floor(Math.random() * empty.length)].i;
 }
 
 function placePhotoInMosaic(photo, opts = {}) {
-  if (!photo?.id || viewMode !== 'mosaic' || isCompletedView()) return;
+  if (!photo?.id || !photos.some(p=>p.id===photo.id) || viewMode !== 'mosaic' || isCompletedView()) return;
   if (mosaicPhotoSlot.has(photo.id) && !opts.force) {
     const idx = mosaicPhotoSlot.get(photo.id);
     const img = mosaicSlots[idx]?.el?.querySelector('.mosaic-slot-photo');
     if (img && photo.url) img.src = thumbSrc(photo);
     return;
   }
-  const empty = pickEmptySlot();
+  const empty = pickEmptySlot(photo);
   if (empty >= 0 && !opts.force) {
     fillMosaicSlot(empty, photo, { ...opts, animate: false });
     return;
@@ -1117,11 +1140,12 @@ function placePhotoInMosaic(photo, opts = {}) {
     if (empty >= 0) fillMosaicSlot(empty, photo, opts);
     return;
   }
-  const filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
+  let filled = mosaicSlots.map((s, i) => ({ s, i })).filter((x) => x.s.photoId);
   if (!filled.length) {
     if (empty >= 0) fillMosaicSlot(empty, photo, opts);
     return;
   }
+  const matching=filled.filter(x=>(x.s.aspect<1)===portraitPhoto(photo));if(matching.length)filled=matching;
   const idx = filled[Math.floor(Math.random() * filled.length)].i;
   fillMosaicSlot(idx, photo, { ...opts, animate: true, focus: Math.random() < 0.45 });
 }
@@ -1162,6 +1186,7 @@ function buildMosaicCollage() {
     const slot = {
       el: cell,
       photoId: null,
+      aspect: layout.aspect,
       size: layout.size,
       height: layout.height,
       homeSize: layout.homeSize ?? layout.size,
@@ -1233,7 +1258,7 @@ function slotSizeKey(slot) {
 }
 
 function slotsDifferInSize(a, b) {
-  if (!a || !b) return false;
+  if (!a || !b || (a.aspect<1)!==(b.aspect<1)) return false;
   if (slotSizeKey(a) !== slotSizeKey(b)) return true;
   // Same span class but different card width (e.g. medium vs hero packing quirks)
   const avg = (a.size + b.size) / 2;
@@ -1319,6 +1344,7 @@ function pickMosaicSizeMoves(maxMoves = 2) {
 }
 
 function swapMosaicSlotPhotos(i, j) {
+  if((mosaicSlots[i]?.aspect<1)!==(mosaicSlots[j]?.aspect<1))return;
   const a = mosaicSlots[i];
   const b = mosaicSlots[j];
   if (!a?.photoId || !b?.photoId || a.photoId === b.photoId) return;
@@ -1633,12 +1659,19 @@ function onWallSettingsEvent(ev) {
 function connectStream(url) {
   if (es) es.close();
   es = new EventSource(url);
+  es.addEventListener('ready', async () => {
+    if(route.kind!=='wall')return;
+    try{const response=await fetch('/api/wall',{cache:'no-store'});if(!response.ok)return;const data=await response.json();photos=selectDisplayPhotosClient(data.photos||[]);if(viewMode==='mosaic')applyMosaicLayoutMode(true);else renderGrid();}catch{}
+  });
   es.addEventListener('photo.added', (ev) => {
     try {
       upsertPhoto(JSON.parse(ev.data));
     } catch {
       /* ignore */
     }
+  });
+  es.addEventListener('photo.removed', (ev) => {
+    try { const {id}=JSON.parse(ev.data);photos=photos.filter(p=>p.id!==id);if(viewMode==='mosaic')applyMosaicLayoutMode(true);else renderGrid(); } catch {}
   });
   es.addEventListener('wall.settings', onWallSettingsEvent);
 

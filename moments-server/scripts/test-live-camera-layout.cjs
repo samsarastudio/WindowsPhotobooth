@@ -16,7 +16,7 @@ const sizes = [
 ];
 (async () => {
   const root = path.resolve(__dirname, '..');
-  const out = path.join(root, 'output/camera-responsive'); fs.mkdirSync(out, { recursive: true });
+  const out = process.env.CAMERA_OUTPUT || path.join(root, 'output/camera-responsive'); fs.mkdirSync(out, { recursive: true });
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'live-camera-layout-'));
   const base = 'http://127.0.0.1:3193', key = 'camera-layout-test-administrator-key-32-characters';
   const server = spawn(process.execPath, ['src/live/index.js'], { cwd: root, windowsHide: true, env: { ...process.env, LIVE_PORT: '3193', LIVE_BASE_URL: base, LIVE_DATA_DIR: data, LIVE_ADMIN_KEY: key }, stdio: 'pipe' });
@@ -32,13 +32,13 @@ const sizes = [
     const event = (await api('/events',{title:'A night to remember',status:'published',visibility:'own'}, {cookie:auth.cookie})).body;
     for (const engine of (process.env.CAMERA_ENGINES || 'chromium,webkit').split(',')) {
       browser = await (engine === 'chromium' ? chromium.launch({ channel:'chrome',headless:true }) : webkit.launch({headless:true}));
-      for (const [name,width,height,insets] of sizes) {
+      for (const [name,width,height,insets] of sizes.filter(s=>!process.env.CAMERA_CASES||process.env.CAMERA_CASES.split(',').includes(s[0]))) {
         const context = await browser.newContext({viewport:{width,height},deviceScaleFactor:1,hasTouch:true,isMobile:true});
         // Deterministic canvas camera, not a hardware/device certification.
         await context.addInitScript(() => {
           if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {} });
           navigator.mediaDevices.getUserMedia = async () => {
-            const c=document.createElement('canvas'); c.width=720; c.height=1280; const x=c.getContext('2d');
+            const c=document.createElement('canvas'); c.width=innerWidth>innerHeight?1280:720; c.height=innerWidth>innerHeight?720:1280; const x=c.getContext('2d');
             const gradient=x.createLinearGradient(0,0,720,1280); gradient.addColorStop(0,'#b9c7ac'); gradient.addColorStop(.55,'#e3d4b5'); gradient.addColorStop(1,'#7e9b8c');
             x.fillStyle=gradient; x.fillRect(0,0,720,1280);
             x.strokeStyle='#ffffff55'; x.lineWidth=2;
@@ -85,7 +85,14 @@ const sizes = [
         if(insets) assert.ok(gallery.x+gallery.width<=width-insets.right+1 && gallery.y+gallery.height<=height-insets.bottom+1,'Gallery clears safe area');
         if(['compact','standard','landscape','safe-area','safe-landscape'].includes(name)) await page.screenshot({path:path.join(out,`${engine}-${name}-camera.png`)});
         // Validate capture framing against the visible preview, plus popup containment.
-        if(engine==='chromium') await page.locator('#shutter').click();
+        if(engine==='chromium') {
+          await page.locator('#shutter').click();await page.locator('.capture-review').waitFor();
+          assert.equal(await page.locator('.shot-count strong').textContent(),'25','Preview does not consume a shot');
+          await page.getByRole('button',{name:'Retake',exact:true}).click();
+          assert.equal(await page.locator('.shot-count strong').textContent(),'25','Retake does not upload');
+          await page.locator('#shutter').click();await page.locator('.capture-review').waitFor();await check('.capture-review');
+          await page.getByRole('button',{name:'Use photo',exact:true}).click();
+        }
         else {
           await page.locator('#open-camera-settings').click();
           const fixture=await sharp({create:{width:720,height:1280,channels:3,background:'#a8baa0'}}).jpeg().toBuffer();
@@ -99,7 +106,7 @@ const sizes = [
         const savedPixels=await sharp(await photo.body()).removeAlpha().raw().toBuffer();
         let savedError=0;for(let i=0;i<savedPixels.length;i+=3)savedError+=Math.abs(savedPixels[i]-savedPixels[i+1])+Math.abs(savedPixels[i+1]-savedPixels[i+2]);
         assert.ok(savedError/(savedPixels.length/3)<3,'Saved photo matches Mono preview');
-        if(engine==='chromium') assert.ok(Math.abs(metadata.width/metadata.height-preview.width/preview.height)<.015,'Captured frame matches viewfinder aspect');
+        if(engine==='chromium') assert.ok(Math.abs(metadata.width/metadata.height-(width>height?1280/720:720/1280))<.015,'Captured image keeps native portrait/landscape orientation');
         if(name==='standard') await page.screenshot({path:path.join(out,`${engine}-gallery.png`)});
         await page.getByRole('button',{name:'Close gallery',exact:true}).click();
         await page.locator('#open-camera-settings').click();await check('#camera-settings');await check('[data-close="camera-settings"]');
