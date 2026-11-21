@@ -641,12 +641,20 @@ els.btnSaveGuestPhoto?.addEventListener('click', () => {
 const photoAspects=new Map();
 let orientationRefresh;
 const portraitPhoto=p=>(photoAspects.get(p.id)||(p.width&&p.height?p.width/p.height:1.5))<1;
+function fitMosaicPhotoCard(img){
+  const card=img?.closest('.mosaic-slot-card'),slot=card?.parentElement;
+  if(!slot||!img.naturalWidth||!img.naturalHeight||!slot.clientWidth||!slot.clientHeight)return;
+  const ratio=img.naturalWidth/img.naturalHeight,box=slot.clientWidth/slot.clientHeight;
+  card.style.width=(ratio<box?ratio/box*100:100)+'%';
+  card.style.height=(ratio>box?box/ratio*100:100)+'%';
+}
 function observePhotoOrientation(img,photo){
   const loaded=()=>{if(!img.naturalWidth||!photos.some(p=>p.id===photo.id))return;
+    fitMosaicPhotoCard(img);
     const ratio=img.naturalWidth/img.naturalHeight,old=portraitPhoto(photo);photoAspects.set(photo.id,ratio);
     if(old!==(ratio<1)){clearTimeout(orientationRefresh);orientationRefresh=setTimeout(()=>{if(viewMode==='mosaic')applyMosaicLayoutMode(true);},100);}
   };
-  img.onload=loaded;if(img.complete)loaded();
+  img.onload=loaded;if(img.complete)requestAnimationFrame(loaded);
 }
 function seededRandom(seed) {
   let s = seed % 2147483647;
@@ -994,6 +1002,7 @@ function applySlotTransform(slot, animatePos = true) {
   slot.height = h;
   slot.el.style.setProperty('--sz', w + 'px');
   slot.el.style.setProperty('--sz-h', h + 'px');
+  fitMosaicPhotoCard(slot.el.querySelector('.mosaic-slot-photo'));
   slot.el.style.setProperty('--rot', slot.rot + 'deg');
   slot.el.style.setProperty('--mx', slot.x + 'px');
   slot.el.style.setProperty('--my', slot.y + 'px');
@@ -1056,6 +1065,8 @@ function clearMosaicSlot(slot) {
   slot.el.style.zIndex = '1';
   const img = slot.el.querySelector('.mosaic-slot-photo');
   if (img) {
+    img.closest('.mosaic-slot-card')?.style.removeProperty('width');
+    img.closest('.mosaic-slot-card')?.style.removeProperty('height');
     img.removeAttribute('src');
     img.alt = '';
   }

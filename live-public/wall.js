@@ -1,4 +1,4 @@
-import {createMosaic} from './mosaic-renderer.js';
+import {createMosaic} from './mosaic-renderer.js?v=20261121-photo-fit';
 const token = location.pathname.split('/')[2];
 const stage = document.querySelector('#stage'), state = document.querySelector('#state');
 let controlsTimer,timer,refreshing=false;
