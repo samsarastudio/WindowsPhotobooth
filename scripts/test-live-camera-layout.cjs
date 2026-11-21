@@ -73,12 +73,13 @@ const sizes = [
         await page.locator('#open-photo-looks').click(); await check('#photo-looks-dialog');
         await page.locator('[data-look=mono]').click();
         await page.locator('#look-strength').evaluate(el=>{el.value='100';el.dispatchEvent(new Event('input',{bubbles:true}));});
-        await page.locator('#look-live-preview').waitFor();assert(await page.evaluate(()=>document.querySelector('#look-live-preview').srcObject===document.querySelector('#camera-preview').srcObject),'Picker shares the live camera stream');const sample=await page.locator('#look-live-preview').screenshot();
-        const pixels=await sharp(sample).removeAlpha().raw().toBuffer();
-        let colourError=0;for(let i=0;i<pixels.length;i+=3)colourError+=Math.abs(pixels[i]-pixels[i+1])+Math.abs(pixels[i+1]-pixels[i+2]);
-        assert.ok(colourError/(pixels.length/3)<3,`${engine}: Mono preview renders in grayscale`);
+        assert.equal(await page.locator('#photo-looks-dialog video').count(),0,'Filter picker has no live camera preview');
         if(name==='standard')await page.screenshot({path:path.join(out,`${engine}-photo-looks.png`)});
         await page.locator('[data-done]').click();
+        const sample=await page.locator('#camera-preview').screenshot();
+        const pixels=await sharp(sample).removeAlpha().raw().toBuffer();
+        let colourError=0;for(let i=0;i<pixels.length;i+=3)colourError+=Math.abs(pixels[i]-pixels[i+1])+Math.abs(pixels[i+1]-pixels[i+2]);
+        assert.ok(colourError/(pixels.length/3)<3,`${engine}: Main camera preview renders selected Mono filter in grayscale`);
         assert.equal(await page.locator('#open-photo-looks').innerText(),'Looks · Mono');
         const shutter=await check('#shutter'); const gallery=await check('#open-gallery');
         assert.ok(shutter.x+shutter.width<=gallery.x||gallery.x+gallery.width<=shutter.x||shutter.y+shutter.height<=gallery.y||gallery.y+gallery.height<=shutter.y,'Controls do not overlap');
