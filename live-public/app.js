@@ -1,5 +1,5 @@
 import {photoLooks} from './photo-looks.js';
-import {mountPhotoLooks} from './photo-look-controls.js';
+import {mountPhotoLooks} from './photo-look-controls.js?v=20261121-live-preview';
 import {landing} from './landing.js';
 import {printStudio} from './print-studio.js';
 import { wallControls } from './wall-controls.js';

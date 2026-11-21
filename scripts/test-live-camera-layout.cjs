@@ -69,11 +69,11 @@ const sizes = [
         assert.equal(await page.locator('body>header').isVisible(),false);
         const preview=await check('#camera-preview'); assert.ok(preview.width>100&&preview.height>100);
         for(const selector of ['#shutter','#open-gallery','#open-camera-settings','#quick-flip']) {const r=await check(selector);assert.ok(r.width>=44&&r.height>=44,`${selector} touch target`);}
-        await check('#open-photo-looks');
+        await check('#open-photo-looks');assert.equal(await page.locator('#open-photo-looks').innerText(),'Try live filters ✨');
         await page.locator('#open-photo-looks').click(); await check('#photo-looks-dialog');
         await page.locator('[data-look=mono]').click();
         await page.locator('#look-strength').evaluate(el=>{el.value='100';el.dispatchEvent(new Event('input',{bubbles:true}));});
-        const sample=await page.locator('.look-preview-box img').screenshot();
+        await page.locator('#look-live-preview').waitFor();assert(await page.evaluate(()=>document.querySelector('#look-live-preview').srcObject===document.querySelector('#camera-preview').srcObject),'Picker shares the live camera stream');const sample=await page.locator('#look-live-preview').screenshot();
         const pixels=await sharp(sample).removeAlpha().raw().toBuffer();
         let colourError=0;for(let i=0;i<pixels.length;i+=3)colourError+=Math.abs(pixels[i]-pixels[i+1])+Math.abs(pixels[i+1]-pixels[i+2]);
         assert.ok(colourError/(pixels.length/3)<3,`${engine}: Mono preview renders in grayscale`);
