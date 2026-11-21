@@ -1671,12 +1671,14 @@ function connectStream(url) {
   if (es) es.close();
   es = new EventSource(url);
   es.addEventListener('ready', async () => {
-    if(route.kind!=='wall')return;
-    try{const response=await fetch('/api/wall',{cache:'no-store'});if(!response.ok)return;const data=await response.json();photos=selectDisplayPhotosClient(data.photos||[]);if(viewMode==='mosaic')applyMosaicLayoutMode(true);else renderGrid();}catch{}
+    const eventWall=route.kind==='session'&&['mosaic','slideshow'].includes(route.mode);
+    if(route.kind!=='wall'&&!eventWall)return;
+    try{const response=await fetch(eventWall?`/api/sessions/${encodeURIComponent(route.slug)}?wall=1`:'/api/wall',{cache:'no-store'});const data=await response.json();photos=response.ok?selectDisplayPhotosClient(eventWall?data.session?.photos||[]:data.photos||[]):[];if(viewMode==='mosaic')applyMosaicLayoutMode(true);else renderGrid();}catch{}
   });
   es.addEventListener('photo.added', (ev) => {
     try {
-      upsertPhoto(JSON.parse(ev.data));
+      const photo=JSON.parse(ev.data);if(photo.wallOnly&&!(route.kind==='session'&&['mosaic','slideshow'].includes(route.mode)))return;
+      upsertPhoto(photo);
     } catch {
       /* ignore */
     }
@@ -1702,7 +1704,7 @@ async function loadSession(slug) {
   const photoQs =
     route.kind === 'photo' && route.photoId
       ? `?photoId=${encodeURIComponent(route.photoId)}`
-      : '';
+      : ['mosaic','slideshow'].includes(route.mode)?'?wall=1':'';
   const res = await fetch(`/api/sessions/${encodeURIComponent(slug)}${photoQs}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -1722,7 +1724,7 @@ async function loadSession(slug) {
     const wr = await fetch('/api/wall');
     const wd = await wr.json();
     if (wr.ok && wd.wall) {
-      wallCfg = { ...wallCfg, ...wd.wall, title: wd.wall.title || wallCfg.title };
+      wallCfg = { ...wallCfg, ...wd.wall, title: data.session.title || slug };
     }
   } catch {
     /* optional */

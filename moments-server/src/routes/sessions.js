@@ -14,7 +14,7 @@ import {
 } from '../db.js';
 import { requireUploadToken } from '../auth.js';
 import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
-import { notifyWallPhoto } from './wall.js';
+import { notifyWallPhoto, livePhotosForSession } from './wall.js';
 import { warmThumb, warmAlbumThumbs } from '../thumbs.js';
 import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
 
@@ -166,7 +166,9 @@ sessionsRouter.get('/:slug', (req, res) => {
     if (row) photos.push(row);
   }
   warmAlbumThumbs(session.slug, photos);
-  return res.json({ ok: true, session: publicSession(session, photos) });
+  const result=publicSession(session,photos);
+  if(req.query.wall==='1'&&!isSessionExpired(session))result.photos.push(...livePhotosForSession(session.slug));
+  return res.set('Cache-Control','no-store').json({ ok: true, session: result });
 });
 
 /** Single photo for share/QR deep links (any variant, including plain originals). */
