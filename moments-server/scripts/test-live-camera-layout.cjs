@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const sharp = require('sharp');
+const {pathToFileURL}=require('node:url');
 
 const sizes = [
   ['compact',320,480], ['small',320,568], ['android-small',360,640], ['classic',375,667],
@@ -16,6 +17,7 @@ const sizes = [
 ];
 (async () => {
   const root = path.resolve(__dirname, '..');
+  const {photoLooks}=await import(pathToFileURL(path.join(root,'live-public/photo-looks.js')).href);
   const out = process.env.CAMERA_OUTPUT || path.join(root, 'output/camera-responsive'); fs.mkdirSync(out, { recursive: true });
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'live-camera-layout-'));
   const base = 'http://127.0.0.1:3193', key = 'camera-layout-test-administrator-key-32-characters';
@@ -39,6 +41,7 @@ const sizes = [
           if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {} });
           navigator.mediaDevices.getUserMedia = async () => {
             const c=document.createElement('canvas'); c.width=innerWidth>innerHeight?1280:720; c.height=innerWidth>innerHeight?720:1280; const x=c.getContext('2d');
+            x.fillStyle='#10120f';x.fillRect(0,0,c.width,c.height); // Camera frames are opaque, including landscape margins.
             const gradient=x.createLinearGradient(0,0,720,1280); gradient.addColorStop(0,'#b9c7ac'); gradient.addColorStop(.55,'#e3d4b5'); gradient.addColorStop(1,'#7e9b8c');
             x.fillStyle=gradient; x.fillRect(0,0,720,1280);
             x.strokeStyle='#ffffff55'; x.lineWidth=2;
@@ -75,6 +78,43 @@ const sizes = [
         const preview=await check('#camera-preview'); assert.ok(preview.width>100&&preview.height>100);
         for(const selector of ['#shutter','#open-gallery','#open-camera-settings','#quick-flip']) {const r=await check(selector);assert.ok(r.width>=44&&r.height>=44,`${selector} touch target`);}
         await check('#open-photo-looks');assert.equal(await page.locator('#open-photo-looks').innerText(),'Try live filters ✨');
+        // Exercise the actual viewfinder canvas, not the picker sample images.
+        for(const look of photoLooks){
+          for(const strength of (look.id==='natural'?[100]:[0,35,70,100])){
+            await page.locator('#open-photo-looks').click();
+            await page.locator(`[data-look=${look.id}]`).click();
+            if(look.id!=='natural')await page.locator('#look-strength').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},strength);
+            await page.locator('[data-done]').click();
+            if(look.id==='natural'||strength===0){
+              await page.locator('#camera-look-preview').waitFor({state:'hidden'});
+              assert(await page.locator('#camera-preview').isVisible(),'Natural/zero strength shows original camera');
+            }else{
+              await page.waitForFunction(({matrix,strength})=>{
+                const display=document.querySelector('#camera-look-preview'),video=document.querySelector('#camera-preview');
+                if(display.hidden||!display.width)return false;
+                const original=document.createElement('canvas');original.width=display.width;original.height=display.height;
+                const ctx=original.getContext('2d',{willReadFrequently:true});ctx.drawImage(video,0,0,original.width,original.height);
+                const source=ctx.getImageData(0,0,original.width,original.height).data;
+                const actual=display.getContext('2d').getImageData(0,0,display.width,display.height).data;
+                const identity=[1,0,0,0,0,1,0,0,0,0,1,0];
+                const m=matrix.map((v,i)=>identity[i]+(v-identity[i])*strength/100);
+                for(let i=0;i<source.length;i+=4*997){
+                  for(let channel=0;channel<3;channel++){
+                    const k=channel*4;
+                    const expected=Math.max(0,Math.min(255,Math.round(source[i]*m[k]+source[i+1]*m[k+1]+source[i+2]*m[k+2]+255*m[k+3])));
+                    if(Math.abs(actual[i+channel]-expected)>1){window.filterMismatch={i,channel,actual:actual[i+channel],expected,source:Array.from(source.slice(i,i+3))};return false;}
+                  }
+                }
+                return true;
+              },{matrix:look.matrix,strength},{timeout:10000}).catch(async error=>{console.error(await page.evaluate(()=>window.filterMismatch));throw error;});
+            }
+          }
+          if(name==='standard')await page.screenshot({path:path.join(out,`${engine}-camera-${look.id}.png`)});
+        }
+        // Return from a filtered view to Natural, then verify a camera restart.
+        await page.locator('#open-photo-looks').click();await page.locator('[data-natural]').click();await page.locator('[data-done]').click();
+        await page.locator('#camera-look-preview').waitFor({state:'hidden'});
+        await page.locator('#quick-flip').click();await page.locator('#shutter:not([disabled])').waitFor();
         await page.locator('#open-photo-looks').click(); await check('#photo-looks-dialog');
         await page.locator('[data-look=mono]').click();
         await page.locator('#look-strength').evaluate(el=>{el.value='100';el.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -120,7 +160,7 @@ const sizes = [
         await page.locator('#settings-camera').click();await page.getByRole('button',{name:'Close camera settings',exact:true}).click();
         assert.equal(await page.locator('#shutter').isDisabled(),true);
         assert.deepEqual(errors,[]);
-        results.push({engine,name,width,height,safeArea:insets||null,result:'PASS',coverage:engine==='chromium'?'layout + canvas-stream capture + gallery + settings':'layout + mocked preview + file upload + gallery + settings'});console.log(`PASS ${engine} ${name} ${width}x${height}`);
+        results.push({engine,name,width,height,safeArea:insets||null,result:'PASS',filters:photoLooks.map(l=>l.id),strengths:[0,35,70,100],coverage:engine==='chromium'?'layout + canvas-stream capture + gallery + settings':'layout + mocked preview + file upload + gallery + settings'});console.log(`PASS ${engine} ${name} ${width}x${height}`);
         await context.close();
       }
       await browser.close(); browser=null;
