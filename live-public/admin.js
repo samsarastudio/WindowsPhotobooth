@@ -1,3 +1,4 @@
+import {galleryWallControls} from './gallery-wall-controls.js';
 import {photoboothControls} from './photobooth-controls.js';
 import { wallControls } from './wall-controls.js';
 import { featureLabels } from './features.js';
@@ -78,6 +79,7 @@ export async function adminDashboard({ app, nav, api, send, form, action, notice
     document.querySelector('#created-event').scrollIntoView({ behavior: 'smooth' });
   });
   app.querySelectorAll('[data-wall]').forEach(d => d.addEventListener('toggle', () => { if(d.open) wallControls(d.querySelector('div'),d.dataset.wall,{api,send,notice}).catch(err=>notice(err.message,true)); }));
+  galleryWallControls(app,events,{api,send,notice,escape}).catch(err=>notice(err.message,true));
   photoboothControls(app,events,{api,send,notice,escape}).catch(err=>notice(err.message,true));
   for(const e of events)form(`[data-photo-approval="${e.slug}"]`,async(_b,f)=>{await send(`/events/${e.slug}`,{moderation:f.elements.autoApprove.checked?0:1},'PATCH');notice('Photo approval saved for new uploads');});
   action('[data-copy]', async el => { await navigator.clipboard.writeText(el.dataset.copy); notice('Event link copied'); });

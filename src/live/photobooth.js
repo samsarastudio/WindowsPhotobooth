@@ -16,8 +16,11 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     CREATE TABLE IF NOT EXISTS live_booth_imports(event TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,slug TEXT NOT NULL,source_id TEXT NOT NULL,photo TEXT REFERENCES photos(id) ON DELETE SET NULL,PRIMARY KEY(event,slug,source_id));`);
   if(!db.prepare('PRAGMA table_info(live_booth_links)').all().some(c=>c.name==='variants'))db.exec(`ALTER TABLE live_booth_links ADD COLUMN variants TEXT NOT NULL DEFAULT '["framed","ai","original"]'`);
   if(!db.prepare('PRAGMA table_info(live_booth_imports)').all().some(c=>c.name==='variant'))db.exec("ALTER TABLE live_booth_imports ADD COLUMN variant TEXT NOT NULL DEFAULT 'unknown'");
+  // Hide orphaned copies left by earlier gallery switches/removals after an upgrade.
+  db.prepare('UPDATE photos SET source_visible=0 WHERE id IN (SELECT i.photo FROM live_booth_imports i WHERE NOT EXISTS (SELECT 1 FROM live_booth_links l WHERE l.event=i.event AND l.slug=i.slug))').run();
   const chosen=source=>JSON.parse(source.variants);
   function applyTypes(e,source){
+    db.prepare('UPDATE photos SET source_visible=0 WHERE id IN (SELECT photo FROM live_booth_imports WHERE event=?)').run(e.id);
     const rows=db.prepare('SELECT photo,variant FROM live_booth_imports WHERE event=? AND slug=?').all(e.id,source.slug);
     for(const row of rows)if(row.photo)db.prepare('UPDATE photos SET source_visible=? WHERE id=?').run(Number(chosen(source).includes(row.variant)||(row.variant==='unknown'&&chosen(source).length===3)),row.photo);
   }
@@ -28,7 +31,7 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     const target=new URL(route,server);
     if(target.origin!==server.origin) throw fail(502,'Invalid gallery media address');
     const response=await fetch(target,{redirect:'error',headers:{'Cache-Control':'no-cache, no-store','Pragma':'no-cache'},signal:AbortSignal.timeout(15000)});
-    if(!response.ok) throw fail(502,'Photobooth gallery is unavailable or this album has expired');
+    if(!response.ok) throw Object.assign(fail(502,'Photobooth gallery is unavailable or this album has expired'),{upstreamStatus:response.status});
     const chunks=[];let size=0;
     for await(const chunk of response.body) {size+=chunk.length;if(size>limit)throw fail(502,'Gallery response exceeds the import size limit');chunks.push(chunk);}
     return Buffer.concat(chunks);
@@ -45,6 +48,8 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
     try {
       const result=await json(`/api/sessions/${encodeURIComponent(source.slug)}?variants=${chosen(source).join(",")}&_live=${Date.now()}`);
       if(!result.ok||result.session?.slug!==source.slug||!Array.isArray(result.session.photos))throw fail(502,'Invalid gallery album');
+      const visibleIds=new Set(result.session.photos.filter(p=>chosen(source).includes(p.variant)).map(p=>p.id));
+      if(current())for(const row of db.prepare('SELECT photo,source_id FROM live_booth_imports WHERE event=? AND slug=?').all(e.id,source.slug)){if(row.photo&&!visibleIds.has(row.source_id))db.prepare('UPDATE photos SET source_visible=0 WHERE id=?').run(row.photo);}
       for(const p of [...result.session.photos].reverse()) {
         if(!current()||attempted>=50)break;
         if(typeof p.id!=='string'||p.id.length>200||p.processStatus==='processing'||['physical','magnet-source'].includes(p.variant))continue;
@@ -80,6 +85,7 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
       if(current())db.prepare("UPDATE live_booth_links SET last_sync=?,error=? WHERE event=?").run(Date.now(),failed?`${failed} photo(s) could not be imported yet. Other photos continue syncing; failed photos will retry.`:'',e.id);
       return {imported,failed,link:stopped?null:link(e)};
     } catch(err) {
+      if(current()&&[404,410].includes(err.upstreamStatus))db.prepare('UPDATE photos SET source_visible=0 WHERE id IN (SELECT photo FROM live_booth_imports WHERE event=? AND slug=?)').run(e.id,source.slug);
       if(current())db.prepare('UPDATE live_booth_links SET error=? WHERE event=?').run('Sync failed. Check the gallery connection and album availability.',e.id);
       throw err;
     } finally {busy.delete(e.id);}
@@ -137,14 +143,14 @@ export function registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fa
   app.post('/api/admin/events/:slug/photobooth/sync',wrap(async(req,res)=>{mustAdmin(req);res.json(await sync(event(req)));}));
   app.delete('/api/admin/events/:slug/photobooth',wrap((req,res)=>{mustAdmin(req);const e=event(req);db.prepare('UPDATE live_booth_links SET enabled=0 WHERE event=?').run(e.id);res.json({ok:true});}));
   app.delete('/api/admin/events/:slug/photobooth/remove',wrap((req,res)=>{
-    mustAdmin(req);const e=event(req),source=link(e);
-    if(!source)return res.json({ok:true,removed:0});
-    const rows=db.prepare('SELECT p.id,p.filename FROM photos p JOIN live_booth_imports i ON i.photo=p.id WHERE i.event=? AND i.slug=? AND p.event=?').all(e.id,source.slug,e.id);
+    mustAdmin(req);const e=event(req);
+    // Remove all previous gallery copies, including galleries switched away from.
+    const rows=db.prepare('SELECT p.id,p.filename FROM photos p JOIN live_booth_imports i ON i.photo=p.id WHERE i.event=? AND p.event=?').all(e.id,e.id);
     db.transaction(()=>{
       // Removing the link also cancels an in-flight sync at its next current() check.
       db.prepare('DELETE FROM live_booth_links WHERE event=?').run(e.id);
       // Keep individual-deletion tombstones; a deliberate reconnect may reimport the other copies.
-      db.prepare('DELETE FROM live_booth_imports WHERE event=? AND slug=? AND photo IS NOT NULL').run(e.id,source.slug);
+      db.prepare('DELETE FROM live_booth_imports WHERE event=? AND photo IS NOT NULL').run(e.id);
       for(const row of rows)db.prepare('DELETE FROM photos WHERE id=? AND event=?').run(row.id,e.id);
     })();
     for(const row of rows){try{fs.rmSync(path.join(data,'photos',row.filename),{force:true});}catch(err){console.error('[moments-live] Unable to remove disconnected gallery file:',row.filename,err.code);}}

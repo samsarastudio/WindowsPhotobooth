@@ -11,9 +11,11 @@ test('Optional photobooth connection imports JPGs once, respects moderation and 
   const dataDir=fs.mkdtempSync(path.join(os.tmpdir(),'live-booth-')),key='booth-test-administrator-key-32-characters';
   const bytes=await sharp({create:{width:2800,height:1600,channels:3,background:'gold'}}).png().toBuffer();
   let holdMedia=false,releaseMedia,mediaStarted;
+  let expired=false;
   let available=true,photos=[{id:'capture-1',url:'/media/booth/one.png',variant:'framed',processStatus:'ready'}];
   const source=http.createServer((req,res)=>{
     if(!available){res.writeHead(503);return res.end();}
+    if(expired){res.writeHead(410);return res.end();}
     if(req.url==='/media/booth/one.png'){res.setHeader('Content-Type','image/png');if(holdMedia){mediaStarted();releaseMedia=()=>res.end(bytes);return;}return res.end(bytes);}
     res.setHeader('Content-Type','application/json');
     if(req.url==='/api/wall')return res.end(JSON.stringify({ok:true,sessions:[{slug:'booth',title:'Reception booth'}]}));
@@ -88,6 +90,14 @@ test('Optional photobooth connection imports JPGs once, respects moderation and 
   assert.equal(live.db.prepare('SELECT approved FROM photos WHERE id=?').get(ai.photo).approved,0);
   assert.equal((await call('/api/admin/photobooth','PUT',{url:aliasUrl+'/booth'},'',true)).status,200);
   assert.equal((await call('/api/admin/photobooth','PUT',{url:galleryUrl+'/booth'},'',true)).status,200);
+  const savedPhotos=photos;photos=[];
+  await call(endpoint+'/sync','POST',{},'',true);
+  assert.deepEqual((await call(feed)).body.photos.map(p=>p.id),[camera.id],'Deleted upstream photos leave the wall');
+  photos=savedPhotos;await call(endpoint+'/sync','POST',{},'',true);
+  assert.equal((await call(feed)).body.photos.length,2);
+  expired=true;await call(endpoint+'/sync','POST',{},'',true);
+  assert.deepEqual((await call(feed)).body.photos.map(p=>p.id),[camera.id],'Expired source album leaves the wall');
+  expired=false;await call(endpoint+'/sync','POST',{},'',true);
   const importedFiles=live.db.prepare('SELECT filename FROM photos WHERE id<>?').all(camera.id).map(p=>path.join(dataDir,'photos',p.filename));
   assert.equal((await call(endpoint+'/remove','DELETE',{},owner)).status,401);
   available=false; // Removal must work even when the source gallery is offline.
@@ -110,4 +120,12 @@ test('Optional photobooth connection imports JPGs once, respects moderation and 
   releaseMedia();assert.equal((await pendingSync).body.imported,0);
   assert.deepEqual(live.db.prepare('SELECT id FROM photos').all().map(p=>p.id),[camera.id]);
   assert.equal(live.db.prepare('SELECT count(*) n FROM live_booth_links').get().n,0);
+  // Copies from an earlier gallery remain removable even after the current link is gone.
+  const original=live.db.prepare('SELECT * FROM photos WHERE id=?').get(camera.id);
+  fs.copyFileSync(path.join(dataDir,'photos',original.filename),path.join(dataDir,'photos','orphan.jpg'));
+  live.db.prepare('INSERT INTO photos(id,event,guest,filename,approved,favorite,created,request_id) VALUES(?,?,?,?,1,0,?,?)').run('orphan',e.id,original.guest,'orphan.jpg',Date.now(),'orphan');
+  live.db.prepare('INSERT INTO live_booth_imports VALUES(?,?,?,?,?)').run(e.id,'previous-gallery','old-source','orphan','framed');
+  assert.equal((await call(endpoint+'/remove','DELETE',{},'',true)).body.removed,1);
+  assert.deepEqual((await call(feed)).body.photos.map(p=>p.id),[camera.id]);
+
 });

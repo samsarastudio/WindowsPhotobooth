@@ -16,7 +16,7 @@ body[data-screen=guest]>header,body[data-screen=guest]>footer{display:none}
 body[data-screen=guest] main{width:100%;max-width:none;height:100dvh;min-height:0;margin:0;padding:0;overflow:hidden}
 .camera-shell{height:100%;display:flex;flex-direction:column;position:relative;max-width:900px;margin:auto;background:#10120f}
 .viewfinder{position:relative;flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;background:#161914}
-#camera-preview{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover;border-radius:0;background:#10120f}
+#camera-preview{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;border-radius:0;background:#10120f}
 #camera-placeholder{position:absolute;inset:0;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:safe center;padding:58px 28px 20px;text-align:center;background:radial-gradient(ellipse at 50% 15%,#303c22,#141712 75%)}
 #camera-placeholder h1{font-size:clamp(24px,5vw,38px);margin:14px 0;max-width:440px;overflow-wrap:anywhere}
 #camera-placeholder>p{max-width:400px;color:#c1c9b5;font-size:14px}
@@ -68,3 +68,5 @@ body[data-screen=guest]{--safe-top:env(safe-area-inset-top,0px);--safe-right:env
 .wall-controls{margin-bottom:24px}.wall-controls>div{display:flex;flex-wrap:wrap;gap:10px;padding:16px 0}.wall-controls h3,.wall-controls p,.wall-controls input{width:100%;margin:0}.wall-controls input{font-size:12px}.wall-controls .muted{font-size:12px}
 
 .wall-display-settings,.wall-asset{flex-basis:100%;width:100%;display:grid;gap:12px;margin-top:20px}.wall-display-settings label{display:grid;gap:6px}.wall-display-settings label.check{display:flex}.wall-display-settings input[type=checkbox]{width:auto}.wall-asset input{max-width:100%}
+
+.capture-review{width:min(94vw,650px);max-height:94dvh;padding:18px;overflow:auto}.capture-review h2{margin:0 0 12px}.capture-review img{display:block;width:100%;height:min(64dvh,650px);object-fit:contain}.capture-review .actions{justify-content:center;margin-top:16px}.capture-review .actions button{min-width:120px}
