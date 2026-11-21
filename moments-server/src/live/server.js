@@ -1,3 +1,4 @@
+import {applyPhotoBranding} from './photo-branding.js';
 import {photoLooks,applyPhotoLook} from '../../live-public/photo-looks.js';
 import {registerGalleryWall} from './gallery-wall.js';
 import {registerPhotobooth} from './photobooth.js';
@@ -51,6 +52,7 @@ export function createLiveApp(options = {}) {
   if (!db.prepare('PRAGMA table_info(photos)').all().some(c => c.name === 'source_visible')) db.exec('ALTER TABLE photos ADD COLUMN source_visible INTEGER NOT NULL DEFAULT 1');
   if (!db.prepare('PRAGMA table_info(events)').all().some(c => c.name === 'closes_at')) db.exec('ALTER TABLE events ADD COLUMN closes_at INTEGER NOT NULL DEFAULT 0');
   if (!db.prepare('PRAGMA table_info(owners)').all().some(c => c.name === 'disabled')) db.exec('ALTER TABLE owners ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0');
+  if(!db.prepare('PRAGMA table_info(events)').all().some(c=>c.name==='photo_branding'))db.exec("ALTER TABLE events ADD COLUMN photo_branding TEXT NOT NULL DEFAULT 'none'");
   const eventColumns=db.prepare('PRAGMA table_info(events)').all();
   if(!eventColumns.some(c=>c.name==='photo_look'))db.exec("ALTER TABLE events ADD COLUMN photo_look TEXT NOT NULL DEFAULT 'natural'");
   if(!eventColumns.some(c=>c.name==='look_strength'))db.exec("ALTER TABLE events ADD COLUMN look_strength INTEGER NOT NULL DEFAULT 70");
@@ -163,10 +165,12 @@ export function createLiveApp(options = {}) {
   app.get('/api/me', wrap((req, res) => res.json(admin(req) || mustOwner(req))));
   app.get('/api/events', wrap((req, res) => res.json(db.prepare('SELECT * FROM events WHERE owner=? ORDER BY created DESC').all(mustOwner(req).id).map(summary))));
   function settings(b, previous = {}) {
-    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding', photo_look:'filters',look_strength:'filters' };
+    const controlled = { closes_at: 'scheduledClosing', reveal: 'scheduledReveal', overlay: 'branding', photo_branding:'branding', photo_look:'filters',look_strength:'filters' };
     for (const [field, flag] of Object.entries(controlled)) if (b[field] !== undefined && String(b[field]) !== String(previous[field] ?? (field === 'style' ? 'classic' : field === 'overlay' ? '' : 0))) requireFeature(flag);
     if (b.visibility === 'host' && previous.visibility !== 'host') requireFeature('hostOnlyGallery');
     const value = { title: text(b.title ?? previous.title), description: text(b.description ?? previous.description, 1500), style: 'classic', shot_limit: Number(b.shot_limit ?? previous.shot_limit ?? 25), guest_limit: Number(b.guest_limit ?? previous.guest_limit ?? 250), reveal: Number(b.reveal ?? previous.reveal ?? 0), visibility: b.visibility ?? previous.visibility ?? 'all', status: b.status ?? previous.status ?? 'draft', moderation: Number(b.moderation ?? previous.moderation ?? 0), overlay: text(b.overlay ?? previous.overlay, 80) };
+    value.photo_branding=b.photo_branding??previous.photo_branding??'none';
+    if(!['none','kwca_gold'].includes(value.photo_branding))throw fail(400,'Choose a valid photo border');
     value.photo_look=b.photo_look??previous.photo_look??'natural';value.look_strength=Number(b.look_strength??previous.look_strength??70);
     if(!photoLooks.some(l=>l.id===value.photo_look)||!Number.isInteger(value.look_strength)||value.look_strength<0||value.look_strength>100)throw fail(400,'Choose a valid photo look and strength from 0 to 100');
     value.closes_at = Number(b.closes_at ?? previous.closes_at ?? 0);
@@ -288,6 +292,7 @@ export function createLiveApp(options = {}) {
       }
       bytes = await sharp(bytes).composite(layers).jpeg({ quality: 88 }).toBuffer();
     }
+    if(features().branding)bytes=await applyPhotoBranding(bytes,e.photo_branding);
     const photoId = id(); const filename = `${photoId}.jpg`; const filepath = path.join(data, 'photos', filename);
     fs.writeFileSync(filepath, bytes, { flag: 'wx' });
     try {
