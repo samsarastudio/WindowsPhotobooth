@@ -31,7 +31,7 @@ function listActiveSessions(now = new Date()) {
 function listWallPhotos(limit = 4000) {
   const sessions = listActiveSessions();
   const byId = new Map(sessions.map((s) => [s.id, s]));
-  if (!sessions.length) return { photos: liveBridge.list(), sessions: [] };
+  if (!sessions.length) return { photos: [], sessions: [] };
   const placeholders = sessions.map(() => '?').join(',');
   const rows = getDb()
     .prepare(
@@ -55,7 +55,7 @@ function listWallPhotos(limit = 4000) {
     })
     .filter(Boolean);
   return {
-    photos: [...photos,...liveBridge.list()],
+    photos,
     sessions: sessions.map((s) => ({
       slug: s.slug,
       title: s.title,
@@ -129,8 +129,9 @@ export function notifyWallPhoto(photo) {
 }
 
 export const wallRouter = Router();
-const liveBridge=createLiveWallBridge({dir:path.join(config.dataDir,'live-wall'),authorize:requireUploadToken,notify:(type,photo)=>broadcastEvent(WALL_CHANNEL,type,photo)});
+const liveBridge=createLiveWallBridge({dir:path.join(config.dataDir,'live-wall'),authorize:requireUploadToken,resolveSession:slug=>listActiveSessions().find(s=>s.slug===slug),sessions:()=>listActiveSessions().map(s=>({id:s.id,slug:s.slug,title:s.title})),notify:(type,photo,slug)=>{if(slug)broadcastEvent(slug,type,photo);}});
 wallRouter.use('/live',liveBridge.router);
+export const livePhotosForSession=slug=>liveBridge.list(slug);
 
 wallRouter.get('/', (_req, res) => {
   const { photos, sessions } = listWallPhotos();

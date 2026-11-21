@@ -1,0 +1,170 @@
+diff --git a/moments-server/public/index.html b/moments-server/public/index.html
+index 9ffc8b1..eced67c 100644
+--- a/moments-server/public/index.html
++++ b/moments-server/public/index.html
+@@ -125,6 +125,6 @@
+     </div>
+ 
+     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+-    <script src="/js/gallery.js?v=20261121-photo-fit" type="module"></script>
++    <script src="/js/gallery.js?v=20261121-event-wall" type="module"></script>
+   </body>
+ </html>
+diff --git a/moments-server/public/js/gallery.js b/moments-server/public/js/gallery.js
+index 7e04101..0e13127 100644
+--- a/moments-server/public/js/gallery.js
++++ b/moments-server/public/js/gallery.js
+@@ -1671,12 +1671,14 @@ function connectStream(url) {
+   if (es) es.close();
+   es = new EventSource(url);
+   es.addEventListener('ready', async () => {
+-    if(route.kind!=='wall')return;
+-    try{const response=await fetch('/api/wall',{cache:'no-store'});if(!response.ok)return;const data=await response.json();photos=selectDisplayPhotosClient(data.photos||[]);if(viewMode==='mosaic')applyMosaicLayoutMode(true);else renderGrid();}catch{}
++    const eventWall=route.kind==='session'&&['mosaic','slideshow'].includes(route.mode);
++    if(route.kind!=='wall'&&!eventWall)return;
++    try{const response=await fetch(eventWall?`/api/sessions/${encodeURIComponent(route.slug)}?wall=1`:'/api/wall',{cache:'no-store'});const data=await response.json();photos=response.ok?selectDisplayPhotosClient(eventWall?data.session?.photos||[]:data.photos||[]):[];if(viewMode==='mosaic')applyMosaicLayoutMode(true);else renderGrid();}catch{}
+   });
+   es.addEventListener('photo.added', (ev) => {
+     try {
+-      upsertPhoto(JSON.parse(ev.data));
++      const photo=JSON.parse(ev.data);if(photo.wallOnly&&!(route.kind==='session'&&['mosaic','slideshow'].includes(route.mode)))return;
++      upsertPhoto(photo);
+     } catch {
+       /* ignore */
+     }
+@@ -1702,7 +1704,7 @@ async function loadSession(slug) {
+   const photoQs =
+     route.kind === 'photo' && route.photoId
+       ? `?photoId=${encodeURIComponent(route.photoId)}`
+-      : '';
++      : ['mosaic','slideshow'].includes(route.mode)?'?wall=1':'';
+   const res = await fetch(`/api/sessions/${encodeURIComponent(slug)}${photoQs}`);
+   const data = await res.json().catch(() => ({}));
+   if (!res.ok) {
+@@ -1722,7 +1724,7 @@ async function loadSession(slug) {
+     const wr = await fetch('/api/wall');
+     const wd = await wr.json();
+     if (wr.ok && wd.wall) {
+-      wallCfg = { ...wallCfg, ...wd.wall, title: wd.wall.title || wallCfg.title };
++      wallCfg = { ...wallCfg, ...wd.wall, title: data.session.title || slug };
+     }
+   } catch {
+     /* optional */
+diff --git a/moments-server/src/live-wall-bridge.js b/moments-server/src/live-wall-bridge.js
+index 98ffc99..a3dc578 100644
+--- a/moments-server/src/live-wall-bridge.js
++++ b/moments-server/src/live-wall-bridge.js
+@@ -6,34 +6,42 @@ import sharp from 'sharp';
+ 
+ // Live sources use the same wall metadata and photo.added stream as booth captures.
+ // A short renewable lease prevents disconnected/crashed Live servers leaving old photos visible.
+-export function createLiveWallBridge({dir,authorize,notify,clock=Date.now}) {
++export function createLiveWallBridge({dir,authorize,notify,resolveSession=()=>null,sessions=()=>[],clock=Date.now}) {
++ let visible=new Map();
++ const emit=(type,p,slug)=>{if(type==='photo.added')visible.set(p.id,slug);else if(type==='photo.removed')visible.delete(p.id);notify(type,p,slug);};
+  const router=Router(),valid=v=>typeof v==='string'&&/^[a-zA-Z0-9-]{1,80}$/.test(v);
+  const root=()=>{fs.mkdirSync(dir,{recursive:true});return dir;};
+  const read=id=>{try{return JSON.parse(fs.readFileSync(path.join(root(),id+'.json'),'utf8'));}catch{return null;}};
+  const write=(id,s)=>{const f=path.join(root(),id+'.json');fs.writeFileSync(f+'.tmp',JSON.stringify(s));fs.renameSync(f+'.tmp',f);};
+- const photo=(id,p)=>({id:`live-${id}-${p}`,variant:'framed',processStatus:'ready',url:`/api/wall/live/${id}/photos/${p}`,thumbUrl:`/api/wall/live/${id}/photos/${p}`,sourceLocalName:`live-${id}-${p}.jpg`});
++ const photo=(id,p)=>({id:`live-${id}-${p}`,variant:'framed',wallOnly:true,processStatus:'ready',url:`/api/wall/live/${id}/photos/${p}`,thumbUrl:`/api/wall/live/${id}/photos/${p}`,sourceLocalName:`live-${id}-${p}.jpg`});
+  const exists=(id,p)=>fs.existsSync(path.join(root(),`${id}-${p}.jpg`));
+- function list(){return fs.readdirSync(root()).filter(f=>f.endsWith('.json')).flatMap(f=>{const id=f.slice(0,-5),s=read(id);return s&&s.until>clock()?s.ids.filter(p=>exists(id,p)).map(p=>photo(id,p)):[];});}
+- router.get('/',authorize,(_req,res)=>res.json({ok:true,liveWallBridge:1}));
++ const active=s=>{const target=s?.sessionSlug&&resolveSession(s.sessionSlug);return s&&s.until>clock()&&target&&target.id===s.sessionId;};
++ function list(sessionSlug){return fs.readdirSync(root()).filter(f=>f.endsWith('.json')).flatMap(f=>{const id=f.slice(0,-5),s=read(id);return active(s)&&(sessionSlug===undefined||s.sessionSlug===sessionSlug)?s.ids.filter(p=>exists(id,p)).map(p=>({...photo(id,p),sessionSlug:s.sessionSlug})):[];});}
++ router.get('/',authorize,(_req,res)=>res.json({ok:true,liveWallBridge:2,sessions:sessions()}));
+  router.put('/:source',authorize,(req,res)=>{
+   const id=req.params.source,ids=req.body?.ids;
+   if(!valid(id)||!Array.isArray(ids)||ids.length>4000||ids.some(p=>!valid(p))||new Set(ids).size!==ids.length)return res.status(400).json({error:'Invalid Live photo list'});
+-  const old=read(id),prior=old?.until>clock()?old.ids:[],keep=new Set(ids);
+-  write(id,{ids,until:clock()+60000});
+-  for(const p of old?.ids||[])if(!keep.has(p)){fs.rmSync(path.join(root(),`${id}-${p}.jpg`),{force:true});notify('photo.removed',{id:photo(id,p).id});}
+-  for(const p of ids)if(!prior.includes(p)&&exists(id,p))notify('photo.added',photo(id,p));
++  const old=read(id),target=resolveSession(req.body.sessionSlug);
++  // Empty snapshots can always revoke a source, even after its destination expires.
++  if(ids.length&&(!target||target.id!==req.body.sessionId))return res.status(409).json({error:'Choose an active Gallery event'});
++  if(ids.length&&old?.ids.length&&old.sessionId&&old.sessionId!==target.id)return res.status(409).json({error:'Disconnect before changing the Gallery event'});
++  const sessionSlug=target?.slug||old?.sessionSlug,sessionId=target?.id||old?.sessionId;
++  const prior=active(old)&&old.sessionId===sessionId?old.ids:[],keep=new Set(ids);
++  write(id,{ids,sessionSlug,sessionId,until:clock()+60000});
++  for(const p of old?.ids||[])if(!keep.has(p)){fs.rmSync(path.join(root(),`${id}-${p}.jpg`),{force:true});emit('photo.removed',{id:photo(id,p).id},old?.sessionSlug);}
++  for(const p of ids)if(!prior.includes(p)&&exists(id,p))emit('photo.added',photo(id,p),sessionSlug);
+   res.set('Cache-Control','no-store').json({ok:true,missing:ids.filter(p=>!exists(id,p))});
+  });
+  const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:25*1024*1024,files:1}}).single('photo');
+  router.post('/:source/photos/:photo',authorize,upload,async(req,res,next)=>{try{
+   const {source:id,photo:p}=req.params;if(!valid(id)||!valid(p)||!req.file)return res.status(400).json({error:'Invalid Live photo'});
+-  const active=()=>{const s=read(id);return s&&s.until>clock()&&s.ids.includes(p);};
+-  if(!active())return res.sendStatus(409);
++  const uploadActive=()=>{const s=read(id);return active(s)&&s.ids.includes(p);};
++  if(!uploadActive())return res.sendStatus(409);
+   const bytes=await sharp(req.file.buffer,{limitInputPixels:40000000}).rotate().resize({width:2400,height:2400,fit:'inside',withoutEnlargement:true}).jpeg({quality:88}).toBuffer();
+-  if(!active())return res.sendStatus(409);
+-  fs.writeFileSync(path.join(root(),`${id}-${p}.jpg`),bytes);notify('photo.added',photo(id,p));res.json({ok:true});
++  if(!uploadActive())return res.sendStatus(409);
++  fs.writeFileSync(path.join(root(),`${id}-${p}.jpg`),bytes);emit('photo.added',photo(id,p),read(id).sessionSlug);res.json({ok:true});
+  }catch(err){next(err);}});
+- router.get('/:source/photos/:photo',(req,res)=>{const {source:id,photo:p}=req.params;if(!valid(id)||!valid(p))return res.sendStatus(404);const s=read(id);if(!s||s.until<=clock()||!s.ids.includes(p)||!exists(id,p))return res.sendStatus(404);res.set('Cache-Control','no-store').type('jpeg').send(fs.readFileSync(path.join(root(),`${id}-${p}.jpg`)));});
+- let visible=new Set();const timer=setInterval(()=>{const next=new Set(list().map(p=>p.id));for(const id of visible)if(!next.has(id))notify('photo.removed',{id});visible=next;},5000);timer.unref();
++ router.get('/:source/photos/:photo',(req,res)=>{const {source:id,photo:p}=req.params;if(!valid(id)||!valid(p))return res.sendStatus(404);const s=read(id);if(!active(s)||!s.ids.includes(p)||!exists(id,p))return res.sendStatus(404);res.set('Cache-Control','no-store').type('jpeg').send(fs.readFileSync(path.join(root(),`${id}-${p}.jpg`)));});
++ const timer=setInterval(()=>{const next=new Map(list().map(p=>[p.id,p.sessionSlug]));for(const [id,slug] of visible)if(!next.has(id))emit('photo.removed',{id},slug);visible=next;},5000);timer.unref();
+  return {router,list,close:()=>clearInterval(timer)};
+ }
+diff --git a/moments-server/src/routes/sessions.js b/moments-server/src/routes/sessions.js
+index fc61320..9fcd251 100644
+--- a/moments-server/src/routes/sessions.js
++++ b/moments-server/src/routes/sessions.js
+@@ -14,7 +14,7 @@ import {
+ } from '../db.js';
+ import { requireUploadToken } from '../auth.js';
+ import { broadcastPhotoAdded, subscribeSession } from '../sse.js';
+-import { notifyWallPhoto } from './wall.js';
++import { notifyWallPhoto, livePhotosForSession } from './wall.js';
+ import { warmThumb, warmAlbumThumbs } from '../thumbs.js';
+ import { filterPhotosForZip, streamAlbumZip } from '../album-zip.js';
+ 
+@@ -166,7 +166,9 @@ sessionsRouter.get('/:slug', (req, res) => {
+     if (row) photos.push(row);
+   }
+   warmAlbumThumbs(session.slug, photos);
+-  return res.json({ ok: true, session: publicSession(session, photos) });
++  const result=publicSession(session,photos);
++  if(req.query.wall==='1'&&!isSessionExpired(session))result.photos.push(...livePhotosForSession(session.slug));
++  return res.set('Cache-Control','no-store').json({ ok: true, session: result });
+ });
+ 
+ /** Single photo for share/QR deep links (any variant, including plain originals). */
+diff --git a/moments-server/src/routes/wall.js b/moments-server/src/routes/wall.js
+index d49ceae..7875781 100644
+--- a/moments-server/src/routes/wall.js
++++ b/moments-server/src/routes/wall.js
+@@ -31,7 +31,7 @@ function listActiveSessions(now = new Date()) {
+ function listWallPhotos(limit = 4000) {
+   const sessions = listActiveSessions();
+   const byId = new Map(sessions.map((s) => [s.id, s]));
+-  if (!sessions.length) return { photos: liveBridge.list(), sessions: [] };
++  if (!sessions.length) return { photos: [], sessions: [] };
+   const placeholders = sessions.map(() => '?').join(',');
+   const rows = getDb()
+     .prepare(
+@@ -55,7 +55,7 @@ function listWallPhotos(limit = 4000) {
+     })
+     .filter(Boolean);
+   return {
+-    photos: [...photos,...liveBridge.list()],
++    photos,
+     sessions: sessions.map((s) => ({
+       slug: s.slug,
+       title: s.title,
+@@ -129,8 +129,9 @@ export function notifyWallPhoto(photo) {
+ }
+ 
+ export const wallRouter = Router();
+-const liveBridge=createLiveWallBridge({dir:path.join(config.dataDir,'live-wall'),authorize:requireUploadToken,notify:(type,photo)=>broadcastEvent(WALL_CHANNEL,type,photo)});
++const liveBridge=createLiveWallBridge({dir:path.join(config.dataDir,'live-wall'),authorize:requireUploadToken,resolveSession:slug=>listActiveSessions().find(s=>s.slug===slug),sessions:()=>listActiveSessions().map(s=>({id:s.id,slug:s.slug,title:s.title})),notify:(type,photo,slug)=>{if(slug)broadcastEvent(slug,type,photo);}});
+ wallRouter.use('/live',liveBridge.router);
++export const livePhotosForSession=slug=>liveBridge.list(slug);
+ 
+ wallRouter.get('/', (_req, res) => {
+   const { photos, sessions } = listWallPhotos();
