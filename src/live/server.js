@@ -97,7 +97,7 @@ export function createLiveApp(options = {}) {
   const event = req => { const e = db.prepare('SELECT * FROM events WHERE slug=?').get(req.params.slug); if (!e) throw fail(404, 'Event not found'); return e; };
   const owned = req => { const e = event(req); if (admin(req)) return e; const o = mustOwner(req); if (e.owner !== o.id) throw fail(404, 'Event not found'); return e; };
   const guest = (req, e) => db.prepare('SELECT * FROM guests WHERE event=? AND hash=?').get(e.id, hash(req.headers['x-guest-token'] || cookies(req)[`live_guest_${e.id}`] || ''));
-  const summary = e => ({ ...e, configured_status: e.status, status: statusOf(e), features: features(), url: `${base}/e/${e.slug}`, photo_count: db.prepare('SELECT count(*) n FROM photos WHERE event=?').get(e.id).n, guest_count: db.prepare('SELECT count(*) n FROM guests WHERE event=?').get(e.id).n });
+  const summary = e => ({ ...e, asset_kinds:db.prepare('SELECT kind FROM assets WHERE event=?').all(e.id).map(a=>a.kind), configured_status: e.status, status: statusOf(e), features: features(), url: `${base}/e/${e.slug}`, photo_count: db.prepare('SELECT count(*) n FROM photos WHERE event=?').get(e.id).n, guest_count: db.prepare('SELECT count(*) n FROM guests WHERE event=?').get(e.id).n });
   const canSee = (req, e, p) => {
     if (admin(req) || owner(req)?.id === e.owner) return true;
     const g = guest(req, e);
@@ -255,6 +255,14 @@ export function createLiveApp(options = {}) {
     if (old) fs.rmSync(path.join(data, 'assets', old.filename), { force: true });
     res.json({ ok: true });
   }));
+  app.delete('/api/events/:slug/assets/:kind', wrap((req,res)=>{
+    const e=owned(req);const kind=req.params.kind;
+    if(!['cover','overlay'].includes(kind))throw fail(400,'Unknown asset type');
+    const asset=db.prepare('SELECT * FROM assets WHERE event=? AND kind=?').get(e.id,kind);
+    db.prepare('DELETE FROM assets WHERE event=? AND kind=?').run(e.id,kind);
+    if(asset)fs.rmSync(path.join(data,'assets',asset.filename),{force:true});
+    res.json({ok:true});
+  }));
   app.get('/api/guest/:slug/cover', wrap((req, res) => {
     requireFeature('branding');
     const e = event(req); if (e.status === 'draft' && !admin(req) && owner(req)?.id !== e.owner) throw fail(404, 'Event not found');
@@ -284,7 +292,7 @@ export function createLiveApp(options = {}) {
     const graphic = db.prepare("SELECT * FROM assets WHERE event=? AND kind='overlay'").get(e.id);
     if (features().branding && (graphic || e.overlay)) {
       const { width, height } = await sharp(bytes).metadata(); const layers = [];
-      if (graphic) layers.push({ input: await sharp(fs.readFileSync(path.join(data, 'assets', graphic.filename))).resize(width, height, { fit: 'fill' }).png().toBuffer() });
+      if (graphic) layers.push({ input: await sharp(fs.readFileSync(path.join(data, 'assets', graphic.filename))).resize(width, height, { fit: 'contain', background: '#00000000' }).png().toBuffer() });
       if (e.overlay) {
         const escaped = e.overlay.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
         const font = Math.max(10, Math.round(width / 42));

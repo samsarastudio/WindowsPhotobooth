@@ -38,6 +38,22 @@ test('Admin photo border persists and brands new portrait, landscape and square 
  const guestPage=await context.newPage();await guestPage.goto(`${base}/e/${event.slug}`);await guestPage.locator('#camera-placeholder img').waitFor();
  assert(await guestPage.locator('#camera-placeholder img').evaluate(img=>img.complete&&img.naturalWidth>0),'Uploaded cover displays on welcome screen');await guestPage.close();
  const guest=(await api(`/api/guest/${event.slug}/join`,'POST',{name:'QA'})).cookie;
+ const overlay=new FormData();overlay.append('photo',new Blob([await sharp({create:{width:200,height:200,channels:4,background:'#e020a0'}}).png().toBuffer()]),'graphic.png');
+ assert.equal((await api(`/api/events/${event.slug}/assets/overlay`,'POST',overlay,owner)).status,200);
+ const probe=new FormData();probe.append('photo',new Blob([await sharp({create:{width:600,height:1000,channels:3,background:'#687981'}}).png().toBuffer()]),'portrait.png');probe.append('request_id','overlay-scaling');
+ const probeResult=await api(`/api/guest/${event.slug}/photos`,'POST',probe,guest);assert.equal(probeResult.status,201);
+ const probeFile=path.join(dataDir,'photos',live.db.prepare('SELECT filename FROM photos WHERE id=?').get(probeResult.body.id).filename);
+ const pixels=await sharp(probeFile).removeAlpha().raw().toBuffer();const pixel=(x,y)=>Array.from(pixels.slice((y*600+x)*3,(y*600+x)*3+3));
+ assert(pixel(300,100)[0]<150,'Square overlay does not stretch to portrait top');assert(pixel(300,500)[0]>180,'Overlay is still composited centrally');
+ assert.equal((await api(`/api/events/${event.slug}/assets/overlay`,'DELETE')).status,401,'Removal requires event ownership');
+ await page.reload();await page.getByText('Cover & branding',{exact:true}).click();
+ assert.equal(await page.getByRole('button',{name:'Remove graphic overlay',exact:true}).isEnabled(),true);
+ await page.getByRole('button',{name:'Remove graphic overlay',exact:true}).click();await page.getByText('Graphic overlay removed. New photos will not include it.',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Remove graphic overlay',exact:true}).isDisabled(),true);
+ assert(!(await api(`/api/events/${event.slug}`,'GET',null,owner)).body.asset_kinds.includes('overlay'));
+ assert.equal((await api(`/api/events/${event.slug}`,'GET',null,owner)).body.photo_branding,'kwca_gold','Removing overlay preserves small KWCA border');
+ await page.getByRole('button',{name:'Remove event cover',exact:true}).click();await page.getByText('Event cover removed.',{exact:true}).waitFor();
+ assert.equal((await fetch(`${base}/api/guest/${event.slug}/cover`)).status,404);
  let n=0;const saved=[];
  for(const [width,height] of [[900,1200],[1200,900],[900,900]]){
   const source=await sharp({create:{width,height,channels:3,background:'#687981'}}).png().toBuffer();
