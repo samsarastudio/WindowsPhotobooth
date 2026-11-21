@@ -51,6 +51,11 @@ const sizes = [
             // Windows WebKit has no media stack. Exercise layout using a poster/track stub.
             const track={readyState:'live',stop(){this.readyState='ended';}};
             Object.defineProperty(HTMLMediaElement.prototype,'srcObject',{configurable:true,get(){return this._testStream;},set(value){this._testStream=value;if(value)this.poster=c.toDataURL();}});
+            Object.defineProperty(HTMLMediaElement.prototype,'readyState',{configurable:true,get(){return this._testStream?4:0;}});
+            Object.defineProperty(HTMLVideoElement.prototype,'videoWidth',{configurable:true,get(){return c.width;}});
+            Object.defineProperty(HTMLVideoElement.prototype,'videoHeight',{configurable:true,get(){return c.height;}});
+            const draw=CanvasRenderingContext2D.prototype.drawImage;
+            CanvasRenderingContext2D.prototype.drawImage=function(source,...args){return draw.call(this,source instanceof HTMLVideoElement?c:source,...args);};
             HTMLMediaElement.prototype.play=async function(){};
             return {getVideoTracks:()=>[track],getTracks:()=>[track]};
           };
@@ -76,7 +81,8 @@ const sizes = [
         assert.equal(await page.locator('#photo-looks-dialog video').count(),0,'Filter picker has no live camera preview');
         if(name==='standard')await page.screenshot({path:path.join(out,`${engine}-photo-looks.png`)});
         await page.locator('[data-done]').click();
-        const sample=await page.locator('#camera-preview').screenshot();
+        await page.locator('#camera-look-preview').waitFor({state:'visible'});
+        const sample=await page.locator('#camera-look-preview').screenshot();
         const pixels=await sharp(sample).removeAlpha().raw().toBuffer();
         let colourError=0;for(let i=0;i<pixels.length;i+=3)colourError+=Math.abs(pixels[i]-pixels[i+1])+Math.abs(pixels[i+1]-pixels[i+2]);
         assert.ok(colourError/(pixels.length/3)<3,`${engine}: Main camera preview renders selected Mono filter in grayscale`);
