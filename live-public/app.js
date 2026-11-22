@@ -1,3 +1,4 @@
+import {sharedAlbum} from './shared-album.js';
 import {finalGallery,finalGalleryControls} from './final-gallery.js';
 import {photoLooks} from './photo-looks.js';
 import {mountPhotoLooks} from './photo-look-controls.js?v=20261121-canvas-filter';
@@ -320,6 +321,6 @@ try {
   if (access) { history.replaceState(null, '', location.pathname); await send('/auth/accept', { token: access }); notice('Welcome to Moments Live'); }
   try { user = await api('/me'); } catch { user = null; }
   navigation();
-  if(parts[0]==='gallery')await finalGallery({app,slug:parts[1],api,escape});else if (parts[0] === 'admin') await admin(); else if (parts[0] === 'e') await guestView(); else if (parts[0] === 'host') await host(); else await home();
+  if(parts[0]==='album')await sharedAlbum({app,slug:parts[1],api});else if(parts[0]==='gallery')await finalGallery({app,slug:parts[1],api,escape});else if (parts[0] === 'admin') await admin(); else if (parts[0] === 'e') await guestView(); else if (parts[0] === 'host') await host(); else await home();
 } catch (err) { app.innerHTML = `<section class="guest"><p class="eyebrow">MOMENTS LIVE</p><h1>Let’s try that again.</h1><p>${escape(err.message)}</p><a class="button" href="/">Return home</a></section>`; }
 app.setAttribute('aria-busy', 'false');
