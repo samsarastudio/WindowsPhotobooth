@@ -22,6 +22,13 @@ test('Print studio validates dimensions, isolates owners and exports approved la
   await call(`/api/events/${e.slug}/photos/${ids[2]}`,'PATCH',{approved:false},cookie);assert.equal((await call(endpoint+'/album/preview','GET',null,cookie)).body.included,1);
   await call(endpoint,'PATCH',{selectedPhotos:[],eventType:'wedding',theme:'auto',subtitle:'A day held close',date:'12 December 2026',location:'The Garden House',intro:'A room full of love, a day full of little moments. These are the stories our people saw.',albumSize:'a4'},cookie);
   const out=path.resolve(process.env.LIVE_PRINT_QA_DIR||'output/live-print-qa');fs.mkdirSync(out,{recursive:true});
+  for(const layout of ['mosaic','compact','tiles']){
+    assert.equal((await call(endpoint,'PATCH',{layout,photosPerPage:4,wording:false},cookie)).status,200);
+    const preview=(await call(endpoint+'/album/preview','GET',null,cookie)).body;
+    assert.equal(preview.pages.filter(p=>p.layout).length,2);
+    const pdf=await call(endpoint+'/album/pdf','GET',null,cookie);assert.equal(pdf.status,200);assert.equal(pdf.body.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,layout+'.pdf'),pdf.body);
+  }
+  for(const photosPerPage of [0,13,1.5])assert.equal((await call(endpoint,'PATCH',{photosPerPage},cookie)).status,400);
   for(const theme of ['wedding','birthday','celebration','corporate','family']){
     await call(endpoint,'PATCH',{eventType:theme,theme:'auto',photoFrame:{wedding:'rounded',birthday:'glass',celebration:'gold',corporate:'none',family:'botanical'}[theme]},cookie);
     for(const kind of ['qr','album']){const r=await call(endpoint+`/${kind}/pdf`,'GET',null,cookie);assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(r.body.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,`${theme}-${kind}.pdf`),r.body);}
