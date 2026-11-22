@@ -62,15 +62,15 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
     const wording=c.wording?(custom[index]||library[(index+c.wordingOffset)%library.length]):'';
     const kicker=`${String(index+1).padStart(2,'0')}  /  ${title}`;
     if(layout==='mosaic'){
-      p.background=null;p.paper='#faf9f6';p.elements=[];
+      p.elements=[]; // Preserve the selected event artwork or keepsake paper.
       const top=wording?.075:.025,bottom=c.pageNumbers?.05:.025;
       const boxes=mosaicAlbumLayout(batch,{x:w*.025,y:h*top,w:w*.95,h:h*(1-top-bottom)},3);
       boxes.forEach((box,i)=>{photo(p,batch[i],box.x/w,box.y/h,box.w/w,box.h/h);Object.assign(p.elements.at(-1),{frame:'none',art:null,fit:c.photoFit||'contain'});});
-      if(wording)text(p,wording,.025,.02,.95,.035,13,'sans','left','#27352f');
+      if(wording)text(p,wording,.025,.02,.95,.035,13,'sans','left',t.ink);
     }else if(layout==='compact'||layout==='tiles'){
       // A compact photo page has no ornamental wells or oversized caption area.
       // Preview and PDF share these exact coordinates, including partial pages.
-      p.background=null;p.paper='#faf9f6';p.elements=[];
+      p.elements=[]; // Preserve the selected event artwork or keepsake paper.
       const margin=.025,gap=3,top=wording?.075:.025,bottom=c.pageNumbers?.05:.025;
       const areaW=w*(1-2*margin),areaH=h*(1-top-bottom);
       let cols=1,best=Infinity;
@@ -85,7 +85,7 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
         photo(p,item,(w*margin+(i%cols)*(cw+gap))/w,(h*top+row*(rh+gap))/h,cw/w,rh/h);
         Object.assign(p.elements.at(-1),{frame:'none',art:null,fit:layout==='tiles'?'cover':c.photoFit||'contain'});
       });
-      if(wording)text(p,wording,margin,.02,1-2*margin,.035,13,'sans','left','#27352f');
+      if(wording)text(p,wording,margin,.02,1-2*margin,.035,13,'sans','left',t.ink);
     }else if(layout==='keepsake'){
       // A landscape PDF sheet is a complete two-page composition, not two clipped pages.
       p.elements.push({kind:'fold',x:w*.499,y:0,w:w*.002,h});
@@ -121,7 +121,7 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
       const rects=layout==='duo'?[[.075,.29,.405,.53],[.52,.29,.405,.53]]:layout==='trio'?[[.065,.29,.48,.55],[.58,.29,.35,.25],[.58,.58,.35,.25]]:[[.075,.29,.405,.25],[.52,.29,.405,.25],[.075,.58,.405,.25],[.52,.58,.405,.25]];
       batch.forEach((item,i)=>photo(p,item,...rects[i]));
     }
-    if(c.pageNumbers)text(p,String(index+1).padStart(2,'0'),.43,['mosaic','compact','tiles'].includes(layout)?.96:.92,.14,.025,8,'sans','center',['mosaic','compact','tiles'].includes(layout)?'#27352f':t.ink);offset+=batch.length;index++;
+    if(c.pageNumbers)text(p,String(index+1).padStart(2,'0'),.43,['mosaic','compact','tiles'].includes(layout)?.96:.92,.14,.025,8,'sans','center',t.ink);offset+=batch.length;index++;
   }
   const close=page();text(close,c.closing,.17,.34,.66,.26,30);text(close,title,.2,.68,.6,.08,14);text(close,c.footer,.15,.84,.7,.04,10,'sans');
   return pages;

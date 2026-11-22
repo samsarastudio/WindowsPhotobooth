@@ -69,3 +69,15 @@ test('Mosaic handles mixed orientations and partial pages without overlap or mis
     assert.ok(pics.reduce((s,e)=>s+e.w*e.h,0)/(p.w*p.h)>.8);
   }
 });
+
+test('Dense album layouts honor selected paper and keep theme text readable',()=>{
+  for(const layout of ['mosaic','compact','tiles'])for(const theme of ['wedding','birthday','celebration','corporate','family'])for(const albumStyle of ['themed','keepsake']){
+    const pages=printPlan('album',{...printDefaults,layout,theme,albumStyle,wording:true},{title:'Our event'},[{url:'/photo',width:600,height:900}]);
+    const cover=pages[0],photoPage=pages.find(p=>p.layout);
+    assert.equal(photoPage.background,cover.background);assert.equal(photoPage.paper,cover.paper);
+    if(albumStyle==='themed')assert.equal(photoPage.background,`/print-themes/${theme}-album.jpg`);
+    else assert.equal(photoPage.paper,'#f8efdd');
+    const ink=cover.elements.find(e=>e.kind==='text').color;
+    assert.ok(photoPage.elements.filter(e=>e.kind==='text').every(e=>e.color===ink));
+  }
+});
