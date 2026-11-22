@@ -1,3 +1,4 @@
+import {registerDownloadRecords} from './download-records.js';
 import {registerFinalGallery} from './final-gallery.js';
 import {applyPhotoBranding} from './photo-branding.js';
 import {photoLooks,applyPhotoLook} from '../../live-public/photo-looks.js';
@@ -318,6 +319,7 @@ export function createLiveApp(options = {}) {
     } catch (err) { fs.unlinkSync(filepath); throw err; }
     res.status(201).json({ id: photoId });
   }));
+  const trackDownload=registerDownloadRecords({app,db,wrap,fail,mustAdmin,cookie,cookies,limit,now});
   app.get('/api/guest/:slug/photos', wrap((req, res) => {
     const e = event(req); if (!guest(req, e) && !admin(req) && owner(req)?.id !== e.owner) throw fail(401, 'Join the event first');
     const photos = db.prepare('SELECT p.*,g.name guest_name FROM photos p JOIN guests g ON p.guest=g.id WHERE p.event=? ORDER BY p.created DESC').all(e.id);
@@ -328,7 +330,7 @@ export function createLiveApp(options = {}) {
     const e = event(req); const p = db.prepare('SELECT * FROM photos WHERE id=? AND event=?').get(req.params.photo, e.id);
     if (!p || !canSee(req, e, p)) throw fail(404, 'Photo not available');
     if (req.query.thumb === '1') return res.type('jpeg').send(await sharp(fs.readFileSync(path.join(data, 'photos', p.filename))).resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer());
-    if (req.query.download) res.attachment(`${p.id}.jpg`);
+    if (req.query.download) {if(!admin(req)&&owner(req)?.id!==e.owner)trackDownload(req,res,e,'live',p.id);res.attachment(`${p.id}.jpg`);}
     res.sendFile(path.resolve(data, 'photos', p.filename));
   }));
   app.patch('/api/events/:slug/photos/:photo', wrap((req, res) => {
@@ -379,8 +381,8 @@ export function createLiveApp(options = {}) {
   }));
   const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL,pollMs:options.galleryPollMs ?? 5000});
   const stopGalleryWall=registerGalleryWall({app,db,mustAdmin,event,features,data,wrap,fail,now,pollMs:options.galleryPollMs??5000});
-  registerFinalGallery({app,db,owned,event,features,requireFeature,base,data,now,wrap,fail});
-  registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail,event,now});
+  registerFinalGallery({app,db,owned,event,features,requireFeature,base,data,now,wrap,fail,trackDownload});
+  registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail,event,now,trackDownload});
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
   app.use((req, res, next) => {
