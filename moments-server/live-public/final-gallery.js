@@ -1,3 +1,4 @@
+import {emailDownload} from './download-email.js';
 export async function finalGallery({app,slug,api,escape}) {
   document.body.classList.add('final-gallery-page');
   const sheet=document.createElement('link');sheet.rel='stylesheet';sheet.href='/final-gallery.css';document.head.append(sheet);
@@ -7,6 +8,7 @@ export async function finalGallery({app,slug,api,escape}) {
   const show=i=>{selected=(i+data.photos.length)%data.photos.length;dialog.querySelector('img').src=data.photos[selected].url;app.querySelector('#release-save').href=data.photos[selected].url+'?download=1';app.querySelector('#release-position').textContent=`${selected+1} / ${data.photos.length}`;if(!dialog.open)dialog.showModal();};
   data.photos.forEach((p,i)=>{const b=document.createElement('button'),img=document.createElement('img');b.type='button';b.setAttribute('aria-label',`Open photo ${i+1}`);img.src=p.url+'?thumb=1';img.alt=`Event photo ${i+1}`;img.loading='lazy';b.append(img);b.onclick=()=>show(i);grid.append(b);});
   if(!data.photos.length)grid.textContent='Photos will appear here when approved.';
+  app.querySelector('#release-save').onclick=async e=>{e.preventDefault();try{await emailDownload(e.currentTarget.href);}catch(err){if(err.message!=='Download cancelled')alert(err.message);}};
   app.querySelector('#release-prev').onclick=()=>show(selected-1);app.querySelector('#release-next').onclick=()=>show(selected+1);app.querySelector('#release-close').onclick=()=>dialog.close();
   dialog.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')show(selected-1);if(e.key==='ArrowRight')show(selected+1);});
 }

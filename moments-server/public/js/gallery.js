@@ -1,3 +1,4 @@
+import {ensureDownloadEmail} from '/download-email.js';
 function parseRoute() {
   const parts = location.pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
   const q = new URLSearchParams(location.search);
@@ -423,6 +424,7 @@ function selectDisplayPhotosClient(list, includeOriginals = wallCfg.showOriginal
 async function savePhotoToDevice(url, filename = 'inmoment-photo.jpg') {
   if (!url) return;
   try {
+    if(route.kind==='session'){await ensureDownloadEmail();const tracked=new URL(url,location.href);tracked.searchParams.set('downloadRecord','1');url=tracked.href;}
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
@@ -449,7 +451,8 @@ async function savePhotoToDevice(url, filename = 'inmoment-photo.jpg') {
     setTimeout(() => URL.revokeObjectURL(obj), 1500);
   } catch (e) {
     console.warn('savePhotoToDevice failed', e);
-    // Last resort: open in new tab
+    if(route.kind==='session'){if(e.message!=='Download cancelled')setStatus(e.message);return;}
+    // QR photo downloads keep their direct fallback.
     window.open(url, '_blank', 'noopener');
   }
 }
@@ -1844,6 +1847,7 @@ els.btnDownloadAlbum?.addEventListener('click', async () => {
   els.btnDownloadAlbum.textContent = 'Preparing ZIP…';
   setStatus(`Building ${scopeLabel} ZIP — large albums may take a minute…`);
   try {
+    await ensureDownloadEmail();
     const res = await fetch(
       `/api/sessions/${encodeURIComponent(slug)}/zip?scope=${encodeURIComponent(scope)}`,
     );

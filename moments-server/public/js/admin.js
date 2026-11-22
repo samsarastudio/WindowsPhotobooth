@@ -1,3 +1,4 @@
+import {downloadAnalytics} from '/download-analytics.js';
 import { initFrameGenerator } from './frame-generator.js';
 const pinEl = document.getElementById('pin');
 const loginCard = document.getElementById('loginCard');
@@ -154,6 +155,7 @@ function setTab(tab) {
     sec.classList.toggle('is-active', on);
     sec.hidden = !on;
   });
+  if(name==='analytics')void api('/api/admin/sessions').then(list=>downloadAnalytics({container:document.querySelector('#downloadAnalytics'),events:list.sessions||[],sources:['photobooth'],api:url=>api('/api'+url),send:(url,body,method)=>api('/api'+url,{method,body:JSON.stringify(body)}),notice:message=>setStatus(message)})).catch(err=>setStatus(err.message));
   if (name === 'photos') void refreshPhotos();
   if (name === 'frames') void refreshFrames();
   if (name === 'physical') void refreshPhysicalFrames();

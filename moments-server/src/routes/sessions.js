@@ -128,6 +128,7 @@ sessionsRouter.get('/:slug/zip', (req, res) => {
       error: `No ${scope === 'original' ? 'original' : scope} photos in this album`,
     });
   }
+  try{req.app.locals.trackGuestDownload(req,res,session,'photobooth','album-'+scope+'.zip');}catch(err){return res.status(err.status||500).json({error:err.message});}
   return streamAlbumZip(res, {
     slug: session.slug,
     title: session.title || session.slug,

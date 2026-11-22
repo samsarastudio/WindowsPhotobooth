@@ -1,3 +1,4 @@
+import {downloadAnalytics} from './download-analytics.js';
 import {galleryWallControls} from './gallery-wall-controls.js';
 import {photoboothControls} from './photobooth-controls.js';
 import { wallControls } from './wall-controls.js';
@@ -36,18 +37,19 @@ export async function adminDashboard({ app, nav, api, send, form, action, notice
   overview.innerHTML = `<div><strong>${events.length}</strong><span>Events</span></div><div><strong>${events.filter(e => e.status === 'published').length}</strong><span>Open for photos</span></div><div><strong>${owners.length}</strong><span>Event owners</span></div><div><strong>${events.reduce((sum,e) => sum + e.photo_count, 0)}</strong><span>Photos collected</span></div>`;
   toolbar.after(overview);
   const tabs = document.createElement('nav'); tabs.className = 'admin-tabs'; tabs.setAttribute('aria-label', 'Dashboard sections');
-  tabs.innerHTML = ['events','owners','settings'].map(key => `<button type="button" data-panel="${key}" aria-controls="panel-${key}">${key[0].toUpperCase()+key.slice(1)}</button>`).join('');
+  tabs.innerHTML = ['events','owners','analytics','settings'].map(key => `<button type="button" data-panel="${key}" aria-controls="panel-${key}">${key[0].toUpperCase()+key.slice(1)}</button>`).join('');
   overview.after(tabs);
   const sections = [...app.querySelectorAll(':scope > section')];
   const createGrid = app.querySelector(':scope > .grid');
   const panels = {};
-  for (const key of ['events','owners','settings']) {
+  for (const key of ['events','owners','analytics','settings']) {
     const panel = document.createElement('div'); panel.id = `panel-${key}`; panel.className = 'admin-panel'; panel.setAttribute('aria-label', key); app.append(panel); panels[key] = panel;
   }
   panels.owners.append(createGrid.firstElementChild, document.querySelector('#invitation'), sections[0]);
   panels.events.append(createGrid.firstElementChild, document.querySelector('#created-event'), sections[1]);
   createGrid.remove();
   panels.settings.append(...app.querySelectorAll(':scope > details'));
+  await downloadAnalytics({container:panels.analytics,events,api,send,notice});
   const switchPanel = key => {
     activePanel = key;
     for (const [name,panel] of Object.entries(panels)) panel.hidden = name !== key;

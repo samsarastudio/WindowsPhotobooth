@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
-export function registerFinalGallery({app,db,owned,event,features,requireFeature,base,data,now,wrap,fail}) {
+export function registerFinalGallery({app,db,owned,event,features,requireFeature,base,data,now,wrap,fail,trackDownload}) {
   if(!db.prepare('PRAGMA table_info(events)').all().some(c=>c.name==='gallery_released'))db.exec('ALTER TABLE events ADD COLUMN gallery_released INTEGER NOT NULL DEFAULT 0');
   const eligible=e=>e.status!=='draft'&&e.visibility==='all'&&e.reveal<=now();
   const released=req=>{const e=event(req);if(!e.gallery_released||!eligible(e))throw fail(404,'This gallery has not been released.');return e;};
@@ -26,7 +26,7 @@ export function registerFinalGallery({app,db,owned,event,features,requireFeature
     if(!fs.existsSync(file))throw fail(404,'Photo not available');
     res.set('Cache-Control','no-store');
     if(req.query.thumb==='1')return res.type('jpeg').send(await sharp(await fs.promises.readFile(file)).rotate().resize({width:640,height:640,fit:'inside',withoutEnlargement:true}).jpeg({quality:80}).toBuffer());
-    if(req.query.download)res.attachment(`${req.params.photo}.jpg`);
+    if(req.query.download){trackDownload(req,res,e,'gallery',req.params.photo);}if(req.query.download)res.attachment(`${req.params.photo}.jpg`);
     res.sendFile(path.resolve(file));
   }));
 }

@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import {themes,printDefaults,qrSizes,albumSizes} from '../../live-public/print-catalog.js';
 import {printPlan,photoGeometry,keepsakeFlourish} from '../../live-public/print-layout.js';
 
-export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail,event,now=Date.now}){
+export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail,event,now=Date.now,trackDownload}){
   db.exec("CREATE TABLE IF NOT EXISTS live_print_designs(event TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,config TEXT NOT NULL)");
   const config=e=>{const saved=db.prepare('SELECT config FROM live_print_designs WHERE event=?').get(e.id);return {...printDefaults,...(saved?{qrLayout:'classic',...JSON.parse(saved.config)}:{})};};
   const logo=e=>db.prepare("SELECT filename FROM assets WHERE event=? AND kind='print-logo'").get(e.id);
@@ -89,6 +89,7 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
     await job.promise;
     const fresh=await prepare(req,publicView);if(signature(fresh)!==job.key)throw fail(409,'Album changed. Please prepare the latest saved version.');
     if(job.state==='error')throw fail(500,job.error);
+    if(publicView)trackDownload(req,res,fresh.e,'album','album.pdf');
     res.set('Cache-Control','no-store');res.set('Content-Disposition',`${req.query.view==='1'?'inline':'attachment'}; filename="${plan.e.slug}-${plan.kind}.pdf"`);res.type('pdf').sendFile(path.resolve(job.file));
   }
   app.get('/api/events/:slug/print/:kind/export',wrap((req,res)=>status(req,res)));

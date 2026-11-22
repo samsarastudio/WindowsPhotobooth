@@ -1,3 +1,4 @@
+import {registerDownloadRecords} from './live/download-records.js';
 import { boothPackagesRouter, adminBoothPackagesRouter } from './routes/booth-packages.js';
 import { portraitJobsRouter, initPortraitJobs } from './routes/portrait-jobs.js';
 import { gameRouter, adminGameRouter } from './routes/game.js';
@@ -42,6 +43,17 @@ app.use((_req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '1mb' }));
+
+const recordFail=(status,message)=>Object.assign(new Error(message),{status});
+const downloadBuckets=new Map();
+app.locals.trackGuestDownload=registerDownloadRecords({app,db:getDb(),eventTable:'sessions',now:Date.now,
+ wrap:fn=>(req,res)=>Promise.resolve().then(()=>{res.set('Cache-Control','no-store');return fn(req,res);}).catch(err=>res.status(err.status||500).json({error:err.message})),fail:recordFail,
+ mustAdmin:req=>{const pin=req.get('x-admin-pin')||req.body?.pin;if(!pin||pin!==config.adminPin)throw recordFail(401,'Invalid admin PIN');},
+ cookies:req=>Object.fromEntries((req.headers.cookie||'').split(';').map(c=>c.trim().split('='))),
+ cookie:(res,key,value,seconds)=>res.cookie(key,value,{httpOnly:true,secure:config.publicBaseUrl.startsWith('https:'),sameSite:'lax',path:'/',maxAge:seconds*1000}),
+ limit:req=>{const time=Date.now(),key=req.ip;for(const [ip,row]of downloadBuckets)if(time-row.at>60000)downloadBuckets.delete(ip);const row=downloadBuckets.get(key)||{at:time,count:0};if(++row.count>30)throw recordFail(429,'Please try again shortly');downloadBuckets.set(key,row);}
+});
+for(const asset of ['download-email.js','download-email.css','download-analytics.js'])app.get('/'+asset,(_req,res)=>{res.set('Cache-Control','no-store');res.sendFile(path.resolve(config.publicDir,'../live-public',asset));});
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -172,6 +184,7 @@ app.get('/media/:slug/:filename', async (req, res) => {
   const filePath = path.join(config.photosDir, slug, filename);
   if (!fs.existsSync(filePath)) return res.status(404).end();
 
+  if(req.query.downloadRecord==='1'){try{app.locals.trackGuestDownload(req,res,session,'photobooth',filename);res.set('Cache-Control','no-store');res.attachment(filename);return res.sendFile(filePath);}catch(err){return res.status(err.status||500).json({error:err.message});}}
   const wantThumb =
     req.query.thumb === '1' ||
     req.query.thumb === 'true' ||

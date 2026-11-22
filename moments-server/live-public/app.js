@@ -1,3 +1,4 @@
+import {emailDownload} from './download-email.js';
 import {sharedAlbum} from './shared-album.js';
 import {finalGallery,finalGalleryControls} from './final-gallery.js';
 import {photoLooks} from './photo-looks.js';
@@ -129,6 +130,7 @@ async function loadPhotos(isHost = false) {
   if (target.dataset.signature === signature) return;
   target.dataset.signature = signature;
   target.innerHTML = photos.map(p => `<figure class="photo"><a href="${p.url}" data-preview="${p.url}"><img loading="lazy" src="${p.url}" alt="Photo shared by ${escape(p.guest_name)}"></a><figcaption><span>${escape(p.guest_name)}${!p.approved ? ' · Awaiting approval' : ''}${p.favorite ? ' · ★' : ''}${p.source_visible===0 ? ' · Excluded by photobooth types' : ''}</span><div class="actions"><a class="button small secondary" href="${p.url}?download=1">Save</a>${isHost ? `<button class="small secondary" data-favorite="${p.id}" data-value="${p.favorite ? 0 : 1}">${p.favorite ? 'Unfavorite' : 'Favorite'}</button><button class="small secondary" data-approve="${p.id}" data-value="${p.approved ? 0 : 1}">${p.approved ? 'Hide from guests' : 'Approve'}</button><button class="small danger" data-delete="${p.id}">Delete</button>` : ''}</div></figcaption></figure>`).join('') || (isHost ? '<div class="empty">No photos yet. Share the event link or QR code to get started.</div>' : '<div class="empty">No shared photos yet. Yours could be the first.</div>');
+  if(!isHost)target.querySelectorAll('a[href$="?download=1"]').forEach(link=>link.onclick=async e=>{e.preventDefault();try{await emailDownload(link.href);}catch(err){if(err.message!=='Download cancelled')notice(err.message,true);}});
   action('[data-favorite]', async el => { await send(`/events/${slug}/photos/${el.dataset.favorite}`, { favorite: Number(el.dataset.value) }, 'PATCH'); await loadPhotos(true); });
   action('[data-approve]', async el => { await send(`/events/${slug}/photos/${el.dataset.approve}`, { approved: Number(el.dataset.value) }, 'PATCH'); await loadPhotos(true); });
   action('[data-delete]', el => {
