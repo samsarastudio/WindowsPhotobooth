@@ -1,3 +1,4 @@
+import {registerFinalGallery} from './final-gallery.js';
 import {applyPhotoBranding} from './photo-branding.js';
 import {photoLooks,applyPhotoLook} from '../../live-public/photo-looks.js';
 import {registerGalleryWall} from './gallery-wall.js';
@@ -378,6 +379,7 @@ export function createLiveApp(options = {}) {
   }));
   const stopPhotobooth = registerPhotobooth({app,db,mustAdmin,event,features,data,wrap,fail,url:options.galleryUrl ?? process.env.LIVE_GALLERY_URL,pollMs:options.galleryPollMs ?? 5000});
   const stopGalleryWall=registerGalleryWall({app,db,mustAdmin,event,features,data,wrap,fail,now,pollMs:options.galleryPollMs??5000});
+  registerFinalGallery({app,db,owned,event,features,requireFeature,base,data,now,wrap,fail});
   registerPrintStudio({app,db,owned,requireFeature,base,data,root,wrap,fail});
   registerWall({ app, db, owned, features, now, base, data, root, wrap, fail });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Endpoint not found' }));
@@ -390,7 +392,7 @@ export function createLiveApp(options = {}) {
   });
   app.get('/marketing/', (_req,res)=>res.sendFile(path.join(root,'live-public/marketing/index.html')));
   app.use(express.static(path.join(root, 'live-public'), { index: false }));
-  app.get(['/', '/access', '/admin', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print', '/host/:slug/album'], (req, res) => {
+  app.get(['/', '/access', '/admin', '/gallery/:slug', '/e/:slug', '/host/:slug', '/host/:slug/slideshow', '/host/:slug/print', '/host/:slug/album'], (req, res) => {
     const storeId = process.env.LIVE_APPLE_APP_STORE_ID || '';
     const bundle = process.env.LIVE_IOS_BUNDLE_ID || 'com.inmomentservices.live';
     if (req.path.startsWith('/e/') && /^\d+$/.test(storeId) && /^[a-zA-Z0-9.-]+$/.test(bundle)) {
