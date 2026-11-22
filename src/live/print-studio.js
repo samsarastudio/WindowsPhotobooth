@@ -15,7 +15,7 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
   const instruction=e=>db.prepare("SELECT filename FROM assets WHERE event=? AND kind='print-instruction'").get(e.id);
   const instructionUrl=e=>instruction(e)?`/api/events/${e.slug}/print/instruction-image?v=${instruction(e).filename}`:'/print-themes/qr-instruction-phone.png';
   const logoUrl=e=>logo(e)?`/api/events/${e.slug}/print/logo?v=${logo(e).filename}`:null;
-  const choices={qrLayout:['classic','pages','fold'],qrHeaderMode:['text','logo','none'],eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],albumStyle:['themed','keepsake'],layout:['keepsake','editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['gold-line','none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
+  const choices={qrLayout:['classic','pages','fold'],qrHeaderMode:['text','logo','none'],eventType:Object.keys(themes),theme:['auto',...Object.keys(themes)],border:['none','fine','double','rounded'],qrSize:[...Object.keys(qrSizes),'custom'],albumSize:[...Object.keys(albumSizes),'custom'],albumStyle:['themed','keepsake'],layout:['mosaic','compact','tiles','keepsake','editorial','hero','hero-right','duo','offset-duo','trio','panorama','gallery','grid'],photoFrame:['gold-line','none','rounded','glass','gold','botanical'],photoFit:['contain','cover'],order:['chronological','favorites','manual']};
   function validate(old,patch){
     if(!patch||typeof patch!=='object'||Array.isArray(patch))throw fail(400,'Provide design settings');
     const c={...old};
@@ -25,8 +25,8 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
         if(!Array.isArray(v)||v.length>300||v.some(id=>typeof id!=='string'||! /^[a-f0-9-]{36}$/.test(id))||new Set(v).size!==v.length)throw fail(400,'Choose up to 300 unique photos');
       }else if(typeof v!==typeof printDefaults[k])throw fail(400,'Invalid design setting: '+k);
       if(choices[k]&&!choices[k].includes(v))throw fail(400,'Invalid choice: '+k);
-      const ranges={qrLogoScale:[25,400],qrWidth:[70,420],qrHeight:[70,594],albumWidth:[180,420],albumHeight:[120,297],photoLimit:[1,300],wordingOffset:[0,149],layoutOffset:[0,7]};
-      if(ranges[k]&&(!Number.isFinite(v)||v<ranges[k][0]||v>ranges[k][1]||(['photoLimit','wordingOffset','layoutOffset'].includes(k)&&!Number.isInteger(v))))throw fail(400,'Invalid range: '+k);
+      const ranges={photosPerPage:[1,12],qrLogoScale:[25,400],qrWidth:[70,420],qrHeight:[70,594],albumWidth:[180,420],albumHeight:[120,297],photoLimit:[1,300],wordingOffset:[0,149],layoutOffset:[0,7]};
+      if(ranges[k]&&(!Number.isFinite(v)||v<ranges[k][0]||v>ranges[k][1]||(['photosPerPage','photoLimit','wordingOffset','layoutOffset'].includes(k)&&!Number.isInteger(v))))throw fail(400,'Invalid range: '+k);
       if(typeof v==='string'&&v.length>({intro:1200,closing:400,customCaptions:12000,qrInstructions:160}[k]||120))throw fail(400,'Text is too long: '+k);
       if(k==='customCaptions'&&(v.split('\n').length>150||v.split('\n').some(line=>line.length>180)))throw fail(400,'Use up to 150 captions, each at most 180 characters');
       c[k]=v;
@@ -59,11 +59,11 @@ export function registerPrintStudio({app,db,owned,requireFeature,base,data,root,
   app.get('/api/events/:slug/print/instruction-image',wrap((req,res)=>{const e=owned(req),a=instruction(e);if(!a)throw fail(404,'Instruction image not found');res.type('png').send(fs.readFileSync(path.join(data,'assets',a.filename)));}));
   app.delete('/api/events/:slug/print/instruction-image',wrap((req,res)=>{const e=owned(req),a=instruction(e);db.prepare("DELETE FROM assets WHERE event=? AND kind='print-instruction'").run(e.id);if(a)fs.rmSync(path.join(data,'assets',a.filename),{force:true});res.json({instructionImage:instructionUrl(e)});}));
   app.get('/api/events/:slug/print/qr/image',wrap(async(req,res)=>{const e=owned(req);requireFeature('qrPrints');res.type('png').send(await QRCode.toBuffer(`${base}/e/${e.slug}`,{width:900,margin:4,errorCorrectionLevel:'M'}));}));
-  function prepare(req){const e=owned(req),kind=req.params.kind;if(!['qr','album'].includes(kind))throw fail(404,'Unknown print format');requireFeature(kind==='album'?'photobooks':'qrPrints');const c=config(e),selection=selected(e,c);if(kind==='album'&&!selection.rows.length)throw fail(400,'Approve or select at least one photo before creating an album');return {e,c,kind,selection,pages:printPlan(kind,c,{...e,url:`${base}/e/${e.slug}`},selection.rows,logoUrl(e),instructionUrl(e))};}
-  app.get('/api/events/:slug/print/:kind/preview',wrap((req,res)=>{const {pages,selection}=prepare(req);res.json({pages,included:selection.rows.length,eligible:selection.total});}));
+  async function prepare(req){const e=owned(req),kind=req.params.kind;if(!['qr','album'].includes(kind))throw fail(404,'Unknown print format');requireFeature(kind==='album'?'photobooks':'qrPrints');const c=config(e),selection=selected(e,c);if(kind==='album'&&!selection.rows.length)throw fail(400,'Approve or select at least one photo before creating an album');if(kind==='album'&&c.layout==='mosaic'){for(const p of selection.rows){const meta=await sharp(path.join(data,'photos',p.filename)).metadata();const swap=[5,6,7,8].includes(meta.orientation);p.width=swap?meta.height:meta.width;p.height=swap?meta.width:meta.height;}}return {e,c,kind,selection,pages:printPlan(kind,c,{...e,url:`${base}/e/${e.slug}`},selection.rows,logoUrl(e),instructionUrl(e))};}
+  app.get('/api/events/:slug/print/:kind/preview',wrap(async(req,res)=>{const {pages,selection}=await prepare(req);res.json({pages,included:selection.rows.length,eligible:selection.total});}));
   const busy=new Set();
   app.get('/api/events/:slug/print/:kind/pdf',wrap(async(req,res)=>{
-    const {e,kind,selection,pages}=prepare(req);if(busy.has(e.id)||busy.size>=2)throw fail(429,'Another PDF is being prepared for this event. Try again shortly.');busy.add(e.id);
+    const {e,kind,selection,pages}=await prepare(req);if(busy.has(e.id)||busy.size>=2)throw fail(429,'Another PDF is being prepared for this event. Try again shortly.');busy.add(e.id);
     try{
       const images=new Map();
       for(const p of kind==='album'?selection.rows:[]){images.set(p.url,await sharp(fs.readFileSync(path.join(data,'photos',p.filename))).resize({width:2400,height:1800,fit:'inside',withoutEnlargement:true}).jpeg({quality:90}).toBuffer());}

@@ -56,12 +56,37 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
   while(offset<photos.length){
     const p=page();let layout=c.layout==='editorial'?sequence[(index+(c.layoutOffset||0))%sequence.length]:c.layout;
     const remaining=photos.length-offset;
-    if(layout!=='keepsake'&&remaining===1&&!['hero','hero-right','panorama'].includes(layout))layout=index%2?'hero-right':'hero';
+    if(!['mosaic','compact','tiles','keepsake'].includes(layout)&&remaining===1&&!['hero','hero-right','panorama'].includes(layout))layout=index%2?'hero-right':'hero';
     else if(remaining===2&&['trio','gallery','grid'].includes(layout))layout='offset-duo';else if(remaining===3&&layout==='grid')layout='gallery';
-    const take={keepsake:Math.min(4,remaining),hero:1,'hero-right':1,panorama:1,duo:2,'offset-duo':2,trio:3,gallery:3,grid:4}[layout];const batch=photos.slice(offset,offset+take);p.layout=layout;
+    const take={mosaic:Math.min(c.photosPerPage||6,remaining),compact:Math.min(c.photosPerPage||6,remaining),tiles:Math.min(c.photosPerPage||6,remaining),keepsake:Math.min(4,remaining),hero:1,'hero-right':1,panorama:1,duo:2,'offset-duo':2,trio:3,gallery:3,grid:4}[layout];const batch=photos.slice(offset,offset+take);p.layout=layout;
     const wording=c.wording?(custom[index]||library[(index+c.wordingOffset)%library.length]):'';
     const kicker=`${String(index+1).padStart(2,'0')}  /  ${title}`;
-    if(layout==='keepsake'){
+    if(layout==='mosaic'){
+      p.background=null;p.paper='#faf9f6';p.elements=[];
+      const top=wording?.075:.025,bottom=c.pageNumbers?.05:.025;
+      const boxes=mosaicAlbumLayout(batch,{x:w*.025,y:h*top,w:w*.95,h:h*(1-top-bottom)},3);
+      boxes.forEach((box,i)=>{photo(p,batch[i],box.x/w,box.y/h,box.w/w,box.h/h);Object.assign(p.elements.at(-1),{frame:'none',art:null,fit:c.photoFit||'contain'});});
+      if(wording)text(p,wording,.025,.02,.95,.035,13,'sans','left','#27352f');
+    }else if(layout==='compact'||layout==='tiles'){
+      // A compact photo page has no ornamental wells or oversized caption area.
+      // Preview and PDF share these exact coordinates, including partial pages.
+      p.background=null;p.paper='#faf9f6';p.elements=[];
+      const margin=.025,gap=3,top=wording?.075:.025,bottom=c.pageNumbers?.05:.025;
+      const areaW=w*(1-2*margin),areaH=h*(1-top-bottom);
+      let cols=1,best=Infinity;
+      for(let n=1;n<=batch.length;n++){
+        const rows=Math.ceil(batch.length/n),cw=(areaW-gap*(n-1))/n,ch=(areaH-gap*(rows-1))/rows;
+        const score=Math.abs(Math.log((cw/ch)/(layout==='tiles'?1:1.5)))+(rows*n-batch.length)*.15;
+        if(score<best){best=score;cols=n;}
+      }
+      const rows=Math.ceil(batch.length/cols),rh=(areaH-gap*(rows-1))/rows;
+      batch.forEach((item,i)=>{
+        const row=Math.floor(i/cols),count=Math.min(cols,batch.length-row*cols),cw=(areaW-gap*(count-1))/count;
+        photo(p,item,(w*margin+(i%cols)*(cw+gap))/w,(h*top+row*(rh+gap))/h,cw/w,rh/h);
+        Object.assign(p.elements.at(-1),{frame:'none',art:null,fit:layout==='tiles'?'cover':c.photoFit||'contain'});
+      });
+      if(wording)text(p,wording,margin,.02,1-2*margin,.035,13,'sans','left','#27352f');
+    }else if(layout==='keepsake'){
       // A landscape PDF sheet is a complete two-page composition, not two clipped pages.
       p.elements.push({kind:'fold',x:w*.499,y:0,w:w*.002,h});
       const mirrored=index%2===1;
@@ -96,7 +121,7 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
       const rects=layout==='duo'?[[.075,.29,.405,.53],[.52,.29,.405,.53]]:layout==='trio'?[[.065,.29,.48,.55],[.58,.29,.35,.25],[.58,.58,.35,.25]]:[[.075,.29,.405,.25],[.52,.29,.405,.25],[.075,.58,.405,.25],[.52,.58,.405,.25]];
       batch.forEach((item,i)=>photo(p,item,...rects[i]));
     }
-    if(c.pageNumbers)text(p,String(index+1).padStart(2,'0'),.43,.92,.14,.025,8,'sans');offset+=batch.length;index++;
+    if(c.pageNumbers)text(p,String(index+1).padStart(2,'0'),.43,['mosaic','compact','tiles'].includes(layout)?.96:.92,.14,.025,8,'sans','center',['mosaic','compact','tiles'].includes(layout)?'#27352f':t.ink);offset+=batch.length;index++;
   }
   const close=page();text(close,c.closing,.17,.34,.66,.26,30);text(close,title,.2,.68,.6,.08,14);text(close,c.footer,.15,.84,.7,.04,10,'sans');
   return pages;
@@ -113,3 +138,34 @@ export function photoGeometry(el,iw,ih){
 
 // Shared vector flourish keeps the browser and exported ornament identical.
 export const keepsakeFlourish='M0 7H100 M35 7Q28 -1 35 1Q41 2 35 7Z M43 7Q37 15 44 13Q49 11 43 7Z M51 7Q44 -1 51 1Q57 2 51 7Z M59 7Q53 15 60 13Q65 11 59 7Z M67 7Q60 -1 67 1Q73 2 67 7Z';
+
+// Build a deterministic, fully packed slicing mosaic. Candidate trees retain
+// natural photo proportions; the final plan is shared by preview and PDF.
+export function mosaicAlbumLayout(photos,box,gap=3){
+  const memo=new Map();
+  function trees(start,end){
+    const key=start+':'+end;if(memo.has(key))return memo.get(key);
+    if(end-start===1){const p=photos[start],ratio=p.width>0&&p.height>0?p.width/p.height:1.5;return [{ratio:Math.max(.25,Math.min(4,ratio)),index:start,areas:[1]}];}
+    const candidates=[];
+    for(let split=start+1;split<end;split++)for(const a of trees(start,split))for(const b of trees(split,end))for(const axis of ['x','y']){
+      const fraction=axis==='x'?a.ratio/(a.ratio+b.ratio):b.ratio/(a.ratio+b.ratio);
+      const areas=[...a.areas.map(v=>v*fraction),...b.areas.map(v=>v*(1-fraction))];
+      const ratio=axis==='x'?a.ratio+b.ratio:1/(1/a.ratio+1/b.ratio);
+      const balance=Math.max(...areas)/Math.min(...areas);
+      if(balance<=6)candidates.push({a,b,axis,fraction,ratio,areas,balance});
+    }
+    // Keep diverse aspect ratios, preferring balanced tile sizes at each ratio.
+    const bins=new Map();for(const t of candidates){const k=Math.round(Math.log(t.ratio)*18);if(!bins.has(k)||bins.get(k).balance>t.balance)bins.set(k,t);}
+    const result=[...bins.values()].sort((a,b)=>Math.abs(Math.log(a.ratio/(box.w/box.h)))-Math.abs(Math.log(b.ratio/(box.w/box.h)))).slice(0,32);
+    memo.set(key,result);return result;
+  }
+  if(!photos.length)return [];
+  const options=trees(0,photos.length),target=box.w/box.h;
+  options.sort((a,b)=>(Math.abs(Math.log(a.ratio/target))*12+Math.log(a.balance||1)*.08)-(Math.abs(Math.log(b.ratio/target))*12+Math.log(b.balance||1)*.08));
+  const out=[];
+  function place(t,r){if(t.index!==undefined){out[t.index]=r;return;}
+    if(t.axis==='x'){const size=(r.w-gap)*t.fraction;place(t.a,{...r,w:size});place(t.b,{...r,x:r.x+size+gap,w:r.w-size-gap});}
+    else{const size=(r.h-gap)*t.fraction;place(t.a,{...r,h:size});place(t.b,{...r,y:r.y+size+gap,h:r.h-size-gap});}
+  }
+  place(options[0],box);return out;
+}

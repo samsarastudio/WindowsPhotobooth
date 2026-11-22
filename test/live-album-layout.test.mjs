@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {printDefaults} from '../live-public/print-catalog.js';import {printPlan,photoGeometry} from '../live-public/print-layout.js';
 test('Editorial album cycles eight compositions without losing or duplicating photos',()=>{
-  const photos=Array.from({length:60},(_,i)=>({url:`/photo/${i}`}));const pages=printPlan('album',printDefaults,{title:'A day together'},photos);
+  const photos=Array.from({length:60},(_,i)=>({url:`/photo/${i}`}));const pages=printPlan('album',{...printDefaults,layout:'editorial'},{title:'A day together'},photos);
   assert.equal(new Set(pages.filter(p=>p.layout).map(p=>p.layout)).size,8);
   const rendered=pages.flatMap(p=>p.elements.filter(e=>e.kind==='photo'));
   assert.deepEqual(rendered.map(e=>e.url),photos.map(p=>p.url));
@@ -42,5 +42,30 @@ test('QR normal is two portrait pages; fold card is one landscape sheet with QR 
     if(mode!=='text')assert.ok(!p.elements.some(e=>e.text==='Event name'||e.text===config.qrHeading));
     for(const page of [...normal,...folded])for(const el of page.elements)assert.ok(el.x>=0&&el.y>=0&&el.x+el.w<=page.w+.01&&el.y+el.h<=page.h+.01,JSON.stringify(el));
     const mark=p.elements.find(e=>e.url==='/logo');if(mark)assert.ok(mark.x+mark.w<=qr.x||qr.x+qr.w<=mark.x||mark.y+mark.h<=qr.y||qr.y+qr.h<=mark.y);
+  }
+});
+
+test('Compact albums fill the page, preserve order and handle partial pages',()=>{
+  for(const layout of ['compact','tiles'])for(const count of [1,2,3,4,5,6,7,10,13,25])for(const per of [1,4,6,9,12]){
+    const photos=Array.from({length:count},(_,i)=>({url:`/p/${i}`}));
+    const pages=printPlan('album',{...printDefaults,layout,photosPerPage:per,wording:false},{title:'Photos'},photos).filter(p=>p.layout);
+    assert.equal(pages.length,Math.ceil(count/per));
+    assert.deepEqual(pages.flatMap(p=>p.elements.filter(e=>e.kind==='photo').map(e=>e.url)),photos.map(p=>p.url));
+    for(const p of pages){const pics=p.elements.filter(e=>e.kind==='photo');
+      assert.ok(pics.reduce((sum,e)=>sum+e.w*e.h,0)/(p.w*p.h)>.80);
+      for(const a of pics){assert.equal(a.frame,'none');assert.equal(a.fit,layout==='tiles'?'cover':'contain');assert.ok(a.x>=0&&a.y>=0&&a.x+a.w<=p.w&&a.y+a.h<=p.h);}
+      for(let i=0;i<pics.length;i++)for(let j=i+1;j<pics.length;j++){const a=pics[i],b=pics[j];assert.ok(a.x+a.w<=b.x+.01||b.x+b.w<=a.x+.01||a.y+a.h<=b.y+.01||b.y+b.h<=a.y+.01);}
+    }
+  }
+});
+
+test('Mosaic handles mixed orientations and partial pages without overlap or missing photos',()=>{
+  for(let n=1;n<=12;n++){
+    const photos=Array.from({length:n},(_,i)=>({url:`/p/${i}`,width:i%3===0?600:900,height:i%3===0?900:600}));
+    const p=printPlan('album',{...printDefaults,layout:'mosaic',photosPerPage:12,wording:false,photoFit:'cover'},{title:'Mosaic'},photos).find(p=>p.layout);
+    const pics=p.elements.filter(e=>e.kind==='photo');assert.deepEqual(pics.map(e=>e.url),photos.map(e=>e.url));
+    for(const a of pics)assert.ok(a.w>0&&a.h>0&&a.x>=0&&a.y>=0&&a.x+a.w<=p.w+.01&&a.y+a.h<=p.h+.01);
+    for(let i=0;i<pics.length;i++)for(let j=i+1;j<pics.length;j++){const a=pics[i],b=pics[j];assert.ok(a.x+a.w<=b.x+.01||b.x+b.w<=a.x+.01||a.y+a.h<=b.y+.01||b.y+b.h<=a.y+.01);}
+    assert.ok(pics.reduce((s,e)=>s+e.w*e.h,0)/(p.w*p.h)>.8);
   }
 });
