@@ -62,16 +62,17 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
     const wording=c.wording?(custom[index]||library[(index+c.wordingOffset)%library.length]):'';
     const kicker=`${String(index+1).padStart(2,'0')}  /  ${title}`;
     if(layout==='mosaic'){
-      p.elements=[]; // Preserve the selected event artwork or keepsake paper.
-      const top=wording?.075:.025,bottom=c.pageNumbers?.05:.025;
-      const boxes=mosaicAlbumLayout(batch,{x:w*.025,y:h*top,w:w*.95,h:h*(1-top-bottom)},3);
-      boxes.forEach((box,i)=>{photo(p,batch[i],box.x/w,box.y/h,box.w/w,box.h/h);Object.assign(p.elements.at(-1),{frame:'none',art:null,fit:c.photoFit||'contain'});});
-      if(wording)text(p,wording,.025,.02,.95,.035,13,'sans','left',t.ink);
+      // Retain page borders and leave a clear inset for the selected artwork.
+      const margin=p.background||c.border!=='none'?.065:.025;
+      const top=wording?margin+.05:margin,bottom=c.pageNumbers?Math.max(margin,.05):margin;
+      const boxes=mosaicAlbumLayout(batch,{x:w*margin,y:h*top,w:w*(1-2*margin),h:h*(1-top-bottom)},3);
+      boxes.forEach((box,i)=>{photo(p,batch[i],box.x/w,box.y/h,box.w/w,box.h/h);});
+      if(wording)text(p,wording,margin,margin,1-2*margin,.035,13,'sans','left',t.ink);
     }else if(layout==='compact'||layout==='tiles'){
       // A compact photo page has no ornamental wells or oversized caption area.
       // Preview and PDF share these exact coordinates, including partial pages.
-      p.elements=[]; // Preserve the selected event artwork or keepsake paper.
-      const margin=.025,gap=3,top=wording?.075:.025,bottom=c.pageNumbers?.05:.025;
+      // Retain page borders and leave a clear inset for the selected artwork.
+      const margin=p.background||c.border!=='none'?.065:.025,gap=3,top=wording?margin+.05:margin,bottom=c.pageNumbers?Math.max(margin,.05):margin;
       const areaW=w*(1-2*margin),areaH=h*(1-top-bottom);
       let cols=1,best=Infinity;
       for(let n=1;n<=batch.length;n++){
@@ -83,9 +84,9 @@ export function printPlan(kind,c,event,photos=[],logo=null,instructionImage='/pr
       batch.forEach((item,i)=>{
         const row=Math.floor(i/cols),count=Math.min(cols,batch.length-row*cols),cw=(areaW-gap*(count-1))/count;
         photo(p,item,(w*margin+(i%cols)*(cw+gap))/w,(h*top+row*(rh+gap))/h,cw/w,rh/h);
-        Object.assign(p.elements.at(-1),{frame:'none',art:null,fit:layout==='tiles'?'cover':c.photoFit||'contain'});
+        Object.assign(p.elements.at(-1),{fit:layout==='tiles'?'cover':c.photoFit||'contain'});
       });
-      if(wording)text(p,wording,margin,.02,1-2*margin,.035,13,'sans','left',t.ink);
+      if(wording)text(p,wording,margin,margin,1-2*margin,.035,13,'sans','left',t.ink);
     }else if(layout==='keepsake'){
       // A landscape PDF sheet is a complete two-page composition, not two clipped pages.
       p.elements.push({kind:'fold',x:w*.499,y:0,w:w*.002,h});

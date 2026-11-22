@@ -48,7 +48,7 @@ test('QR normal is two portrait pages; fold card is one landscape sheet with QR 
 test('Compact albums fill the page, preserve order and handle partial pages',()=>{
   for(const layout of ['compact','tiles'])for(const count of [1,2,3,4,5,6,7,10,13,25])for(const per of [1,4,6,9,12]){
     const photos=Array.from({length:count},(_,i)=>({url:`/p/${i}`}));
-    const pages=printPlan('album',{...printDefaults,layout,photosPerPage:per,wording:false},{title:'Photos'},photos).filter(p=>p.layout);
+    const pages=printPlan('album',{...printDefaults,layout,photosPerPage:per,wording:false,albumStyle:'keepsake',border:'none'},{title:'Photos'},photos).filter(p=>p.layout);
     assert.equal(pages.length,Math.ceil(count/per));
     assert.deepEqual(pages.flatMap(p=>p.elements.filter(e=>e.kind==='photo').map(e=>e.url)),photos.map(p=>p.url));
     for(const p of pages){const pics=p.elements.filter(e=>e.kind==='photo');
@@ -62,7 +62,7 @@ test('Compact albums fill the page, preserve order and handle partial pages',()=
 test('Mosaic handles mixed orientations and partial pages without overlap or missing photos',()=>{
   for(let n=1;n<=12;n++){
     const photos=Array.from({length:n},(_,i)=>({url:`/p/${i}`,width:i%3===0?600:900,height:i%3===0?900:600}));
-    const p=printPlan('album',{...printDefaults,layout:'mosaic',photosPerPage:12,wording:false,photoFit:'cover'},{title:'Mosaic'},photos).find(p=>p.layout);
+    const p=printPlan('album',{...printDefaults,layout:'mosaic',photosPerPage:12,wording:false,albumStyle:'keepsake',border:'none',photoFit:'cover'},{title:'Mosaic'},photos).find(p=>p.layout);
     const pics=p.elements.filter(e=>e.kind==='photo');assert.deepEqual(pics.map(e=>e.url),photos.map(e=>e.url));
     for(const a of pics)assert.ok(a.w>0&&a.h>0&&a.x>=0&&a.y>=0&&a.x+a.w<=p.w+.01&&a.y+a.h<=p.h+.01);
     for(let i=0;i<pics.length;i++)for(let j=i+1;j<pics.length;j++){const a=pics[i],b=pics[j];assert.ok(a.x+a.w<=b.x+.01||b.x+b.w<=a.x+.01||a.y+a.h<=b.y+.01||b.y+b.h<=a.y+.01);}
@@ -79,5 +79,15 @@ test('Dense album layouts honor selected paper and keep theme text readable',()=
     else assert.equal(photoPage.paper,'#f8efdd');
     const ink=cover.elements.find(e=>e.kind==='text').color;
     assert.ok(photoPage.elements.filter(e=>e.kind==='text').every(e=>e.color===ink));
+  }
+});
+
+test('Mosaic and compact pages retain selected photo frames and page borders',()=>{
+  for(const layout of ['mosaic','compact','tiles'])for(const photoFrame of ['none','rounded','gold-line','glass','gold','botanical'])for(const border of ['fine','double','rounded']){
+    const p=printPlan('album',{...printDefaults,layout,photoFrame,border,photoFit:'cover'},{title:'Frames'},[{url:'/p',width:900,height:600}]).find(p=>p.layout);
+    assert.ok(p.elements.some(e=>e.kind==='border'));
+    const pic=p.elements.find(e=>e.kind==='photo');assert.equal(pic.frame,photoFrame);
+    assert.equal(!!pic.art,['glass','gold','botanical'].includes(photoFrame));
+    assert.ok(pic.x>=p.w*.06&&pic.y>=p.h*.06);
   }
 });
