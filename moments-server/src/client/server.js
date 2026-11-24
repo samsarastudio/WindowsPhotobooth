@@ -1,4 +1,6 @@
 import express from "express";
+import QRCode from "qrcode";
+import { captureDate } from "./capture-date.js";
 import { watermark, embedUrl } from "./media-tools.js";
 import Database from "better-sqlite3";
 import multer from "multer";
@@ -1511,6 +1513,106 @@ export function createClientApp(options = {}) {
       res.json({ ok: true });
     }),
   );
+  // Social crawlers have no guest session. Never expose protected or private media.
+  function socialCover(c) {
+    if (!active(c) || c.settings.passwordHash || c.settings.emailRegistration)
+      return null;
+    return db
+      .prepare(
+        `SELECT p.* FROM photos p LEFT JOIN sets s ON s.id=p.setId
+      WHERE p.collectionId=? AND p.type='image' AND p.private=0 AND COALESCE(s.private,0)=0
+      ${c.coverId ? "AND p.id=?" : ""} ORDER BY p.position,p.createdAt LIMIT 1`,
+      )
+      .get(...(c.coverId ? [c.id, c.coverId] : [c.id]));
+  }
+  app.get(
+    "/social-cover/:slug/:photo",
+    wrap(async (req, res) => {
+      const c = collection(req.params.slug, true),
+        p = socialCover(c);
+      if (!p || p.id !== req.params.photo) throw fail(404, "Not available");
+      res.set("Cache-Control", "no-store");
+      res.type("jpeg").send(
+        await sharp(path.join(data, "previews", p.storage))
+          .resize(1200, 630, { fit: "contain", background: "#f4f2ec" })
+          .jpeg({ quality: 88 })
+          .toBuffer(),
+      );
+    }),
+  );
+  app.get(
+    "/api/admin/collections/:id/qr",
+    wrap(async (req, res) => {
+      const c = collection(req.params.id);
+      if (!active(c))
+        throw fail(409, "Publish this collection before sharing it");
+      res
+        .type("png")
+        .send(
+          await QRCode.toBuffer(base + "/g/" + encodeURIComponent(c.slug), {
+            width: 1000,
+            margin: 2,
+          }),
+        );
+    }),
+  );
+  app.get(
+    "/api/admin/collections/:id/capture-dates",
+    wrap(async (req, res) => {
+      const c = collection(req.params.id),
+        dates = {};
+      for (const p of db
+        .prepare("SELECT * FROM photos WHERE collectionId=? AND type='image'")
+        .all(c.id)) {
+        try {
+          dates[p.id] = captureDate(
+            (
+              await sharp(
+                path.join(data, "originals", p.storage + ".source"),
+              ).metadata()
+            ).exif,
+          );
+        } catch {
+          dates[p.id] = null;
+        }
+      }
+      res.json({ dates });
+    }),
+  );
+  app.put(
+    "/api/admin/collections/:id/order",
+    wrap(async (req, res) => {
+      const c = collection(req.params.id),
+        ids = req.body.photoIds;
+      const rows = db
+        .prepare(
+          "SELECT id FROM photos WHERE collectionId=? ORDER BY position,createdAt",
+        )
+        .all(c.id);
+      if (
+        !Array.isArray(ids) ||
+        ids.length !== rows.length ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !rows.some((p) => p.id === id))
+      )
+        throw fail(400, "Supply every collection photo exactly once");
+      if (
+        req.body.expectedIds &&
+        JSON.stringify(req.body.expectedIds) !==
+          JSON.stringify(rows.map((p) => p.id))
+      )
+        throw fail(
+          409,
+          "Photo order changed in another window. Refresh before reordering.",
+        );
+      const update = db.prepare(
+        "UPDATE photos SET position=? WHERE id=? AND collectionId=?",
+      );
+      db.transaction(() => ids.forEach((id, i) => update.run(i, id, c.id)))();
+      audit(c.id, "photos.reordered", "", String(ids.length));
+      res.json(full(c, req));
+    }),
+  );
   app.get(
     "/cover/:id",
     wrap(async (req, res) => {
@@ -2053,7 +2155,53 @@ export function createClientApp(options = {}) {
       "X-Robots-Tag",
       cfg().searchEngineVisible ? "index, follow" : "noindex, nofollow",
     );
-    res.sendFile(path.join(root, "client-public/gallery.html"));
+    let html = fs.readFileSync(
+      path.join(root, "client-public/gallery.html"),
+      "utf8",
+    );
+    const escapeMeta = (value) =>
+      String(value || "").replace(
+        /[&<>"']/g,
+        (ch) =>
+          ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          })[ch],
+      );
+    if (req.params.slug) {
+      let c;
+      try {
+        c = collection(req.params.slug, true);
+      } catch {}
+      if (c && active(c)) {
+        const p = socialCover(c),
+          url = base + "/g/" + encodeURIComponent(c.slug);
+        const title = escapeMeta(c.title),
+          description = escapeMeta(
+            c.description || "View your photographs from " + c.title,
+          );
+        const image = p
+          ? base + "/social-cover/" + encodeURIComponent(c.slug) + "/" + p.id
+          : "";
+        html = html.replace(
+          "<title>In Moment · Client Gallery</title>",
+          `<title>${title} · In Moment</title>
+          <meta property="og:type" content="website"><meta property="og:title" content="${title}">
+          <meta property="og:description" content="${description}"><meta property="og:url" content="${escapeMeta(url)}">
+          <meta name="twitter:card" content="${image ? "summary_large_image" : "summary"}">
+          ${image ? `<meta property="og:image" content="${escapeMeta(image)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:image" content="${escapeMeta(image)}">` : ""}`,
+        );
+      } else if (
+        (!c || !session(req, "admin")) &&
+        !(c?.status === "pre-release" && !c.deletedAt)
+      ) {
+        res.status(404);
+      }
+    }
+    res.type("html").send(html);
   });
   app.use((error, req, res, next) => {
     for (const f of req.files || []) fs.rmSync(f.path, { force: true });
@@ -2072,22 +2220,20 @@ export function createClientApp(options = {}) {
           ? 400
           : 500);
     if (status === 500) console.error("Client Gallery:", error.message);
-    res
-      .status(status)
-      .json({
-        error:
-          status === 500
-            ? "Something went wrong. Please try again."
-            : error.message,
-        ...(error.locked ? { locked: true, title: error.title } : {}),
-        ...(error.registrationRequired
-          ? {
-              registrationRequired: true,
-              title: error.title,
-              brand: error.brand,
-            }
-          : {}),
-      });
+    res.status(status).json({
+      error:
+        status === 500
+          ? "Something went wrong. Please try again."
+          : error.message,
+      ...(error.locked ? { locked: true, title: error.title } : {}),
+      ...(error.registrationRequired
+        ? {
+            registrationRequired: true,
+            title: error.title,
+            brand: error.brand,
+          }
+        : {}),
+    });
   });
   let maintaining = false;
   async function maintenance() {

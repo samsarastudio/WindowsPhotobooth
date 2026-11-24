@@ -241,6 +241,7 @@ async function newCollection() {
   );
 }
 async function openCollection(id) {
+  orderSelection.clear();
   state.collection = await api("/collections/" + encodeURIComponent(id));
   state.view = "collections";
   state.tab = "photos";
@@ -260,7 +261,7 @@ function renderCollection() {
             ? '<div id="activity-holder"></div>'
             : "";
   shell(
-    `<button class="quiet back" data-action="nav" data-view="collections">← All collections</button><div class="heading"><div><div class="collection-title"><h1>${esc(c.title)}</h1><span class="pill ${esc(c.status)}">${esc(c.status)}</span></div><p class="muted">${esc(dateLabel(c.date))} · ${c.photos?.length || 0} photograph${c.photos?.length === 1 ? "" : "s"}</p></div><div class="actions"><button data-action="collection-more">More ···</button><a class="button-link" href="/g/${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Preview ↗</a><button class="primary" data-action="share">Share collection</button></div></div><nav class="tabs">${["photos", "design", "settings", "activity"].map((t) => `<button data-action="collection-tab" data-tab="${t}" class="${t === state.tab ? "active" : ""}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</nav>${page}`,
+    `<button class="quiet back" data-action="nav" data-view="collections">← All collections</button><div class="heading"><div><div class="collection-title"><h1>${esc(c.title)}</h1><span class="pill ${esc(c.status)}">${esc(c.status)}</span></div><p class="muted">${esc(dateLabel(c.date))} · ${c.photos?.length || 0} photograph${c.photos?.length === 1 ? "" : "s"}</p></div><div class="actions"><button data-action="collection-more">More ···</button><a class="button-link" href="/g/${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Preview ↗</a><button class="primary" data-action="share">${shareable(c) ? "Share collection" : "Publish collection"}</button></div></div><nav class="tabs">${["photos", "design", "settings", "activity"].map((t) => `<button data-action="collection-tab" data-tab="${t}" class="${t === state.tab ? "active" : ""}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</nav>${page}`,
     c.title,
   );
   if (state.tab === "activity") loadCollectionActivity();
@@ -270,10 +271,10 @@ function photosPage() {
   const photos = (c.photos || [])
     .filter((p) => !state.setId || p.setId === state.setId)
     .sort((a, b) => (a.position || 0) - (b.position || 0));
-  return `<div class="workspace"><aside><div class="eyebrow">Photo sets</div><div class="set-nav"><button class="${!state.setId ? "active" : ""}" data-action="set" data-id="">All photographs <span class="set-count">${c.photos?.length || 0}</span></button>${(c.sets || []).map((s) => `<button class="${state.setId === s.id ? "active" : ""}" data-action="set" data-id="${esc(s.id)}">${esc(s.name)}<span class="set-count">${c.photos.filter((p) => p.setId === s.id).length}</span></button>`).join("")}<button data-action="new-set">＋ Add set</button>${state.setId ? '<button data-action="edit-set">Edit this set ···</button>' : ""}</div></aside><div><div class="dropzone" id="dropzone"><button data-action="upload" class="primary">＋ Add photographs</button><input id="photo-files" class="hidden" type="file" accept="image/*,video/mp4,video/webm" multiple><button class="quiet" data-action="embed-video">Embed video</button><p>Drag photographs or videos here. Your originals stay intact.</p><div id="upload-status" aria-live="polite"></div></div>${photos.length ? `<div class="photo-grid">${photos.map(photoCard).join("")}</div>` : empty("The beginning of a collection", "Add your photographs to start shaping this story.")}</div></div>`;
+  return `<div class="workspace"><aside><div class="eyebrow">Photo sets</div><div class="set-nav"><button class="${!state.setId ? "active" : ""}" data-action="set" data-id="">All photographs <span class="set-count">${c.photos?.length || 0}</span></button>${(c.sets || []).map((s) => `<button class="${state.setId === s.id ? "active" : ""}" data-action="set" data-id="${esc(s.id)}">${esc(s.name)}<span class="set-count">${c.photos.filter((p) => p.setId === s.id).length}</span></button>`).join("")}<button data-action="new-set">＋ Add set</button>${state.setId ? '<button data-action="edit-set">Edit this set ···</button>' : ""}</div></aside><div><div class="dropzone" id="dropzone"><button data-action="upload" class="primary">＋ Add photographs</button><input id="photo-files" class="hidden" type="file" accept="image/*,video/mp4,video/webm" multiple><button class="quiet" data-action="embed-video">Embed video</button><p>Drag photographs or videos here. Your originals stay intact.</p><div id="upload-status" aria-live="polite"></div></div>${photos.length ? `<div class="order-toolbar"><label>Sort photos <select id="photo-sort"><option value="">Custom order</option><option value="name-asc">Filename A–Z</option><option value="name-desc">Filename Z–A</option><option value="upload-asc">Uploaded oldest first</option><option value="upload-desc">Uploaded newest first</option><option value="capture-asc">Date taken oldest first</option><option value="capture-desc">Date taken newest first</option><option value="random">Random</option><option value="balanced">Balanced portrait & landscape</option></select></label><button data-action="order-undo" ${orderUndo?.collectionId === c.id ? "" : "disabled"}>Undo order</button><button data-action="order-top">Move selected to start</button><button data-action="order-bottom">Move selected to end</button><button data-action="order-select-all">Select all</button><button data-action="order-clear">Clear selection</button></div><p class="hint">Select photos, then drag a selected image to move the group. On touch screens, use Move to start/end or tap “Place before” on the destination.</p><div class="photo-grid sortable-grid">${photos.map(photoCard).join("")}</div>` : empty("The beginning of a collection", "Add your photographs to start shaping this story.")}</div></div>`;
 }
 function photoCard(p) {
-  return `<article class="photo-card">${p.type === "embed" ? `<div class="cover-empty" style="height:170px;font-size:30px">▷</div>` : p.type === "video" ? `<video src="${safeUrl(p.url)}" preload="metadata"></video>` : `<img src="${safeUrl(p.thumbnailUrl || p.url)}" alt="${esc(p.caption || p.filename)}" loading="lazy">`}<button data-action="photo-menu" data-id="${esc(p.id)}" aria-label="Options for ${esc(p.filename)}">···</button>${p.private ? '<span class="photo-flag">Private</span>' : p.starred ? '<span class="photo-flag">★</span>' : ""}<div class="photo-label" title="${esc(p.filename)}">${esc(p.filename)}</div></article>`;
+  return `<article class="photo-card" ${state.collection ? `draggable="true" data-order-id="${esc(p.id)}"` : ""}>${state.collection ? `<label class="photo-select"><input type="checkbox" data-select-photo="${esc(p.id)}" ${orderSelection.has(p.id) ? "checked" : ""} aria-label="Select ${esc(p.filename)}"></label><button class="place-before" data-action="order-before" data-id="${esc(p.id)}">Place before</button>` : ""}${p.type === "embed" ? `<div class="cover-empty" style="height:170px;font-size:30px">▷</div>` : p.type === "video" ? `<video src="${safeUrl(p.url)}" preload="metadata"></video>` : `<img src="${safeUrl(p.thumbnailUrl || p.url)}" alt="${esc(p.caption || p.filename)}" loading="lazy">`}<button data-action="photo-menu" data-id="${esc(p.id)}" aria-label="Options for ${esc(p.filename)}">···</button>${p.private ? '<span class="photo-flag">Private</span>' : p.starred ? '<span class="photo-flag">★</span>' : ""}<div class="photo-label" title="${esc(p.filename)}">${esc(p.filename)}</div></article>`;
 }
 async function upload(files) {
   if (!files.length) return;
@@ -432,7 +433,7 @@ async function renderLibrary() {
       .includes(state.search.toLowerCase()),
   );
   shell(
-    `<div class="heading"><div><div class="eyebrow">Across every collection</div><h1>Photo library</h1><p class="muted">Find the photograph you had in mind.</p></div><span class="pill">${state.library.length} photographs</span></div><div class="toolbar"><input type="search" id="library-search" placeholder="Search filename or caption" value="${esc(state.search)}" aria-label="Search library"></div>${photos.length ? `<div class="photo-grid">${photos.map(photoCard).join("")}</div>` : empty("Your photographs, together", "Images from your collections will appear here.")}`,
+    `<div class="heading"><div><div class="eyebrow">Across every collection</div><h1>Photo library</h1><p class="muted">Find the photograph you had in mind.</p></div><span class="pill">${state.library.length} photographs</span></div><div class="toolbar"><input type="search" id="library-search" placeholder="Search filename or caption" value="${esc(state.search)}" aria-label="Search library"></div>${photos.length ? `<div class="order-toolbar"><label>Sort photos <select id="photo-sort"><option value="">Custom order</option><option value="name-asc">Filename A–Z</option><option value="name-desc">Filename Z–A</option><option value="upload-asc">Uploaded oldest first</option><option value="upload-desc">Uploaded newest first</option><option value="capture-asc">Date taken oldest first</option><option value="capture-desc">Date taken newest first</option><option value="random">Random</option><option value="balanced">Balanced portrait & landscape</option></select></label><button data-action="order-undo" ${orderUndo?.collectionId === c.id ? "" : "disabled"}>Undo order</button><button data-action="order-top">Move selected to start</button><button data-action="order-bottom">Move selected to end</button><button data-action="order-select-all">Select all</button><button data-action="order-clear">Clear selection</button></div><p class="hint">Select photos, then drag a selected image to move the group. On touch screens, use Move to start/end or tap “Place before” on the destination.</p><div class="photo-grid sortable-grid">${photos.map(photoCard).join("")}</div>` : empty("Your photographs, together", "Images from your collections will appear here.")}`,
     "Photo library",
   );
 }
@@ -504,13 +505,28 @@ function activityTable(items) {
         "Client activity will appear here when your collections are shared.",
       );
 }
+function shareable(c) {
+  return (
+    c.status === "published" &&
+    (!c.settings?.expiry ||
+      Date.parse(c.settings.expiry + "T23:59:59Z") > Date.now())
+  );
+}
 async function share() {
   const c = state.collection;
+  if (!shareable(c)) {
+    modal(
+      "Publish your collection",
+      "<p>Your sharing link becomes available when the collection is published and active. Review your photographs and privacy settings first.</p>",
+      '<button data-action="close-modal">Keep editing</button><button class="primary" data-action="publish-collection">Publish collection</button>',
+    );
+    return;
+  }
   const templates = list(await api("/templates"));
   state.templates = templates;
   modal(
     "Share this collection",
-    `<div class="notice">${c.status === "published" ? "This collection is published and ready to share." : "This collection is " + esc(c.status) + ". Change availability in Settings before delivering it to clients."}</div><label class="field"><span>Collection link</span><div class="link-box"><input id="share-link" readonly value="${esc(location.origin + "/g/" + encodeURIComponent(c.slug))}"><button type="button" data-action="copy-link">Copy</button></div></label><form id="share-form" data-form="share">${select("template", "Email template", "", [["", "Write a personal message"], ...templates.map((t) => [t.id, t.name])])}${textarea("emails", "Recipient email addresses", "", "Separate addresses with commas or new lines.")}${field("subject", "Subject", `Your photographs from ${c.title}`)}${textarea("message", "Message", `Your collection is ready. We hope you love these moments as much as we loved capturing them.`)}<p class="hint">Email delivery requires SMTP to be configured on your server.</p></form>`,
+    `<div class="notice">${c.status === "published" ? "This collection is published and ready to share." : "This collection is " + esc(c.status) + ". Change availability in Settings before delivering it to clients."}</div><label class="field"><span>Collection link</span><div class="link-box"><input id="share-link" readonly value="${esc(location.origin + "/g/" + encodeURIComponent(c.slug))}"><button type="button" data-action="copy-link">Copy</button></div></label><details><summary>Collection QR code</summary><img src="/api/admin/collections/${encodeURIComponent(c.id)}/qr" alt="Collection QR code" style="width:180px;height:180px"><a href="/api/admin/collections/${encodeURIComponent(c.id)}/qr" download="${esc(c.slug)}-qr.png">Download QR code</a></details><form id="share-form" data-form="share">${select("template", "Email template", "", [["", "Write a personal message"], ...templates.map((t) => [t.id, t.name])])}${textarea("emails", "Recipient email addresses", "", "Separate addresses with commas or new lines.")}${field("subject", "Subject", `Your photographs from ${c.title}`)}${textarea("message", "Message", `Your collection is ready. We hope you love these moments as much as we loved capturing them.`)}<p class="hint">Email delivery requires SMTP to be configured on your server.</p></form>`,
     `<button data-action="close-modal">Close</button><button class="primary" form="share-form">Send gallery email</button>`,
   );
 }
@@ -560,15 +576,192 @@ async function favoriteLists() {
     `<button data-action="close-modal">Close</button><button class="primary" form="favorite-form">Create list</button>`,
   );
 }
+let orderSelection = new Set();
+let orderUndo = null;
+let orderBusy = false;
+function orderedPhotos() {
+  return [...(state.collection?.photos || [])].sort(
+    (a, b) => (a.position || 0) - (b.position || 0),
+  );
+}
+async function saveOrder(ids, undo = false) {
+  if (orderBusy) return;
+  const before = orderedPhotos().map((p) => p.id),
+    c = state.collection;
+  if (JSON.stringify(ids) === JSON.stringify(before)) return;
+  orderBusy = true;
+  try {
+    const result = await api(
+      "/collections/" + c.id + "/order",
+      { photoIds: ids, expectedIds: before },
+      "PUT",
+    );
+    orderUndo = undo ? null : { collectionId: c.id, ids: before };
+    state.collection = result;
+    renderCollection();
+    notify("Photo order saved");
+  } catch (e) {
+    notify(e.message);
+  } finally {
+    orderBusy = false;
+  }
+}
+async function moveSelection(target, end = false) {
+  const photos = orderedPhotos(),
+    selected = photos.filter((p) => orderSelection.has(p.id));
+  if (!selected.length || orderSelection.has(target)) return;
+  const rest = photos.filter((p) => !orderSelection.has(p.id));
+  const index = target
+    ? rest.findIndex((p) => p.id === target)
+    : end
+      ? rest.length
+      : 0;
+  if (index < 0) return;
+  rest.splice(index, 0, ...selected);
+  await saveOrder(rest.map((p) => p.id));
+}
+document.addEventListener("change", async (e) => {
+  if (e.target.matches("[data-select-photo]")) {
+    const id = e.target.dataset.selectPhoto;
+    e.target.checked ? orderSelection.add(id) : orderSelection.delete(id);
+  }
+  if (e.target.id === "photo-sort" && e.target.value) {
+    const all = orderedPhotos(),
+      scope = all.filter((p) => !state.setId || p.setId === state.setId),
+      mode = e.target.value;
+    if (mode.startsWith("name"))
+      scope.sort(
+        (a, b) =>
+          a.filename.localeCompare(b.filename, undefined, { numeric: true }) *
+          (mode.endsWith("desc") ? -1 : 1),
+      );
+    if (mode.startsWith("upload"))
+      scope.sort(
+        (a, b) =>
+          (a.createdAt - b.createdAt) * (mode.endsWith("desc") ? -1 : 1),
+      );
+    if (mode.startsWith("capture")) {
+      try {
+        const { dates } = await api(
+          "/collections/" + state.collection.id + "/capture-dates",
+        );
+        if (!scope.some((p) => dates[p.id])) {
+          notify(
+            "These originals have no capture dates. Photo order is unchanged.",
+          );
+          e.target.value = "";
+          return;
+        }
+        scope.sort((a, b) =>
+          !dates[a.id] && !dates[b.id]
+            ? 0
+            : !dates[a.id]
+              ? 1
+              : !dates[b.id]
+                ? -1
+                : dates[a.id].localeCompare(dates[b.id]) *
+                  (mode.endsWith("desc") ? -1 : 1),
+        );
+      } catch (error) {
+        notify(error.message);
+        return;
+      }
+    }
+    if (mode === "random")
+      for (let i = scope.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [scope[i], scope[j]] = [scope[j], scope[i]];
+      }
+    if (mode === "balanced") {
+      const portrait = scope.filter((p) => p.height > p.width),
+        landscape = scope.filter((p) => !(p.height > p.width));
+      scope.length = 0;
+      while (portrait.length || landscape.length) {
+        if (landscape.length) scope.push(landscape.shift());
+        if (portrait.length) scope.push(portrait.shift());
+      }
+    }
+    const queue = [...scope];
+    await saveOrder(
+      all.map((p) =>
+        !state.setId || p.setId === state.setId ? queue.shift().id : p.id,
+      ),
+    );
+  }
+});
+document.addEventListener("dragstart", (e) => {
+  const card = e.target.closest("[data-order-id]");
+  if (!card) return;
+  if (e.target.closest("button,input")) {
+    e.preventDefault();
+    return;
+  }
+  if (!orderSelection.has(card.dataset.orderId))
+    orderSelection = new Set([card.dataset.orderId]);
+  e.dataTransfer.setData(
+    "application/x-client-photo-order",
+    card.dataset.orderId,
+  );
+  e.dataTransfer.effectAllowed = "move";
+});
+document.addEventListener("dragover", (e) => {
+  if (
+    e.target.closest("[data-order-id]") &&
+    e.dataTransfer.types.includes("application/x-client-photo-order")
+  )
+    e.preventDefault();
+});
+document.addEventListener("drop", async (e) => {
+  const card = e.target.closest("[data-order-id]");
+  if (card && e.dataTransfer.getData("application/x-client-photo-order")) {
+    e.preventDefault();
+    await moveSelection(card.dataset.orderId);
+  }
+});
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-action]");
   if (!b) return;
   const a = b.dataset.action;
   try {
+    if (a === "order-before") await moveSelection(b.dataset.id);
+    if (a === "order-top") await moveSelection(null);
+    if (a === "order-bottom") await moveSelection(null, true);
+    if (a === "order-undo" && orderUndo?.collectionId === state.collection.id)
+      await saveOrder(orderUndo.ids, true);
+    if (a === "order-select-all") {
+      orderSelection = new Set(
+        orderedPhotos()
+          .filter((p) => !state.setId || p.setId === state.setId)
+          .map((p) => p.id),
+      );
+      renderCollection();
+    }
+    if (a === "order-clear") {
+      orderSelection.clear();
+      renderCollection();
+    }
     if (a === "nav") await navigate(b.dataset.view);
     if (a === "logout") {
       await api("/logout", {}, "POST");
       login();
+    }
+    if (a === "publish-collection") {
+      if (
+        state.collection.settings?.expiry &&
+        Date.parse(state.collection.settings.expiry + "T23:59:59Z") <=
+          Date.now()
+      )
+        throw new Error(
+          "Change the expired date in Settings before publishing.",
+        );
+      state.collection = await api(
+        "/collections/" + state.collection.id,
+        { status: "published" },
+        "PATCH",
+      );
+      renderCollection();
+      await share();
+      notify("Collection published");
     }
     if (a === "new-collection") await newCollection();
     if (a === "close-modal") $("#dialog").close();

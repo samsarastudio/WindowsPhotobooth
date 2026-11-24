@@ -6,6 +6,115 @@ import path from "node:path";
 import sharp from "sharp";
 import { createClientApp } from "../src/client/server.js";
 
+test("Published gallery social covers and QR respect availability and privacy", async (t) => {
+  const f = await fixture(t),
+    c = await f.create({ title: "A <special> collection" });
+  const p = await f.upload(c.id);
+  const route = "/api/admin/collections/" + c.id;
+  await f.call(route, "PATCH", { coverId: p.id }, f.admin);
+  assert.equal((await f.call("/g/" + c.slug)).status, 404);
+  assert.equal(
+    (await f.call(route + "/qr", "GET", undefined, f.admin)).status,
+    409,
+  );
+  await f.call(
+    route,
+    "PATCH",
+    { status: "published", settings: { homepageVisible: false } },
+    f.admin,
+  );
+  const page = await f.call("/g/" + c.slug);
+  assert.equal(page.status, 200);
+  assert.match(page.body, /og:image/);
+  assert.match(page.body, /A &lt;special&gt; collection/);
+  const image = "/social-cover/" + c.slug + "/" + p.id;
+  const img = await fetch(f.base + image);
+  assert.equal(img.status, 200);
+  const meta = await sharp(Buffer.from(await img.arrayBuffer())).metadata();
+  assert.equal(meta.width, 1200);
+  assert.equal(meta.height, 630);
+  assert.equal(
+    (await fetch(f.base + route + "/qr", { headers: { cookie: f.admin } }))
+      .status,
+    200,
+  );
+  await f.call(
+    "/api/admin/photos/" + p.id,
+    "PATCH",
+    { private: true },
+    f.admin,
+  );
+  assert.equal((await f.call(image)).status, 404);
+  assert.doesNotMatch((await f.call("/g/" + c.slug)).body, /og:image/);
+  await f.call(
+    "/api/admin/photos/" + p.id,
+    "PATCH",
+    { private: false },
+    f.admin,
+  );
+  await f.call(
+    route,
+    "PATCH",
+    { settings: { password: "protected-password" } },
+    f.admin,
+  );
+  assert.equal((await f.call(image)).status, 404);
+  await f.call(route, "PATCH", { status: "hidden" }, f.admin);
+  assert.equal((await f.call("/g/" + c.slug)).status, 404);
+  assert.equal((await f.call(image)).status, 404);
+});
+
+test("Photo ordering is atomic, isolated, and rejects stale edits", async (t) => {
+  const f = await fixture(t),
+    c = await f.create(),
+    other = await f.create();
+  const a = await f.upload(c.id),
+    b = await f.upload(c.id, 180, 120, "landscape.jpg");
+  const foreign = await f.upload(other.id);
+  const route = "/api/admin/collections/" + c.id + "/order";
+  assert.equal(
+    (await f.call(route, "PUT", { photoIds: [b.id, a.id] })).status,
+    401,
+  );
+  const ok = await f.call(
+    route,
+    "PUT",
+    { photoIds: [b.id, a.id], expectedIds: [a.id, b.id] },
+    f.admin,
+  );
+  assert.equal(ok.status, 200);
+  assert.deepEqual(
+    ok.body.photos.map((p) => p.id),
+    [b.id, a.id],
+  );
+  assert.equal(
+    (await f.call(route, "PUT", { photoIds: [a.id, foreign.id] }, f.admin))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await f.call(route, "PUT", { photoIds: [a.id, a.id] }, f.admin)).status,
+    400,
+  );
+  assert.equal(
+    (
+      await f.call(
+        route,
+        "PUT",
+        { photoIds: [a.id, b.id], expectedIds: [a.id, b.id] },
+        f.admin,
+      )
+    ).status,
+    409,
+  );
+  assert.deepEqual(
+    (
+      await f.call("/api/admin/collections/" + c.id, "GET", undefined, f.admin)
+    ).body.photos.map((p) => p.id),
+    [b.id, a.id],
+  );
+});
+
 async function fixture(t, overrides = {}) {
   const dataDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "inmoment-client-test-"),
