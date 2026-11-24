@@ -279,8 +279,12 @@
           data.brand.name || data.brand.brandName || "In Moment";
       const favicon = safeUrl(data.brand?.faviconUrl);
       if (favicon) {
-        let link = document.querySelector('link[rel=icon]');
-        if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+        let link = document.querySelector("link[rel=icon]");
+        if (!link) {
+          link = document.createElement("link");
+          link.rel = "icon";
+          document.head.appendChild(link);
+        }
         link.href = favicon;
       }
       if (slug) {
@@ -607,10 +611,40 @@
           throw new Error(
             "The download link was not returned. Please try again.",
           );
+        // Fetch before the final tap: iOS requires share() during user activation.
+        const photo =
+          ids?.length === 1
+            ? collection.photos.find((p) => p.id === ids[0])
+            : null;
+        let shareFile = null;
+        if (photo && (!photo.type || photo.type === "image")) {
+          const filename =
+            form.size.value === "original"
+              ? photo.filename
+              : photo.filename.replace(/\.[^.]+$/, "") + ".jpg";
+          shareFile = await window.PhotoDelivery.prepare(url, filename);
+        }
         openModal(
           "Your photographs are ready",
-          `<p>Keep a little of this day, wherever you go.</p><a class="primary full download-ready" href="${esc(url)}" download>Save download</a><p class="help">On a phone, your download may appear in Files or Downloads.</p>`,
+          `<p>Keep a little of this day, wherever you go.</p>${shareFile ? '<button id="save-photo-share" class="primary full">Save or share photo</button><p class="help">On iPhone, choose Save Image in the share sheet to add it to Photos.</p>' : ""}<a class="${shareFile ? "secondary" : "primary"} full download-ready" href="${esc(url)}" download>${shareFile ? "Download file instead" : "Save download"}</a><p id="share-help" class="help">${shareFile ? "" : "Your download may appear in Files or Downloads."}</p>`,
         );
+        if (shareFile)
+          document.getElementById("save-photo-share").onclick = async (
+            event,
+          ) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+              // No fetch or other await before this call.
+              await navigator.share({ files: [shareFile] });
+            } catch (error) {
+              if (error.name !== "AbortError")
+                document.getElementById("share-help").textContent =
+                  "Sharing is unavailable. Use Download file instead, or try again.";
+            } finally {
+              button.disabled = false;
+            }
+          };
       });
     };
   }
