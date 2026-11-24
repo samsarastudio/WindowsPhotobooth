@@ -497,23 +497,27 @@ img {
 .favorite-on svg {
   fill: currentColor;
 }
+/* Proportional justified rows. The spacer absorbs the final row's spare
+   width so a remaining portrait never expands into a panoramic crop. */
 .photo-grid.horizontal {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--gap);
 }
 .photo-grid.horizontal .tile {
-  flex: 1 1 calc(var(--ratio, 1.5) * 220px);
+  flex: var(--ratio, 1.5) 1 calc(var(--ratio, 1.5) * 220px);
   margin: 0;
-  height: 260px;
-  min-width: 180px;
+  min-width: 0;
+  max-width: 100%;
 }
 .photo-grid.horizontal .tile img {
-  height: 260px;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
 }
-.photo-grid.horizontal .tile:last-child {
-  flex-grow: 0;
+.photo-grid.horizontal::after {
+  content: "";
+  flex: 10000 1 0;
 }
 .empty {
   padding: 100px 24px;
