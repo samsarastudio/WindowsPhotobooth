@@ -227,6 +227,7 @@ function collectionCard(c) {
 }
 function modal(title, body, foot = "") {
   const d = $("#dialog");
+  d.classList.remove("cover-picker-dialog");
   d.innerHTML = `<div class="modal-head"><h2>${esc(title)}</h2><button class="quiet icon" data-action="close-modal" aria-label="Close dialog">×</button></div><div class="modal-body">${body}</div>${foot ? `<div class="modal-foot">${foot}</div>` : ""}`;
   d.showModal();
 }
@@ -302,35 +303,101 @@ async function upload(files) {
     else error(e);
   }
 }
+function designChoice(name, value, current, visual, label = value) {
+  return `<label class="design-choice"><input type="radio" name="${name}" value="${esc(value)}" ${String(value).toLowerCase() === String(current).toLowerCase() ? "checked" : ""}><span class="choice-art">${visual}</span><span class="choice-label">${esc(label)}</span></label>`;
+}
 function designPage() {
   const c = state.collection,
     d = c.design || {},
-    cover = c.photos?.find((p) => p.id === c.coverId) || c.photos?.[0],
-    colors =
-      palette[
-        Object.keys(palette).find(
-          (k) => k.toLowerCase() === String(d.palette).toLowerCase(),
-        )
-      ] || palette.Light;
-  return `<div class="design-layout"><form data-form="design" class="panel"><h2>Make it yours</h2><p class="muted">Quiet design. Your photographs in focus.</p>${select("coverId", "Cover photograph", c.coverId || "", [["", "First photograph"], ...(c.photos || []).filter((p) => p.type !== "video").map((p) => [p.id, p.filename])])}${select("coverStyle", "Cover design", d.coverStyle || "Outline", covers)}${select("typography", "Typography", d.typography || "Timeless", ["Sans", "Serif", "Modern", "Timeless", "Bold", "Subtle"])}${select("palette", "Color palette", d.palette || "Light", Object.keys(palette))}<div class="palette-options">${Object.entries(
-    palette,
-  )
-    .map(
-      ([n, v]) =>
-        `<button type="button" data-action="palette" data-value="${n}" class="${d.palette === n ? "selected" : ""}" style="background:${v[0]}" aria-label="${n}"></button>`,
+    photos = (c.photos || []).filter((p) => !p.type || p.type === "image"),
+    cover = photos.find((p) => p.id === c.coverId) || photos[0];
+  const thumb = cover
+    ? `<img class="design-cover-image" src="${safeUrl(cover.thumbnailUrl || cover.url)}" alt="">`
+    : "";
+  const styles = covers
+    .map((n) =>
+      designChoice(
+        "coverStyle",
+        n,
+        d.coverStyle || "Outline",
+        `<span class="cover-mini mini-${n.toLowerCase()}">${thumb}<span class="mini-title">TITLE</span></span>`,
+      ),
     )
-    .join("")}</div>${select("layout", "Photo layout", d.layout || "vertical", [
-    ["vertical", "Vertical masonry"],
-    ["horizontal", "Horizontal rows"],
-  ])}${select("thumbnailSize", "Photo size", d.thumbnailSize || "regular", ["regular", "large"])}${select("spacing", "Spacing", d.spacing || "regular", ["regular", "large"])}${select(
-    "navigation",
-    "Navigation",
-    d.navigation || "icons",
+    .join("");
+  const fonts = {
+    Sans: "Arial",
+    Serif: "Georgia",
+    Modern: "Trebuchet MS",
+    Timeless: "Georgia",
+    Bold: "Arial Black",
+    Subtle: "Palatino Linotype",
+  };
+  const type = Object.entries(fonts)
+    .map(([name, font]) =>
+      designChoice(
+        "typography",
+        name,
+        d.typography || "Timeless",
+        `<span class="type-sample" style="font-family:${font}">Aa<span>Beautiful moments</span></span>`,
+      ),
+    )
+    .join("");
+  const colors = Object.entries(palette)
+    .map(([name, values]) =>
+      designChoice(
+        "palette",
+        name,
+        d.palette || "Light",
+        `<span class="color-sample" style="background:${values[0]};color:${values[1]}"><span>Aa</span><i style="background:${values[1]}"></i></span>`,
+      ),
+    )
+    .join("");
+  const segment = (name, current, options) =>
+    `<div class="design-segments">${options.map(([value, label]) => `<label><input type="radio" name="${name}" value="${value}" ${value === current ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
+  return `<div class="design-studio"><nav class="design-navigation" aria-label="Design settings">${[
+    ["cover", "▧", "Cover"],
+    ["type", "T", "Typography"],
+    ["color", "◉", "Color"],
+    ["grid", "▦", "Grid"],
+  ]
+    .map(
+      ([id, icon, label], i) =>
+        `<button type="button" data-action="design-section" data-section="${id}" class="${i === 0 ? "active" : ""}"><span>${icon}</span>${label}</button>`,
+    )
+    .join(
+      "",
+    )}</nav><form data-form="design" class="design-controls"><input type="hidden" name="coverId" value="${esc(cover?.id || "")}"><section data-design-section="cover"><div class="design-section-heading"><h2>Cover</h2><button type="button" class="design-link" data-action="choose-cover">▧ Cover Photo</button><button type="button" class="design-link" data-action="cover-focal">◎ Focal</button></div><button type="button" class="selected-cover" data-action="choose-cover">${thumb}<span>Change cover photo</span></button><div id="focal-controls" hidden><p class="hint">Position the photograph inside the cover.</p><label class="field">Horizontal<input type="range" name="focalX" min="0" max="100" value="${d.focalX ?? 50}"></label><label class="field">Vertical<input type="range" name="focalY" min="0" max="100" value="${d.focalY ?? 50}"></label></div><div class="design-choices cover-choices">${styles}</div></section><section data-design-section="type" hidden><h2>Typography</h2><p class="hint">Choose the character of your collection.</p><div class="design-choices">${type}</div></section><section data-design-section="color" hidden><h2>Color</h2><p class="hint">A palette for your photographs.</p><div class="design-choices">${colors}</div></section><section data-design-section="grid" hidden><h2>Grid</h2><h3>Grid style</h3>${segment(
+    "layout",
+    d.layout || "vertical",
     [
-      ["icons", "Icons"],
-      ["text", "Icons and text"],
+      ["vertical", "▥ Vertical"],
+      ["horizontal", "▤ Horizontal"],
     ],
-  )}<div class="form-grid">${field("focalX", "Focal point X (%)", d.focalX ?? 50, "number")}${field("focalY", "Focal point Y (%)", d.focalY ?? 50, "number")}</div><button class="primary">Save design</button></form><div class="preview-frame ${state.mobile ? "mobile" : ""}"><div class="preview-bar"><button class="quiet small" data-action="preview-device" data-mobile="false">Desktop</button><button class="quiet small" data-action="preview-device" data-mobile="true">Mobile</button></div><iframe id="design-preview" title="Live collection design preview" src="/g/${encodeURIComponent(c.slug)}?studio-preview=1"></iframe><p class="hint" style="padding:12px">Live preview of your gallery. Save design to publish these changes.</p></div></div>`;
+  )}<h3>Thumbnail size</h3>${segment(
+    "thumbnailSize",
+    d.thumbnailSize || "regular",
+    [
+      ["regular", "Regular"],
+      ["large", "Large"],
+    ],
+  )}<h3>Grid spacing</h3>${segment("spacing", d.spacing || "regular", [
+    ["regular", "Regular"],
+    ["large", "Large"],
+  ])}<h3>Navigation style</h3>${segment("navigation", d.navigation || "icons", [
+    ["icons", "Icons only"],
+    ["text", "Icons & text"],
+  ])}</section><div class="design-save"><span id="design-save-state">Preview changes before saving</span><button class="primary">Save design</button></div></form><div class="design-preview-stage"><div class="preview-frame ${state.mobile ? "mobile" : ""}"><iframe id="design-preview" title="Live collection design preview" src="/g/${encodeURIComponent(c.slug)}?studio-preview=1"></iframe></div><div class="preview-bar"><button type="button" class="quiet small" data-action="preview-device" data-mobile="false">▱ Desktop</button><button type="button" class="quiet small" data-action="preview-device" data-mobile="true">▯ Mobile</button></div></div></div>`;
+}
+function coverPicker() {
+  const selected = $("form[data-form=design]").elements.coverId.value;
+  const photos = (state.collection.photos || []).filter(
+    (p) => !p.type || p.type === "image",
+  );
+  modal(
+    "Choose cover photo",
+    `<p class="muted">Choose a photograph from this collection. Your selection updates the preview immediately.</p><div class="cover-photo-picker">${photos.map((p) => `<button type="button" data-action="select-cover-photo" data-id="${esc(p.id)}" aria-label="Choose ${esc(p.filename)}" aria-pressed="${p.id === selected}"><img src="${safeUrl(p.thumbnailUrl || p.url)}" alt="${esc(p.filename)}" loading="lazy"><span>${esc(p.filename)}</span>${p.id === selected ? "<b>✓ Selected</b>" : ""}</button>`).join("") || "<p>Add photographs to choose a cover.</p>"}</div>`,
+  );
+  $("#dialog").classList.add("cover-picker-dialog");
 }
 function collectionSettings() {
   const c = state.collection,
@@ -556,6 +623,31 @@ document.addEventListener("click", async (e) => {
       state.setId = "";
       state.collection = await api("/collections/" + state.collection.id);
       renderCollection();
+    }
+    if (a === "design-section") {
+      document
+        .querySelectorAll("[data-design-section]")
+        .forEach(
+          (section) =>
+            (section.hidden =
+              section.dataset.designSection !== b.dataset.section),
+        );
+      document
+        .querySelectorAll('[data-action="design-section"]')
+        .forEach((button) => button.classList.toggle("active", button === b));
+    }
+    if (a === "choose-cover") coverPicker();
+    if (a === "cover-focal")
+      $("#focal-controls").hidden = !$("#focal-controls").hidden;
+    if (a === "select-cover-photo") {
+      const photo = state.collection.photos.find((p) => p.id === b.dataset.id);
+      if (!photo) return;
+      $("form[data-form=design]").elements.coverId.value = photo.id;
+      document
+        .querySelectorAll(".design-cover-image")
+        .forEach((img) => (img.src = photo.thumbnailUrl || photo.url));
+      $("#dialog").close();
+      sendDesignPreview();
     }
     if (a === "preview-device") {
       state.mobile = b.dataset.mobile === "true";
@@ -1357,6 +1449,8 @@ function sendDesignPreview() {
     frame = $("#design-preview");
   if (!form || !frame?.contentWindow || !state.collection) return;
   const { coverId, ...design } = Object.fromEntries(new FormData(form));
+  if ($("#design-save-state"))
+    $("#design-save-state").textContent = "Preview updated · Save to apply";
   design.focalX = Math.max(0, Math.min(100, Number(design.focalX)));
   design.focalY = Math.max(0, Math.min(100, Number(design.focalY)));
   frame.contentWindow.postMessage(
