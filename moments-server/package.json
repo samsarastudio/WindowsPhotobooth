@@ -6,6 +6,9 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
+    "start:client": "node src/client/index.js",
+    "test:client": "node --test test/client-gallery.test.mjs",
+    "demo:client": "node scripts/client-demo.mjs",
     "start:live": "node src/live/index.js",
     "test:live": "node --test test/live.test.mjs test/live-features.test.mjs test/live-admin.test.mjs test/live-wall.test.mjs test/live-print.test.mjs test/live-album-layout.test.mjs test/live-photobooth.test.mjs test/live-photobooth-auto.test.mjs test/live-photo-looks.test.mjs",
     "test:live:browser": "node scripts/test-live-browser.cjs",

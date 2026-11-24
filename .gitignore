@@ -39,3 +39,8 @@ Thumbs.db
 /output/
 *.dpapi
 __pycache__/
+
+# Client Gallery local state and private research
+moments-server/client-data/
+moments-server/.env.client
+deliverables/pixieset-client-gallery-reference-2026-11-24/screenshots/

@@ -1,0 +1,25 @@
+[Unit]
+Description=In Moment Client Gallery and photo delivery
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=moments-client
+Group=moments-client
+WorkingDirectory=/opt/moments-client/moments-server
+EnvironmentFile=/etc/moments-client.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/moments-client/moments-server/src/client/index.js
+Restart=on-failure
+RestartSec=5
+StateDirectory=moments-client
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/moments-client
+
+[Install]
+WantedBy=multi-user.target

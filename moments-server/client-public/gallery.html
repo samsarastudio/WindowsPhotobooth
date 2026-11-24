@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="same-origin" />
+    <title>In Moment · Client Gallery</title>
+    <link rel="stylesheet" href="/gallery.css" />
+    <script defer src="/gallery.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#gallery">Skip to photographs</a>
+    <main id="app">
+      <div class="loading">
+        <span class="wordmark">inmoment</span>
+        <div class="spinner"></div>
+        <p>Opening your collection…</p>
+      </div>
+    </main>
+    <dialog id="modal" aria-labelledby="modal-title">
+      <button
+        class="modal-close icon-button"
+        data-action="close-modal"
+        aria-label="Close dialog"
+      >
+        ×
+      </button>
+      <div id="modal-content"></div>
+    </dialog>
+    <dialog id="lightbox" aria-label="Photo viewer">
+      <div class="viewer-top">
+        <button
+          class="icon-button"
+          data-action="close-viewer"
+          aria-label="Close photo"
+        >
+          ←</button
+        ><span id="viewer-counter"></span>
+        <div id="viewer-tools"></div>
+      </div>
+      <div id="viewer-media"></div>
+      <button
+        class="viewer-prev icon-button"
+        data-action="previous"
+        aria-label="Previous photo"
+      >
+        ‹</button
+      ><button
+        class="viewer-next icon-button"
+        data-action="next"
+        aria-label="Next photo"
+      >
+        ›
+      </button>
+      <div id="viewer-caption"></div>
+    </dialog>
+    <div id="notice" role="status" aria-live="polite"></div>
+  </body>
+</html>

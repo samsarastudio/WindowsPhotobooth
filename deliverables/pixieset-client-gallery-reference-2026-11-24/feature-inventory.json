@@ -1,0 +1,731 @@
+[
+  {
+    "area": "Collections",
+    "feature": "Collection manager",
+    "detail": "Cover cards, title, photo count, event date and publication state.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collections",
+    "feature": "Search and filters",
+    "detail": "Search; status, category tag, event date, expiry date and starred filters.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collections",
+    "feature": "Sort and view",
+    "detail": "Created date, event date and alphabetical ordering; view switch.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collections",
+    "feature": "Create collection",
+    "detail": "Name, event date and watermark selection; reusable preset entry points.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collections",
+    "feature": "Collection actions",
+    "detail": "Direct link, email history, presets, move, duplicate and move to trash.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collections",
+    "feature": "Starred collections and photos",
+    "detail": "Separate tabs for frequently used collections and images.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collections",
+    "feature": "Trash",
+    "detail": "Recovery area; interface states permanent removal after 30 days. Recovery/deletion not executed.",
+    "evidence": "02,03,34,35,39,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Photo sets",
+    "detail": "Add sets; edit name and description; delete and arrange content.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Upload photos and videos",
+    "detail": "Drag/drop or computer picker; watermark selection; classic uploader entry.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Embed video",
+    "detail": "YouTube/Vimeo URL entry.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Photo actions",
+    "detail": "Open, quick share, download, move/copy, copy filename, cover, rename, replace, watermark, delete.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Library",
+    "detail": "Cross-collection chronological image browser with search and date control.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Library search",
+    "detail": "Natural-language example shown in search field; retrieval quality not tested.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Media management",
+    "feature": "Media inspector",
+    "detail": "Collection link, filename, timestamp, megapixels, dimensions, size and additional information.",
+    "evidence": "04,05,32,33,41,42",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Identity",
+    "detail": "Editable name/date and collection URL slug.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Category tags",
+    "detail": "Select or create labels to organize collections.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Default watermark",
+    "detail": "Choose watermark for new uploads.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Expiry",
+    "detail": "Date-based hiding and reminder-email entry point.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Email registration",
+    "detail": "Record visitors accessing a collection.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Gallery Assist",
+    "detail": "Guest walkthrough toggle.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Slideshow",
+    "detail": "Enable slideshow; additional options available but not fully expanded.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Social sharing",
+    "detail": "Enable guest sharing controls.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Collection settings",
+    "feature": "Language",
+    "detail": "Collection language setting.",
+    "evidence": "06",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Privacy",
+    "feature": "Collection password",
+    "detail": "Password field with generation control.",
+    "evidence": "07",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Privacy",
+    "feature": "Homepage visibility",
+    "detail": "Per-collection listing control; unavailable while account homepage is off.",
+    "evidence": "07",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Privacy",
+    "feature": "Client exclusive access",
+    "detail": "Client-only sets and marking photos private; permission paths not exercised.",
+    "evidence": "07",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Photo and video permissions",
+    "detail": "Independent photo/video download switches.",
+    "evidence": "08,09,16",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Resolution",
+    "detail": "Original or 3600px high-resolution selection and web-size availability.",
+    "evidence": "08,09,16",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "PIN",
+    "detail": "Four-digit download PIN control.",
+    "evidence": "08,09,16",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Limits",
+    "detail": "Global download limit and specific-contact restrictions.",
+    "evidence": "08,09,16",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Set restrictions",
+    "detail": "Select which photo sets may be downloaded.",
+    "evidence": "08,09,16",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Activity",
+    "detail": "Gallery, single-photo and single-video download activity views.",
+    "evidence": "08,09,16",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Granular single-photo controls",
+    "detail": "Separate full-gallery/single-photo availability, single-photo PIN, email tracking and restricted resolution.",
+    "evidence": "08",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/115003795572",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Downloads",
+    "feature": "Web sizes",
+    "detail": "2048px, 1024px or 640px options; configuration depends on enabled settings.",
+    "evidence": "08",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/115003795572",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Proofing",
+    "feature": "Favorites",
+    "detail": "Enable photo favorites and optional per-photo notes.",
+    "evidence": "10,23",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Proofing",
+    "feature": "Preset favorite lists",
+    "detail": "Create named selection tasks and selection limits.",
+    "evidence": "10,23",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Proofing",
+    "feature": "Email sign-in",
+    "detail": "Guest favorites prompt requests email to save and revisit lists.",
+    "evidence": "10,23",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Proofing",
+    "feature": "Multiple client lists",
+    "detail": "Create, rename, update and share lists; send completed selections to photographer. Photos only, not videos.",
+    "evidence": "23",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/115003733131",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Design",
+    "feature": "Cover and focal point",
+    "detail": "Choose cover image and focal position; desktop/mobile editor preview.",
+    "evidence": "12,13,14,15",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Design",
+    "feature": "Cover catalog",
+    "detail": "29 named designs plus None: Center, Joy, Left, Novel, Vintage, Frame, Stripe, Divider, Journal, Stamp, Outline, Classic, Split, Label, Border, Album, Cliff, Cedar, Breeze, Aero, Surf, Cosmos, Reef, Bondi, West, Oakwood, Edge, Anchor, Love.",
+    "evidence": "12,13,14,15",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Design",
+    "feature": "Typography",
+    "detail": "Sans, Serif, Modern, Timeless, Bold, Subtle.",
+    "evidence": "12,13,14,15",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Design",
+    "feature": "Color palettes",
+    "detail": "Light, Gold, Rose, Terracotta, Sand, Olive, Agave, Sea, Dark.",
+    "evidence": "12,13,14,15",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Design",
+    "feature": "Grid layout",
+    "detail": "Vertical/horizontal, regular/large thumbnails, regular/large spacing.",
+    "evidence": "12,13,14,15",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Design",
+    "feature": "Navigation style",
+    "detail": "Icon only or icon and text.",
+    "evidence": "12,13,14,15",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Share composer",
+    "detail": "Recipient entry, subject, rich message, template insertion and branded email preview.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Direct collection link",
+    "detail": "Copy gallery link; social sharing and custom-domain entry points. Dialog observed; capture 18 shows its entry button, not open dialog.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Photographic cover",
+    "detail": "Full-viewport image, logo, date, title and View Gallery action.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Responsive gallery",
+    "detail": "Mixed-orientation masonry on desktop; single-column large photos at 390px emulated mobile width.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Lightbox",
+    "detail": "Large contained image, navigation and favorite/download/share/slideshow/buy actions.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Download entry",
+    "detail": "Email form explains file-ready notification. No email submitted.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Favorites entry",
+    "detail": "Email-based list access in focused modal.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Guest toolbar",
+    "detail": "Collection/studio identity, print-store/cart/favorites and overflow on narrow screens.",
+    "evidence": "17,18,19,20,21,22,23,43,44",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Delivery and guest experience",
+    "feature": "Full-gallery download flow",
+    "detail": "Email and optional PIN precede the download workflow; downstream generation and notification were not executed in this account.",
+    "evidence": "22",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/115003594212-Your-client-s-download-experience",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Activities",
+    "feature": "Activity navigation",
+    "detail": "Downloads, favorites, orders, email registrations, marketing contacts, quick-share links and private photos.",
+    "evidence": "16,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Activities",
+    "feature": "Email history",
+    "detail": "Collection menu entry; delivery reporting not tested.",
+    "evidence": "16,40",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Branding",
+    "feature": "Domains",
+    "detail": "Account gallery domain and custom-domain setup entry.",
+    "evidence": "24,25,26",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Branding",
+    "feature": "Logos",
+    "detail": "Separate general and cover logos; transparent/light cover-logo guidance.",
+    "evidence": "24,25,26",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Branding",
+    "feature": "Favicon",
+    "detail": "GIF/PNG/ICO, up to 32px per interface.",
+    "evidence": "24,25,26",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Branding",
+    "feature": "Platform branding",
+    "detail": "Hide Pixieset branding control.",
+    "evidence": "24,25,26",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Branding",
+    "feature": "Watermark library",
+    "detail": "Named reusable watermarks and apply-to-web-downloads option.",
+    "evidence": "24,25,26",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Branding",
+    "feature": "Watermark editor",
+    "detail": "Text/image types; image upload, scale, opacity, nine positions and landscape/portrait preview. Changes apply to future uploads.",
+    "evidence": "24,25,26",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Reusable settings",
+    "feature": "Presets manager",
+    "detail": "Add preset and use defaults for collection creation; account currently has no presets.",
+    "evidence": "27,28,29",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Reusable settings",
+    "feature": "Email templates",
+    "detail": "Template library, new-template control and expiry-reminder template.",
+    "evidence": "27,28,29",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Reusable settings",
+    "feature": "Preferences",
+    "detail": "Default language, filename display, search-engine visibility and web sharpening.",
+    "evidence": "27,28,29",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Reusable settings",
+    "feature": "Legal presentation",
+    "detail": "Terms and privacy rich-text fields; EU cookie banner option.",
+    "evidence": "27,28,29",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Reusable settings",
+    "feature": "RAW support",
+    "detail": "Shown as Pro upgrade; disabled on observed account.",
+    "evidence": "27,28,29",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Reusable settings",
+    "feature": "Preset contents",
+    "detail": "Design, photo-set titles, privacy/password generation, download sizes/limits and store price sheet; create from scratch or existing collection, apply to new or existing collection.",
+    "evidence": "27",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/115003740052",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Homepage",
+    "feature": "Homepage switch",
+    "detail": "Currently OFF; left unchanged. Public collection-listing controls therefore not fully observable.",
+    "evidence": "31",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Homepage",
+    "feature": "Homepage configuration",
+    "detail": "Public collection portal with independent homepage password, profile information, collection sort order, category tags and per-collection visibility. Homepage password does not replace collection passwords.",
+    "evidence": "31",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/115003780571-Managing-your-Client-Gallery-Homepage",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Marketing within Client Gallery",
+    "feature": "Campaigns",
+    "detail": "Email campaigns list and New Campaign entry; account empty, no campaign sent.",
+    "evidence": "36,37,38",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Marketing within Client Gallery",
+    "feature": "Contacts",
+    "detail": "Marketing contacts list, currently empty.",
+    "evidence": "36,37,38",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Marketing within Client Gallery",
+    "feature": "Opt-in locations",
+    "detail": "Registration, checkout, downloads and favorites sign-in; underlying feature must be enabled.",
+    "evidence": "36,37,38",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Marketing within Client Gallery",
+    "feature": "Pop-up signup",
+    "detail": "Global gallery pop-up form toggle and standalone signup-link description.",
+    "evidence": "36,37,38",
+    "status": "Observed",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Volume and pre-release",
+    "feature": "Bulk creation",
+    "detail": "CSV and desktop-folder collection creation; volume-folder QR matching with review before upload.",
+    "evidence": "",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/41219071036685-Bulk-creating-collections",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Volume and pre-release",
+    "feature": "Bulk sharing",
+    "detail": "Folder-level recipient review and individual gallery emails; documented upgraded feature. No sends tested.",
+    "evidence": "",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/45591863891725-Bulk-sharing-collections-in-Client-Gallery",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Volume and pre-release",
+    "feature": "Pre-release signup",
+    "detail": "Unpublished signup page, then Publish & Notify campaign draft; access after publication follows collection privacy settings.",
+    "evidence": "",
+    "status": "Documented",
+    "source": "https://help.pixieset.com/hc/en-us/articles/47597713273101-Setting-up-a-pre-release-gallery",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Integration boundaries",
+    "feature": "Store bridge",
+    "detail": "Gallery store enablement, price sheet and personalized product previews; checkout unavailable until payment setup. Full commerce engine is separate Store product.",
+    "evidence": "11,30,40",
+    "status": "Observed integration",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Integration boundaries",
+    "feature": "Studio Manager bridge",
+    "detail": "Link collection contacts; full CRM/project/payment workflows are separate product.",
+    "evidence": "11,30,40",
+    "status": "Observed integration",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Integration boundaries",
+    "feature": "Photo Editor bridge",
+    "detail": "Upload/edit and Create Style entry points; full editor is separate product.",
+    "evidence": "11,30,40",
+    "status": "Observed integration",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Integration boundaries",
+    "feature": "Lightroom Classic",
+    "detail": "Upload/republish/sync integration described in settings; plugin not installed or exercised.",
+    "evidence": "11,30,40",
+    "status": "Observed integration",
+    "source": "",
+    "release": "Client Gallery v1"
+  },
+  {
+    "area": "Integration boundaries",
+    "feature": "Google Analytics",
+    "detail": "Tracking-ID connection field; no connection changed.",
+    "evidence": "11,30,40",
+    "status": "Observed integration",
+    "source": "",
+    "release": "Client Gallery v1"
+  }
+]
