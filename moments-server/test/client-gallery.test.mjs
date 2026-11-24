@@ -6,6 +6,18 @@ import path from "node:path";
 import sharp from "sharp";
 import { createClientApp } from "../src/client/server.js";
 
+test("Admin and gallery HTML version application assets after deployments", async (t) => {
+  const f = await fixture(t);
+  const admin = await f.call("/admin");
+  assert.equal(admin.headers.get("cache-control"), "no-store");
+  assert.match(admin.body, /\/client-assets\/admin\.js\?v=[a-f0-9]{16}/);
+  assert.match(admin.body, /\/client-assets\/styles\.css\?v=[a-f0-9]{16}/);
+  const page = await f.call("/");
+  assert.match(page.body, /\/gallery\.js\?v=[a-f0-9]{16}/);
+  const asset = await f.call("/client-assets/admin.js");
+  assert.equal(asset.headers.get("cache-control"), "no-store");
+});
+
 test("Published gallery social covers and QR respect availability and privacy", async (t) => {
   const f = await fixture(t),
     c = await f.create({ title: "A <special> collection" });

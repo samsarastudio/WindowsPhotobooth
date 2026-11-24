@@ -506,7 +506,8 @@ img {
   gap: var(--gap);
 }
 .photo-grid.horizontal .tile {
-  flex: calc(var(--ratio, 1.5) * 100) 1 calc(var(--ratio, 1.5) * 220px);
+  flex: calc(var(--ratio, 1.5) * 100) 1
+    calc(var(--ratio, 1.5) * var(--photo-row-height));
   margin: 0;
   min-width: 0;
   max-width: 100%;
@@ -1061,7 +1062,7 @@ dialog p {
   }
   .photo-grid.horizontal .tile {
     height: auto;
-    flex-basis: calc(var(--ratio, 1.5) * 135px);
+    flex-basis: calc(var(--ratio, 1.5) * var(--photo-row-height));
     min-width: 0;
   }
   .photo-grid.horizontal .tile img {
@@ -1137,16 +1138,43 @@ dialog p {
   }
 }
 
+/* Thumbnail density is independent of spacing and applies to both grid styles. */
+:root[data-thumbnail-size="regular"] {
+  --photo-columns: 4;
+  --photo-row-height: 220px;
+}
+:root[data-thumbnail-size="large"] {
+  --photo-columns: 3;
+  --photo-row-height: 330px;
+}
+@media (min-width: 1800px) {
+  :root[data-thumbnail-size="regular"] {
+    --photo-columns: 5;
+    --photo-row-height: 260px;
+  }
+  :root[data-thumbnail-size="large"] {
+    --photo-columns: 3;
+    --photo-row-height: 400px;
+  }
+}
 @media (max-width: 1000px) {
-  .photo-grid {
-    columns: 2;
+  :root[data-thumbnail-size="regular"] {
+    --photo-columns: 3;
+    --photo-row-height: 180px;
+  }
+  :root[data-thumbnail-size="large"] {
+    --photo-columns: 2;
+    --photo-row-height: 280px;
   }
 }
 @media (max-width: 600px) {
-  .photo-grid {
-    columns: 2;
-    column-gap: 6px;
-    --gap: 6px;
+  :root[data-thumbnail-size="regular"] {
+    --photo-columns: 2;
+    --photo-row-height: 135px;
+  }
+  :root[data-thumbnail-size="large"] {
+    --photo-columns: 1;
+    --photo-row-height: 240px;
   }
 }
 

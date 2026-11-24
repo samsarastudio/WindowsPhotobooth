@@ -1546,14 +1546,12 @@ export function createClientApp(options = {}) {
       const c = collection(req.params.id);
       if (!active(c))
         throw fail(409, "Publish this collection before sharing it");
-      res
-        .type("png")
-        .send(
-          await QRCode.toBuffer(base + "/g/" + encodeURIComponent(c.slug), {
-            width: 1000,
-            margin: 2,
-          }),
-        );
+      res.type("png").send(
+        await QRCode.toBuffer(base + "/g/" + encodeURIComponent(c.slug), {
+          width: 1000,
+          margin: 2,
+        }),
+      );
     }),
   );
   app.get(
@@ -2134,14 +2132,36 @@ export function createClientApp(options = {}) {
       dotfiles: "deny",
     }),
   );
-  app.use("/client-assets", express.static(path.join(root, "client-public")));
+  app.use(
+    "/client-assets",
+    express.static(path.join(root, "client-public"), {
+      setHeaders: (res) => res.set("Cache-Control", "no-store"),
+    }),
+  );
+  function versionClientAssets(html) {
+    return html.replace(
+      /(src|href)="(\/client-assets\/[^"?]+\.(?:js|css)|\/gallery\.(?:js|css))"/g,
+      (match, attr, url) => {
+        const file = path.join(root, "client-public", path.basename(url));
+        const version = hash(fs.readFileSync(file, "utf8")).slice(0, 16);
+        return `${attr}="${url}?v=${version}"`;
+      },
+    );
+  }
   for (const name of ["gallery.js", "gallery.css"])
     app.get("/" + name, (req, res) =>
       res.sendFile(path.join(root, "client-public", name)),
     );
-  app.get(["/admin", "/admin/*"], (req, res) =>
-    res.sendFile(path.join(root, "client-public/admin.html")),
-  );
+  app.get(["/admin", "/admin/*"], (req, res) => {
+    res.set("Cache-Control", "no-store");
+    res
+      .type("html")
+      .send(
+        versionClientAssets(
+          fs.readFileSync(path.join(root, "client-public/admin.html"), "utf8"),
+        ),
+      );
+  });
   app.get(["/", "/g/:slug"], (req, res) => {
     res.set("X-Frame-Options", "SAMEORIGIN");
     res.set(
@@ -2201,7 +2221,7 @@ export function createClientApp(options = {}) {
         res.status(404);
       }
     }
-    res.type("html").send(html);
+    res.type("html").send(versionClientAssets(html));
   });
   app.use((error, req, res, next) => {
     for (const f of req.files || []) fs.rmSync(f.path, { force: true });

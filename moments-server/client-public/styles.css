@@ -1722,3 +1722,20 @@ dialog::backdrop {
     opacity: 1;
   }
 }
+
+.sortable-grid .photo-card {
+  overflow: visible;
+}
+.sortable-grid .photo-card.drop-before {
+  box-shadow: -5px 0 0 #168c79;
+}
+.sortable-grid .photo-card.drop-after {
+  box-shadow: 5px 0 0 #168c79;
+}
+.sortable-grid .photo-card.order-dragging {
+  opacity: 0.55;
+}
+.sortable-grid .photo-card img {
+  user-select: none;
+  -webkit-user-drag: none;
+}

@@ -179,10 +179,9 @@
       "--gap",
       design.spacing === "large" ? "20px" : "8px",
     );
-    document.documentElement.style.setProperty(
-      "--photo-columns",
-      design.thumbnailSize === "regular" ? "4" : "3",
-    );
+    document.documentElement.style.removeProperty("--photo-columns");
+    document.documentElement.dataset.thumbnailSize =
+      design.thumbnailSize === "large" ? "large" : "regular";
     document.body.classList.toggle(
       "icon-only",
       !["icon-text", "Icon & Text", "text"].includes(design.navigation),
