@@ -895,6 +895,7 @@ document.addEventListener("click", async (e) => {
     if (a === "preview-device") {
       state.mobile = b.dataset.mobile === "true";
       $(".preview-frame")?.classList.toggle("mobile", state.mobile);
+      sizeDesignPreview();
     }
     if (a === "palette") {
       const form = $("form[data-form=design]");
@@ -1687,7 +1688,26 @@ document.addEventListener("change", async (e) => {
 });
 start();
 
+let previewResizeObserver;
+function sizeDesignPreview() {
+  const frame = $("#design-preview"),
+    host = frame?.parentElement;
+  if (!host) return;
+  const width = state.mobile ? 390 : 1600;
+  const scale = Math.min(1, host.clientWidth / width);
+  frame.style.width = width + "px";
+  frame.style.height = 650 / scale + "px";
+  frame.style.transform = `scale(${scale})`;
+}
+window.addEventListener("resize", sizeDesignPreview);
 function sendDesignPreview() {
+  sizeDesignPreview();
+  previewResizeObserver?.disconnect();
+  const previewHost = $("#design-preview")?.parentElement;
+  if (previewHost) {
+    previewResizeObserver = new ResizeObserver(sizeDesignPreview);
+    previewResizeObserver.observe(previewHost);
+  }
   const form = $('form[data-form="design"]'),
     frame = $("#design-preview");
   if (!form || !frame?.contentWindow || !state.collection) return;

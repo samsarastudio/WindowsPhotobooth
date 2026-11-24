@@ -1739,3 +1739,12 @@ dialog::backdrop {
   user-select: none;
   -webkit-user-drag: none;
 }
+
+.design-preview-stage .preview-frame {
+  height: 650px;
+  overflow: hidden;
+}
+.design-preview-stage #design-preview {
+  transform-origin: top left;
+  max-width: none;
+}

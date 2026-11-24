@@ -1,3 +1,4 @@
+import { layoutPhotos } from "/client-assets/gallery-layout.js";
 (() => {
   "use strict";
   const app = document.getElementById("app");
@@ -177,7 +178,7 @@
     );
     document.documentElement.style.setProperty(
       "--gap",
-      design.spacing === "large" ? "20px" : "8px",
+      design.spacing === "large" ? "40px" : "8px",
     );
     document.documentElement.style.removeProperty("--photo-columns");
     document.documentElement.dataset.thumbnailSize =
@@ -491,6 +492,47 @@
   function isFavorite(id) {
     return (activeList?.photoIds || []).includes(id);
   }
+  let gridObserver;
+  function arrangePhotos() {
+    const grid = document.getElementById("photo-grid");
+    if (!grid) return;
+    if (!visiblePhotos.length) {
+      grid.classList.remove("arranged");
+      grid.style.height = "";
+      return;
+    }
+    const d = collection.design || {};
+    const result = layoutPhotos(
+      visiblePhotos.map((p) => p.width / p.height),
+      grid.clientWidth,
+      {
+        layout: d.layout,
+        large: d.thumbnailSize === "large",
+        gap:
+          d.spacing === "large"
+            ? innerWidth <= 600
+              ? 24
+              : 40
+            : innerWidth <= 600
+              ? 4
+              : 8,
+        mobile: innerWidth <= 600,
+        tablet: innerWidth > 600 && innerWidth <= 1000,
+      },
+    );
+    grid.classList.add("arranged");
+    grid.style.height = result.height + "px";
+    [...grid.querySelectorAll(".tile")].forEach((tile, i) => {
+      const box = result.boxes[i];
+      Object.assign(tile.style, {
+        left: box.x + "px",
+        top: box.y + "px",
+        width: box.width + "px",
+        height: box.height + "px",
+      });
+    });
+  }
+  window.addEventListener("resize", arrangePhotos);
   function renderPhotos() {
     visiblePhotos = (collection.photos || []).filter(
       (p) => !activeSet || p.setId === activeSet,
@@ -506,6 +548,10 @@
         )
         .join("") ||
       '<div class="empty"><h2>A little anticipation.</h2><p>Your photographer is preparing the photographs for this collection.</p></div>';
+    gridObserver?.disconnect();
+    arrangePhotos();
+    gridObserver = new ResizeObserver(arrangePhotos);
+    gridObserver.observe(document.getElementById("photo-grid"));
   }
   function openModal(title, content) {
     document.getElementById("modal-content").innerHTML =
