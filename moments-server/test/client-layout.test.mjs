@@ -4,6 +4,22 @@ import { layoutPhotos } from "../client-public/gallery-layout.js";
 const ratios = [
   1.78, 0.67, 0.56, 0.56, 0.56, 1.78, 0.56, 0.56, 1.78, 0.56, 0.56,
 ];
+test("Phone galleries stack full-width uncropped photos for every desktop setting", () => {
+  for (const width of [312, 367, 382, 422, 592])
+    for (const layout of ["vertical", "horizontal"])
+      for (const large of [false, true])
+        for (const gap of [8, 40]) {
+          const { boxes, height } = layoutPhotos(ratios, width, { mobile: true, layout, large, gap });
+          boxes.forEach((box, i) => {
+            assert.equal(box.x, 0);
+            assert.equal(box.width, width);
+            assert.equal(box.height, width / ratios[i]);
+            assert.equal(box.y, i ? boxes[i - 1].y + boxes[i - 1].height + 4 : 0);
+          });
+          const last = boxes.at(-1);
+          assert.equal(height, last.y + last.height);
+        }
+});
 test("Masonry fills the shortest column in source order", () => {
   const { boxes } = layoutPhotos(ratios, 1600, { large: true });
   assert.equal(boxes[0].y, 0);

@@ -13,6 +13,16 @@ export function layoutPhotos(
   ratios = ratios.map((r) => (Number.isFinite(r) && r > 0 ? r : 1.5));
   const boxes = [];
   if (!ratios.length || width <= 0) return { boxes, height: 0 };
+  // Phones always read as one continuous photo story, regardless of desktop design.
+  if (mobile) {
+    let y = 0;
+    for (const ratio of ratios) {
+      const height = width / ratio;
+      boxes.push({ x: 0, y, width, height });
+      y += height + 4;
+    }
+    return { boxes, height: y - 4 };
+  }
   if (layout === "vertical") {
     const columns = mobile
       ? large
