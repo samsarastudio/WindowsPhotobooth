@@ -1509,3 +1509,56 @@ test("Client bulk sharing validates all collections before sending mapped links"
   assert.ok(sent[1].text.includes("/g/" + b.slug));
   assert.equal(sent[1].to, "b@example.com");
 });
+
+test("Bulk removal is authenticated, atomic and collection scoped, including the cover", async (t) => {
+  const f = await fixture(t),
+    c = await f.create(),
+    other = await f.create();
+  const a = await f.upload(c.id),
+    b = await f.upload(c.id),
+    foreign = await f.upload(other.id);
+  const route = `/api/admin/collections/${c.id}/photos/delete`;
+  await f.call(
+    `/api/admin/collections/${c.id}`,
+    "PATCH",
+    { coverId: a.id },
+    f.admin,
+  );
+  assert.equal((await f.call(route, "POST", { photoIds: [a.id] })).status, 401);
+  for (const ids of [[], [a.id, a.id]])
+    assert.equal(
+      (await f.call(route, "POST", { photoIds: ids }, f.admin)).status,
+      400,
+    );
+  for (const ids of [
+    [a.id, foreign.id],
+    [a.id, "missing"],
+  ])
+    assert.equal(
+      (await f.call(route, "POST", { photoIds: ids }, f.admin)).status,
+      409,
+    );
+  assert.equal(
+    (await f.call(`/api/admin/collections/${c.id}`, "GET", undefined, f.admin))
+      .body.photos.length,
+    2,
+  );
+  const first = await f.call(route, "POST", { photoIds: [a.id] }, f.admin);
+  assert.equal(first.status, 200);
+  assert.equal(first.body.removed, 1);
+  assert.equal(first.body.collection.photos.length, 1);
+  assert.notEqual(first.body.collection.coverId, a.id);
+  const last = await f.call(route, "POST", { photoIds: [b.id] }, f.admin);
+  assert.equal(last.body.collection.photos.length, 0);
+  assert.equal(
+    (
+      await f.call(
+        `/api/admin/collections/${other.id}`,
+        "GET",
+        undefined,
+        f.admin,
+      )
+    ).body.photos[0].id,
+    foreign.id,
+  );
+});

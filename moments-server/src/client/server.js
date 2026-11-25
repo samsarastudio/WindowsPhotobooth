@@ -861,6 +861,60 @@ export function createClientApp(options = {}) {
       );
     }),
   );
+  app.post("/api/admin/collections/:id/photos/delete", (req, res, next) => {
+    try {
+      const c = collection(req.params.id),
+        ids = req.body.photoIds;
+      if (
+        !Array.isArray(ids) ||
+        !ids.length ||
+        ids.length > 10000 ||
+        ids.some((id) => typeof id !== "string") ||
+        new Set(ids).size !== ids.length
+      )
+        throw fail(400, "Select valid photographs to remove");
+      const selected = new Set(ids);
+      db.transaction(() => {
+        const photos = db
+          .prepare("SELECT id FROM photos WHERE collectionId=?")
+          .all(c.id);
+        if (ids.some((id) => !photos.some((p) => p.id === id)))
+          throw fail(
+            409,
+            "The selection has changed. Refresh the collection and select again.",
+          );
+        const remove = db.prepare(
+          "DELETE FROM photos WHERE id=? AND collectionId=?",
+        );
+        for (const id of ids) remove.run(id, c.id);
+        if (selected.has(c.coverId))
+          db.prepare("UPDATE collections SET coverId=NULL WHERE id=?").run(
+            c.id,
+          );
+        for (const list of db
+          .prepare("SELECT * FROM favorites WHERE collectionId=?")
+          .all(c.id)) {
+          const notes = parse(list.notes || "{}");
+          for (const id of ids) delete notes[id];
+          db.prepare("UPDATE favorites SET photoIds=?,notes=? WHERE id=?").run(
+            JSON.stringify(
+              parse(list.photoIds).filter((id) => !selected.has(id)),
+            ),
+            JSON.stringify(notes),
+            list.id,
+          );
+        }
+        audit(c.id, "photos.deleted", "", String(ids.length));
+      })();
+      // Storage can be shared by collection copies; removing membership must not erase their files.
+      res.json({
+        removed: ids.length,
+        collection: full(collection(c.id), req),
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
   app.delete("/api/admin/photos/:id", (req, res) => {
     db.prepare("DELETE FROM photos WHERE id=?").run(req.params.id);
     res.json({ ok: true });

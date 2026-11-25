@@ -271,7 +271,7 @@ function photosPage() {
   const photos = (c.photos || [])
     .filter((p) => !state.setId || p.setId === state.setId)
     .sort((a, b) => (a.position || 0) - (b.position || 0));
-  return `<div class="workspace"><aside><div class="eyebrow">Photo sets</div><div class="set-nav"><button class="${!state.setId ? "active" : ""}" data-action="set" data-id="">All photographs <span class="set-count">${c.photos?.length || 0}</span></button>${(c.sets || []).map((s) => `<button class="${state.setId === s.id ? "active" : ""}" data-action="set" data-id="${esc(s.id)}">${esc(s.name)}<span class="set-count">${c.photos.filter((p) => p.setId === s.id).length}</span></button>`).join("")}<button data-action="new-set">＋ Add set</button>${state.setId ? '<button data-action="edit-set">Edit this set ···</button>' : ""}</div></aside><div><div class="dropzone" id="dropzone"><button data-action="upload" class="primary">＋ Add photographs</button><input id="photo-files" class="hidden" type="file" accept="image/*,video/mp4,video/webm" multiple><button class="quiet" data-action="embed-video">Embed video</button><p>Drag photographs or videos here. Your originals stay intact.</p><div id="upload-status" aria-live="polite"></div></div>${photos.length ? `<div class="order-toolbar"><label>Sort photos <select id="photo-sort"><option value="">Custom order</option><option value="name-asc">Filename A–Z</option><option value="name-desc">Filename Z–A</option><option value="upload-asc">Uploaded oldest first</option><option value="upload-desc">Uploaded newest first</option><option value="capture-asc">Date taken oldest first</option><option value="capture-desc">Date taken newest first</option><option value="random">Random</option><option value="balanced">Balanced portrait & landscape</option></select></label><button data-action="order-undo" ${orderUndo?.collectionId === c.id ? "" : "disabled"}>Undo order</button><button data-action="order-top">Move selected to start</button><button data-action="order-bottom">Move selected to end</button><button data-action="order-select-all">Select all</button><button data-action="order-clear">Clear selection</button></div><p class="hint">Select photos, then drag a selected image to move the group. On touch screens, use Move to start/end or tap “Place before” on the destination.</p><div class="photo-grid sortable-grid">${photos.map(photoCard).join("")}</div>` : empty("The beginning of a collection", "Add your photographs to start shaping this story.")}</div></div>`;
+  return `<div class="workspace"><aside><div class="eyebrow">Photo sets</div><div class="set-nav"><button class="${!state.setId ? "active" : ""}" data-action="set" data-id="">All photographs <span class="set-count">${c.photos?.length || 0}</span></button>${(c.sets || []).map((s) => `<button class="${state.setId === s.id ? "active" : ""}" data-action="set" data-id="${esc(s.id)}">${esc(s.name)}<span class="set-count">${c.photos.filter((p) => p.setId === s.id).length}</span></button>`).join("")}<button data-action="new-set">＋ Add set</button>${state.setId ? '<button data-action="edit-set">Edit this set ···</button>' : ""}</div></aside><div><div class="dropzone" id="dropzone"><button data-action="upload" class="primary">＋ Add photographs</button><input id="photo-files" class="hidden" type="file" accept="image/*,video/mp4,video/webm" multiple><button class="quiet" data-action="embed-video">Embed video</button><p>Drag photographs or videos here. Your originals stay intact.</p><div id="upload-status" aria-live="polite"></div></div>${photos.length ? `<div class="order-toolbar"><label>Sort photos <select id="photo-sort"><option value="">Custom order</option><option value="name-asc">Filename A–Z</option><option value="name-desc">Filename Z–A</option><option value="upload-asc">Uploaded oldest first</option><option value="upload-desc">Uploaded newest first</option><option value="capture-asc">Date taken oldest first</option><option value="capture-desc">Date taken newest first</option><option value="random">Random</option><option value="balanced">Balanced portrait & landscape</option></select></label><button data-action="order-undo" ${orderUndo?.collectionId === c.id ? "" : "disabled"}>Undo order</button><button data-action="order-top">Move selected to start</button><button data-action="order-bottom">Move selected to end</button><button data-action="order-select-all">Select all</button><button data-action="order-clear">Clear selection</button><button class="danger" data-action="bulk-delete" ${orderSelection.size ? "" : "disabled"}>Remove selected (${orderSelection.size})</button></div><p class="hint">Select photos, then drag a selected image to move the group. On touch screens, use Move to start/end or tap “Place before” on the destination.</p><div class="photo-grid sortable-grid">${photos.map(photoCard).join("")}</div>` : empty("The beginning of a collection", "Add your photographs to start shaping this story.")}</div></div>`;
 }
 function photoCard(p) {
   return `<article class="photo-card" ${state.collection ? `draggable="false" data-order-id="${esc(p.id)}"` : ""}>${state.collection ? `<label class="photo-select"><input type="checkbox" data-select-photo="${esc(p.id)}" ${orderSelection.has(p.id) ? "checked" : ""} aria-label="Select ${esc(p.filename)}"></label><button class="place-before" data-action="order-before" data-id="${esc(p.id)}">Place before</button>` : ""}${p.type === "embed" ? `<div class="cover-empty" style="height:170px;font-size:30px">▷</div>` : p.type === "video" ? `<video src="${safeUrl(p.url)}" preload="metadata"></video>` : `<img draggable="false" src="${safeUrl(p.thumbnailUrl || p.url)}" alt="${esc(p.caption || p.filename)}" loading="lazy">`}<button data-action="photo-menu" data-id="${esc(p.id)}" aria-label="Options for ${esc(p.filename)}">···</button>${p.private ? '<span class="photo-flag">Private</span>' : p.starred ? '<span class="photo-flag">★</span>' : ""}<div class="photo-label" title="${esc(p.filename)}">${esc(p.filename)}</div></article>`;
@@ -577,6 +577,12 @@ async function favoriteLists() {
   );
 }
 let orderSelection = new Set();
+function updateBulkRemoval() {
+  const button = document.querySelector('[data-action="bulk-delete"]');
+  if (!button) return;
+  button.disabled = !orderSelection.size || orderBusy;
+  button.textContent = `Remove selected (${orderSelection.size})`;
+}
 let orderUndo = null;
 let orderBusy = false;
 function orderedPhotos() {
@@ -624,6 +630,7 @@ document.addEventListener("change", async (e) => {
   if (e.target.matches("[data-select-photo]")) {
     const id = e.target.dataset.selectPhoto;
     e.target.checked ? orderSelection.add(id) : orderSelection.delete(id);
+    updateBulkRemoval();
   }
   if (e.target.id === "photo-sort" && e.target.value) {
     const all = orderedPhotos(),
@@ -735,6 +742,7 @@ document.addEventListener("pointermove", (e) => {
           (input.checked = orderSelection.has(input.dataset.selectPhoto)),
       );
     drag.card.classList.add("order-dragging");
+    updateBulkRemoval();
   }
   document
     .querySelectorAll(".drop-before,.drop-after")
@@ -773,6 +781,36 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   const a = b.dataset.action;
   try {
+    if (a === "bulk-delete") {
+      if (orderBusy || !state.collection) return;
+      const ids = state.collection.photos
+        .filter((p) => orderSelection.has(p.id))
+        .map((p) => p.id);
+      if (
+        !ids.length ||
+        !confirm(
+          `Remove ${ids.length} selected photograph${ids.length === 1 ? "" : "s"} from this collection? They will disappear from the shared gallery and favorites. This cannot be undone. Copies in other collections are kept.`,
+        )
+      )
+        return;
+      orderBusy = true;
+      updateBulkRemoval();
+      try {
+        const result = await api(
+          `/collections/${state.collection.id}/photos/delete`,
+          { photoIds: ids },
+          "POST",
+        );
+        state.collection = result.collection;
+        orderSelection.clear();
+        orderUndo = null;
+        renderCollection();
+        notify(`${result.removed} photographs removed`);
+      } finally {
+        orderBusy = false;
+        updateBulkRemoval();
+      }
+    }
     if (a === "order-before") await moveSelection(b.dataset.id);
     if (a === "order-top") await moveSelection(null);
     if (a === "order-bottom") await moveSelection(null, true);
@@ -842,6 +880,7 @@ document.addEventListener("click", async (e) => {
     }
     if (a === "set") {
       state.setId = b.dataset.id;
+      orderSelection.clear();
       renderCollection();
     }
     if (a === "upload") $("#photo-files").click();
