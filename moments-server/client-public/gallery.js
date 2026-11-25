@@ -26,6 +26,7 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     touchX = 0,
     touchY = 0,
     viewerRequest = 0,
+    galleryRender = 0,
     viewerPhotoId = null,
     quickPhotoOpened = false,
     gateBrand = {};
@@ -415,7 +416,8 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     draw();
     extras();
   }
-  function renderGallery() {
+  async function renderGallery() {
+    const render = ++galleryRender;
     const c = collection,
       d = c.design || {},
       b = c.brand || {};
@@ -427,7 +429,14 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     const photo =
       (c.photos || []).find((p) => p.id === c.coverId) ||
       (c.photos || []).find((p) => !p.type || p.type === "image");
-    const cover = safeUrl(c.coverUrl || photo?.url || "");
+    const cover = safeUrl(photo?.url || c.coverUrl || "");
+    if (cover) {
+      const coverImage = new Image();
+      coverImage.fetchPriority = "high";
+      coverImage.src = cover;
+      try { await coverImage.decode(); } catch { /* Keep the gallery usable if the cover fails. */ }
+      if (render !== galleryRender) return;
+    }
     const coverStyle = String(d.coverStyle || "outline")
       .toLowerCase()
       .replace(/[^a-z-]/g, "");
@@ -441,7 +450,7 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
       );
     const focalX = focal(d.focalX),
       focalY = focal(d.focalY);
-    app.innerHTML = `${c.preview ? '<div class="preview-badge">Private photographer preview</div>' : ""}<section class="cover cover-${coverStyle}">${cover ? `<img class="cover-photo" src="${esc(cover)}" alt="" style="object-position:${focalX}% ${focalY}%">` : ""}<a class="cover-brand" href="/">${brandHTML(b, true)}</a><div class="cover-copy"><div class="cover-date">${esc(dateLabel(c.date))}</div><h1>${esc(c.title)}</h1>${c.description ? `<p class="cover-description">${esc(c.description)}</p>` : ""}</div><a href="#gallery" class="enter-gallery">View gallery ↓</a></section><section id="gallery"><header class="gallery-head"><a class="gallery-brand" href="#"><h2>${esc(c.title)}</h2><small>${esc(b.name || "In Moment")}</small></a><div class="gallery-tools">${settings().favoritesEnabled !== false ? button("heart", "Favorites", "favorites") : ""}${settings().downloadEnabled !== false && settings().galleryDownloadEnabled !== false ? button("download", "Download", "download") : ""}${settings().socialSharing !== false ? button("share", "Share", "share", "mobile-hide") : ""}${settings().slideshow !== false ? button("play", "Slideshow", "slideshow", "mobile-hide") : ""}${button("more", "More options", "more")}</div></header><div class="set-tabs">${(c.sets || []).length > 1 ? `<button class="active" data-set="">All photographs</button>${c.sets.map((s) => `<button data-set="${esc(s.id)}">${esc(s.name)}</button>`).join("")}` : ""}</div><div id="set-description" class="gallery-intro"></div><div class="photo-grid ${d.layout === "horizontal" ? "horizontal" : ""}" id="photo-grid"></div></section><footer class="gallery-footer"><a href="/">${brandHTML(b)}</a><p>Beautifully captured. Yours to keep.</p><a class="eyebrow" href="#">Back to top ↑</a></footer>`;
+    app.innerHTML = `${c.preview ? '<div class="preview-badge">Private photographer preview</div>' : ""}<section class="cover cover-${coverStyle}">${cover ? `<img class="cover-photo" fetchpriority="high" loading="eager" decoding="sync" src="${esc(cover)}" alt="" style="object-position:${focalX}% ${focalY}%">` : ""}<a class="cover-brand" href="/">${brandHTML(b, true)}</a><div class="cover-copy"><div class="cover-date">${esc(dateLabel(c.date))}</div><h1>${esc(c.title)}</h1>${c.description ? `<p class="cover-description">${esc(c.description)}</p>` : ""}</div><a href="#gallery" class="enter-gallery">View gallery ↓</a></section><section id="gallery"><header class="gallery-head"><a class="gallery-brand" href="#"><h2>${esc(c.title)}</h2><small>${esc(b.name || "In Moment")}</small></a><div class="gallery-tools">${settings().favoritesEnabled !== false ? button("heart", "Favorites", "favorites") : ""}${settings().downloadEnabled !== false && settings().galleryDownloadEnabled !== false ? button("download", "Download", "download") : ""}${settings().socialSharing !== false ? button("share", "Share", "share", "mobile-hide") : ""}${settings().slideshow !== false ? button("play", "Slideshow", "slideshow", "mobile-hide") : ""}${button("more", "More options", "more")}</div></header><div class="set-tabs">${(c.sets || []).length > 1 ? `<button class="active" data-set="">All photographs</button>${c.sets.map((s) => `<button data-set="${esc(s.id)}">${esc(s.name)}</button>`).join("")}` : ""}</div><div id="set-description" class="gallery-intro"></div><div class="photo-grid ${d.layout === "horizontal" ? "horizontal" : ""}" id="photo-grid"></div></section><footer class="gallery-footer"><a href="/">${brandHTML(b)}</a><p>Beautifully captured. Yours to keep.</p><a class="eyebrow" href="#">Back to top ↑</a></footer>`;
     document.querySelectorAll("[data-set]").forEach(
       (b) =>
         (b.onclick = () => {

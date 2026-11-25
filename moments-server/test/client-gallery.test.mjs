@@ -329,6 +329,23 @@ test("Client images preserve dimensions and obey collection visibility", async (
   );
 });
 
+test("High-density covers use original pixels and cached derivatives retain privacy", async (t) => {
+  const f = await fixture(t);
+  const c = await f.create({ title: "Retina cover", status: "published" });
+  const p = await f.upload(c.id, 4200, 2800);
+  const gallery = (await f.call(`/api/gallery/${c.slug}`)).body;
+  assert.equal(gallery.coverUrl, p.url);
+  const read = async (url) => sharp(Buffer.from(await (await fetch(new URL(url, f.base))).arrayBuffer())).metadata();
+  const thumbnail = await read(p.thumbnailUrl);
+  const display = await read(p.url);
+  assert.equal(thumbnail.width, 1600);
+  assert.equal(display.width, 3840);
+  assert.equal(display.height, 2560);
+  assert.equal((await read(p.url)).width, 3840);
+  await f.call(`/api/admin/photos/${p.id}`, "PATCH", { private: true }, f.admin);
+  assert.equal((await fetch(new URL(p.url, f.base))).status, 404);
+});
+
 test("Client password gates public gallery and direct media", async (t) => {
   const f = await fixture(t);
   const c = await f.create({ title: "Protected session", status: "published" });

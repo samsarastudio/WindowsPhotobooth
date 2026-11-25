@@ -300,7 +300,7 @@ export function createClientApp(options = {}) {
       storage: undefined,
       starred: !!p.starred,
       private: !!p.private,
-      url: `/media/${p.id}`,
+      url: `/media/${p.id}?display=1`,
       thumbnailUrl: `/media/${p.id}?preview=1`,
     };
   }
@@ -362,8 +362,8 @@ export function createClientApp(options = {}) {
         ? c.coverId
         : photos[0]?.id,
       coverUrl:
-        photos.find((p) => p.id === c.coverId)?.thumbnailUrl ||
-        photos[0]?.thumbnailUrl ||
+        photos.find((p) => p.id === c.coverId)?.url ||
+        photos[0]?.url ||
         "",
       brand: brandOut(),
     };
@@ -1776,17 +1776,34 @@ export function createClientApp(options = {}) {
       if (p.type === "video")
         return res.sendFile(path.join(data, "originals", p.storage));
       if (p.type === "embed") return res.redirect(p.storage);
+      // Build a high-density display derivative from the original, including
+      // existing uploads. Never enlarge or expose the unrestricted source file.
+      let displayPath = path.join(data, "previews", p.storage);
+      if (req.query.display === "1") {
+        displayPath = path.join(data, "previews", p.storage + ".display-3840.jpg");
+        if (!fs.existsSync(displayPath)) {
+          const buffer = await sharp(path.join(data, "originals", p.storage))
+            .rotate()
+            .resize({ width: 3840, height: 3840, fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+            .toBuffer();
+          const temporary = displayPath + "." + uid() + ".tmp";
+          await fs.promises.writeFile(temporary, buffer);
+          try { await fs.promises.rename(temporary, displayPath); }
+          finally { await fs.promises.rm(temporary, { force: true }); }
+        }
+      }
       const mark = cfg().watermarks?.find(
         (w) => w.id === c.settings.watermarkId,
       );
       if (mark || cfg().sharpening) {
         let input = await fs.promises.readFile(
-          path.join(data, "previews", p.storage),
+          displayPath,
         );
         if (cfg().sharpening) input = await sharp(input).sharpen().toBuffer();
         return res.type("jpg").send(await watermark(input, mark, data));
       }
-      res.sendFile(path.join(data, "previews", p.storage));
+      res.sendFile(displayPath);
     }),
   );
   app.post(
