@@ -1748,3 +1748,54 @@ dialog::backdrop {
   transform-origin: top left;
   max-width: none;
 }
+
+.collection-menu-button {
+  position: absolute;
+  z-index: 2;
+  top: 11px;
+  right: 11px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #dce2da;
+  border-radius: 50%;
+  background: #fffdf5f2;
+  font-size: 22px;
+}
+.card .star {
+  right: 54px;
+}
+.collection-quick-menu {
+  position: fixed;
+  z-index: 1000;
+  width: 230px;
+  padding: 6px;
+  border: 1px solid #dce2da;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 40px #142c2926;
+}
+.collection-quick-menu button,
+.collection-quick-menu a {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  color: var(--ink);
+  text-decoration: none;
+  font: inherit;
+}
+.collection-quick-menu :is(button, a):hover,
+.collection-quick-menu :is(button, a):focus-visible {
+  background: #edf3ef;
+  outline: 2px solid #47786e;
+  outline-offset: -2px;
+}
+.collection-quick-menu .danger {
+  color: #a73434;
+  border-top: 1px solid #e7eae5;
+  border-radius: 0 0 7px 7px;
+}

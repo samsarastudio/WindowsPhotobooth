@@ -223,7 +223,7 @@ function collectionCard(c) {
     c.coverUrl ||
     c.photos?.find((p) => p.id === c.coverId)?.thumbnailUrl ||
     c.photos?.[0]?.thumbnailUrl;
-  return `<article class="card"><button class="card-open" data-action="${state.view === "trash" ? "restore" : "open"}" data-id="${esc(c.id)}">${cover ? `<img class="cover" src="${safeUrl(cover)}" alt="${esc(c.title)}" loading="lazy">` : '<div class="cover-empty">◇</div>'}<div class="card-body"><div class="card-title">${esc(c.title)}</div><div class="card-meta"><span>${c.photoCount ?? c.photos?.length ?? 0} photos</span><span>${esc(dateLabel(c.date))}</span></div>${state.view === "trash" ? '<p class="hint">Click to restore</p>' : ""}</div></button><span class="pill card-status ${esc(c.status)}">${esc(c.status)}</span>${state.view !== "trash" ? `<button class="star ${c.starred ? "on" : ""}" data-action="star-collection" data-id="${esc(c.id)}" aria-label="${c.starred ? "Unstar" : "Star"} collection">${c.starred ? "★" : "☆"}</button>` : ""}</article>`;
+  return `<article class="card" data-collection-id="${esc(c.id)}"><button class="collection-menu-button" data-action="collection-menu" data-id="${esc(c.id)}" aria-label="Actions for ${esc(c.title)}" aria-haspopup="menu">···</button><button class="card-open" data-action="${state.view === "trash" ? "restore" : "open"}" data-id="${esc(c.id)}">${cover ? `<img class="cover" src="${safeUrl(cover)}" alt="${esc(c.title)}" loading="lazy">` : '<div class="cover-empty">◇</div>'}<div class="card-body"><div class="card-title">${esc(c.title)}</div><div class="card-meta"><span>${c.photoCount ?? c.photos?.length ?? 0} photos</span><span>${esc(dateLabel(c.date))}</span></div>${state.view === "trash" ? '<p class="hint">Click to restore</p>' : ""}</div></button><span class="pill card-status ${esc(c.status)}">${esc(c.status)}</span>${state.view !== "trash" ? `<button class="star ${c.starred ? "on" : ""}" data-action="star-collection" data-id="${esc(c.id)}" aria-label="${c.starred ? "Unstar" : "Star"} collection">${c.starred ? "★" : "☆"}</button>` : ""}</article>`;
 }
 function modal(title, body, foot = "") {
   const d = $("#dialog");
@@ -543,6 +543,84 @@ function photoMenu(id) {
     `<button data-action="close-modal">Cancel</button><button class="primary" form="photo-form">Save details</button>`,
   );
 }
+let quickMenuAnchor;
+function closeQuickMenu(restoreFocus = false) {
+  document.getElementById("collection-quick-menu")?.remove();
+  if (restoreFocus && quickMenuAnchor?.isConnected) quickMenuAnchor.focus();
+}
+function showCollectionMenu(id, anchor, x, y) {
+  closeQuickMenu();
+  const c = state.collections.find((c) => c.id === id);
+  if (!c) return;
+  quickMenuAnchor = anchor;
+  const menu = document.createElement("div");
+  menu.id = "collection-quick-menu";
+  menu.className = "collection-quick-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", `Actions for ${c.title}`);
+  const action = (command, label, danger = false) =>
+    `<button role="menuitem" class="${danger ? "danger" : ""}" data-action="collection-quick" data-command="${command}" data-id="${esc(id)}">${label}</button>`;
+  menu.innerHTML = c.deletedAt
+    ? `<button role="menuitem" data-action="restore" data-id="${esc(id)}">Restore collection</button>`
+    : action("open", "Open collection") +
+      action("share", shareable(c) ? "Share collection" : "Publish & share…") +
+      `<a role="menuitem" href="/g/${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Preview ↗</a>` +
+      action("rename-collection", "Quick edit") +
+      action("duplicate", "Duplicate collection") +
+      action("save-preset", "Save as preset") +
+      action("trash-collection", "Move to trash", true);
+  document.body.append(menu);
+  const rect = anchor.getBoundingClientRect();
+  menu.style.left =
+    Math.max(
+      8,
+      Math.min(x ?? rect.right - 230, innerWidth - menu.offsetWidth - 8),
+    ) + "px";
+  menu.style.top =
+    Math.max(
+      8,
+      Math.min(y ?? rect.bottom + 6, innerHeight - menu.offsetHeight - 8),
+    ) + "px";
+  menu.querySelector('[role="menuitem"]')?.focus();
+}
+document.addEventListener("contextmenu", (e) => {
+  const card = e.target.closest("[data-collection-id]");
+  if (card) {
+    e.preventDefault();
+    showCollectionMenu(
+      card.dataset.collectionId,
+      card.querySelector(".collection-menu-button"),
+      e.clientX,
+      e.clientY,
+    );
+  }
+});
+document.addEventListener("pointerdown", (e) => {
+  if (!e.target.closest("#collection-quick-menu,.collection-menu-button"))
+    closeQuickMenu();
+});
+document.addEventListener("keydown", (e) => {
+  const menu = document.getElementById("collection-quick-menu");
+  if (!menu) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeQuickMenu(true);
+  }
+  if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+    e.preventDefault();
+    const items = [...menu.querySelectorAll('[role="menuitem"]')],
+      i = items.indexOf(document.activeElement);
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? items.length - 1
+          : (i + (e.key === "ArrowDown" ? 1 : -1) + items.length) %
+            items.length;
+    items[next].focus();
+  }
+});
+window.addEventListener("resize", () => closeQuickMenu());
 function collectionMore() {
   modal(
     "Collection actions",
@@ -780,8 +858,19 @@ document.addEventListener("dragstart", (e) => {
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-action]");
   if (!b) return;
-  const a = b.dataset.action;
+  let a = b.dataset.action;
   try {
+    if (a === "collection-menu") {
+      showCollectionMenu(b.dataset.id, b);
+      return;
+    }
+    if (a === "collection-quick") {
+      closeQuickMenu();
+      await openCollection(b.dataset.id);
+      a = b.dataset.command;
+      if (a === "open") return;
+    }
+    if (a === "restore") closeQuickMenu();
     if (a === "bulk-delete") {
       if (orderBusy || !state.collection) return;
       const ids = state.collection.photos
@@ -982,7 +1071,7 @@ document.addEventListener("click", async (e) => {
     if (a === "trash-collection") {
       if (
         !confirm(
-          "Move this collection to the trash? Its public link will stop working.",
+          "Move this collection to the trash? Its public link will stop working. You can restore it from Trash.",
         )
       )
         return;
