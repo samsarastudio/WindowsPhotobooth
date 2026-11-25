@@ -24,6 +24,9 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     homeData;
   let noticeTimer,
     touchX = 0,
+    touchY = 0,
+    viewerRequest = 0,
+    viewerPhotoId = null,
     quickPhotoOpened = false,
     gateBrand = {};
   const icons = {
@@ -563,13 +566,18 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
   }
   function openViewer(index) {
     viewerIndex = index;
-    paintViewer();
     if (!viewer.open) viewer.showModal();
+    document.documentElement.classList.add("viewing-photo");
+    paintViewer();
   }
   function closeViewer() {
     clearInterval(slideTimer);
     slideTimer = null;
+    viewerRequest++;
+    viewerPhotoId = null;
     viewer.close();
+    document.documentElement.classList.remove("viewing-photo");
+    document.getElementById("viewer-media").removeAttribute("aria-busy");
     document.getElementById("viewer-media").innerHTML = "";
   }
   function embedUrl(url) {
@@ -599,7 +607,7 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     } catch {}
     return "";
   }
-  function paintViewer() {
+  async function paintViewer() {
     const p = visiblePhotos[viewerIndex];
     if (!p) return;
     document.getElementById("viewer-counter").textContent =
@@ -609,6 +617,10 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     document.getElementById("viewer-tools").innerHTML =
       `${settings().favoritesEnabled !== false && (!p.type || p.type === "image") ? button("heart", "Favorite", "viewer-favorite", isFavorite(p.id) ? "favorite-on" : "") : ""}${canDownloadPhoto(p) ? button("download", "Download", "viewer-download") : ""}${settings().slideshow !== false ? button(slideTimer ? "pause" : "play", slideTimer ? "Pause slideshow" : "Play slideshow", "toggle-slideshow") : ""}`;
     const media = document.getElementById("viewer-media");
+    if (viewerPhotoId === p.id) return;
+    viewerPhotoId = p.id;
+    const request = ++viewerRequest;
+    media.removeAttribute("aria-busy");
     if (p.type === "video")
       media.innerHTML = `<video src="${esc(photoUrl(p))}" controls playsinline preload="metadata"></video>`;
     else if (p.type === "embed") {
@@ -616,8 +628,32 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
       media.innerHTML = url
         ? `<iframe src="${esc(url)}" title="${esc(p.filename || "Video")}" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>`
         : "<p>This video cannot be embedded.</p>";
-    } else
-      media.innerHTML = `<img src="${esc(photoUrl(p))}" alt="${esc(p.caption || p.filename || "Photograph")}">`;
+    } else {
+      // Decode before replacing the current photo to avoid blank navigation flashes.
+      const image = new Image();
+      image.alt = p.caption || p.filename || "Photograph";
+      image.src = photoUrl(p);
+      media.setAttribute("aria-busy", "true");
+      try { await image.decode(); } catch {
+        if (request !== viewerRequest || !viewer.open) return;
+        media.removeAttribute("aria-busy");
+        viewerPhotoId = null;
+        media.innerHTML = '<p role="status">This photograph could not load. Try opening it again.</p>';
+        return;
+      }
+      if (request !== viewerRequest || !viewer.open) return;
+      media.removeAttribute("aria-busy");
+      media.replaceChildren(image);
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+        image.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+      for (const offset of [-1, 1]) {
+        const next = visiblePhotos[(viewerIndex + offset + visiblePhotos.length) % visiblePhotos.length];
+        if (next && (!next.type || next.type === "image")) {
+          const preload = new Image();
+          preload.src = photoUrl(next);
+        }
+      }
+    }
   }
   function moveViewer(delta) {
     if (!visiblePhotos.length) return;
@@ -985,7 +1021,7 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
       notice(error.message);
     }
   });
-  viewer.addEventListener("cancel", () => closeViewer());
+  viewer.addEventListener("cancel", (e) => { e.preventDefault(); closeViewer(); });
   viewer.addEventListener("keydown", (e) => {
     if (modal.open) return;
     if (e.key === "ArrowRight") {
@@ -1009,6 +1045,7 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     "touchstart",
     (e) => {
       touchX = e.changedTouches[0].clientX;
+      touchY = e.changedTouches[0].clientY;
     },
     { passive: true },
   );
@@ -1017,7 +1054,9 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     (e) => {
       if (modal.open || e.target.closest("video,iframe")) return;
       const delta = e.changedTouches[0].clientX - touchX;
-      if (Math.abs(delta) > 65) moveViewer(delta < 0 ? 1 : -1);
+      const vertical = e.changedTouches[0].clientY - touchY;
+      if (Math.abs(delta) > 65 && Math.abs(delta) > Math.abs(vertical) * 1.3)
+        moveViewer(delta < 0 ? 1 : -1);
     },
     { passive: true },
   );
