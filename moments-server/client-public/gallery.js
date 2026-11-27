@@ -66,7 +66,15 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
       return "";
     }
   };
-  const photoUrl = (p) => safeUrl(p.url || p.thumbnailUrl || "");
+  const photoUrl = (p) => {
+    const phone = innerWidth <= 600 ||
+      (matchMedia("(pointer: coarse)").matches && Math.min(innerWidth, innerHeight) <= 600);
+    // Reuse the sharp 1600px preview already loaded by the mobile gallery.
+    // Original download URLs are issued separately by the download endpoint.
+    return safeUrl(phone && (!p.type || p.type === "image")
+      ? p.thumbnailUrl || p.url || ""
+      : p.url || p.thumbnailUrl || "");
+  };
   const thumbUrl = (p) => safeUrl(p.thumbnailUrl || p.url || "");
   const emailValue = () => {
     try {
@@ -429,7 +437,7 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
     const photo =
       (c.photos || []).find((p) => p.id === c.coverId) ||
       (c.photos || []).find((p) => !p.type || p.type === "image");
-    const cover = safeUrl(photo?.url || c.coverUrl || "");
+    const cover = photo ? photoUrl(photo) : safeUrl(c.coverUrl || "");
     if (cover) {
       const coverImage = new Image();
       coverImage.fetchPriority = "high";

@@ -37,3 +37,17 @@ test('Failed full image retains selected preview and closed viewers reject late 
  f.context.viewerIndex=1; await f.paint(); f.context.viewer.open=false; f.images[3].onload();
  assert.equal(f.nodes.get('viewer-media').firstChild.src,'b-small');
 });
+
+test('Phone viewer reuses 1600px previews in portrait and landscape, desktop keeps high density', () => {
+ const start=source.indexOf('  const photoUrl =');
+ const end=source.indexOf('  const thumbUrl =',start);
+ const choose=(width,height,coarse,p={url:'large',thumbnailUrl:'preview'})=>{
+  const context=vm.createContext({innerWidth:width,innerHeight:height,matchMedia:()=>({matches:coarse}),safeUrl:v=>v,p});
+  return vm.runInContext(source.slice(start,end)+'\nphotoUrl(p)',context);
+ };
+ assert.equal(choose(390,844,true),'preview');
+ assert.equal(choose(844,390,true),'preview');
+ assert.equal(choose(1440,900,false),'large');
+ assert.equal(choose(390,844,true,{type:'video',url:'video',thumbnailUrl:'poster'}),'video');
+ assert.equal(choose(390,844,true,{url:'fallback'}),'fallback');
+});
