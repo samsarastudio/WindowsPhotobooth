@@ -638,30 +638,37 @@ import { layoutPhotos } from "/client-assets/gallery-layout.js";
         ? `<iframe src="${esc(url)}" title="${esc(p.filename || "Video")}" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>`
         : "<p>This video cannot be embedded.</p>";
     } else {
-      // Decode before replacing the current photo to avoid blank navigation flashes.
-      const image = new Image();
-      image.alt = p.caption || p.filename || "Photograph";
-      image.src = photoUrl(p);
+      // Switch to the selected photo immediately. A slow full-resolution load
+      // must never leave the previous person's photo under the new counter.
+      const preview = new Image();
+      preview.alt = p.caption || p.filename || "Photograph";
+      preview.src = thumbUrl(p);
+      media.replaceChildren(preview);
       media.setAttribute("aria-busy", "true");
-      try { await image.decode(); } catch {
-        if (request !== viewerRequest || !viewer.open) return;
+      const image = new Image();
+      image.alt = preview.alt;
+      const current = () => request === viewerRequest && viewer.open;
+      const timeout = setTimeout(() => {
+        image.onload = image.onerror = null;
+        if (current()) media.removeAttribute("aria-busy");
+      }, 15000);
+      image.onload = () => {
+        clearTimeout(timeout);
+        if (!current()) return;
         media.removeAttribute("aria-busy");
-        viewerPhotoId = null;
-        media.innerHTML = '<p role="status">This photograph could not load. Try opening it again.</p>';
-        return;
-      }
-      if (request !== viewerRequest || !viewer.open) return;
-      media.removeAttribute("aria-busy");
-      media.replaceChildren(image);
-      if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
-        image.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
-      for (const offset of [-1, 1]) {
-        const next = visiblePhotos[(viewerIndex + offset + visiblePhotos.length) % visiblePhotos.length];
-        if (next && (!next.type || next.type === "image")) {
-          const preload = new Image();
-          preload.src = photoUrl(next);
-        }
-      }
+        media.replaceChildren(image);
+      };
+      image.onerror = () => {
+        clearTimeout(timeout);
+        if (current()) media.removeAttribute("aria-busy");
+        // Keep the selected thumbnail available when the larger image fails.
+      };
+      preview.onerror = () => {
+        if (current() && media.firstChild === preview)
+          media.innerHTML = '<p role="status">Loading this photograph…</p>';
+      };
+      image.src = photoUrl(p);
+
     }
   }
   function moveViewer(delta) {
